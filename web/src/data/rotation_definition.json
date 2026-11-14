@@ -1,0 +1,97 @@
+{
+  "contract": "rotation_definition",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "rotation_id": "example-rotation-1",
+  "label": "Illustrative rotation",
+  "ag_year_start": {
+    "month": 7,
+    "provisional": true,
+    "provenance": "DECLARED",
+    "source": "user"
+  },
+  "repeats": true,
+  "components": [
+    {
+      "component_id": "c1",
+      "position": 1,
+      "crop_id": "PLACEHOLDER_crop",
+      "purpose": "grain",
+      "sowing": {
+        "date": "2027-11-15",
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "harvest": {
+        "date": "2028-04-10",
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "management": {
+        "residue": "left_on_surface",
+        "grazing": {
+          "missing": { "reason": "NOT_DECLARED" }
+        },
+        "termination": {
+          "missing": { "reason": "NOT_DECLARED" }
+        }
+      }
+    },
+    {
+      "component_id": "c2",
+      "position": 2,
+      "crop_id": "PLACEHOLDER_cover_crop",
+      "purpose": "cover",
+      "sowing": {
+        "date": "2028-04-20",
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "harvest": {
+        "date": null,
+        "missing": {
+          "reason": "NOT_APPLICABLE",
+          "detail": "cover crop is terminated, not harvested"
+        }
+      },
+      "management": {
+        "residue": "left_on_surface",
+        "grazing": {
+          "missing": { "reason": "NOT_DECLARED" }
+        },
+        "termination": {
+          "date": "2028-08-15",
+          "method": "chemical"
+        }
+      }
+    },
+    {
+      "component_id": "c3",
+      "position": 3,
+      "crop_id": "PLACEHOLDER_pasture",
+      "purpose": "pasture",
+      "sowing": {
+        "date": "2028-08-20",
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "harvest": {
+        "date": null,
+        "missing": {
+          "reason": "NOT_APPLICABLE",
+          "detail": "a pasture is grazed, not harvested"
+        }
+      },
+      "management": {
+        "residue": "left_on_surface",
+        "grazing": {
+          "intensity": "PLACEHOLDER_light"
+        },
+        "termination": {
+          "missing": { "reason": "NOT_DECLARED" }
+        }
+      }
+    }
+  ]
+}

@@ -22,6 +22,7 @@
  * - map.*        the map screen (title, select hint, base-layer attribution)
  * - site.*       the site sheet of the selected field (climate monthly series,
  *                soil and slope), wording addendum Block 3
+ * - ribbon.*     the rotation timeline of the selected field
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -88,6 +89,19 @@ export const strings = {
   'site.slope_steepness': 'Slope steepness',
   'site.series_heading': '{quantity} ({unit})',
   'site.months_count': '{count} months',
+  'ribbon.title': 'Rotation timeline',
+  'ribbon.rotation_of': 'Rotation: {label}',
+  'ribbon.ag_year_start': 'Agricultural year starts in month {month}',
+  'ribbon.repeats': 'Repeats',
+  'ribbon.component': 'Component {position}',
+  'ribbon.crop': 'Crop',
+  'ribbon.purpose': 'Purpose',
+  'ribbon.sowing': 'Sowing',
+  'ribbon.harvest': 'Harvest',
+  'ribbon.management': 'Management',
+  'ribbon.mgmt_residue': 'Residue',
+  'ribbon.mgmt_grazing': 'Grazing',
+  'ribbon.mgmt_termination': 'Termination',
 } as const
 
 /**
