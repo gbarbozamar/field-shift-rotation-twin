@@ -39,7 +39,7 @@ Identifiers such as C3.2 refer to `contracts/CONVENTIONS.md`; EP2, G1 to G7 and 
 |---|---|
 | `contract` | The text `rotation_calendar` |
 | `example_data`, `case_id`, `field_id`, `rotation_id` | The definition, unchanged |
-| `ag_year_start` | Missing, reason `NOT_DECLARED` (P6) |
+| `ag_year_start` | `ag_year_start` of the definition, copied field by field (P6; D8 of issue #77) |
 | `start_date`, `end_date` | The earliest and the latest date placed in the calendar (P4) |
 | `feasibility` | The feasibility check (see [PROPOSED rules](#proposed-rules)) |
 | `components` | One per component of the definition, in the order of its list (P8) |
@@ -56,15 +56,15 @@ EP2 does not say how a definition becomes a calendar. For each point below the e
 
 **P1. The start of a component is its sowing date and the end is its harvest date.** Each date is carried as the definition gives it: the same date, with the same provenance label, source and assumption mark. Nothing is computed from it. OPEN, questions 2 and 12.
 
-**P2. A date the definition gives as missing is missing in the calendar, with the same reason code and the same detail.** When the harvest is missing, the end of the component is missing; no end is computed. EP2 says a date that cannot be placed has reason `NOT_DECLARED` "when the user did not give what the date needs, otherwise the code of G4 that applies". The engine keeps the code of the definition instead: for `NOT_DECLARED` the two readings agree, and for the other seven codes the engine keeps what the user said. The example of the definition has such a date: a harvest that is `NOT_APPLICABLE`. OPEN, questions 3 and 4.
+**P2. A date the definition gives as missing is missing in the calendar, with the same reason code and the same detail.** When the harvest is missing, the end of the component is missing; no end is computed. EP2 says a date that cannot be placed has reason `NOT_DECLARED` "when the user did not give what the date needs, otherwise the code of G4 that applies". The engine keeps the code of the definition instead: for `NOT_DECLARED` the two readings agree, and for the other seven codes the engine keeps what the user said. The example of the definition has two such dates: the harvests of the cover crop and the pasture, both `NOT_APPLICABLE`. OPEN, questions 3 and 4.
 
 **P3. A missing date breaks no rule.** Whether a calendar with a missing date can be feasible is question 8 of `contracts/inputs/README.md`, and it is not answered. OPEN, question 9.
 
-**P4. The calendar runs from the earliest to the latest date placed in it.** The definition carries no first and no last day (question 10 of `contracts/rotation_definition/README.md`), and the rotation calendar cannot hold either as missing. These two are the only dates that are in the argument and that satisfy the rule of the model that every date of a component lies inside the calendar. Consequence: when the component that comes last has no end, the calendar ends on the latest date that is known, which is not the end of that component. For the example of the definition, `end_date` is the sowing date of the second component. OPEN, question 5.
+**P4. The calendar runs from the earliest to the latest date placed in it.** The definition carries no first and no last day (question 10 of `contracts/rotation_definition/README.md`), and the rotation calendar cannot hold either as missing. These two are the only dates that are in the argument and that satisfy the rule of the model that every date of a component lies inside the calendar. Consequence: when the component that comes last has no end, the calendar ends on the latest date that is known, which is not the end of that component. For the example of the definition, `end_date` is the sowing date of its last component, a pasture that is not harvested. OPEN, question 5.
 
 **P5. `repeats` is not used.** Every component is placed once, at the dates the definition gives, whether `repeats` is true or false. To place a second cycle the engine would have to choose the length of a cycle, move dates and make new component identifiers; none of that is decided. The calendar has no field that says the rotation repeats, so a consumer of the calendar cannot see it. OPEN, question 7.
 
-**P6. The start month of the agricultural year is missing, with reason `NOT_DECLARED`.** EP2 says a start month that was not declared is an `AgYearStart` with `month` null and its `missing` part. The definition carries no start month, so the engine never has one. Consequence, from EP1 and Q4: with a missing start month the erosion entry point returns one `Missing`, and the route has no valid `ResultsPerRotation`. That holds for every calendar this engine returns today. OPEN, question 6.
+**P6. The start month of the agricultural year is copied from the definition.** Decided by D7 and D8 of issue #77: the start month is a required part of the rotation definition, with its provisional mark, and the calendar engine copies it into the calendar. What is PROPOSED here is only how: the engine copies `month`, `provisional`, `provenance`, `source` and `assumption` of the definition's `ag_year_start` into the calendar's `AgYearStart`, each unchanged; nothing is converted or invented. The definition never carries a missing month (D7), so the `missing` part of the calendar's start month stays empty and the engine never writes one. The two models have the same field names and rules, except that the calendar's model also allows a missing month. OPEN, question 6.
 
 **P7. `periods` is empty for every component.** What a period for cover management is, and which types exist, depends on `docs/METHODS.md` M1.5, which is OPEN. Out of scope of this unit. OPEN, question 8.
 
@@ -113,11 +113,11 @@ Cases where the `RotationCalendar` model has no valid form. The engine does not 
 
 | | The case | Why there is no valid form |
 |---|---|---|
-| N1 | The definition gives no date: every sowing and every harvest is missing | `start_date` and `end_date` are required and cannot be missing (EP2, Q8). The definition loads, so this is a valid request that is answered `500` today |
-| N2 | The definition has no component | The same. The definition model accepts an empty list (question 9 of `contracts/rotation_definition/README.md`) |
+| N1 | The definition gives no date: every sowing and every harvest is missing | `start_date` and `end_date` are required and cannot be missing (EP2, Q8). D21 of issue #77 makes this unreachable through the route: the definition model requires at least one present sowing or harvest date, so such a definition does not load and the route answers `422` before any engine is called. A loaded definition reaches it only if it is changed after loading |
+| N2 | The definition has no component | The same. D21 also makes this unreachable through the route: a definition with no component has no present date, so the model rejects it (question 9 of `contracts/rotation_definition/README.md`, settled as a consequence of D21). Reached only by changing a loaded definition |
 | N3 | Two components share one `component_id` | The calendar rejects two components with one identifier. A loaded definition cannot be in this state; only one changed after loading |
 
-A case of N1 also follows from P10: when the only dates of a definition are the two dates of a component whose harvest is before its sowing, nothing can be placed.
+A case of N1 also follows from P10: when the only dates of a definition are the two dates of a component whose harvest is before its sowing, nothing can be placed. That state, too, comes only from a definition changed after loading.
 
 OPEN, question 14.
 
@@ -147,8 +147,8 @@ The identifier of a case is the name of its test function in `test_calendar.py` 
 
 | Case | What is checked |
 |---|---|
-| `start-month-of-the-agricultural-year-is-missing-not-declared` | `ag_year_start` has no month, no label and reason `NOT_DECLARED` (P6) |
-| `periods-are-empty` | Every component has an empty list of periods (P7) |
+| `start-month-of-the-agricultural-year-is-copied-from-the-definition` | `ag_year_start` of the calendar is an `AgYearStart` of `contracts.inputs` with the month, the provisional mark, the provenance label, the source and the assumption mark of the definition, and no `missing` part (P6, D8). Checked on the example and on three variants of it: the assumption mark with no source, `provisional` false (not a proposal to allow it: question 28 of `contracts/rotation_definition/README.md`), and the next month of the year |
+| `periods-are-empty` | Every component of the example (three) has an empty list of periods (P7) |
 | `repeats-changes-nothing` | The calendar is the same with `repeats` true and false, with each component once (P5) |
 | `components-keep-the-order-of-the-definition-list` | A definition listed in another order gives a calendar in that order (P8) |
 
@@ -179,10 +179,12 @@ The identifier of a case is the name of its test function in `test_calendar.py` 
 
 | Case | What is checked |
 |---|---|
-| `definition-with-no-date-has-no-valid-calendar` | N1 raises `NoValidCalendarForm` |
-| `definition-with-no-component-has-no-valid-calendar` | N2 raises `NoValidCalendarForm` |
+| `definition-with-no-date-is-rejected-when-loaded` | A definition whose every sowing and harvest is missing does not load: the model rejects it under D21, so N1 cannot come from the route |
+| `definition-with-no-component-is-rejected-when-loaded` | A definition with no component does not load (D21), so N2 cannot come from the route |
+| `definition-with-no-date-has-no-valid-calendar` | A loaded definition changed afterwards so that every sowing and harvest is missing: N1 raises `NoValidCalendarForm` |
+| `definition-with-no-component-has-no-valid-calendar` | A loaded definition changed afterwards so that it has no component: N2 raises `NoValidCalendarForm` |
 | `two-components-with-one-identifier-have-no-valid-calendar` | N3 raises `NoValidCalendarForm` |
-| `only-dates-that-cannot-be-placed-have-no-valid-calendar` | A definition whose only component has, after a change, its harvest before its sowing: nothing can be placed (N1 through P10), and `NoValidCalendarForm` is raised |
+| `only-dates-that-cannot-be-placed-have-no-valid-calendar` | The example reduced to its first component (so its position stays valid), whose harvest is changed after loading to fall before its sowing: nothing can be placed (N1 through P10), and `NoValidCalendarForm` is raised |
 | `no-valid-form-is-not-one-of-the-caller-defects` | `NoValidCalendarForm` is not a `TypeError` or a `ValueError` |
 
 ### This file and the test
@@ -201,7 +203,7 @@ Each item is a question a person has to answer. The role that answers it is name
 3. **What ends a component that is not harvested?** The example has one: a cover crop with harvest `NOT_APPLICABLE`. Today its end is missing (P2), so the calendar does not say until when it occupies the field. A termination date is part of question 3 of issue #60 (management details). For the engines developer and the interface developer.
 4. **Which reason code does the calendar give to a date that the definition gives as missing with a code other than `NOT_DECLARED`?** Today: the code and the detail of the definition, unchanged (P2). EP2 can be read as asking for a code of G4, which would be `MISSING_INPUT` with a detail that names the date. For the lead developer, as owner of `contracts/ENTRYPOINTS.md`, and the interface developer.
 5. **What are the first and the last day of a calendar, and where do they come from?** Part (a) of Q8, question 10 of `contracts/rotation_definition/README.md` and question 6 of `contracts/inputs/README.md`. Today: the earliest and the latest date placed (P4), which is not the span of a cycle and not the years of the climate record. For the lead developer, as owner of lane L1, and the interface developer.
-6. **Where does the start month of the agricultural year come from?** Part (a) of Q8; C5.4 says a person declares it per case. Today it is always missing (P6), so by EP1 and Q4 no soil loss can be returned for any calendar of this engine. Also: is `NOT_DECLARED` the right code when the definition has no field in which to declare the month? For the lead developer and the interface developer; the person who declares the case for the month itself.
+6. **The start month of the agricultural year.** Where it comes from is decided: D7 and D8 of issue #77 put it in the rotation definition, required, with its provisional mark, and the engine copies it (P6). Still open: may the start month be declared not provisional (question 28 of `contracts/rotation_definition/README.md`)? The engine copies the mark as the definition gives it either way. For the lead developer and the science reviewers; the person who declares the case for the month itself.
 7. **What does one cycle mean when `repeats` is true?** How long a cycle is, how its dates are moved onto later years, what the `component_id` of a component placed a second time is, and how the calendar says that a rotation repeats: questions 11 and 12 of `contracts/rotation_definition/README.md`, question 6 of `contracts/inputs/README.md`. Today `repeats` is not used (P5). For the engines developer and the interface developer; the lead developer as consumer of the calendar.
 8. **What does `periods` hold?** Question 2 of `contracts/inputs/README.md`; it depends on `docs/METHODS.md` M1.5. Today it is empty (P7). For the science reviewers and the lead developer.
 9. **Can a calendar with a missing date be feasible?** Question 8 of `contracts/inputs/README.md`. Today a missing date breaks no rule (P3). For the engines developer.
@@ -209,7 +211,7 @@ Each item is a question a person has to answer. The role that answers it is name
 11. **In which order does the calendar list its components, and does it carry what the user declared per component?** `position`, `purpose` and `label` are not in the calendar; question 4 of `contracts/inputs/README.md` asks the same. Today: the order of the list of the definition (P8). For the engines developer and the lead developer.
 12. **Which provenance label and source does a date of the calendar carry?** Today: those of the definition, unchanged (P1). The example of the rotation calendar labels the end of a component `DERIVED`, as a date computed by the engine; this engine computes none. Questions 15 and 17 of `contracts/rotation_definition/README.md`. For the lead developer.
 13. **What does the calendar hold for a component that breaks a rule and cannot be placed?** Today, for a harvest before its sowing: both dates missing with `NOT_COMPUTABLE` (P10). For the lead developer.
-14. **What does EP2 return when the calendar has no valid form?** Cases N1 to N3. EP2 says the function always returns a `RotationCalendar` and raises only for a caller defect; for these cases the model has no valid instance. Today the engine raises `NoValidCalendarForm`, and the route answers `500` to a request that is valid (N1, N2). The options are: the rotation definition carries the first and last day; EP2 gains arguments (Q8); the rotation calendar gains a missing form for its two dates (a change of the model, a new L0 unit); or a definition without a date is not a valid request. Also: is the name `NoValidCalendarForm` part of what `engine.calendar` exports? For the lead developer; the platform developer for the answer of the route; the interface developer for the definition.
+14. **What does EP2 return when the calendar has no valid form?** Cases N1 to N3. EP2 says the function always returns a `RotationCalendar` and raises only for a caller defect; for these cases the model has no valid instance. D21 of issue #77 made a definition without a present date an invalid request: N1 and N2 are now rejected when the definition is loaded, and the route answers `422` without calling the engine, as it already did for N3. All three can now arise only from a definition changed after loading (question 15). Today the engine raises `NoValidCalendarForm` for them, which the route would answer with `500`. Still open: is raising the right answer for such a state, and is the name `NoValidCalendarForm` part of what `engine.calendar` exports? For the lead developer; the platform developer for the answer of the route.
 15. **Does the engine check again what the model of the definition already checks?** G3 says an argument is already validated. Today the engine checks the three rules of the definition model again, so that a definition changed after loading gives an infeasible calendar or `NoValidCalendarForm` and not an error of the calendar model. Any other state that the definition model would reject is not handled. For the lead developer and the platform developer.
 16. **Does any calendar rule need site data?** Part (b) of Q8. Today a rule reads the rotation definition only. For the lead developer and the science reviewers.
 17. **The import path.** The engine recognises a `RotationDefinition` only when its class was loaded as `contracts.rotation_definition.rotation_definition`. `contracts/__init__.py` does not exist yet (Q1, answered in issue #18 and not landed), and the tests of the contract folders still load the same files under other names. An instance built from a class loaded under another name raises `TypeError`. For the platform developer and the lead developer.
