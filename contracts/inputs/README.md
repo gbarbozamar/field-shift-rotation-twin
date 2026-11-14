@@ -10,6 +10,25 @@ This folder holds a Pydantic model and one example for three contracts of bluepr
 | Site data: climate | Platform (L2a) → Lead, Engines, Interface | `site_climate.SiteClimate` | `examples/PLACEHOLDER_site_climate.json` |
 | Site data: soil and slope | Platform (L2a) → Lead, Engines, Interface | `site_soil_slope.SiteSoilSlope` | `examples/PLACEHOLDER_site_soil_slope.json` |
 
+### The chain set (PROPOSED, unit l0/chain-examples, issue #168)
+
+Two more examples, one per site-data contract, for one purpose: to let the whole chain run on example data, rotation definition → EP2 → EP1 and EP3 → `ResultsPerRotation`, through the runner of `api/engines.py` (test: `validation/test_chain_examples.py`).
+
+| Contract | Example |
+|---|---|
+| Site data: climate | `examples/PLACEHOLDER_chain_site_climate.json` |
+| Site data: soil and slope | `examples/PLACEHOLDER_chain_site_soil_slope.json` |
+
+Why they exist: the examples above name `PLACEHOLDER-case` / `PLACEHOLDER-field`, while the rotation definition example (`contracts/rotation_definition/examples/`, signed by its producer) names `example-case` / `example-field-1`. The runner calls EP1 and EP3 only when every input names the calendar's case and field, so no run on the examples above ever reached them. The climate example above also covers five days, too few for one agricultural year, so even a run with matching identifiers came back `NO_COVERAGE`. The examples above stay unchanged, because tests of other lanes read them.
+
+What the chain set holds:
+
+- `case_id` and `field_id` exactly those of the rotation definition example, and `"example_data": true`.
+- Climate: the six daily series that EP1 and EP3 read (`precipitation` and the five inputs of the reference evapotranspiration), each from 2001-07-01 to 2002-06-30, with no day missing and time zone `UTC`. That is agricultural year 2001 of the record of decision D47, laid out for the start month the rotation definition example declares (July). Every day of every series holds the same number, `1234.5`: plainly not weather. The unit strings are those of `contracts/CLIMATE_QUANTITIES.md` (CQ1 to CQ6), copied so that a unit guard does not stand in for the reason a value is missing; the numbers in them are not data. The point is the same as in the example above: illustrative numbers in a placeholder unit.
+- Soil and slope: a slope length of `123456.25` and a slope steepness of `1234.5`, both plainly unreal, and no soil property. The steepness unit is `percent`, the string `engine/erosion/ls.py` reads as a slope (EP1's PROPOSED reading; question 18 is still open). The length unit is `example_length_unit`: it does not carry the word PLACEHOLDER because the parameter catalogue refuses that word in a record, and ls.py requires the unit-length record to carry exactly the slope length's unit string. It is not a real unit. Not the accepted soil-and-slope example of decision D38: which file holds the demonstration values is a person's decision.
+
+The open questions this set raises are in `validation/README.md`, section "OPEN", "Chain of the examples".
+
 Blueprint section 5 says the producer of a contract writes its example. No producer example exists yet, so a builder session proposed the models and the examples. The producers correct them: the engines lane for the rotation calendar, sub-lane L2a for the two site-data contracts. The consumers named above approve the pull request.
 
 **The examples are PLACEHOLDER data.** Every number, date, identifier, unit string and source string in them is illustrative. They describe no real place, no real field and no real producer. The climate example carries a point because its model requires one (see [Site data: climate](#site-data-climate-site_climatepy)): the three numbers of that point are illustrative, in a placeholder unit, and they are not the coordinates of any field. The other two examples carry no coordinates. Each example says `"example_data": true`.
