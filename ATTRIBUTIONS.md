@@ -6,6 +6,7 @@ Add a row **when the item is first used**, not at the end.
 
 | Name and version | Provider | URL | Licence or terms | Used for | Added on |
 |---|---|---|---|---|---|
+| NASA POWER daily point data (POWER Daily API v2.10.3, as the response header reports it; parameters `IMERG_PRECTOT`, `PRECTOTCORR`, `T2M_MAX`, `T2M_MIN`, `T2MDEW`, `WS2M`, `ALLSKY_SFC_SW_DWN`, community `ag`, 2024-01-01 to 2024-01-10), accessed 2026-11-14 | NASA Langley Research Center, Prediction Of Worldwide Energy Resources (POWER) project | https://power.larc.nasa.gov/api/temporal/daily/point | OPEN: the POWER site states no licence (#15, section 8); the Registry of Open Data on AWS entry for NASA POWER states "There are no restrictions on the use, access, and/or download of data from the NASA POWER Project" and "Creative Commons BY 4.0", and does not say whether that covers data obtained through the API (#15, section 8). Which statement to record is for a person (#15, decision 9) | Evidence of the documented request of D32 of issue #77, committed under D17: `docs/evidence/nasa-power-2026-11-14/`. A made-up point in the ocean, not a producer's field | 2026-11-14 |
 
 ## Libraries
 
