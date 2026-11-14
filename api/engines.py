@@ -10,9 +10,9 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    and their reason (G4), but only when the climate and soil-and-slope data carry the calendar's
    ``case_id`` and ``field_id``; otherwise neither is called and the result
    is absent, ``MISSING_INPUT`` (PROPOSED). Each of the two also gets the
-   parameter catalogue as ``parameters=`` (Q3, D46, D56 of issue #77) when its
-   signature has a parameter of that name (PROPOSED transition rule, see
-   ``takes_parameters``); EP2 never does;
+   parameter catalogue as the keyword argument ``parameters`` (Q3, D46, D56
+   of issue #77), always, as contracts/ENTRYPOINTS.md states; EP2 never does.
+   An engine that does not take it is a defect (``TypeError``, ``500``);
 3. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend`` written here as missing,
    because no carbon engine is built (decision Q15 c). A part whose engine is
@@ -170,20 +170,14 @@ def discover_engine_functions() -> EngineFunctions:
     )
 
 
-# The name of the argument that carries the parameter catalogue (Q3, D46, D56).
-PARAMETERS_ARGUMENT = "parameters"
-
-
 def takes_parameters(function: Callable[..., Any]) -> bool:
     """Whether ``function`` has a parameter named ``parameters`` that a keyword can fill.
 
-    PROPOSED transition rule: EP1 and EP3 gain the argument one by one, so the
-    runner passes it only to a function whose signature names it. OPEN: once
-    both engines on ``main`` take it, the check can go and the argument is
-    always passed (platform developer). A signature that cannot be read
-    raises, as ``inspect.signature`` does.
+    The runner no longer uses this: it always passes ``parameters=`` to EP1 and
+    EP3 (D46, D56). It is kept because ``validation/test_chain_examples.py``
+    (lane L0) imports it; lane L0 may drop that use, and then this goes.
     """
-    parameter = inspect.signature(function).parameters.get(PARAMETERS_ARGUMENT)
+    parameter = inspect.signature(function).parameters.get("parameters")
     return parameter is not None and parameter.kind in (
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         inspect.Parameter.KEYWORD_ONLY,
@@ -357,7 +351,7 @@ class EntryPointEngines:
       returned it and after ``params.catalogue.check_catalogue`` reported no
       problem (the app loads and checks it at start-up, ``api/config.py``).
       Passed by keyword, the same object on every call and never copied,
-      edited or filtered, to EP1 and EP3 when their signature takes it.
+      edited or filtered, to EP1 and EP3 always.
       ``None`` (the default) is the empty catalogue ``{}``, today's state of
       ``params/records/``; it reads no file (PROPOSED).
     """
@@ -387,18 +381,6 @@ class EntryPointEngines:
             raise TypeError("parameters is the catalogue as loaded: a dict")
         self._functions = functions
         self._parameters = parameters
-        # Read once, here, never per request (PROPOSED transition rule).
-        self._extra: dict[str, dict[str, Any]] = {
-            name: (
-                {PARAMETERS_ARGUMENT: parameters}
-                if function is not None and takes_parameters(function)
-                else {}
-            )
-            for name, function in (
-                ("soil_loss", functions.compute_soil_loss),
-                ("water", functions.compute_water_deficit_exposure),
-            )
-        }
         self._load_rotation = load_rotation
         self._carbon_models = models
 
@@ -493,17 +475,19 @@ class EntryPointEngines:
                 ),
             )
 
-        # 4. EP1 and EP3, also for an infeasible calendar (G4).
+        # 4. EP1 and EP3, also for an infeasible calendar (G4), each with the
+        # parameter catalogue by keyword (Q3, D46, D56).
         arguments = {
             "calendar": calendar,
             "climate": climate.data,
             "soil_slope": soil_slope.data,
+            "parameters": self._parameters,
         }
         soil_loss: SoilLossResults | ResultsMissing | None = None
         if soil_loss_function is None:
             erosion_module = _not_built(EROSION)
         else:
-            soil_loss = soil_loss_function(**arguments, **self._extra["soil_loss"])
+            soil_loss = soil_loss_function(**arguments)
             if isinstance(soil_loss, SoilLossResults):
                 erosion_module = module_status_of(
                     EROSION.module_id, count_values(soil_loss_values(soil_loss))
@@ -525,7 +509,7 @@ class EntryPointEngines:
         if water_function is None:
             water_module = _not_built(WATER)
         else:
-            water = water_function(**arguments, **self._extra["water"])
+            water = water_function(**arguments)
             if not isinstance(water, list) or not all(
                 isinstance(item, WaterDeficitExposure) for item in water
             ):
