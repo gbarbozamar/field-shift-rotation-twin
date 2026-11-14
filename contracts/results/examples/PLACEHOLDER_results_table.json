@@ -1,0 +1,126 @@
+{
+  "case_id": "PLACEHOLDER_case",
+  "field_id": "PLACEHOLDER_field",
+  "rows": [
+    {
+      "rotation_id": "PLACEHOLDER_rotation_a",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
+      "indicator": "soil_loss",
+      "direction": "lower_is_better",
+      "value": 12.0,
+      "unit": "t ha-1 yr-1",
+      "range": {"low": 6.0, "high": 18.0, "kind": "PLACEHOLDER_range_kind"},
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_a",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "ag_year",
+      "ag_year": 2002,
+      "indicator": "soil_loss",
+      "direction": "lower_is_better",
+      "value": null,
+      "unit": "t ha-1 yr-1",
+      "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_a",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "rotation",
+      "indicator": "water_deficit_exposure",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "dimensionless",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_a",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "rotation",
+      "carbon_model": "PLACEHOLDER_carbon_model_one",
+      "computation": "end_minus_start",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": 0.5,
+      "unit": "t C ha-1 yr-1",
+      "range": {"low": -0.5, "high": 1.5, "kind": "PLACEHOLDER_range_kind"},
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_a",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "rotation",
+      "carbon_model": "PLACEHOLDER_carbon_model_two",
+      "computation": "end_minus_start",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_b",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
+      "indicator": "soil_loss",
+      "direction": "lower_is_better",
+      "value": 8.0,
+      "unit": "t ha-1 yr-1",
+      "range": {"low": 4.0, "high": 12.0, "kind": "PLACEHOLDER_range_kind"},
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_b",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "ag_year",
+      "ag_year": 2002,
+      "indicator": "soil_loss",
+      "direction": "lower_is_better",
+      "value": null,
+      "unit": "t ha-1 yr-1",
+      "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_b",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "rotation",
+      "indicator": "water_deficit_exposure",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "dimensionless",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_b",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "rotation",
+      "carbon_model": "PLACEHOLDER_carbon_model_one",
+      "computation": "end_minus_start",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": -0.25,
+      "unit": "t C ha-1 yr-1",
+      "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for this value"},
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_b",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "rotation",
+      "carbon_model": "PLACEHOLDER_carbon_model_two",
+      "computation": "end_minus_start",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    }
+  ]
+}
