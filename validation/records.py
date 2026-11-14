@@ -30,7 +30,6 @@ import math
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -140,9 +139,9 @@ def _is_number(value: Any) -> bool:
 
 
 class _ChangedNumber(float):
-    """A number written in a file with digits that are lost when it is read.
+    """An integer written in a file with more digits than Python converts.
 
-    ``_read_json`` puts it in place of the number, so that the record can
+    ``_read_json`` puts it in place of the integer, so that the record can
     still be checked and the field is reported. No slot accepts it.
     """
 
@@ -155,14 +154,17 @@ class _ChangedNumber(float):
 
 
 def _exactness_problem(value: Any) -> str | None:
-    """Why a number would not be read back as it is written, or None.
+    """Why an integer would not be read back as it is written, or None.
 
-    Engines and other readers of a JSON file hold a number as a float, so a
-    number that a float cannot hold exactly is reported, never rounded.
+    Engines and other readers of a JSON file hold a number as a float, so an
+    integer that a float cannot hold exactly is reported, never rounded.
+
+    This rule is about integers only. A number written with a decimal point
+    or an exponent is the float it denotes, as for any JSON reader.
     """
     if isinstance(value, _ChangedNumber):
         literal = value.literal if len(value.literal) <= 40 else value.literal[:40] + "..."
-        return f"is written as {literal}, which would change when read as a number"
+        return f"is written as the integer {literal}, which would change when read as a number"
     if isinstance(value, int) and not isinstance(value, bool):
         try:
             exact = float(value) == value
@@ -542,17 +544,6 @@ def _reject_constant(name: str) -> Any:
     raise ValueError(f"{name} is not a number; a missing value is written with 'missing_reason'")
 
 
-def _parse_float(literal: str) -> float:
-    value = float(literal)
-    if not math.isfinite(value):
-        return value  # reported by the check as not finite
-    try:
-        unchanged = Decimal(literal) == Decimal(repr(value))
-    except (InvalidOperation, ValueError):
-        unchanged = False
-    return value if unchanged else _ChangedNumber(value, literal)
-
-
 def _parse_int(literal: str) -> int | float:
     try:
         return int(literal)
@@ -576,7 +567,6 @@ def _read_json(path: Path) -> tuple[Any, str | None]:
             text,
             object_pairs_hook=_object_without_duplicate_keys,
             parse_constant=_reject_constant,
-            parse_float=_parse_float,
             parse_int=_parse_int,
         )
     except ValueError as exc:
@@ -637,10 +627,7 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
             if error is not None:
                 problems.append((relative, error))
                 continue
-            try:
-                found = check_record(record, allow_placeholders=allow_placeholders)
-            except RecursionError:
-                found = [_TOO_DEEP]
+            found = check_record(record, allow_placeholders=allow_placeholders)
             if isinstance(record, dict):
                 record_kind = record.get("kind")
                 if isinstance(record_kind, str) and record_kind in FOLDER_BY_KIND and record_kind != kind:
@@ -696,7 +683,7 @@ def _require_sound_store(store: Any) -> None:
     if not isinstance(store, Store):
         raise ValueError("summarise: needs a Store, as load_store returns it")
     for name, kind in (("runs", KIND_RUN), ("results", KIND_RESULT), ("unresolved", KIND_RESULT)):
-        group = getattr(store, name)
+        group = getattr(store, name, None)
         if not isinstance(group, dict):
             raise ValueError(f"summarise: store.{name} must be a dict of records by id")
         for key, record in group.items():
@@ -705,13 +692,13 @@ def _require_sound_store(store: Any) -> None:
                     f"summarise: store.{name} holds, under the key {_shown(key)}, "
                     f"something that is not a well-formed '{kind}' record"
                 )
-    problems = store.problems
+    problems = getattr(store, "problems", None)
     if not isinstance(problems, (tuple, list)) or not all(
         isinstance(item, (tuple, list)) and len(item) == 2 and all(isinstance(part, str) for part in item)
         for item in problems
     ):
         raise ValueError("summarise: store.problems must be a sequence of (path, message) pairs of text")
-    paths = store.failed_malformed
+    paths = getattr(store, "failed_malformed", None)
     if not isinstance(paths, (tuple, list)) or not all(isinstance(path, str) for path in paths):
         raise ValueError("summarise: store.failed_malformed must be a sequence of paths as text")
 

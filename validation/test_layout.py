@@ -13,7 +13,6 @@ from __future__ import annotations
 import copy
 import json
 import re
-from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -367,7 +366,8 @@ def test_R47_a_broken_record_reports_every_problem_at_once():
 
 def write_text(path: Path, text: str) -> Path:
     """The only place where a test writes a file: its content must carry the word PLACEHOLDER."""
-    assert "PLACEHOLDER" in text, f"fixture without the word PLACEHOLDER: {path.name}"
+    if "PLACEHOLDER" not in text:
+        raise AssertionError(f"fixture without the word PLACEHOLDER: {path.name}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(text.encode("utf-8"))
     return path
@@ -689,7 +689,7 @@ def test_S28_every_rejected_file_that_says_failed_is_counted_as_failed(tmp_path)
     write(tmp_path, result_failed(), name="PLACEHOLDER-b.json")
     # a failed result in the folder of another kind
     write(tmp_path, result_failed(), folder="runs", name="PLACEHOLDER-c.json")
-    # a failed result with a field nested too deeply to be checked, but not to be read
+    # a failed result with a deeply nested list where a wording is expected
     text = json.dumps(result_failed()).replace('"PLACEHOLDER observed wording"', "[" * 400 + '"PLACEHOLDER"' + "]" * 400)
     write_text(folder / "PLACEHOLDER-d.json", text)
     # rejected files that do not say failed, or that cannot be read at all
@@ -752,7 +752,7 @@ def test_R48_check_references_reports_an_unchecked_record_and_does_not_raise():
 def test_S29_file_saved_with_a_byte_order_mark_is_read(tmp_path):
     write_full_store(tmp_path)
     for path in sorted(tmp_path.rglob("*.json")):
-        write_text(path, "﻿" + path.read_text(encoding="utf-8"))
+        write_text(path, "\ufeff" + path.read_text(encoding="utf-8"))
         assert path.read_bytes().startswith(b"\xef\xbb\xbf")
     store = load(tmp_path)
     assert store.problems == ()
@@ -872,24 +872,34 @@ def test_S33_number_that_would_change_when_read_from_a_file_is_reported(tmp_path
     changed_when_read = [
         "9007199254740993",  # an integer one above the last that a float holds exactly
         "12345678901234567890123",
-        "12345678901234567890.0",  # read as 12345678901234567000
-        "1e-400",  # read as zero
-        "0.12345678901234567890",
+        "100000000000000000000000",
         "1" + "0" * 400,  # too large for a float
         "1" * 5000,  # more digits than Python converts
-        "1e400",  # read as infinity
     ]
     for index, literal in enumerate(changed_when_read):
         store, found = stored(f"changed-{index}", literal)
         assert "PLACEHOLDER-expected-number" not in store.expected, literal
         assert found and all(message.startswith("value.number:") for message in found), (literal, found)
 
-    read_as_written = ["9007199254740992", "1e22", "0.1", "-0.5", "100000000000000000000", "1.0E+2", "0.10000000000000000000"]
-    for index, literal in enumerate(read_as_written):
+    # A number that a float reads as infinity is rejected as not finite, as before.
+    store, found = stored("infinite", "1e400")
+    assert found and "must be a finite number" in found[0]
+
+    integers_read_as_written = ["9007199254740992", "100000000000000000000", "123456789", "-4503599627370496"]
+    for index, literal in enumerate(integers_read_as_written):
         store, found = stored(f"same-{index}", literal)
         assert found == [], (literal, found)
         number = store.expected["PLACEHOLDER-expected-number"]["value"]["number"]
-        assert Decimal(repr(number)) == Decimal(literal), literal
+        assert type(number) is int and number == int(literal), literal
+
+    # The rule is about integers only: a number written with a decimal point or
+    # an exponent is accepted as the float it denotes.
+    not_integer_literals = ["0.1", "0.10000000000000001", "0.12345678901234567890", "12345678901234567890.0", "1e22", "1e23", "1.0E+2"]
+    for index, literal in enumerate(not_integer_literals):
+        store, found = stored(f"float-{index}", literal)
+        assert found == [], (literal, found)
+        number = store.expected["PLACEHOLDER-expected-number"]["value"]["number"]
+        assert type(number) is float and number == float(literal), literal
 
     # In a tolerance too, and a failed result that holds such a number is still counted as failed.
     root = tmp_path / "other-slots"
@@ -897,7 +907,7 @@ def test_S33_number_that_would_change_when_read_from_a_file_is_reported(tmp_path
     text = json.dumps(expected_number()).replace("987654321.0", "9007199254740993")
     write_text(root / "expected" / "PLACEHOLDER-expected-number.json", text)
     failed = changed(result_passed, set_field("outcome", "failed"))
-    text = json.dumps(failed).replace("123456789.0", "12345678901234567890.0")
+    text = json.dumps(failed).replace("123456789.0", "9007199254740993")
     write_text(root / "results" / "PLACEHOLDER-result-passed.json", text)
     store = load(root)
     found = messages(store, "expected/PLACEHOLDER-expected-number.json")
@@ -905,6 +915,22 @@ def test_S33_number_that_would_change_when_read_from_a_file_is_reported(tmp_path
     found = messages(store, "results/PLACEHOLDER-result-passed.json")
     assert found and found[0].startswith("observed.number:")
     assert "results/PLACEHOLDER-result-passed.json" in records.summarise(store)["failed_malformed"]
+
+
+def test_S35_result_whose_observed_number_has_more_digits_than_a_float_keeps_is_counted(tmp_path):
+    for index, literal in enumerate(["0.10000000000000001", "1e23", "12345678901234567890.0"]):
+        root = tmp_path / f"case-{index}"
+        write_full_store(root)
+        text = json.dumps(result_passed()).replace("123456789.0", literal)
+        assert literal in text
+        write_text(root / "results" / "PLACEHOLDER-result-passed.json", text)
+        store = load(root)
+        assert store.problems == (), literal
+        assert store.results["PLACEHOLDER-result-passed"]["observed"]["number"] == float(literal)
+        summary = records.summarise(store)
+        assert summary["counts"] == {"passed": 1, "failed": 1, "not_evaluated": 1}, literal
+        assert summary["no_result"] == [] and summary["rejected"] == [], literal
+    assert float("0.10000000000000001") == 0.1
 
 
 # --- input that the functions were not written for -------------------------------
@@ -1038,6 +1064,7 @@ def test_S34_summarise_and_load_store_raise_only_their_documented_exception(tmp_
         store_with(results=[result_failed()]),
         store_with(problems=("PLACEHOLDER",)),
         store_with(failed_malformed=(1,)),
+        records.Store.__new__(records.Store),  # a store object that was never initialised
     ]
     for store in not_a_store_of_load_store:
         with pytest.raises(ValueError, match="summarise"):
@@ -1061,7 +1088,7 @@ def test_S34_summarise_and_load_store_raise_only_their_documented_exception(tmp_
 # --- every fixture is a placeholder ------------------------------------------------
 
 
-def test_R53_every_fixture_that_looks_like_a_record_carries_the_word_placeholder():
+def test_R53_every_fixture_that_looks_like_a_record_carries_the_word_placeholder(tmp_path):
     fixtures = [build() for build in BUILDERS]
     fixtures += [build() for build in ACCEPTED.values()]
     fixtures += [changed(build, change) for build, change, _ in REJECTED.values()]
@@ -1076,8 +1103,10 @@ def test_R53_every_fixture_that_looks_like_a_record_carries_the_word_placeholder
     source = Path(__file__).read_text(encoding="utf-8")
     assert source.count("." + "write_text(") == 0
     assert source.count("." + "write_bytes(") == 1
+    never_written = tmp_path / "PLACEHOLDER-never-written.json"
     with pytest.raises(AssertionError, match="without the word"):
-        write_text(HERE / "never-written.json", '{"outcome": "failed"}')
+        write_text(never_written, '{"outcome": "failed"}')
+    assert not never_written.exists()
 
 
 # --- the README lists every case -----------------------------------------------
