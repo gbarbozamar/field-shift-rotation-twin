@@ -1,0 +1,273 @@
+{
+  "contract": "carbon_balance",
+  "example_data": true,
+  "case_id": "PLACEHOLDER-case",
+  "field_id": "PLACEHOLDER-field",
+  "rotation_id": "PLACEHOLDER-rotation",
+  "carbon_model": "amg",
+  "variant": "placeholder_variant",
+  "horizon": {
+    "start": {
+      "year": 2001,
+      "month": 1
+    },
+    "end": {
+      "year": 2002,
+      "month": 12
+    }
+  },
+  "soil_depth": {
+    "value": null,
+    "unit": "PLACEHOLDER_unit",
+    "missing": {
+      "reason": "NOT_DECLARED",
+      "detail": "PLACEHOLDER: example of a value nobody has given yet"
+    }
+  },
+  "total_stock": {
+    "quantity": "placeholder_total_stock",
+    "unit": "PLACEHOLDER_unit",
+    "provenance": "SIMULATED",
+    "source": "PLACEHOLDER: example data, no real source",
+    "range_missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER: the example carries no uncertainty range"
+    },
+    "initial": {
+      "value": 30.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      }
+    },
+    "steps": [
+      {
+        "start": {
+          "year": 2001,
+          "month": 1
+        },
+        "end": {
+          "year": 2001,
+          "month": 12
+        },
+        "value": 31.0
+      },
+      {
+        "start": {
+          "year": 2002,
+          "month": 1
+        },
+        "end": {
+          "year": 2002,
+          "month": 12
+        },
+        "value": 32.0
+      }
+    ]
+  },
+  "pools": [
+    {
+      "quantity": "placeholder_pool_a",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "initial": {
+        "value": 20.0,
+        "unit": "PLACEHOLDER_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "steps": [
+        {
+          "start": {
+            "year": 2001,
+            "month": 1
+          },
+          "end": {
+            "year": 2001,
+            "month": 12
+          },
+          "value": 21.0
+        },
+        {
+          "start": {
+            "year": 2002,
+            "month": 1
+          },
+          "end": {
+            "year": 2002,
+            "month": 12
+          },
+          "value": 22.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_pool_b",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "initial": {
+        "value": 10.0,
+        "unit": "PLACEHOLDER_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "steps": [
+        {
+          "start": {
+            "year": 2001,
+            "month": 1
+          },
+          "end": {
+            "year": 2001,
+            "month": 12
+          },
+          "value": 10.0
+        },
+        {
+          "start": {
+            "year": 2002,
+            "month": 1
+          },
+          "end": {
+            "year": 2002,
+            "month": 12
+          },
+          "value": 10.0
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "quantity": "placeholder_flow_in",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "steps": [
+        {
+          "start": {
+            "year": 2001,
+            "month": 1
+          },
+          "end": {
+            "year": 2001,
+            "month": 12
+          },
+          "value": 2.0
+        },
+        {
+          "start": {
+            "year": 2002,
+            "month": 1
+          },
+          "end": {
+            "year": 2002,
+            "month": 12
+          },
+          "value": 2.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_flow_out",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "steps": [
+        {
+          "start": {
+            "year": 2001,
+            "month": 1
+          },
+          "end": {
+            "year": 2001,
+            "month": 12
+          },
+          "value": 1.0
+        },
+        {
+          "start": {
+            "year": 2002,
+            "month": 1
+          },
+          "end": {
+            "year": 2002,
+            "month": 12
+          },
+          "value": 1.0
+        }
+      ]
+    }
+  ],
+  "soil_carbon_trend": [
+    {
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": 1.0,
+      "unit": "t C ha-1 yr-1",
+      "carbon_model": "amg",
+      "computation": "end_minus_start",
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      }
+    },
+    {
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": 1.0,
+      "unit": "t C ha-1 yr-1",
+      "carbon_model": "amg",
+      "computation": "fitted_slope",
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      }
+    },
+    {
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "carbon_model": "amg",
+      "computation": "mean_over_cycles",
+      "missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "PLACEHOLDER: example of a trend value whose input is missing"
+      }
+    }
+  ]
+}
