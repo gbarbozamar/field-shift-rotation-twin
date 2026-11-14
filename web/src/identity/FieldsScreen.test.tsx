@@ -109,4 +109,13 @@ describe('FieldsScreen', () => {
       html.indexOf(lastFieldId),
     )
   })
+  it('shows the results section of the results example after the field list', () => {
+    setSelectedFieldId(exampleCase.fields[0].field_id)
+    const html = renderToString(<FieldsScreen />)
+    expect(html).toContain(strings['cards.title'])
+    const lastField = exampleCase.fields[exampleCase.fields.length - 1]
+    expect(html.indexOf(strings['cards.title'])).toBeGreaterThan(html.indexOf(lastField.field_id))
+    expect(html).toContain(strings['example.banner'])
+    expect(html).toContain(strings['cards.availability'])
+  })
 })

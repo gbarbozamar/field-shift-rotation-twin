@@ -25,6 +25,8 @@
  * - ribbon.*     the rotation timeline of the selected field
  * - clocks.*     the two clocks of a rotation of the results example (soil
  *                clock, water clock, year columns), Block 2 addendum
+ * - cards.*      the results cards (title, rotation heading, availability
+ *                heading, carbon model and computation labels)
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -72,6 +74,11 @@ export const strings = {
   'entry.title': 'Case',
   'entry.open_field': 'Open field',
   'entry.fields_count': '{n} fields',
+  'cards.title': 'Results',
+  'cards.per_rotation': 'Rotation {id}',
+  'cards.availability': 'Availability',
+  'cards.model_label': 'Model: {model}',
+  'cards.computation_label': 'Computation: {computation}',
   'identity.title': 'Fields',
   'identity.case_label': 'Case',
   'identity.banner_title': 'Example data',

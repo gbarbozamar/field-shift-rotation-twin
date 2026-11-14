@@ -114,6 +114,11 @@ const WORDING_SHEET: Record<string, string> = {
   'entry.title': 'Case',
   'entry.open_field': 'Open field',
   'entry.fields_count': '{n} fields',
+  'cards.title': 'Results',
+  'cards.per_rotation': 'Rotation {id}',
+  'cards.availability': 'Availability',
+  'cards.model_label': 'Model: {model}',
+  'cards.computation_label': 'Computation: {computation}',
 }
 
 /** Source of the shell page as it was before the strings unit. */
