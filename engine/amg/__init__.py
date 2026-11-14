@@ -1,0 +1,60 @@
+"""Core of the AMG soil carbon model as pure functions (decision D1 of issue #77). PROPOSED.
+
+Unit ``l1/amg-core`` (issue #174). This package holds the model core only:
+the two pools and their step (``pools.py``), the rate coefficient and its
+modifiers (``modifiers.py``) and the trend measures of C1.6 (``trend.py``).
+The entry point EP5 of contracts/ENTRYPOINTS.md is OPEN and is not here:
+there is no ``run_amg`` yet. Every form is PROPOSED with its source to be
+confirmed by a person, and no value of the method appears in this package
+(README.md of this folder).
+"""
+
+from .modifiers import (
+    carbonate_modifier,
+    clay_modifier,
+    moisture_modifier,
+    ph_modifier,
+    rate_coefficient,
+    temperature_modifier,
+)
+from .pools import (
+    SCHEMES,
+    PoolState,
+    Run,
+    StepInput,
+    StepResult,
+    humified_input,
+    initial_state,
+    run,
+    step,
+)
+from .trend import (
+    TrendMeasures,
+    end_minus_start,
+    fitted_slope,
+    mean_over_cycles,
+    trend_measures,
+)
+
+__all__ = [
+    "SCHEMES",
+    "PoolState",
+    "Run",
+    "StepInput",
+    "StepResult",
+    "TrendMeasures",
+    "carbonate_modifier",
+    "clay_modifier",
+    "end_minus_start",
+    "fitted_slope",
+    "humified_input",
+    "initial_state",
+    "mean_over_cycles",
+    "moisture_modifier",
+    "ph_modifier",
+    "rate_coefficient",
+    "run",
+    "step",
+    "temperature_modifier",
+    "trend_measures",
+]
