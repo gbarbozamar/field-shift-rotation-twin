@@ -3,8 +3,10 @@
 For the developers who join a lane. Read this first, then [DEVELOPMENT_BLUEPRINT.md](DEVELOPMENT_BLUEPRINT.md).
 
 - [All developers](#all-developers)
-- [Platform developer (sub-lane L2a)](#platform-developer-sub-lane-l2a)
-- [Interface developer (lane L3 and sub-lane L2b)](#interface-developer-lane-l3-and-sub-lane-l2b)
+- [Enzo: platform developer (sub-lane L2a)](#enzo-platform-developer-sub-lane-l2a)
+- [Martín: interface developer (lane L3 and sub-lane L2b)](#martín-interface-developer-lane-l3-and-sub-lane-l2b)
+
+Gustavo, the lead developer, owns lanes L0 Core and L1 Engines. Adrian and Leonardo are the science reviewers.
 
 ## All developers
 
@@ -71,9 +73,9 @@ Limits: at most three builders in flight; no new unit while two of yours wait fo
 
 Parameter values, thresholds, ranges, expected test values, citations, the choice of a data source or a dependency, the wording of a claim, pushing to `main`, deploying. If a session produces one of these, discard it.
 
-## Platform developer (sub-lane L2a)
+## Enzo: platform developer (sub-lane L2a)
 
-You own `adapters/`, `api/`, CI and deploy: sub-lane L2a, data and service. The other half of the platform lane, L2b (`decision/`, `engine/rothc/`, `demo/`), belongs to the interface developer. You also decide technical matters for everyone: structure, dependencies, deploy.
+You own `adapters/`, `api/`, CI and deploy: sub-lane L2a, data and service. The other half of the platform lane, L2b (`decision/`, `engine/rothc/`, `demo/`), belongs to Martín. You also decide technical matters for everyone: structure, dependencies, deploy.
 
 ### Decide first, because every lane waits for it
 
@@ -104,11 +106,11 @@ You own `adapters/`, `api/`, CI and deploy: sub-lane L2a, data and service. The 
 
 ### Seams to agree early
 
-- **Engine entry points** with the lead developer (`contracts/ENTRYPOINTS.md`), before Block 1.
-- **Frontend build command and origin** with the interface developer.
-- **Contract validation command** that CI runs, with the lead developer.
+- **Engine entry points** with Gustavo (`contracts/ENTRYPOINTS.md`), before Block 1.
+- **Frontend build command and origin** with Martín.
+- **Contract validation command** that CI runs, with Gustavo.
 
-## Interface developer (lane L3 and sub-lane L2b)
+## Martín: interface developer (lane L3 and sub-lane L2b)
 
 You own `web/` (lane L3) and `decision/`, `engine/rothc/` and `demo/` (sub-lane L2b, decision and carbon). You also decide what is delivered and when. Run each of the two with its own sessions and its own clone, and branch as `l3/<unit>` and `l2/<unit>`.
 
