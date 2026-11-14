@@ -29,6 +29,10 @@ Mutation = Callable[[dict[str, Any]], None]
 
 CLIMATE = ["climate", 0]  # the series with one missing month
 CARBON = ["carbon_inputs", 0]
+ANNUAL = ["annual_climate", 0]  # the annual series with a value
+ANNUAL_MISSING = ["annual_climate", 1]  # the annual series whose year is missing
+ANNUAL_CARBON = ["annual_carbon_inputs", 0]
+LAST_MONTH = {"year": 2001, "month": 11}  # one month before the end of the horizon
 
 
 def load() -> dict[str, Any]:
@@ -85,7 +89,67 @@ def _series_shorter_than_horizon(data: dict[str, Any]) -> None:
     """A series consistent in itself that stops one month before the horizon."""
     series = data["climate"][1]
     series["months"].pop()
-    series["end"] = {"year": 2001, "month": 3}
+    series["end"] = LAST_MONTH
+
+
+def _two_years(series: dict[str, Any]) -> None:
+    """Extend an annual series, consistent in itself, to a second year."""
+    second = copy.deepcopy(series["years"][0])
+    second["ag_year"] += 1
+    series["years"].append(second)
+    series["last_ag_year"] += 1
+
+
+def _annual_gap(data: dict[str, Any]) -> None:
+    series = data["annual_climate"][0]
+    _two_years(series)
+    series["years"][1]["ag_year"] += 1
+
+
+def _annual_duplicate_year(data: dict[str, Any]) -> None:
+    series = data["annual_climate"][0]
+    _two_years(series)
+    series["years"][1]["ag_year"] = series["years"][0]["ag_year"]
+
+
+def _annual_out_of_order(data: dict[str, Any]) -> None:
+    series = data["annual_climate"][0]
+    _two_years(series)
+    series["years"].reverse()
+
+
+def _annual_beyond_horizon(data: dict[str, Any]) -> None:
+    _two_years(data["annual_climate"][0])
+
+
+def _annual_carbon_shifted(data: dict[str, Any]) -> None:
+    series = data["annual_carbon_inputs"][0]
+    series["first_ag_year"] += 1
+    series["last_ag_year"] += 1
+    series["years"][0]["ag_year"] += 1
+
+
+def _horizon_not_whole_years(data: dict[str, Any]) -> None:
+    """Horizon and monthly series shortened by one month, annual series kept."""
+    data["horizon"]["end"] = LAST_MONTH
+    for series in data["climate"] + data["carbon_inputs"]:
+        series["months"].pop()
+        series["end"] = LAST_MONTH
+
+
+def _short_horizon_without_annual(data: dict[str, Any]) -> None:
+    """A horizon of four months, not a whole agricultural year, no annual series."""
+    end = {"year": 2001, "month": 4}
+    data["horizon"]["end"] = end
+    for series in data["climate"] + data["carbon_inputs"]:
+        del series["months"][4:]
+        series["end"] = end
+    data["annual_climate"] = []
+    data["annual_carbon_inputs"] = []
+
+
+def _duplicate_annual_quantity(data: dict[str, Any]) -> None:
+    data["annual_climate"][1]["quantity"] = data["annual_climate"][0]["quantity"]
 
 
 # (case, mutation, fragment of the error message)
@@ -131,7 +195,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("soil-depth-left-out", drop(["soil_depth"]), "soil_depth: Field required"),
     (
         "series-one-month-short",
-        drop([*CLIMATE, "months", 3]),
+        drop([*CLIMATE, "months", 11]),
         "the months stop before end",
     ),
     (
@@ -144,7 +208,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
         apply(
             lambda data: (
                 data["carbon_inputs"][0]["months"].pop(),
-                data["carbon_inputs"][0].update(end={"year": 2001, "month": 3}),
+                data["carbon_inputs"][0].update(end=LAST_MONTH),
             )
         ),
         "carbon_inputs 'placeholder_carbon_input_a': start and end are those of the horizon",
@@ -209,6 +273,87 @@ INVALID: list[tuple[str, Mutation, str]] = [
         put(["horizon", "end"], {"year": 2000, "month": 12}),
         "horizon: ends before it starts",
     ),
+    (
+        "annual-climate-left-out",
+        drop(["annual_climate"]),
+        "annual_climate: Field required",
+    ),
+    (
+        "annual-carbon-inputs-left-out",
+        drop(["annual_carbon_inputs"]),
+        "annual_carbon_inputs: Field required",
+    ),
+    (
+        "annual-year-gap",
+        apply(_annual_gap),
+        "every agricultural year from first_ag_year to last_ag_year appears once",
+    ),
+    (
+        "annual-duplicate-year",
+        apply(_annual_duplicate_year),
+        "every agricultural year from first_ag_year to last_ag_year appears once",
+    ),
+    (
+        "annual-year-out-of-order",
+        apply(_annual_out_of_order),
+        "every agricultural year from first_ag_year to last_ag_year appears once",
+    ),
+    (
+        "annual-series-one-year-short",
+        put([*ANNUAL, "last_ag_year"], 2002),
+        "the years stop before last_ag_year",
+    ),
+    (
+        "annual-series-ends-before-it-starts",
+        put([*ANNUAL, "last_ag_year"], 2000),
+        "series 'placeholder_annual_climate_quantity_a': ends before it starts",
+    ),
+    (
+        "annual-series-beyond-horizon",
+        apply(_annual_beyond_horizon),
+        (
+            "annual_climate 'placeholder_annual_climate_quantity_a': first_ag_year "
+            "and last_ag_year are the agricultural years of the horizon"
+        ),
+    ),
+    (
+        "annual-carbon-inputs-not-the-horizon-years",
+        apply(_annual_carbon_shifted),
+        "annual_carbon_inputs 'placeholder_annual_carbon_input_a': first_ag_year",
+    ),
+    (
+        "annual-series-with-horizon-not-whole-years",
+        apply(_horizon_not_whole_years),
+        "horizon: with annual series, the horizon is a whole number of agricultural",
+    ),
+    (
+        "duplicate-annual-quantity",
+        apply(_duplicate_annual_quantity),
+        (
+            "annual_climate: the quantity identifier "
+            "'placeholder_annual_climate_quantity_a'"
+        ),
+    ),
+    (
+        "annual-missing-year-without-reason",
+        drop([*ANNUAL_MISSING, "years", 0, "missing"]),
+        "a missing value carries a missing part with its reason",
+    ),
+    (
+        "annual-missing-year-written-as-zero",
+        put([*ANNUAL_MISSING, "years", 0, "value"], 0.0),
+        "an item holds a value or a missing part, never both",
+    ),
+    (
+        "annual-year-written-as-text",
+        put([*ANNUAL, "years", 0, "ag_year"], "2001"),
+        "ag_year: Input should be a valid integer",
+    ),
+    (
+        "annual-carbon-inputs-origin-left-out",
+        drop([*ANNUAL_CARBON, "origin"]),
+        "origin: Field required",
+    ),
 ]
 
 # (case, mutation): variants the model accepts.
@@ -238,6 +383,14 @@ VALID: list[tuple[str, Mutation]] = [
         apply(
             lambda data: data.update(climate=[], carbon_inputs=[], soil_properties=[])
         ),
+    ),
+    (
+        "empty-annual-lists-with-horizon-not-whole-years",
+        apply(_short_horizon_without_annual),
+    ),
+    (
+        "empty-annual-lists-with-whole-year-horizon",
+        apply(lambda data: data.update(annual_climate=[], annual_carbon_inputs=[])),
     ),
     (
         "same-quantity-in-two-lists",
@@ -275,19 +428,41 @@ def test_example_shows_the_absence_form() -> None:
     ]
     assert missing_months
     assert all(item["missing"]["reason"] for item in missing_months)
+    missing_years = [
+        item
+        for series in data["annual_climate"] + data["annual_carbon_inputs"]
+        for item in series["years"]
+        if item["value"] is None
+    ]
+    assert missing_years
+    assert all(item["missing"]["reason"] for item in missing_years)
+
+
+def test_example_horizon_is_one_agricultural_year() -> None:
+    """Twelve months from the start month (C5.3), so the annual series apply."""
+    horizon = load()["horizon"]
+    assert horizon["start"] == {"year": 2001, "month": 1}
+    assert horizon["end"] == {"year": 2001, "month": 12}
 
 
 def test_example_holds_placeholders_only() -> None:
     data = load()
     units = [data["soil_depth"]["unit"]]
-    for series in data["climate"] + data["carbon_inputs"]:
+    every_series = (
+        data["climate"]
+        + data["carbon_inputs"]
+        + data["annual_climate"]
+        + data["annual_carbon_inputs"]
+    )
+    for series in every_series:
         units.append(series["unit"])
         assert series["quantity"].startswith("placeholder_")
-        assert series["source"].startswith("PLACEHOLDER")
+        if "source" in series:
+            assert series["source"].startswith("PLACEHOLDER")
     for item in data["soil_properties"]:
         units.append(item["unit"])
         assert item["quantity"].startswith("placeholder_")
-    for series in data["carbon_inputs"]:
+    for series in data["carbon_inputs"] + data["annual_carbon_inputs"]:
         assert series["origin"].startswith("placeholder_")
     assert set(units) == {"PLACEHOLDER_unit"}
 

@@ -11,7 +11,7 @@
     },
     "end": {
       "year": 2001,
-      "month": 4
+      "month": 12
     }
   },
   "soil_depth": {
@@ -38,7 +38,7 @@
       },
       "end": {
         "year": 2001,
-        "month": 4
+        "month": 12
       },
       "months": [
         {
@@ -64,6 +64,46 @@
           "year": 2001,
           "month": 4,
           "value": 4.0
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": 5.0
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": 6.0
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": 7.0
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": 8.0
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": 9.0
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": 10.0
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": 11.0
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": 12.0
         }
       ]
     },
@@ -82,7 +122,7 @@
       },
       "end": {
         "year": 2001,
-        "month": 4
+        "month": 12
       },
       "months": [
         {
@@ -104,6 +144,46 @@
           "year": 2001,
           "month": 4,
           "value": 8.0
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": 9.0
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": 10.0
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": 11.0
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": 12.0
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": 13.0
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": 14.0
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": 15.0
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": 16.0
         }
       ]
     }
@@ -125,7 +205,7 @@
       },
       "end": {
         "year": 2001,
-        "month": 4
+        "month": 12
       },
       "months": [
         {
@@ -147,6 +227,103 @@
           "year": 2001,
           "month": 4,
           "value": 3.0
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": 4.0
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": 5.0
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": 6.0
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": 7.0
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": 8.0
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": 9.0
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": 10.0
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": 11.0
+        }
+      ]
+    }
+  ],
+  "annual_climate": [
+    {
+      "quantity": "placeholder_annual_climate_quantity_a",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "first_ag_year": 2001,
+      "last_ag_year": 2001,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": 10.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_annual_climate_quantity_b",
+      "unit": "PLACEHOLDER_unit",
+      "first_ag_year": 2001,
+      "last_ag_year": 2001,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": null,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER: example of an agricultural year without a value"
+          }
+        }
+      ]
+    }
+  ],
+  "annual_carbon_inputs": [
+    {
+      "quantity": "placeholder_annual_carbon_input_a",
+      "unit": "PLACEHOLDER_unit",
+      "origin": "placeholder_origin",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "first_ag_year": 2001,
+      "last_ag_year": 2001,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": 20.0
         }
       ]
     }
