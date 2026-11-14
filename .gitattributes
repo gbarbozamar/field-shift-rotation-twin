@@ -1,0 +1,3 @@
+# Lines appended to the AI use log by different branches are kept side by side
+# instead of being reported as a conflict.
+AI_USE_LOG.md merge=union
