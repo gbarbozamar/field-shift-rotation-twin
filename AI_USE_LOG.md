@@ -47,6 +47,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 
 | 2026-11-14 | l3 | `web/` frontend skeleton | ZCode (GLM) | Scaffolded the frontend skeleton from the brief of #36 (React, Vite, TypeScript, Tailwind CSS, TanStack Query, hash routing, Pages base path); a separate verifier session ran the acceptance test and reviewed the diff | Martín |
 | 2026-11-14 | l3 | `l3/strings-file` (#87): `web/` | ZCode (GLM) | A builder session moved every user-visible string into one strings file with the exact supplied values, added the Vitest acceptance suite and the format helper; a separate verifier ran the tests and read the diff | Martín |
+| 2026-11-14 | L2a | CI runs the frontend tests (#120): `.github/workflows/ci.yml`, `CLAUDE.md` | Claude Code (Anthropic) | An AI session added `npm test` to the `frontend-build` job, after the platform review of #110 found that CI built the frontend without running its tests | The platform developer asked for it; the session ran the frontend tests on a clean install before the change |
 Rules:
 
 - No generated images, video or voice in the submission.
