@@ -3,8 +3,8 @@
 For the developers who join a lane. Read this first, then [DEVELOPMENT_BLUEPRINT.md](DEVELOPMENT_BLUEPRINT.md).
 
 - [All developers](#all-developers)
-- [Platform developer (lane L2)](#platform-developer-lane-l2)
-- [Interface developer (lane L3)](#interface-developer-lane-l3)
+- [Platform developer (sub-lane L2a)](#platform-developer-sub-lane-l2a)
+- [Interface developer (lane L3 and sub-lane L2b)](#interface-developer-lane-l3-and-sub-lane-l2b)
 
 ## All developers
 
@@ -71,9 +71,9 @@ Limits: at most three builders in flight; no new unit while two of yours wait fo
 
 Parameter values, thresholds, ranges, expected test values, citations, the choice of a data source or a dependency, the wording of a claim, pushing to `main`, deploying. If a session produces one of these, discard it.
 
-## Platform developer (lane L2)
+## Platform developer (sub-lane L2a)
 
-You own `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/`, CI and deploy. You also decide technical matters for everyone: structure, dependencies, deploy.
+You own `adapters/`, `api/`, CI and deploy: sub-lane L2a, data and service. The other half of the platform lane, L2b (`decision/`, `engine/rothc/`, `demo/`), belongs to the interface developer. You also decide technical matters for everyone: structure, dependencies, deploy.
 
 ### Decide first, because every lane waits for it
 
@@ -89,7 +89,7 @@ You own `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/`, CI and deplo
 
 ### Your Block 0 units
 
-1. Hand-written examples of the contracts you produce: site data (climate; soil and slope) and decision output. Every number marked illustrative.
+1. Hand-written examples of the contracts you produce: site data (climate; soil and slope). Every number marked illustrative. The decision output example is written by L2b.
 2. Backend skeleton with one liveness route and a passing test.
 3. CI with all six checks, each shown to fail on a planted case that a person designs.
 4. Container definition and deploy configuration. **A person performs the deploy.**
@@ -101,7 +101,6 @@ You own `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/`, CI and deplo
 - Credentials: only in the host's settings, never in the repository.
 - Liveness route path and response; path, method and error format of the route for one rotation.
 - For the NASA POWER adapter (science reviewers decide the data questions): endpoint and parameters with units, years of record, how UTC is requested, how the source's fill value becomes "missing with reason", whether IMERG precipitation comes through POWER or directly, a test point that is not a real producer's field with expected values checked by a second person, and whether a recorded response may be committed.
-- For the decision functions: the definitions of the tests in `docs/VALIDATION.md`, the test plan with its thresholds, hand-made tables with expected outputs, and the exact wording of each state.
 
 ### Seams to agree early
 
@@ -109,9 +108,24 @@ You own `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/`, CI and deplo
 - **Frontend build command and origin** with the interface developer.
 - **Contract validation command** that CI runs, with the lead developer.
 
-## Interface developer (lane L3)
+## Interface developer (lane L3 and sub-lane L2b)
 
-You own `web/`. You also decide what is delivered and when.
+You own `web/` (lane L3) and `decision/`, `engine/rothc/` and `demo/` (sub-lane L2b, decision and carbon). You also decide what is delivered and when. Run each of the two with its own sessions and its own clone, and branch as `l3/<unit>` and `l2/<unit>`.
+
+### Sub-lane L2b: decision and carbon
+
+First units, from section 8 of the blueprint:
+
+1. Block 0: the hand-written example of the decision output, which your own screens consume.
+2. Block 1: decision functions on hand-made tables.
+3. Block 2: tipping point, measurement priority and measurement input; RothC with common forcings; the thin matrix through the decision.
+4. Block 3: RothC by month, year and cycle; the saved case.
+
+Inputs a person supplies: the definitions of the decision tests in `docs/VALIDATION.md`, the test plan with its thresholds, the hand-made tables with their expected outputs, the exact wording of each state, the paired-difference method with its citation, and how a missing cell is treated. The science reviewers decide what is claimed.
+
+Seams: the results table from the lead developer and the engines lane; `CarbonForcing` from L2a; the engine entry points in `contracts/ENTRYPOINTS.md`.
+
+### Lane L3: interface
 
 ### Your Block 0 units
 
