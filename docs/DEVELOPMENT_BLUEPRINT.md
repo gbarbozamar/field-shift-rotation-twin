@@ -97,6 +97,14 @@ Flow of a unit:
 | **Logic with a known answer** | Calendar, matrix, decision, routes | A person designs the cases first; a builder implements | Lane owner and the consumer of the seam |
 | **Interface and glue** | Screens, wiring, pipeline | Builder | Folder owner; someone who did not build it looks at the screen with real data |
 
+### 3.7 Proposals by a session
+
+For conventions, definitions, contract field lists and the design of test cases, a builder may write a proposal instead of waiting for a person to write them first.
+
+- Every proposed item is marked `PROPOSED`. Anything the builder cannot responsibly propose is marked `OPEN`, with the question a person has to answer.
+- A proposal takes effect only when a person approves the pull request. Science-class proposals also need a science reviewer.
+- This never covers the list in section 3.5. Parameter values, thresholds, ranges, expected test values and citations are supplied by people. Where one is needed, the builder writes `OPEN` or `CITATION NEEDED` and stops there.
+
 ## 4. Repository layout
 
 | Folder | Content | Owner |
@@ -130,6 +138,8 @@ Folders are created by the first unit that needs them.
 | Deploy | Static frontend and one backend container, both on a public URL without login |
 
 Only the platform developer adds a dependency, and records its licence at that moment.
+
+**Provisional environment,** until the platform developer fixes the list: Python 3.12, pytest and Pydantic. A pull request that relies on it says so in its description.
 
 ## 5. Contracts first
 
