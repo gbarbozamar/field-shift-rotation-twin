@@ -9,6 +9,12 @@
       "provenance": "OBSERVED"
     }
   ],
+  "point": {
+    "latitude_unit": "PLACEHOLDER_unit",
+    "longitude_unit": "PLACEHOLDER_unit",
+    "elevation_unit": "PLACEHOLDER_unit",
+    "provenance": "OBSERVED"
+  },
   "optional_arguments": {},
   "fill_value": -1000000000.0,
   "fill_reason": "NO_COVERAGE",

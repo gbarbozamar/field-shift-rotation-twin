@@ -122,12 +122,38 @@ class ParameterSpec:
 
 
 @dataclass(frozen=True, kw_only=True)
+class PointSpec:
+    """How the point of the series is written in the contract (issue 77, D9, D18).
+
+    The numbers come from the response of the source. Their unit strings and
+    their provenance label are decisions of people and have no default.
+    """
+
+    latitude_unit: str
+    longitude_unit: str
+    elevation_unit: str
+    provenance: str
+
+    def __post_init__(self) -> None:
+        _require_text(self.latitude_unit, "point.latitude_unit")
+        _require_text(self.longitude_unit, "point.longitude_unit")
+        _require_text(self.elevation_unit, "point.elevation_unit")
+        if self.provenance not in PROVENANCE_LABELS:
+            raise ValueError(
+                "setting 'point.provenance' is required and must be one of "
+                + ", ".join(PROVENANCE_LABELS)
+                + " (C4.1)"
+            )
+
+
+@dataclass(frozen=True, kw_only=True)
 class PowerSettings:
     """Everything a person decides for this adapter. No field has a default."""
 
     base_url: str
     community: str
     parameters: tuple[ParameterSpec, ...]
+    point: PointSpec
     optional_arguments: Mapping[str, str]  # may be empty: send none of them
     fill_value: float
     fill_reason: str
@@ -158,6 +184,8 @@ class PowerSettings:
         if len(set(quantities)) != len(quantities):
             raise ValueError("setting 'parameters' names one quantity twice")
         object.__setattr__(self, "parameters", tuple(self.parameters))
+        if not isinstance(self.point, PointSpec):
+            raise TypeError("setting 'point' is required: a PointSpec")
 
         if not isinstance(self.optional_arguments, Mapping):
             raise TypeError(
@@ -192,7 +220,8 @@ class PowerSettings:
     def from_mapping(cls, document: Mapping[str, Any]) -> PowerSettings:
         """Build settings from configuration, for example a parsed JSON file.
 
-        ``parameters`` is a list of mappings with the fields of ``ParameterSpec``.
+        ``parameters`` is a list of mappings with the fields of ``ParameterSpec``;
+        ``point`` is one mapping with the fields of ``PointSpec``.
         Unknown or missing keys are an error naming them.
         """
         if not isinstance(document, Mapping):
@@ -209,8 +238,15 @@ class PowerSettings:
                 raise TypeError(f"setting 'parameters[{index}]' is a mapping")
             _check_keys(item, spec_fields, f"parameters[{index}]")
             parameters.append(ParameterSpec(**item))
+        raw_point = document["point"]
+        if not isinstance(raw_point, Mapping):
+            raise TypeError("setting 'point' is a mapping")
+        _check_keys(
+            raw_point, {field.name for field in dataclasses.fields(PointSpec)}, "point"
+        )
         values = dict(document)
         values["parameters"] = tuple(parameters)
+        values["point"] = PointSpec(**raw_point)
         return cls(**values)
 
 
