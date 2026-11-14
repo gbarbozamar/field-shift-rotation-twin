@@ -13,9 +13,5 @@ export const FIELDS_SCREEN_TEXT = {
     'This screen shows illustrative placeholder fields over a generic rural area. No real field is described.',
   selectedLabel: 'Selected',
   fieldIdLabel: 'Identifier',
-  areaUnit: 'ha',
-  areaProvenanceLabel: 'DERIVED',
-  areaFootnote:
-    'Area is computed from each field boundary with a spherical approximation of the Earth (provenance DERIVED). It is not stored.',
   emptyList: 'The example case has no fields.',
 } as const
