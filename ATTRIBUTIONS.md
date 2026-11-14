@@ -23,6 +23,17 @@ Add a row **when the item is first used**, not at the end.
 | gitleaks (CI: secret scan, container image `ghcr.io/gitleaks/gitleaks`) | 8.21.2 | https://github.com/gitleaks/gitleaks | MIT | L2a | 2026-11-14 |
 | GitHub Actions `actions/checkout`, `actions/setup-python`, `actions/setup-node` (CI) | v5, v6, v4 | https://github.com/actions | MIT | L2a | 2026-11-14 |
 | GitHub Action `astral-sh/setup-uv` (CI) | v6 | https://github.com/astral-sh/setup-uv | MIT | L2a | 2026-11-14 |
+| React | 19.3.1 | https://react.dev | MIT | l3 | 2026-11-14 |
+| React DOM | 19.3.1 | https://react.dev | MIT | l3 | 2026-11-14 |
+| Vite | 8.3.8 | https://vite.dev | MIT | l3 | 2026-11-14 |
+| TypeScript | 7.0.2 | https://www.typescriptlang.org | Apache-2.0 | l3 | 2026-11-14 |
+| Tailwind CSS | 4.3.5 | https://tailwindcss.com | MIT | l3 | 2026-11-14 |
+| @tailwindcss/vite | 4.3.5 | https://tailwindcss.com | MIT | l3 | 2026-11-14 |
+| TanStack Query | 5.107.1 | https://tanstack.com/query | MIT | l3 | 2026-11-14 |
+| @vitejs/plugin-react | 6.3.0 | https://github.com/vitejs/vite-plugin-react | MIT | l3 | 2026-11-14 |
+| @types/react | 19.3.0 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
+| @types/react-dom | 19.3.0 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
+| @types/node | 24.19.2 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
 
 ## Tables and publications
 
