@@ -242,9 +242,12 @@ def _check_persons(record: dict) -> list[str]:
         if key in record and not _is_text(record[key]):
             problems.append(f"'{key}' must be a non-empty string")
     transcriber, checker = record.get("transcribed_by"), record.get("checked_by")
-    if _is_text(transcriber) and _is_text(checker):
-        if _normalise(transcriber) == _normalise(checker):
-            problems.append("'transcribed_by' and 'checked_by' are the same person")
+    if (
+        _is_text(transcriber)
+        and _is_text(checker)
+        and _normalise(transcriber) == _normalise(checker)
+    ):
+        problems.append("'transcribed_by' and 'checked_by' are the same person")
     return problems
 
 
