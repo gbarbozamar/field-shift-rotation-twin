@@ -85,6 +85,7 @@ drift from the code. The running app reads the file named by
 | `ParameterSpec.unit` | Unit string written in the contract | non-empty text | Science reviewers |
 | `ParameterSpec.provenance` | `DECLARED`, `OBSERVED`, `DERIVED` or `SIMULATED` | one of the four (C4.1) | Science reviewers |
 | `optional_arguments` | Optional arguments of the service to send (`units`, `site-elevation`, `wind-elevation`, `wind-surface`); an empty mapping sends none | only those four names; `user` and the arguments the adapter builds are refused | Science reviewers |
+| `point` | How the point of the series is written: `latitude_unit`, `longitude_unit`, `elevation_unit` (unit strings) and `provenance` (one of the four labels). The numbers come from the response | mapping, all four required | Science reviewers (`contracts/inputs/README.md`, questions 25 and 26) |
 | `fill_value` | The number the source uses for "no data" | finite number | Scout report; science reviewers confirm |
 | `fill_reason` | C3.2 code a fill value or an absent day becomes | a C3.2 code | Science reviewers |
 | `range_missing_reason` | C3.2 code written in `range_missing` | a C3.2 code | Lead developer |
@@ -153,6 +154,15 @@ Two further cases, not failures of the source:
 - Days in the response outside the requested period are not reported.
 - No unit conversion.
 
+### The point of the series
+
+Decisions D9 and D18 of issue #77: the record carries the point its series are valid for, and it is what the response of the source reports, never the point of the request. The response is a GeoJSON feature; `geometry.coordinates` holds longitude, latitude and elevation, in that order.
+
+- Each of the three becomes a value with its unit string (`point` settings), the label of `point.provenance`, the source `source_id`, and `range_missing` with `range_missing_reason` and a detail.
+- A part the response does not report, or that is not a finite number, is missing with `fill_reason` and a detail. A response without `geometry` gives three missing values; the series are still mapped.
+- An elevation equal to the fill value is missing; a real zero stays zero.
+- No unit is converted and no bound is checked.
+
 ### Drop-in check
 
 `test_power_mapping.py::test_drop_in_against_the_contract_model` loads the mapper's output into `SiteClimate` through JSON. It is an ordinary test now that `contracts/inputs/` is on `main`.
@@ -209,6 +219,12 @@ Unit `l2/power-adapter`:
 15. The test cases in `test_cache.py`, `test_power.py`, `test_power_mapping.py`.
 16. Concurrency: two processes asking for the same key at the same moment may both fetch; the cache keeps one entry (the last rename of the two simultaneous first writers). Not designed further.
 
+### The point of the series (PROPOSED)
+
+- A response that reports no point, or only part of one, is still usable: the missing parts are written as missing with `fill_reason`. The alternative, treating such a response as unusable, is for the lead developer (question 27 of `contracts/inputs/README.md`).
+- One reason code (`fill_reason`) covers a part that is not reported and a part reported as the fill value, with two different details.
+- One provenance label for the three values (`point.provenance`).
+
 ## OPEN
 
 Each item is a question a person answers. Until then the setting has no value and the adapter is not constructed for real.
@@ -233,3 +249,4 @@ Each item is a question a person answers. Until then the setting has no value an
 18. **Should the place the source answered for (grid cell, elevation in the response) travel with the data?** The contract has no field for it (contracts/inputs OPEN 21). For the platform developer and the lead developer.
 19. **Which file is the accepted soil-and-slope example?** (`ExampleSoilSlopeSource(path)`, set in the running app with `SOIL_SLOPE_EXAMPLE_FILE`.) The placeholder example's numbers mean nothing, and the engines may reject its units. For the lead developer and the platform developer.
 20. **Is the example served for any field?** It carries its own `case_id` and `field_id` and is returned unchanged whatever field is asked. An engine that receives site data of another field raises `ValueError` (G5), and the route answers `500`. Unit `l2/app-config` PROPOSES that the engine runner checks the identifiers first and answers `MISSING_INPUT` without calling the engines (`api/README.md`); whether the example may stand in for any field, and if so whether the source rewrites the identifiers or the engines stop comparing them, is OPEN for the lead developer.
+- **The point of the series:** the three unit strings and the datum they refer to, the provenance label, and which elevation it is when the source reports the average of a grid cell (`contracts/inputs/README.md`, questions 25, 26 and 28). For the science reviewers. Until they are decided, the real settings file cannot be written.

@@ -268,3 +268,110 @@ def test_every_reason_code_gives_a_document_that_loads(setting, code):
     missing = [day.missing for day in series.days if day.value is None]
     assert len(missing) == 2
     assert all(part.reason == settings.fill_reason and part.detail for part in missing)
+
+
+# --- the point of the series (issue 77, D9 and D18) --------------------------
+
+
+def point_of(raw):
+    return to_site_climate(raw, REQUEST, SETTINGS)["point"]
+
+
+def document_with_coordinates(coordinates):
+    raw = full_document(REQUEST.start_date, REQUEST.end_date)
+    raw["geometry"] = {"type": "Point", "coordinates": coordinates}
+    return raw
+
+
+def test_point_is_read_from_the_response_in_geojson_order():
+    # GeoJSON: longitude, latitude, elevation.
+    point = point_of(document_with_coordinates([10.0, 20.0, 30.0]))
+    assert point["longitude"]["value"] == 10.0
+    assert point["latitude"]["value"] == 20.0
+    assert point["elevation"]["value"] == 30.0
+
+
+def test_point_comes_from_the_response_not_from_the_request():
+    assert (REQUEST.latitude, REQUEST.longitude) != (20.0, 10.0)
+    point = point_of(document_with_coordinates([10.0, 20.0, 30.0]))
+    assert point["latitude"]["value"] != REQUEST.latitude
+    assert point["longitude"]["value"] != REQUEST.longitude
+
+
+def test_each_point_value_carries_unit_label_source_and_the_reason_it_has_no_range():
+    point = point_of(document_with_coordinates([10.0, 20.0, 30.0]))
+    for name in ("latitude", "longitude", "elevation"):
+        value = point[name]
+        assert value["unit"] == getattr(SETTINGS.point, f"{name}_unit")
+        assert value["provenance"] == SETTINGS.point.provenance
+        assert value["source"] == SETTINGS.source_id
+        assert value["range_missing"]["reason"] == SETTINGS.range_missing_reason
+        assert value["range_missing"]["detail"]
+        assert "missing" not in value
+
+
+def test_a_zero_elevation_is_a_real_value():
+    elevation = point_of(document_with_coordinates([10.0, 20.0, 0.0]))["elevation"]
+    assert elevation["value"] == 0.0
+    assert "missing" not in elevation
+
+
+def test_a_fill_value_elevation_is_missing_never_zero():
+    elevation = point_of(document_with_coordinates([10.0, 20.0, PLACEHOLDER_FILL]))[
+        "elevation"
+    ]
+    assert elevation["value"] is None
+    assert elevation["missing"]["reason"] == SETTINGS.fill_reason
+    assert elevation["missing"]["detail"]
+    assert elevation["unit"] == SETTINGS.point.elevation_unit
+    assert "provenance" not in elevation and "range_missing" not in elevation
+
+
+@pytest.mark.parametrize(
+    "geometry",
+    [
+        None,
+        "PLACEHOLDER",
+        {},
+        {"type": "Point"},
+        {"type": "Point", "coordinates": "PLACEHOLDER"},
+        {"type": "Point", "coordinates": []},
+    ],
+)
+def test_a_response_without_a_point_gives_three_missing_values(geometry):
+    raw = full_document(REQUEST.start_date, REQUEST.end_date)
+    if geometry is None:
+        del raw["geometry"]
+    else:
+        raw["geometry"] = geometry
+    point = point_of(raw)
+    for name in ("latitude", "longitude", "elevation"):
+        assert point[name]["value"] is None
+        assert point[name]["missing"]["reason"] == SETTINGS.fill_reason
+        assert point[name]["unit"]
+
+
+def test_a_point_without_elevation_keeps_its_coordinates():
+    point = point_of(document_with_coordinates([10.0, 20.0]))
+    assert point["longitude"]["value"] == 10.0
+    assert point["latitude"]["value"] == 20.0
+    assert point["elevation"]["value"] is None
+
+
+@pytest.mark.parametrize("bad", ["PLACEHOLDER", None, True, float("nan")])
+def test_a_part_that_is_not_a_finite_number_is_missing(bad):
+    point = point_of(document_with_coordinates([bad, 20.0, 30.0]))
+    assert point["longitude"]["value"] is None
+    assert point["latitude"]["value"] == 20.0
+
+
+@pytest.mark.parametrize(
+    "coordinates",
+    [[10.0, 20.0, 30.0], [10.0, 20.0], [], [10.0, 20.0, PLACEHOLDER_FILL]],
+)
+def test_the_document_with_its_point_loads_into_the_contract_model(coordinates):
+    document = to_site_climate(
+        document_with_coordinates(coordinates), REQUEST, SETTINGS
+    )
+    model = SiteClimate.model_validate_json(json.dumps(document))
+    assert model.point.latitude.unit == SETTINGS.point.latitude_unit
