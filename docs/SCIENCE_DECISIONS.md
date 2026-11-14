@@ -106,19 +106,21 @@ Later decisions that relaxed an earlier restriction are applied as relaxed, for 
 - Soil profile: USER-AC gave the 0.60 m average reference; USER-AE makes the 0.90 m profile the principal one and keeps the other as a separate reference.
 - Sensitivity levels: USER-T fixed the blocks; USER-AA withdrew the generic levels; USER-AD set termination at 30 and 60 days.
 - RothC: USER-V deferred the constants; USER-W closes it with standard RothC as reference.
-- R and K at the point: an instruction to the pre-check session kept B3, B4, P09 and P10 pending; the lead developer then confirmed D68 and D70, which are in force.
+- R and K at the point: an instruction to the pre-check session kept B3, B4, P09 and P10 pending; the lead developer then confirmed D68 and D70, which are in force, and chose the point (La Estanzuela, R of Colonia: D83).
 - LS: USER-I and USER-L make the dynamic LS of RUSLE2 the first stage of the erosion route. D66, recorded later the same day, has the lead developer check the LS rows of S2 first for the demonstration point. Read together (this file's reading, not a new decision): the static LS that exists stands in for the demonstration, declared as a partial stage, until dynamic LS is built.
 
 ## R and K at the demonstration point
 
 - **D68 and D70 are in force.** The lead developer confirmed them on 14 November 2026 in the orchestrator chat, and the confirmation is recorded in issue #77 at the end of [D71 to D82](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753). It supersedes the lead developer's earlier instruction to the pre-check session to keep blocks B3 and B4 (rows 1 to 76 of the check sheet) and questions P09 and P10 pending.
 - **Method, decided:** `R` from the nearest locality of S4, Cuadro 2, series 1980-2009, declared as the method choice, with a locality other than Salto (D68); `K` as the mean of the point's soil class in S9, Table 1, with the class standard deviation as the range (D70).
-- **Not yet declared, and not chosen here:** which locality and which soil class apply to the point, and the slope and slope length; a person declares them (D67). Until then rows 1 to 76 stay unsigned.
-- **To reconcile, for the lead developer (noted, not resolved):** D71 makes the La Estanzuela station, in the south-west of the country (Colonia department), the base of the demonstration, while D68 picks the locality **nearest to the point**. The localities discussed as candidates for the point lie in the north (Tacuarembó, Artigas, Rivera: latitudes −31.70, −30.40 and −30.89 in S4, Cuadro 1). If the demonstration point is the station, the nearest locality by D68 is not one of them; if the point is elsewhere, its soil class, slope and climate are not those of the station's accepted water profile (USER-AE). Which point the demonstration uses decides this.
+- **The point, decided** ([issue #77, D83](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885496342), 14 November 2026, in a chat reply of the lead developer to the orchestrator session): the demonstration point is **La Estanzuela**, the base case of D71. By D68, `R` takes the annual value of the nearest locality of S4 Cuadro 2, series 1980-2009, which is **Colonia**; the two tables of S4 agree for Colonia, so the note on Salto does not apply.
+- **Declared by the lead developer, not chosen here:** the soil class (one of the 14 classes of S9 Table 1, D70), the slope and the slope length, each labelled `DECLARED` (D67, D83). Until the class is declared, the row of `K` stays unsigned: that follows from D66 (a value enters the catalogue only after the lead developer checks it) and D67 (the class is declared by a person). This file's inference from D66, not a decision: the row of Colonia in S4 Cuadro 2 is the one of block B3 to check first for `R`.
+- **Monthly fraction at the point** ([D84](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885496342)): read from the twelve monthly GloREDa rasters at the point; no GloREDa station with monthly values lies near it: the nearest, El Palomar, about 74 km away, has none (D84). The fraction of a month is that month's value over the sum of the twelve (D69).
+- As issue #77 says of D83 and D84: they are data choices for the demonstration point; they do not validate the method.
 
 ### Still open
 
-- **The licence of the climatology of D69.** Until the team confirms it, no monthly value is committed and the monthly values stay `NOT_AVAILABLE`.
+- **The licence of the climatology of D69 and D84.** The Zenodo record says CC BY 4.0 and the ESDAC copy states contrary conditions. Until the team confirms which governs, no GloREDa value is committed and the monthly values stay `NOT_AVAILABLE`.
 
 ## Findings of the AI pre-check (14 November 2026)
 
@@ -161,8 +163,8 @@ Counts of the AI pre-check, from the copies of the check sheets (the originals o
 |---|---|---|---|
 | B1 LS coefficients | 78 to 87 (10) | 10 match | Pending |
 | B2 tables for E3 | 88 to 119 (32) | 32 match | Pending; cells and tolerance of E3 with the lead developer |
-| B3 R | 1 to 52 | Not read by the AI pre-check, by the lead developer's earlier choice (not a failure to open). The method is now decided (D68); the row of the locality of the point is checked once a person declares the locality (D67) | Pending |
-| B4 K | 53 to 76 | Not read by the AI pre-check, by the same earlier choice. The method is now decided (D70); the row of the soil class of the point is checked once a person declares the class (D67) | Pending |
+| B3 R | 1 to 52 | Not read by the AI pre-check, by the lead developer's earlier choice (not a failure to open). The method is decided (D68) and the locality is Colonia (D83). Checking its row of S4 Cuadro 2 first is this file's inference from D66 (rows needed for the demonstration point first), not a decision | Pending |
+| B4 K | 53 to 76 | Not read by the AI pre-check, by the same earlier choice. The method is decided (D70); the row of the soil class is checked once the lead developer declares the class (D67, D83) | Pending |
 | B5 tolerance mention | 77 (1) | Matches as a secondary citation | Pending; not T |
 | B6 C | 52, with derived row 315 | 52 match | Pending |
 | B7 FAO-56 constants | 145 to 186 (42) | 42 match | Pending |
@@ -173,4 +175,4 @@ Counts of the AI pre-check, from the copies of the check sheets (the originals o
 
 ## To record in issue #77
 
-Done: the `USER-` decisions, the later soybean-material acceptance and PC-1 to PC-7 were posted in issue #77 as [D71 to D82](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) on 14 November 2026 by the coordinating session, with the account `gbarbozamar`, as the lead developer authorised. `USER-B` (packages accepted with evidence; independent validation pending) is procedural and has no `D` number; under D66 the team reviews. Next free number: D83. Recording them there (with the next free `D` numbers) is the lead developer's or the coordinating session's act; this session publishes nothing.
+Done: the `USER-` decisions, the later soybean-material acceptance and PC-1 to PC-7 were posted in issue #77 as [D71 to D82](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) on 14 November 2026 by the coordinating session, with the account `gbarbozamar`, as the lead developer authorised. `USER-B` (packages accepted with evidence; independent validation pending) is procedural and has no `D` number; under D66 the team reviews. D83 and D84 followed the same day; next free number: D85. Recording them there (with the next free `D` numbers) is the lead developer's or the coordinating session's act; this session publishes nothing.
