@@ -8,6 +8,7 @@ Which method each engine implements, and where it is published. This file names 
 - The items below were transcribed by an AI session from the planning notes of the lead developer, who approved them on 14 November 2026: they are `DECIDED`. They are science class: a science reviewer still has to accept them. A point marked `OPEN` inside a decided item is not decided.
 - Two points that were `OPEN` here, the source of `K` in M1.3 and the units of `R` and `K` in M1.7, were decided by the lead developer on 14 November 2026 and recorded in issue #77 (decisions D10 and D11). An AI session transcribed them into this file. Like the other items of this file, a science reviewer still has to accept them.
 - Section M2 (the water method) and the sub-factors of M1.5 hold decisions D44 and D45 of the lead developer, of 14 November 2026, recorded in [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346). A builder session wrote them into this file. Issue #77 says of them that where they are science class, a science reviewer may still review them; it does not say which of them are. This file reads both as science class, like its other items, so it marks acceptance by a science reviewer as pending.
+- Decisions the lead developer accepted in explicit chat replies on 14 November 2026 (identifiers `USER-`), which are not yet in issue #77, and the findings of the AI pre-check of the same day, are listed in [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md) with where each acceptance is recorded. This file points to them where they touch a method. A finding of the pre-check is not a decision and not a person's check under D34.
 - A citation here says where a method is published. The column "Read" says how far the planning notes got with the source: `read` (the abstract or the text was read), `fragments` (only fragments of the abstract), or `located` (the reference was found, nothing of it was read). A builder session never takes a number from memory of these sources: it reads it from the parameter catalogue, and returns a missing value with its reason when the catalogue does not have it.
 - If an engine needs a method that is not in this file, that is an `OPEN` point for the lead developer, not something a session chooses.
 
@@ -47,11 +48,24 @@ Two parts, from two sources:
 - The exponent and the threshold of the daily index are parameters: `params/`, with their citation, before anything is computed.
 - Known limit, from S8: erosivity computed from satellite precipitation needs the 30-minute data; that is why the daily index is used only in relative terms.
 
+`DECIDED` for the first release (decided by the lead developer on 14 November 2026, [issue #77, D69](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6884997091), and USER-G of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)), while S5 and S6 stay behind paywalls and are requested:
+
+| Part | Method of the first release | Source |
+|---|---|---|
+| Fraction of the annual erosivity in each month | The monthly erosivity of a published climatology at the point: the fraction of a month is that month's value over the sum of the twelve | GloREDa (Panagos et al. 2023, Zenodo record 8036998, licence "Creative Commons Attribution 4.0 International", read on 14 November 2026), named by D69 |
+| Variation between years | **Deferred** (USER-G): the same twelve fractions hold for every agricultural year. The climatology gives none; this is declared as a limit of the method (D69) | — |
+
+- `OPEN` under D69: which licence governs the climatology: the copy distributed by ESDAC states conditions that contradict the licence of the Zenodo record. The team confirms it before any value is committed; until then the monthly values stay `NOT_AVAILABLE` and `C` is a single declared value.
+- The form is built in `engine/erosion/r_factor/climatology.py` (PROPOSED); it holds no value of the climatology.
+- `DECIDED` for how the mean annual level of S4 reaches the field (decided by the lead developer on 14 November 2026, [issue #77, D68](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6884997091), confirmed with D71 to D82): **the nearest locality of S4, Cuadro 2, series 1980-2009, declared as the method choice**, with a locality other than Salto, because Cuadro 2 and Cuadro 3 differ for Salto; the source is not corrected and the difference is kept as a note. Which locality applies to the point is declared by a person (D67); see "R and K at the demonstration point" in [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md).
+- Finding of the AI pre-check (F16, not a decision): S4 prints regressions of the **annual** `R` only and gives no monthly distribution in pages 92 to 93, so the control of the third row of the first table has no published monthly form among the pages read (`engine/erosion/r_factor/README.md`, OPEN 7). Decided (PC-7 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): the control is marked without a source and stays out of the route of the first release.
+
 ### M1.3 Factor K and soil-loss tolerance
 
 The question was: which source the event repository may use.
 
 - `DECIDED` for the source of `K` (decided by the lead developer on 14 November 2026, issue #77, D10; acceptance by a science reviewer pending): **the open dataset of source S9**.
+- `DECIDED` for the `K` of the demonstration point ([issue #77, D70](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6884997091), confirmed with D71 to D82): **the mean `K` of the point's soil class in S9, Table 1, with the class standard deviation as the range**. The header label "mg kg-1" over that column is recorded as a note, not corrected; the unit is confirmed against the paper (D11, M1.7). The soil class of the point is declared by a person (D67).
 - `OPEN` for the soil-loss tolerance: which source the event repository may use. As far as the planning notes record, the dataset of S9 carries `K` and not the tolerance (issue #77).
 
 What the planning notes say, unchanged:
@@ -63,12 +77,17 @@ What the planning notes say, unchanged:
 
 For the lead developer and the science reviewers: which source for the soil-loss tolerance, and under which licence. Issue #77 names the source of `K` and names no licence for it.
 
+- Finding of the AI pre-check (not a decision): the only mention found, "7 t ha-1" in Carrasco-Letelier and Beretta-Blanco (2017), is secondary, cites no primary norm and is **not adopted** as the tolerance of the soil.
+- USER-Q of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md) admits a rotation on erosion only against a **verified** tolerance; without one, erosion admissibility is reported "not evaluated" (D60).
+
 ### M1.4 Factor LS
 
 The slope steepness and slope length equations of RUSLE: steepness with two branches according to the slope, and length with an exponent that depends on the ratio of rill to interrill erosion. Sources: S2, S3.
 
 - Every coefficient of these equations is a parameter in `params/`.
 - Steepness and length are proposed from the terrain data and **confirmed or corrected by the user**. The interface shows how the result moves with both.
+
+`DECIDED` as the target (USER-I and USER-L of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md), 14 November 2026): the classical daily route of RUSLE2 (S1), built in stages starting with **dynamic LS**, explicitly partial while other components stay simplified. Dynamic LS is not built: `engine/erosion/ls.py` holds the static forms above. D66 plans the check of the LS rows of S2 for the demonstration point first; read together, the static LS stands in for the demonstration as a declared partial stage.
 
 ### M1.5 Factor C by period
 
@@ -85,7 +104,15 @@ The soil-loss ratio of a period comes from the sub-factor equations of RUSLE (ca
 `OPEN`, for the lead developer and the science reviewers, not answered by D45:
 
 - The source of each input (residue cover at sowing, canopy cover and fall height by stage, the residue type of each crop). Whether the erosion engine takes residue cover from the residue ledger is Q12 of `contracts/ENTRYPOINTS.md`.
-- The level of residue cover at sowing. The share of the soil covered by residue at sowing is the most sensitive input: it is explicit, and the result is shown for more than one level.
+- The level of residue cover at sowing. The share of the soil covered by residue at sowing is the most sensitive input: it is explicit, and the result is shown for more than one level. The generic levels proposed for it were withdrawn (USER-AA of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): local published evidence is needed first.
+
+Findings of the AI pre-check against S1 (not decisions; findings 1 to 3 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): S1 uses the effective canopy cover; its ground-cover sub-factor has a roughness term and takes the cover in percent; it multiplies seven daily sub-factors and integrates daily; and it modifies residue decay by daily moisture and temperature. The forms built in `engine/erosion/c_factor/` are a partial reading of S1. Decided by the lead developer on 14 November 2026 (PC-1 to PC-3 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)):
+
+- **Canopy:** the canopy sub-factor takes the effective canopy cover of S1 Eq. 6.5 (PC-1).
+- **Ground cover:** the sub-factor of S1 Eq. 6.6, with its coefficient per percent of cover and the random roughness at the value of the unit plot, so that its roughness term is one (PC-1).
+- **Sub-factors set to one:** surface roughness, soil biomass, soil consolidation and prior land use (D45), and ridge height and antecedent soil moisture (PC-3). Declared as a limit of the method.
+- **Residue decay:** a constant rate by residue type, without the moisture and temperature modifiers of S1, declared as a simplification (PC-2).
+- **Integration:** the monthly weighting by the erosivity fraction is a declared partial stage of the classical daily route of RUSLE2 (PC-3, USER-L).
 
 ### M1.6 Factor P
 
@@ -115,6 +142,10 @@ The daily **FAO-56 Penman-Monteith** method. Source: S10.
 
 It is checked against the worked example of the manual: test H2 of `docs/VALIDATION.md`, whose definition, expected value and tolerance are still `OPEN` there.
 
+- USER-F of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md): the comparison is at the published precision, and the internal daily state is never rounded. Which printed figure and which tolerance are still for the lead developer; the rounding oddities of the worked example do not supply a tolerance (finding 9).
+- Findings of the AI pre-check (not decisions): the list of symbols of Eq. 39 bounds Rs/Rso at 1, and chapter 3 bounds the wind speed used in Eq. 6; the code applies neither (finding 4, question P21). The image of Eq. 9 prints a minus sign that the text, Box 11 and Example 18 contradict; the code takes the mean and keeps it (finding 5).
+- Decided (PC-4 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): Rs/Rso is bounded at 1 in the net longwave radiation, and the wind speed used in Eq. 6 at 0.5 m s-1 or more, as S10 prescribes. Built by lane L1 in `engine/water/et0/`.
+
 ### M2.2 Daily water balance
 
 As D44 states it:
@@ -129,7 +160,18 @@ As D44 states it:
 
 D44 does not spell out the symbols of the closure. `engine/water/balance/README.md` (rule R1) reads them as the change of storage in the column over the day (`ΔS`), precipitation (`P`), runoff (`Q`), evaporation (`E`), transpiration (`T`) and drainage (`D`).
 
-`OPEN`, for the lead developer and the science reviewers: **the source of the Curve Number method.** D44 names the method and no source, and S10 is not cited for it.
+`OPEN`, for the lead developer and the science reviewers: **the source of the Curve Number method.** D44 names the method and no source, and S10 is not cited for it. Finding of the AI pre-check (not a decision; finding 8): the forms built match the National Engineering Handbook Part 630, chapter 10 (NRCS 2004); its 2025 edition says that using the method as a loss in continuous simulation is outside its intended use, so admitting it in this continuous balance would be a declared adaptation.
+
+`DECIDED` for the source of the forms (PC-6 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md), 14 November 2026): **S11**, chapter 10, for the potential retention, the initial abstraction and the runoff; its use as the daily loss of this continuous balance is **declared an adaptation**. Still `OPEN`: the table of curve numbers by soil and cover, and its source.
+
+`DECIDED` for the exploratory water case (lead developer, 14 November 2026; [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md), section Water). Each value comes from its source under D34; none is written here:
+
+- **Soil:** the full hydraulic profile of Capurro (2017) at the La Estanzuela station, documented to 0.90 m (USER-AE). The station's average available-water reference of the national agroclimate service is a separate reference, not the principal profile. Neither is identified as the soil of another experiment of the case.
+- **Surface layer:** evaporation-layer depth 0.10 m, and 0.15 m in sensitivity (USER-AG); readily evaporable water explored at 8, 9, 10, 11 and 12 mm, the 10 mm reference being an assumption, not a calibration (USER-AL, provisional). Water evaporable below the wilting point stays in the same storage and never reaches the roots (USER-AF).
+- **Crops:** basal crop coefficients of FAO-56 Table 17 and depletion fractions of Table 22 as a transferred reference, with climatic adjustment and sensitivity (USER-AR); provisional crop-specific root growth of FAO-56 Annex 8 (USER-AO), and for soybean a provisional local curve inferred from Capurro (2016) (USER-AK). No local calibration is claimed.
+- **Initial state:** depletion zero and depletion equal to TAW, the same for every rotation (USER-P).
+- **Agricultural year of the demonstration:** 1 July to 30 June (USER-K), the start month of the case under C5.4.
+- Finding of the AI pre-check (not a decision; finding 6): FAO-56 chapter 7, Eq. 77, carries the transpiration from the surface layer (Tew), which the built step leaves out; the manual allows leaving it out in some cases, and the scope of that simplification is for the lead developer. Decided (PC-5): the omission is declared as a limit of the method, for a rain-fed balance, stating that with a 0.10 m evaporation layer and shallow early roots the surface layer is a large share of the early root zone, where the omission weighs most.
 
 ### M2.3 Fallback to the single crop coefficient
 
@@ -139,13 +181,15 @@ If the crop parameters of the dual coefficient or the values of the surface laye
 
 ### M2.4 What is built today
 
-No value of the water axis is computed today: EP3 returns every item missing with its reason, and `params/records/` holds no parameter.
+No value of the water axis is reported today: EP3 chains the four parts day by day, but convention C1.4 is incomplete, so every year is missing with its reason (D61), and `params/records/` holds no parameter.
 
 | Part | Where | State |
 |---|---|---|
 | Reference evapotranspiration (M2.1) | `engine/water/et0/`, pull request #121 | The forms of the equations are written and PROPOSED: a builder session wrote them without the method's text, and a person checks each one against its equation before any number of the folder is used (OPEN 2 of its README). Every constant is an argument the caller supplies, with no default. The test of H2 is written and skipped. As its README says, it waits for the inputs, intermediate results and final value of the worked example, transcribed and checked under D34; the tolerance and printed precision, set by the science reviewers; the constants; and a person's check of the forms. The README lists what else is still `OPEN` |
-| Daily water balance (M2.2) | `engine/water/balance/`, pull request #116 | The single-bucket form only: one layer, as in the fallback of M2.3. Runoff and `Ke` are inputs that the caller supplies; the Curve Number and the surface layer are not built. Every coefficient is an argument with no default |
-| Entry point EP3 of `contracts/ENTRYPOINTS.md` | `engine/water/exposure.py`, pull request #135 | Mechanical form: it lays out the agricultural years and returns every item missing with its reason. It returns no number |
+| Daily water balance (M2.2) | `engine/water/balance/`, pull request #116 | One layer, as in the fallback of M2.3. Every coefficient is an argument with no default |
+| Curve Number runoff (M2.2) | `engine/water/runoff/`, pull request #150 | The forms of finding 8; its source is still `OPEN` |
+| Surface-layer evaporation `Ke` (M2.2) | `engine/water/evaporation/`, pull request #151 | The daily balance of the surface layer; Tew left out (finding 6) |
+| Entry point EP3 of `contracts/ENTRYPOINTS.md` | `engine/water/exposure.py`, pull requests #135 and #165 | Chains the reference evapotranspiration, runoff, `Ke` and the balance day by day with `parameters` (D44, D46, D56); crop parameters are one value per crop, with no curve by stage (`engine/water/EXPOSURE.md`, OPEN 4). It reports no number while C1.4 is incomplete (D61) |
 
 ## Sources
 
@@ -161,6 +205,7 @@ No value of the water axis is computed today: EP3 returns every item missing wit
 | S8 | Emberson, R. (2023). Dynamic rainfall erosivity estimates derived from IMERG data. *Hydrology and Earth System Sciences* 27:3547–3563. https://doi.org/10.5194/hess-27-3547-2023 | read |
 | S9 | Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. *Ciencia e Investigación Agraria* 44(1):100–112. https://doi.org/10.7764/rcia.v44i1.1622 | read |
 | S10 | FAO-56. Reference: `OPEN`, `CITATION NEEDED`: a person composes it, as item 17 of the OPEN list of `engine/water/et0/README.md` asks. Issue #13 records how the contents page identifies the document: title line "Crop evapotranspiration - Guidelines for computing crop water requirements - FAO Irrigation and drainage paper 56"; authors R.G. Allen, L.S. Pereira, D. Raes, M. Smith; FAO, Rome, 1998; series mark M-56; ISBN 92-5-104219-5. https://www.fao.org/4/X0490E/x0490e00.htm. Locators used in this file: chapter 4, Example 18, the daily worked example that issue #13 locates for H2 (the definition of H2 is `OPEN` in `docs/VALIDATION.md`, so which example H2 uses is for the science reviewers); chapters 7 and 8, the dual crop coefficient, as D44 names them | located (issue #13 read the online pages on 14 November 2026; the session that wrote this row did not read the source) |
+| S11 | USDA Natural Resources Conservation Service (2004). *National Engineering Handbook*, Part 630 Hydrology, Chapter 10: Estimation of Direct Runoff from Storm Rainfall (210-VI-NEH, July 2004). Scope warning of its 2025 edition: Part 630, Subpart H, section 630.113G (August 2025) | read by the AI pre-check of 14 November 2026 (pp. 10-3 and 10-4); no person's check yet (D34). Chosen as the source of the forms by PC-6 |
 
 For the science reviewers: check every row not marked `read` against the source before a parameter is transcribed from it, and complete the author lists and titles of S3, S5 and S6.
 
@@ -175,6 +220,6 @@ For the science reviewers: check every row not marked `read` against the source 
 
 `OPEN`, for the lead developer:
 
-- The methods of the residue ledger and of the two carbon models.
+- The methods of the residue ledger and of the two carbon models. The lead developer's carbon decisions of 14 November 2026 (AMG-A and RothC mandatory for an integral comparison, AMG-M experimental, standard RothC as reference with a separate local evaluation, the variant with monthly FAO-56 ET0 as demand identified as an adaptation) are listed in [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md), section Carbon.
 - The correction of soil loss for soil water, if any is applied.
 - The name of the official program that a person runs for the comparison of blueprint section 8.

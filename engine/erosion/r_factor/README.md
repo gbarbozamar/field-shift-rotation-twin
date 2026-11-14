@@ -193,6 +193,44 @@ Each is **skipped**, and its reason says what it waits for: the inputs, the expe
 | `test_s7_control_regression_against_a_worked_example` | The control against a worked example of S7 as S4 gives it |
 | `test_s4_r_by_month_against_published_values` | `R` by month against the level, and the monthly distribution if S4 publishes one, at one place |
 
+## Climatological monthly fraction (D69)
+
+Decision D69 of issue #77 (14 November 2026): while S5 and S6 stay behind paywalls, the first release takes the **monthly erosivity of a published climatology** (D69 names GloREDa, Panagos et al. 2023, Zenodo record 8036998), and **the fraction of a month is that month's value over the sum of the twelve**. Decision USER-G of the lead developer (the same day, recorded in `docs/SCIENCE_DECISIONS.md`) defers the variation between years: the same twelve fractions hold for every agricultural year. D69 declares that limit: the climatology gives a climatological fraction, not the variation between years that M1.2 asks for.
+
+**Still open under D69, and not settled by this code:** which licence governs the climatology (the copy of one distributor states conditions that contradict the licence of the Zenodo record); the team confirms it before any value is committed. Until then no monthly value of the climatology is in this repository and the monthly values stay `NOT_AVAILABLE` in EP1.
+
+```text
+fraction(month)  = E(month) / (E(1) + ... + E(12))          E: published monthly erosivity at the point
+R(year, month)   = mean_annual_r * fraction(month)            the same for every agricultural year
+```
+
+| Function | Module | Takes | Returns |
+|---|---|---|---|
+| `climatological_monthly_fractions` | `climatology.py` | `monthly_erosivity`: the twelve calendar months, each a number or a `Missing` | `{month: float \| Missing}` adding up to one, or one `Missing` |
+| `climatological_r_by_year_and_month` | `climatology.py` | `mean_annual_r`, `mean_annual_r_unit`, `fractions`, `ag_years`, `start_month` | `{ag_year: {(year, month): float \| Missing}}`, the shape of `r_by_year_and_month`, or one `Missing` |
+
+`PROPOSED` handling, in the style of the rest of this package: a missing month makes every fraction one `MISSING_INPUT` naming it (the sum of the twelve is not defined); a month below zero or not finite is `NOT_COMPUTABLE`, never clipped; twelve months adding up to zero are `NOT_COMPUTABLE`, never split equally; a level in another unit than `R_UNIT` is `REASON_UNIT_NOT_ACCEPTED`. The monthly values carry one unit because they come in one table; the fraction has none, so no unit string is checked for them.
+
+| Input a person supplies | Proposed identifier | Unit | Source | Value |
+|---|---|---|---|---|
+| The twelve monthly erosivity values at the point | OPEN: the scope keys of `params/README.md` have no month, so twelve records need a new key, or the values travel as site data from an adapter of the platform lane | OPEN: as the climatology prints it | D69: GloREDa, licence to be confirmed; locator (layer, cell) OPEN | |
+
+Cases, in `test_climatology.py` (a test checks that this list and that file agree; every number in it is a PLACEHOLDER):
+
+| Case | What it shows |
+|---|---|
+| `test_fractions_are_each_month_over_the_sum_of_twelve` | Each fraction is its month over the sum, by hand; the twelve add up to one |
+| `test_a_missing_month_makes_every_fraction_missing_and_names_it` | A missing month, of either shape, gives one `MISSING_INPUT` naming it; no month is filled |
+| `test_negative_non_finite_or_zero_sum_months_are_not_computed` | A negative or infinite month, or twelve zeros, give `NOT_COMPUTABLE`; never clipped, never split equally |
+| `test_r_is_the_level_times_the_fraction_and_repeats_every_year` | `R` is the level times the fraction of the calendar month; every year has the same twelve values, adding up to the level, keyed by the start month |
+| `test_r_with_a_missing_or_foreign_level_or_missing_fractions` | A missing level or table gives `MISSING_INPUT`; a level in another unit gives `REASON_UNIT_NOT_ACCEPTED`; a missing fraction makes its month missing |
+| `test_the_table_of_r_has_the_shape_of_the_daily_index_route` | The same keys as `r_by_year_and_month` for the same years and start month |
+| `test_climatology_defects_of_the_caller_raise` | Keyword arguments only, no default; a month set other than 1 to 12 is `ValueError`; wrong types are `TypeError` |
+| `test_climatology_module_holds_no_number_but_calendar_ones` | The module writes only 0, 1, 2 and 12 |
+| `test_readme_lists_the_cases_of_test_climatology` | This list and `test_climatology.py` name the same cases |
+
+Not verified: no value of the climatology was read or run through these functions; whether its monthly layers are in the unit D11 implies for a month is OPEN (OPEN 9).
+
 ## OPEN
 
 Each item is a question a person has to answer, with the role that answers it. None is answered by this unit.
@@ -203,7 +241,7 @@ Each item is a question a person has to answer, with the role that answers it. N
 4. **Which year is the year of the fractions and the ratios: the calendar year or the agricultural year of the case?** The functions take `start_month` and leave the choice to the caller; `start_month=1` gives calendar years. D47 lists agricultural years in the results. For the lead developer and the science reviewers.
 5. **A year with no erosive day.** Its fractions are not defined, so its values of `R` are missing, although its yearly ratio is a real zero. Is that the wanted result, or is `R` of such a year zero? For the science reviewers.
 6. **Over which years is the mean of the ratios taken?** Proposed: the years whose annual sum is a number, so missing and incomplete years are left out. The alternative is to require the whole record (D29, 2001 to 2024) and make every ratio missing otherwise. For the science reviewers.
-7. **What is the form of the control regression, and on what does it run?** Proposed: `coefficient * P(month) ** exponent` on the monthly sum of daily precipitation, in millimetres. `docs/METHODS.md` says the equation of S7 was taken from S4 and the session read neither. If the published regression uses another quantity (for example an annual total, or an index built from monthly totals), the function changes. For the science reviewers.
+7. **What is the form of the control regression, and on what does it run?** Proposed: `coefficient * P(month) ** exponent` on the monthly sum of daily precipitation, in millimetres. `docs/METHODS.md` says the equation of S7 was taken from S4 and the session read neither. If the published regression uses another quantity (for example an annual total, or an index built from monthly totals), the function changes. For the science reviewers. **AI pre-check finding (F16, 14 November 2026; not a person's check, D34):** S4, p. 92 (PDF page 2), prints two regressions of the **annual** `R`, Eq 1 on mean annual precipitation and Eq 2 on the modified Fournier index; neither is a power of the monthly precipitation, and pages 92 to 93 neither print the formula of the Fournier index nor prescribe a monthly distribution of `R` or applying the regressions month by month. Eq 2 prints a squared `P` after the Fournier term; the oddity is kept as printed and not corrected by inference. So the form of `control_monthly_erosivity` has no source among the pages read. Under D69 the monthly fraction of the first release comes from a published monthly climatology (section "Climatological monthly fraction (D69)"), and this control is not run by EP1. See `docs/SCIENCE_DECISIONS.md`, finding F16. **Decided (PC-7, 14 November 2026):** the control is marked without a source and stays out of the route of the first release.
 8. **How is the comparison with the control reported to people?** The function returns both fractions and their difference per month. Whether a summary is shown, and from which difference the two are said to disagree, is a threshold that a person supplies. For the lead developer and the science reviewers; the interface developer if it is shown.
 9. **Which unit strings do a monthly value of `R` and a value of the control carry?** The months of a year add up to an annual `R` in `MJ mm ha-1 h-1 yr-1`, but no unit string for a monthly value exists in the repository. For the science reviewers and the lead developer (C1.1).
 10. **For which values do the forms hold?** No bound is written: a negative exponent, a negative threshold, a negative level or a negative coefficient is computed where the arithmetic allows. A bound is a threshold, which a person supplies. For the science reviewers.
