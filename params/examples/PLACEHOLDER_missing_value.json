@@ -1,0 +1,15 @@
+{
+  "id": "PLACEHOLDER_parameter",
+  "scope": {
+    "crop": "PLACEHOLDER_other_crop"
+  },
+  "value": null,
+  "value_missing_reason": "PLACEHOLDER reason: why no value is recorded",
+  "unit": "PLACEHOLDER_unit",
+  "range": null,
+  "range_missing_reason": "PLACEHOLDER reason: why no range is recorded",
+  "citation": null,
+  "transcribed_by": "PLACEHOLDER_person_one",
+  "checked_by": "PLACEHOLDER_person_two",
+  "note": "PLACEHOLDER example of a record whose value is missing."
+}
