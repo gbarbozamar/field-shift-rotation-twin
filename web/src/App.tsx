@@ -2,13 +2,14 @@ import { useHashRoute } from './lib/useHashRoute'
 import { API_URL } from './lib/api'
 import { formatString } from './lib/format'
 import { strings } from './strings'
+import EntryScreen from './entry/EntryScreen'
 import FieldsScreen from './identity/FieldsScreen'
 
 export default function App() {
   const route = useHashRoute()
-  // The identity screen is the first real screen: it is the default view and
-  // also reachable at "/fields". Other routes keep the placeholder page.
-  const showFieldsScreen = route === '/' || route === '/fields'
+  // The entry screen opens the case as the default view at "/"; the fields
+  // screen (map above the list) follows at "/fields". Other routes keep the
+  // placeholder page.
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -17,7 +18,9 @@ export default function App() {
         <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
       </header>
       <main className="px-6 py-8">
-        {showFieldsScreen ? (
+        {route === '/' ? (
+          <EntryScreen />
+        ) : route === '/fields' ? (
           <FieldsScreen />
         ) : (
           <>
