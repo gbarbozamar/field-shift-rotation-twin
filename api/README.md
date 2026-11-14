@@ -126,6 +126,75 @@ One shape for every non-2xx response on every route:
 - Unexpected exceptions are caught inside the route, logged with `logging`,
   and answered `500` without exception text, so the CORS headers are kept.
 
+## Configuration (`api/config.py`)
+
+The app a server runs (`api.main:app`) is assembled from environment
+variables: `app = build_app(load_config(os.environ))`. When the people who own
+the decisions write the settings, the real data flows with no code change.
+
+- `load_config(environ) -> AppConfig` reads only the mapping it is given,
+  never `os.environ` itself. An empty or blank value counts as unset; values
+  are stripped of surrounding whitespace.
+- `build_app(config, *, client_factory=None) -> FastAPI` builds the sources
+  the configuration names and calls `create_app` (now in `api/app.py`,
+  re-exported by `api/main.py` with `parse_origins`). Engines and the rotation
+  validator are the defaults of `create_app`. `create_app` keeps its signature
+  and stays the way tests inject fakes.
+
+**No variable has a default.** A piece that is **not configured** is a typed
+absence (the app of today). A piece that is **configured wrongly** is a deploy
+defect: `ConfigError`, whose message names the variable and what is wrong, so
+the server refuses to start. A message never contains the content of a file,
+only its path and the reason.
+
+| Variable | Meaning | When unset |
+|---|---|---|
+| `CORS_ORIGINS` | Comma-separated origins allowed to call the API from a browser | No cross-origin access (unchanged) |
+| `POWER_SETTINGS_FILE` | Path of a JSON file with the NASA POWER adapter settings, loaded with `PowerSettings.from_mapping`. The template is `adapters/examples/PLACEHOLDER_power_settings.json` (placeholders only, never a usable configuration) | The climate source is the stand-in: `unavailable` / `NOT_AVAILABLE` |
+| `CLIMATE_CACHE_DIR` | Folder of the `FileCache` of climate responses. Not created or checked at start-up beyond being non-empty: `FileCache` creates it on first write | Required when `POWER_SETTINGS_FILE` is set; alone it is ignored |
+| `CLIMATE_START_DATE`, `CLIMATE_END_DATE` | The climate record period (`RunSettings`), `YYYY-MM-DD`, inclusive | No period: the climate source is not called (unchanged) |
+| `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example` | The soil-and-slope source is the stand-in |
+
+Relative paths are resolved against the working directory of the server.
+
+With `POWER_SETTINGS_FILE`, the climate source is
+`PowerClimateSource(settings, FileCache(CLIMATE_CACHE_DIR), client)`. The
+`httpx.Client` is made by `client_factory(settings)` (default: a plain
+`httpx.Client` with the configured `timeout_seconds`) and closed when the app
+shuts down (the FastAPI lifespan). Tests pass a factory that returns a client
+on `httpx.MockTransport`.
+
+### Start-up failures (`ConfigError`)
+
+- `POWER_SETTINGS_FILE` set and the file does not exist, cannot be read as
+  UTF-8 text, is not JSON (line and column given), or is rejected by
+  `PowerSettings.from_mapping` (its message is passed on).
+- `POWER_SETTINGS_FILE` set without `CLIMATE_CACHE_DIR`.
+- Only one of `CLIMATE_START_DATE` and `CLIMATE_END_DATE` set; a date that is
+  not `YYYY-MM-DD` or not a calendar date; the start after the end. A period
+  of one day is accepted.
+- `SOIL_SLOPE_EXAMPLE_FILE` set and the file does not exist, cannot be read,
+  does not load into `SiteSoilSlope`, or has `example_data` false. This is an
+  extra, earlier guard: `ExampleSoilSlopeSource` itself still answers
+  `unavailable` for these when used directly.
+
+### Running locally with settings
+
+```bash
+cp adapters/examples/PLACEHOLDER_power_settings.json <a folder outside git>/power_settings.json
+# replace every placeholder with the values the people who own them decided
+POWER_SETTINGS_FILE=<that folder>/power_settings.json \
+CLIMATE_CACHE_DIR=<a folder for the cache> \
+CLIMATE_START_DATE=<first day> CLIMATE_END_DATE=<last day> \
+SOIL_SLOPE_EXAMPLE_FILE=<the accepted example> \
+uv run uvicorn api.main:app --reload
+```
+
+Started with the template unchanged, the server starts but every climate
+request fails (`https://power.invalid/` never resolves): the template is a
+shape, not a configuration. `compose.yaml` lists the variables as comments;
+none is switched on.
+
 ## Interfaces and their implementations
 
 The route depends only on these interfaces. `create_app(cors_origins, *,
@@ -134,8 +203,8 @@ settings=None)` receives the implementations; `None` means the default.
 
 | Interface | Defined in | Default | Default behaviour | Still to come |
 |---|---|---|---|---|
-| `ClimateSource` | `adapters/ports.py` | Stand-in `ClimateUnavailable` | `data=None`, `unavailable`, `NOT_AVAILABLE` | The NASA POWER adapter (`adapters/power.py`) is built; wiring it needs its settings (OPEN in `adapters/README.md`) |
-| `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is built, not wired: which file is the accepted example is a person's decision. Then the Block 2 adapters |
+| `ClimateSource` | `adapters/ports.py` | Stand-in `ClimateUnavailable` | `data=None`, `unavailable`, `NOT_AVAILABLE` | The NASA POWER adapter (`adapters/power.py`) is wired by `POWER_SETTINGS_FILE` (see Configuration); its settings are OPEN in `adapters/README.md` |
+| `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is wired by `SOIL_SLOPE_EXAMPLE_FILE`: which file is the accepted example is a person's decision. Then the Block 2 adapters |
 | `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; today none is, so every module is `not_available` and there is no result | Nothing in `api/`: each engine is picked up when its lane lands it |
 | `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
 
@@ -221,6 +290,7 @@ The rows are checked in this order; the first that applies decides
 |---|---|---|---|
 | EP2 not built | `None` | `NOT_AVAILABLE`, detail names `engine.calendar.build_rotation_calendar` | `calendar` `not_available` / `NOT_AVAILABLE`; `erosion`, `water` `not_available` / `MISSING_INPUT` naming the calendar (see the precedence rule below) |
 | Climate or soil-and-slope data is `None` | `None` | `MISSING_INPUT`, detail names the input(s) (`climate`, `soil_slope`). EP1 and EP3 are **not** called: their arguments are model instances (G3) | `calendar` as it ran; `erosion`, `water` `not_available` / `MISSING_INPUT` |
+| Climate or soil-and-slope data carry another `case_id` or `field_id` than the calendar | `None` | `MISSING_INPUT`, detail starts "site data of another field than the calendar" and names the input(s) and the identifier field(s) that differ, never their values. EP1 and EP3 are **not** called: they would raise `ValueError` (G5) | `calendar` as it ran; `erosion`, `water` `not_available` / `MISSING_INPUT` |
 | EP1 or EP3 not built (the other is still called) | `None` | `NOT_AVAILABLE`, detail names the engine(s) | that module `not_available` / `NOT_AVAILABLE`; the other from its output |
 | EP1 returns a bare `Missing` (Q4) | `None` | its reason and detail, copied | `erosion` `not_available` with that reason and detail |
 | No carbon model identifier configured (an explicit `carbon_models=()`; not the app's default) | `None` | `NOT_AVAILABLE`, detail says the carbon model identifiers are not configured | `residues`, `amg`, `rothc` `not_available` / `NOT_AVAILABLE` |
@@ -274,6 +344,15 @@ result and not both zero with one (checked at construction).
 - `RotationDefinitionValidator`: one detail per validation error, path
   relative to the rotation, code and message as above.
 - The detail of the missing carbon rows ("no carbon engine is built yet").
+- Unit `l2/app-config`: the configuration (`api/config.py`): the variable
+  names, `AppConfig`, `load_config` reading only its mapping, blank as unset,
+  every `ConfigError` case and message, `build_app` and `client_factory`
+  taking the settings, closing the client in the lifespan, the move of
+  `create_app` to `api/app.py`.
+- Unit `l2/app-config`: the row "site data of another field" of the runner
+  table (its place after "data is `None`", the reason `MISSING_INPUT`, the
+  detail text, `other_field_inputs`), and the test cases of
+  `api/test_config.py` and section 11 of `api/test_engines.py`.
 - The test cases of `api/test_rotations.py`, `api/test_errors.py`,
   `api/test_engines.py`, `api/test_rotation_validator.py`,
   `api/test_packaging.py`.
@@ -315,12 +394,21 @@ result and not both zero with one (checked at construction).
   then enforces it with no change here. Until then the runner keeps the
   defensive handling of a bare `Missing` from EP1 (Q4). The first and last
   dates of the calendar remain open.
-- **Do the identifiers of the site data have to match the calendar's?** The
-  runner passes the climate and soil-and-slope instances as they come. A
-  source whose `case_id` or `field_id` differs (for example the accepted
-  example, which carries its own) makes the engines raise `ValueError` (G5),
-  which the route answers `500`. Should the runner or the route check the
-  identifiers first and answer with a typed absence? (platform developer).
+- **May the accepted soil-and-slope example stand in for any field at the
+  first checkpoint (blueprint section 7)?** (lead developer). The example
+  carries its own `case_id` and `field_id`; today the runner answers site data
+  of another field with a typed absence (`MISSING_INPUT`, `200`) instead of
+  the engines' `ValueError` (`500`). So with `SOIL_SLOPE_EXAMPLE_FILE` set,
+  the engines run only for the field the example names. If the example may
+  stand in for any field: does the source rewrite the identifiers to the
+  requested field, or do the engines stop comparing them? Neither is
+  implemented. (The rotation definition example and the site-data examples
+  also carry different identifiers.)
+- **Which values go into the settings?** `POWER_SETTINGS_FILE` (every OPEN of
+  `adapters/README.md`), `CLIMATE_START_DATE` and `CLIMATE_END_DATE` (science
+  reviewers), `SOIL_SLOPE_EXAMPLE_FILE` (lead developer and platform
+  developer), `CLIMATE_CACHE_DIR` and whether the host keeps it between
+  restarts (platform developer). Until set, each piece stays an absence.
 
 ### No echo of submitted values in a rotation error
 
