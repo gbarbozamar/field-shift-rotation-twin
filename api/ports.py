@@ -1,12 +1,13 @@
 """Interfaces the rotation route needs that are not in ``adapters/ports.py``.
 
-The route in ``api/rotations.py`` depends only on these interfaces and on
-``adapters.ports.ClimateSource``. It never imports a concrete adapter or
-engine. Until the real implementations exist, ``api/standins.py`` supplies
-stand-ins that return only typed absences.
+The route in ``api/rotations.py`` depends only on these interfaces and on the
+two source interfaces of ``adapters/ports.py``. It never imports a concrete
+adapter or engine. ``api/engines.py`` implements ``RotationEngines`` on the
+engine entry points of contracts/ENTRYPOINTS.md; ``api/standins.py`` supplies
+the stand-ins of the interfaces that have no real implementation yet.
 
 Status: PROPOSED (blueprint section 3.7). The shapes below are a design of the
-builder session of unit ``l2/api-one-rotation``.
+builder sessions of units ``l2/api-one-rotation`` and ``l2/engine-runner``.
 
 Rules:
 
@@ -21,48 +22,69 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, get_args
 
-from adapters.ports import ClimateResult, SourceInfo
+from adapters.ports import (
+    ClimateResult,
+    SoilSlopePayload,
+    SoilSlopeResult,
+    SoilSlopeSource,
+)
+from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
+from contracts.results.models import ReasonCode, ResultsPerRotation
 
-# --- payload aliases: one alias, one line to change later --------------------
+__all__ = [
+    "CLIMATE_CONTRACT",
+    "SOIL_SLOPE_CONTRACT",
+    "CalendarPayload",
+    "EnginesResult",
+    "ErrorDetail",
+    "Missing",
+    "ModuleState",
+    "ModuleStatus",
+    "ReasonCode",
+    "ResultsPayload",
+    "RotationEngines",
+    "RotationPayload",
+    "RotationValidator",
+    "RunSettings",
+    "SoilSlopePayload",
+    "SoilSlopeResult",
+    "SoilSlopeSource",
+]
 
-# One item of the contract "Rotation definition", as submitted by the client.
-# Replaced by the "Rotation definition" contract model when it is merged.
+# --- payload types: one line each --------------------------------------------
+
+# One item of the contract "Rotation definition", as submitted by the client:
+# a JSON object. The ``RotationValidator`` loads it into
+# ``contracts.rotation_definition.RotationDefinition``, and the engine runner
+# passes that instance to EP2.
 RotationPayload = Mapping[str, Any]
 
-# The contract "Rotation calendar". Replaced by its contract model.
-CalendarPayload = Mapping[str, Any]
+# The contract "Rotation calendar".
+CalendarPayload = RotationCalendar
 
-# The contract "Results per rotation". Replaced by
-# ``contracts.results.ResultsPerRotation`` when it is merged.
-ResultsPayload = Mapping[str, Any]
+# The contract "Results per rotation".
+ResultsPayload = ResultsPerRotation
 
-# The contract "Site data: soil and slope". Replaced by
-# ``contracts.inputs.SiteSoilSlope`` when it is merged.
-SoilSlopePayload = Mapping[str, Any]
+# ``SoilSlopePayload`` (the contract "Site data: soil and slope"),
+# ``SoilSlopeResult`` and ``SoilSlopeSource`` live in adapters/ports.py, next
+# to the climate ones, and are re-exported here.
 
-# PROPOSED: contract identifiers of the two site-data sources, as they appear
-# in ``SourceInfo.contract``. The climate one follows the example in
-# adapters/ports.py; the soil-and-slope one follows the unmerged proposal of
-# contracts/inputs/.
-CLIMATE_CONTRACT = "site_data_climate"
-SOIL_SLOPE_CONTRACT = "site_data_soil_slope"
+
+# Contract identifiers of the two site-data sources, as they appear in
+# ``SourceInfo.contract``: the ``contract`` value of each model.
+def _contract_of(model: type) -> str:
+    (value,) = get_args(model.model_fields["contract"].annotation)
+    return value
+
+
+CLIMATE_CONTRACT: str = _contract_of(SiteClimate)
+SOIL_SLOPE_CONTRACT: str = _contract_of(SiteSoilSlope)
 
 # --- closed vocabularies ------------------------------------------------------
 
-# contracts/CONVENTIONS.md C3.2. Replaced by the ``ReasonCode`` of the
-# contracts package when it is merged.
-ReasonCode = Literal[
-    "NOT_DECLARED",
-    "SOURCE_UNAVAILABLE",
-    "NO_COVERAGE",
-    "MISSING_INPUT",
-    "NOT_COMPUTABLE",
-    "CONTROL_FAILED",
-    "NOT_AVAILABLE",
-    "NOT_APPLICABLE",
-]
+# ``ReasonCode`` is the C3.2 list of contracts/results/models.py.
 
 # PROPOSED: the state of one engine module for this run.
 #   available      the module ran and produced its outputs
@@ -96,21 +118,30 @@ class ModuleStatus:
 class EnginesResult:
     """What the engines return for one rotation.
 
-    ``result_missing`` is set exactly when ``result`` is ``None``.
+    ``result_missing`` is set exactly when ``result`` is ``None`` (checked by
+    the route). ``values_present`` and ``values_missing`` count the indicator
+    values inside ``result`` (``api.engines.count_values``), so the route can
+    derive the outcome without reading the result: both are zero without a
+    result, and with a result they count at least one value.
     """
 
     calendar: CalendarPayload | None
     result: ResultsPayload | None
     result_missing: Missing | None
     modules: Sequence[ModuleStatus] = field(default_factory=tuple)
+    values_present: int = 0
+    values_missing: int = 0
 
-
-@dataclass(frozen=True)
-class SoilSlopeResult:
-    """The answer of a soil-and-slope source: the data, or None with the reason."""
-
-    data: SoilSlopePayload | None
-    source: SourceInfo
+    def __post_init__(self) -> None:
+        for name in ("values_present", "values_missing"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"EnginesResult: {name} is a count")
+        counted = self.values_present + self.values_missing
+        if self.result is None and counted:
+            raise ValueError("EnginesResult: values are counted only in a result")
+        if self.result is not None and not counted:
+            raise ValueError("EnginesResult: a result counts its values")
 
 
 class RotationEngines(Protocol):
@@ -126,20 +157,6 @@ class RotationEngines(Protocol):
         climate: ClimateResult,
         soil_slope: SoilSlopeResult,
     ) -> EnginesResult: ...
-
-
-# --- soil and slope -----------------------------------------------------------
-
-
-class SoilSlopeSource(Protocol):
-    """Anything that can supply the soil and slope data of a field.
-
-    Same rules as ``adapters.ports.ClimateSource``: a source that does not
-    answer is a result (``data=None``, ``state="unavailable"`` with a reason),
-    never an exception.
-    """
-
-    def get_soil_slope(self, case_id: str, field_id: str) -> SoilSlopeResult: ...
 
 
 # --- rotation validation ------------------------------------------------------
@@ -162,8 +179,8 @@ class ErrorDetail:
 class RotationValidator(Protocol):
     """Checks one rotation. An empty list means valid.
 
-    The real implementation loads the rotation into the "Rotation definition"
-    contract model.
+    The real implementation (``api/rotation_validator.py``) loads the rotation
+    into the "Rotation definition" contract model.
     """
 
     def validate(self, rotation: RotationPayload) -> list[ErrorDetail]: ...

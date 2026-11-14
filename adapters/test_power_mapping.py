@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from typing import get_args
 
 import pytest
 
@@ -17,7 +18,9 @@ from adapters._fakes import (
     make_settings,
     power_document,
 )
-from adapters.power_mapping import UnusableResponse, to_site_climate
+from adapters.power_mapping import DETAIL_NO_RANGE, UnusableResponse, to_site_climate
+from contracts.inputs import SiteClimate
+from contracts.inputs.common import ReasonCode
 
 SETTINGS = make_settings()
 REQUEST = make_request()  # 1900-01-01 to 1900-01-03
@@ -59,7 +62,10 @@ def test_full_response():
         assert series["time_zone"] == "UTC"
         assert series["start_date"] == "1900-01-01"
         assert series["end_date"] == "1900-01-03"
-        assert series["range_missing"] == {"reason": "NOT_AVAILABLE"}
+        assert series["range_missing"] == {
+            "reason": "NOT_AVAILABLE",
+            "detail": DETAIL_NO_RANGE,
+        }
         assert series["days"] == [
             {"date": "1900-01-01", "value": 1.0},
             {"date": "1900-01-02", "value": 2.0},
@@ -238,14 +244,27 @@ def test_mapping_does_not_change_its_input():
 
 # 23
 def test_drop_in_against_the_contract_model():
-    """Skipped until contracts/inputs/ is merged; then it runs unchanged."""
-    inputs = pytest.importorskip("contracts.inputs")
-    site_climate = pytest.importorskip("contracts.inputs.site_climate")
-    model = getattr(inputs, "SiteClimate", None) or site_climate.SiteClimate
+    """The mapper's document loads into the contract model, through JSON."""
     raw = two_series(
         {"19000101": 0.0, "19000102": PLACEHOLDER_FILL},
         {"19000101": PLACEHOLDER_FILL},
     )
     document = to_site_climate(raw, REQUEST, SETTINGS)
     # Through JSON, as the document travels.
-    model.model_validate_json(json.dumps(document))
+    SiteClimate.model_validate_json(json.dumps(document))
+
+
+@pytest.mark.parametrize("code", get_args(ReasonCode))
+@pytest.mark.parametrize("setting", ["fill_reason", "range_missing_reason"])
+def test_every_reason_code_gives_a_document_that_loads(setting, code):
+    """Every missing and range_missing part carries a detail, so every C3.2 code loads."""
+    settings = make_settings(**{setting: code})
+    raw = two_series({"19000101": 0.0, "19000102": PLACEHOLDER_FILL})  # one day absent
+    document = to_site_climate(raw, REQUEST, settings)
+    loaded = SiteClimate.model_validate_json(json.dumps(document))
+    series = loaded.daily_series[0]
+    assert series.range_missing.reason == settings.range_missing_reason
+    assert series.range_missing.detail
+    missing = [day.missing for day in series.days if day.value is None]
+    assert len(missing) == 2
+    assert all(part.reason == settings.fill_reason and part.detail for part in missing)

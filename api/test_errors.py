@@ -8,6 +8,9 @@ obvious placeholder and every identifier is ``PLACEHOLDER_...``.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -21,7 +24,16 @@ SITE = {
     "latitude": 1.0,
     "longitude": 2.0,
 }
-ROTATION = {"PLACEHOLDER_KEY": "PLACEHOLDER_VALUE"}
+# A valid rotation: the PLACEHOLDER example of the rotation definition.
+ROTATION = json.loads(
+    (
+        Path(__file__).parent.parent
+        / "contracts"
+        / "rotation_definition"
+        / "examples"
+        / "PLACEHOLDER_rotation_definition.json"
+    ).read_text(encoding="utf-8")
+)
 
 client = TestClient(create_app([]))
 

@@ -21,15 +21,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from adapters.ports import ClimateSource
+from api.engines import (
+    DEFAULT_CARBON_MODELS,
+    EntryPointEngines,
+    discover_engine_functions,
+)
 from api.errors import install_error_handlers
 from api.ports import RotationEngines, RotationValidator, RunSettings, SoilSlopeSource
+from api.rotation_validator import RotationDefinitionValidator
 from api.rotations import make_router
-from api.standins import (
-    AcceptAnyRotation,
-    ClimateUnavailable,
-    EnginesNotBuilt,
-    SoilSlopeNotLoaded,
-)
+from api.standins import ClimateUnavailable, SoilSlopeNotLoaded
 
 
 class Health(BaseModel):
@@ -54,10 +55,15 @@ def create_app(
     rotation_validator: RotationValidator | None = None,
     settings: RunSettings | None = None,
 ) -> FastAPI:
-    """Build the application. ``None`` for an implementation means its stand-in.
+    """Build the application. ``None`` for an implementation means its default.
 
-    The stand-ins are in ``api/standins.py``; ``settings=None`` means no climate
-    record period is configured (OPEN for the science reviewers).
+    The default engines are ``EntryPointEngines`` on the engine functions found
+    at their paths of contracts/ENTRYPOINTS.md, with the carbon model
+    identifiers ``DEFAULT_CARBON_MODELS``. The default rotation validator loads the item into
+    ``RotationDefinition``. The two sources default to the stand-ins of
+    ``api/standins.py``.
+    ``settings=None`` means no climate record period is configured (OPEN for
+    the science reviewers).
     """
     app = FastAPI(title="Field Shift Rotation Twin")
     install_error_handlers(app)
@@ -78,11 +84,17 @@ def create_app(
         make_router(
             climate=climate if climate is not None else ClimateUnavailable(),
             soil_slope=soil_slope if soil_slope is not None else SoilSlopeNotLoaded(),
-            engines=engines if engines is not None else EnginesNotBuilt(),
+            engines=(
+                engines
+                if engines is not None
+                else EntryPointEngines(
+                    discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS
+                )
+            ),
             rotation_validator=(
                 rotation_validator
                 if rotation_validator is not None
-                else AcceptAnyRotation()
+                else RotationDefinitionValidator()
             ),
             settings=settings if settings is not None else RunSettings(),
         )
