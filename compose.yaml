@@ -1,0 +1,21 @@
+# Local development. Start with:  docker compose watch
+# Code edits are synced into the container and uvicorn reloads;
+# a change to pyproject.toml or uv.lock rebuilds the image.
+services:
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    develop:
+      watch:
+        - action: sync
+          path: ./api
+          target: /app/api
+        # Add ./adapters here when the folder exists.
+        - action: rebuild
+          path: pyproject.toml
+        - action: rebuild
+          path: uv.lock
