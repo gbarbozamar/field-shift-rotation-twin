@@ -138,6 +138,11 @@ MONTHLY_NOT_BUILT = (
     "month, from the daily erosivity index of docs/METHODS.md M1.2, which is not "
     "built (blueprint section 8, Block 1)"
 )
+R_NOT_BUILT = (
+    "the daily erosivity index of docs/METHODS.md M1.2, which gives the monthly "
+    "fraction of R and its variation between years, is not built (blueprint "
+    "section 8, Block 1)"
+)
 C_NOT_BUILT = (
     "the method that would compute C, the sub-factor equations of docs/METHODS.md "
     "M1.5 (decision D45 of issue #77), is not built"
@@ -364,7 +369,7 @@ def _factors(soil_slope: SiteSoilSlope, parameters: dict[str, dict]) -> _Factors
         return read_parameter(parameters, pid, SCOPE)
 
     return _Factors(
-        r=_factor(record(R_ID), ACCEPTED_UNITS.r),
+        r=_factor(record(R_ID), ACCEPTED_UNITS.r, extra=R_NOT_BUILT),
         k=_factor(record(K_ID), ACCEPTED_UNITS.k),
         ls=_ls_factor(soil_slope, parameters),
         c=_factor(record(C_ID), ACCEPTED_UNITS.c, extra=C_NOT_BUILT),

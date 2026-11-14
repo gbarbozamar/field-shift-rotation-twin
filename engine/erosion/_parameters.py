@@ -69,17 +69,36 @@ def read_parameter(
       ``MISSING_INPUT``, the parameter named and the refusal repeated.
     - A record whose value is ``null``: ``MISSING_INPUT``, the parameter named
       and the reason of the record repeated (G4).
+    - A record without a well-formed ``id`` and ``scope`` anywhere in
+      ``parameters``: ``MISSING_INPUT``, the parameter named and every such
+      record named by its key. It cannot be compared, so it could be a record of
+      this parameter; it is reported, not skipped (F3c of params/README.md).
+      PROPOSED; ``check_catalogue`` rejects such a catalogue (G3).
 
     A record with another scope is not read, also not one with a wider or a
     narrower scope (question 5 of params/README.md is OPEN).
     """
     sought = identity({"id": parameter_id, "scope": scope})
-    matches = [
-        record
-        for _, record in sorted(parameters.items())
-        if _identity_or_none(record) == sought
-    ]
     named = _named(parameter_id, scope)
+    identities = {
+        key: _identity_or_none(record) for key, record in sorted(parameters.items())
+    }
+    malformed = [key for key, found in identities.items() if found is None]
+    if malformed:
+        return Parameter(
+            Missing(
+                reason="MISSING_INPUT",
+                detail=(
+                    f"{named} cannot be looked up: the record(s) "
+                    f"{', '.join(repr(key) for key in malformed)} have no well-formed "
+                    "'id' and 'scope', so they cannot be compared and could be records "
+                    "of this parameter (F3c of params/README.md); "
+                    "params.catalogue.check_catalogue rejects such a catalogue (G3)"
+                ),
+            ),
+            None,
+        )
+    matches = [parameters[key] for key, found in identities.items() if found == sought]
     if not matches:
         return Parameter(
             Missing(

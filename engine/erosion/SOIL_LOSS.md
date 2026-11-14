@@ -96,7 +96,8 @@ Each factor is an `equation.Factor`: a number with the unit string it arrives in
 
 | Factor | How it is obtained | When it is missing |
 |---|---|---|
-| `R`, `K`, `P` | The value of one record, read with `read_value`; its unit is the record's `unit` | See [a parameter that cannot be read](#a-parameter-that-cannot-be-read) |
+| `R` | The value of one record, read with `read_value`; its unit is the record's `unit` | See [a parameter that cannot be read](#a-parameter-that-cannot-be-read), and the detail adds that the daily erosivity index of M1.2, which gives the monthly fraction of `R` and its variation between years, is not built |
+| `K`, `P` | The same | See [a parameter that cannot be read](#a-parameter-that-cannot-be-read) |
 | `C` | The same | The same, and the detail adds that the method that would compute `C`, the sub-factor equations of M1.5 (D45), is not built |
 | `LS` | `ls.slope_length_factor(...) * ls.slope_steepness_factor(...)`, from `soil_slope.slope_steepness`, `soil_slope.slope_length` and the ten records of `LS.md`; unit `dimensionless` | First, `MISSING_INPUT` naming every slope input that is missing in `SiteSoilSlope` (with its own reason and detail) and every coefficient that cannot be read. Then `ls.REASON_UNIT_NOT_ACCEPTED` for a slope unit that is not read as a `SlopeUnit`. Then the `Missing` that `ls.py` returns (units of the length that differ, a form without a finite real result). Then `NOT_COMPUTABLE` if `L * S` is not finite |
 
@@ -106,6 +107,7 @@ Always reason `MISSING_INPUT` (G4, the two rows for a parameter). The detail nam
 
 | Situation | `detail` |
 |---|---|
+| A record anywhere in `parameters` without a well-formed `id` and `scope` (only in a catalogue that `check_catalogue` rejects, G3). It cannot be compared, so it could be a record of this parameter: it is reported, not skipped (F3c of `params/README.md`). PROPOSED, OPEN 18 | `parameter '<id>' with scope {} cannot be looked up: the record(s) '<key>', ... have no well-formed 'id' and 'scope', ...` |
 | No record with that id and scope | `parameter '<id>' with scope {} has no record in parameters (D56)` |
 | More than one such record (only in a catalogue that `check_catalogue` rejects, G3) | `parameter '<id>' with scope {} has more than one record in parameters, which params.catalogue.check_catalogue rejects (G3)` |
 | `read_value` refuses the record (malformed, or a placeholder) | `the record of parameter '<id>' with scope {} is refused by params.catalogue.read_value: <its message>` |
@@ -134,7 +136,7 @@ A number is returned as an `AnnualSoilLoss` with:
 | `1` | `soil_loss.py`, `_FIRST` | Months and days are counted from one (C5.1) |
 | `1` | `_parameters.py` | More than one record with one id and scope |
 
-The test file builds its PLACEHOLDER numbers from positions in the list of identifiers (`position + 2`, so that none is zero or one), adds `1` to a number to change it, and uses the integers of month arithmetic. It writes no value of the method. Its records carry the word PLACEHOLDER in their citation, persons and reasons, and are passed as an in-memory copy in which the word is replaced by `UNMARKED_TEST_ONLY`, as `params/test_layout.py` does (question 12 of `params/README.md`); that copy passes `check_catalogue`. The unit strings of the `R`, `K`, `C` and `P` records are read from `ACCEPTED_UNITS` of the module, not written in the test.
+The test file builds its PLACEHOLDER numbers as `PLACEHOLDER_BASE` plus the position in the list of identifiers. The base is plainly unreal, far above any value a factor or a coefficient of RUSLE takes, so that no test number lands on a published coefficient. The test adds `1` to a number to change it, and uses the integers of month arithmetic. It writes no value of the method. Its records carry the word PLACEHOLDER in their citation, persons and reasons, and are passed as an in-memory copy in which the word is replaced by `UNMARKED_TEST_ONLY`, as `params/test_layout.py` does (question 12 of `params/README.md`); that copy passes `check_catalogue`. The unit strings of the `R`, `K`, `C` and `P` records are read from `ACCEPTED_UNITS` of the module, not written in the test.
 
 ## PROPOSED cases
 
@@ -160,7 +162,7 @@ The identifier is the name of the test function in `test_soil_loss.py` without `
 | Case | What it checks |
 |---|---|
 | `parameters-missing-positional-or-not-a-dict-raises-type-error` | `parameters` left out, passed by position, or not a `dict` (`None`, a list, a tuple, text, a list of pairs), or a `dict` with an item that is not a `dict` or a key that is not `str`: `TypeError` (G3, G5) |
-| `empty-catalogue-names-every-parameter-and-keeps-every-year` | `{}`: every agricultural year of D47 is present and `MISSING_INPUT`; the detail names the five factors and every identifier of the table with `scope {}` and D56, and M1.5 and D45 for `C`; every month is `NOT_AVAILABLE` naming M1.2 |
+| `empty-catalogue-names-every-parameter-and-keeps-every-year` | `{}`: every agricultural year of D47 is present and `MISSING_INPUT`; the detail names the five factors and every identifier of the table with `scope {}` and D56, M1.2 and its daily erosivity index for `R`, and M1.5 and D45 for `C`; every month is `NOT_AVAILABLE` naming M1.2 |
 | `full-catalogue-gives-the-product-of-equation-py` | Every record present: each covered year's value equals `equation.annual_soil_loss` of the record values and of `LS` from `ls.py`; it carries `DERIVED`, a source naming every identifier, no range and `range_missing` `NOT_AVAILABLE`; years not covered stay `NO_COVERAGE`; months stay missing; the result loads back equal |
 | `ls-is-computed-through-ls-py-from-the-catalogue` | With the break slope above the slope and at the slope, and each `LS` record changed in turn: the value equals the product with `LS` computed by `ls.py` from the changed numbers |
 | `removing-any-one-record-makes-the-year-missing-and-names-it` | For each of the fourteen identifiers: without its record every year is `MISSING_INPUT`, and the detail names that identifier with `scope {}` and no other |
@@ -168,6 +170,7 @@ The identifier is the name of the test function in `test_soil_loss.py` without `
 | `record-that-read-value-refuses-is-missing-input` | A record still marked PLACEHOLDER, and a record without `unit`: `MISSING_INPUT`, naming the parameter and the refusal of `read_value` |
 | `only-a-record-with-the-empty-scope-is-read` | A record of `P` with a `management` scope instead of `{}`: not read, `MISSING_INPUT` naming `P` with `scope {}` (OPEN 3) |
 | `two-records-with-one-identity-are-missing-input` | Two records of `C` with one id and scope: `MISSING_INPUT`, saying there is more than one |
+| `record-that-cannot-be-compared-is-reported-not-skipped` | A record with `id` null, `scope` null, or an `id` that starts with a digit: every parameter is `MISSING_INPUT` and its detail names that record by its key; never "has no record" (F3c of `params/README.md`) |
 | `slope-unit-that-ls-py-cannot-read-is-not-computed` | A `slope_steepness` unit, or an `s_break` record unit, that is no `SlopeUnit` value: `LS` missing with `ls.REASON_UNIT_NOT_ACCEPTED`, naming which |
 | `factor-in-another-unit-is-stopped-by-the-unit-guard` | An `R` record in another unit string than D11's: the year is missing with the unit-guard reason, naming factor `r` |
 | `no-value-is-a-number-unless-every-factor-is-present` | Over the cases with an empty catalogue, with one record left out, and with a full catalogue but a slope unit that is not read: no value is a number, none is zero, every value has a `missing` part with a code of C3.2 and carries no range, source or provenance |
@@ -207,5 +210,5 @@ Each item is a question a person has to answer, with the role that answers it. N
 15. **The units of the coefficient records of `LS`.** `LS` is passed to the product as `dimensionless` (M1.7). The unit strings of `a1` to `a4` and `b1` to `b4` are not checked (OPEN 4 of `LS.md`). For the science reviewers.
 16. **`P` under no-till.** M1.6 says `P` is one by default under no-till. This unit writes no default: `P` is read from a record like the other factors. For the lead developer and the science reviewers.
 17. **`ls.py` has no `LS` function.** It returns `S` and `L`; the product `L * S` is written in `soil_loss.py`, with a finiteness check. Whether `ls.py` should offer it is for the lead developer (not changed here, as the brief says).
-18. **A record that `read_value` refuses.** G4 has rows for a parameter without a record and for a record with `"value": null`. A refused record (malformed or a placeholder, possible only in a catalogue that `check_catalogue` rejects, G3) and two records with one identity are answered with `MISSING_INPUT` too, naming the parameter. For the lead developer and the platform developer.
+18. **A record that `read_value` refuses, or that cannot be compared.** G4 has rows for a parameter without a record and for a record with `"value": null`. A refused record (malformed or a placeholder), two records with one identity, and a record without a well-formed `id` and `scope` are possible only in a catalogue that `check_catalogue` rejects (G3); each is answered with `MISSING_INPUT` too, naming the parameter. A record that cannot be compared is reported, not skipped (F3c of `params/README.md`): PROPOSED, it makes **every** parameter missing, because it could be a record of any of them. The alternative is to report it only for a parameter that has no comparable record. For the lead developer and the platform developer.
 19. **Who reads `detail`.** The format above is for developers. If the interface shows it, its wording belongs to the strings file of `web/` and to people. For the interface developer and the lead developer.

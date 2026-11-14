@@ -279,12 +279,18 @@ PERCENT = ls.SlopeUnit.PERCENT
 LENGTH_UNIT = "PLACEHOLDER_length_unit"
 
 
+# PLACEHOLDER base of the test numbers: plainly unreal, far above any value a
+# factor or a coefficient of RUSLE takes, so that no test number lands on a
+# published coefficient. Not a value of the method.
+PLACEHOLDER_BASE = 123456.25
+
+
 def placeholder_values() -> dict[str, float]:
-    """One PLACEHOLDER number per parameter: its position in the list of
-    identifiers, plus two, so that none is zero or one. Not values of the
-    method."""
+    """One PLACEHOLDER number per parameter: ``PLACEHOLDER_BASE`` plus its
+    position in the list of identifiers. Not values of the method."""
     return {
-        pid: float(position + 2) for position, pid in enumerate(module.PARAMETER_IDS)
+        pid: PLACEHOLDER_BASE + position
+        for position, pid in enumerate(module.PARAMETER_IDS)
     }
 
 
@@ -595,6 +601,10 @@ def test_empty_catalogue_names_every_parameter_and_keeps_every_year():
     for pid in module.PARAMETER_IDS:
         assert f"{named(pid)} has no record in parameters (D56)" in detail
     assert "M1.5" in detail and "D45" in detail
+    r_part = detail.split("factor 'k'", 1)[0]
+    assert (
+        "M1.2" in r_part and "daily erosivity index" in r_part and "not built" in r_part
+    )
     assert {item.missing.reason for item in result.monthly} == {"NOT_AVAILABLE"}
     assert all("M1.2" in item.missing.detail for item in result.monthly)
 
@@ -712,6 +722,25 @@ def test_two_records_with_one_identity_are_missing_input():
     for item in run_computable(parameters).annual:
         assert item.missing.reason == "MISSING_INPUT"
         assert f"{named(module.C_ID)} has more than one record" in item.missing.detail
+
+
+def test_record_that_cannot_be_compared_is_reported_not_skipped():
+    """F3c of params/README.md: a record without a well-formed id and scope is
+    named in the detail of every parameter, never read as "no record"."""
+    for broken in ({"id": None}, {"scope": None}, {"id": "0PLACEHOLDER"}):
+        parameters = catalogue()
+        key = f"{module.K_ID}.json"
+        parameters[key] = dict(parameters[key], **unmarked(broken))
+        assert check_catalogue(parameters) != []
+        for item in run_computable(parameters).annual:
+            assert item.value is None
+            assert item.missing.reason == "MISSING_INPUT"
+            detail = item.missing.detail
+            assert "has no record" not in detail
+            for pid in module.PARAMETER_IDS:
+                assert (
+                    f"{named(pid)} cannot be looked up: the record(s) '{key}'" in detail
+                )
 
 
 def test_slope_unit_that_ls_py_cannot_read_is_not_computed():
