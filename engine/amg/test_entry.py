@@ -1,7 +1,9 @@
 """Acceptance test of EP5 ``run_amg`` (unit l1/amg-ep5, issue #192).
 
-Every number here is a PLACEHOLDER: small values with repeated digits, chosen
-only so that the forms of the core give finite numbers. None is a value of
+Every number here is a PLACEHOLDER: plainly unreal values with repeated
+digits (a stable fraction of 0.999, a starting stock of 99999.9, a clay
+content of 999.9, temperatures near 100), chosen only so that the forms of
+the core give finite numbers. None is a value of
 AMG, and no expected value of the science is written: each computed number is
 compared with the core functions called a second time on the same inputs, or
 with the mass balance.
@@ -81,16 +83,16 @@ CONTENT = f"{MARK}_content"
 
 # PLACEHOLDER numbers; the unit of each record follows the rule of entry.PARAMETERS.
 VALUES: dict[str, tuple[float, str]] = {
-    "stable_fraction": (0.55, "dimensionless"),
+    "stable_fraction": (0.999, "dimensionless"),
     "potential_rate": (0.22, f"{STEP_UNIT}-1"),
-    "temperature_reference": (11.0, DEGREE),
+    "temperature_reference": (99.9, DEGREE),
     "temperature_shape": (2.2, "dimensionless"),
     "temperature_sensitivity": (0.11, f"{DEGREE}-1"),
     "moisture_shape": (0.33, "dimensionless"),
     "moisture_sensitivity": (0.011, f"{DEPTH}-1"),
     "clay_sensitivity": (0.0011, f"{CONTENT}-1"),
     "carbonate_sensitivity": (0.0022, f"{CONTENT}-1"),
-    "ph_optimum": (7.7, "dimensionless"),
+    "ph_optimum": (1.11, "dimensionless"),
     "ph_sensitivity": (0.044, "dimensionless"),
 }
 HUMIFICATION = {ORIGINS[0]: 0.33, ORIGINS[1]: 0.44}
@@ -192,7 +194,7 @@ def forcing_data() -> dict:
     data["soil_cover"] = []
     quantity = {name: q for name, (_, q) in FORCING_QUANTITIES.items()}
     data["annual_climate"] = [
-        annual(quantity["temperature"], unmark(DEGREE), [9.9, 11.1, 12.2, 10.0]),
+        annual(quantity["temperature"], unmark(DEGREE), [88.8, 99.9, 111.1, 77.7]),
         annual(quantity["water_balance"], unmark(DEPTH), [-22.2, 33.3, 0.0, 11.1]),
     ]
     data["annual_carbon_inputs"] = [
@@ -207,13 +209,13 @@ def forcing_data() -> dict:
         ),
     ]
     data["soil_properties"] = [
-        soil(quantity["clay_content"], 222.0, unmark(CONTENT)),
-        soil(quantity["carbonate_content"], 11.0, unmark(CONTENT)),
-        soil(quantity["ph"], 6.6, "dimensionless"),
+        soil(quantity["clay_content"], 999.9, unmark(CONTENT)),
+        soil(quantity["carbonate_content"], 99.9, unmark(CONTENT)),
+        soil(quantity["ph"], 9.99, "dimensionless"),
     ]
     data["starting_state"] = [
         {
-            **soil(quantity["starting_carbon"], 44.4, STOCK_UNIT),
+            **soil(quantity["starting_carbon"], 99999.9, STOCK_UNIT),
             "provenance": "DECLARED",
         }
     ]
@@ -376,13 +378,15 @@ def test_mass_balance_holds_at_every_step():
     active, stable = balance.pools
     humified, mineralised = balance.flows
     stocks = [total.initial.value] + [s.value for s in total.steps]
+    # A difference of two stocks is exact only to the precision of the stocks.
+    tolerance = 1e-12 * max(abs(stock) for stock in stocks)
     for position in range(len(total.steps)):
         change = stocks[position + 1] - stocks[position]
         assert math.isclose(
             change,
             humified.steps[position].value - mineralised.steps[position].value,
             rel_tol=1e-12,
-            abs_tol=1e-12,
+            abs_tol=tolerance,
         )
         assert mineralised.steps[position].value >= 0
         assert math.isclose(
@@ -397,7 +401,7 @@ def test_mass_balance_holds_at_every_step():
         math.fsum(s.value for s in humified.steps)
         - math.fsum(s.value for s in mineralised.steps),
         rel_tol=1e-12,
-        abs_tol=1e-12,
+        abs_tol=tolerance,
     )
 
 
@@ -522,7 +526,7 @@ def test_each_quantity_the_forcing_lacks_is_named(name):
 def test_a_missing_climate_year_makes_that_step_and_every_later_step_missing():
     data = forcing_data()
     data["annual_climate"][0] = annual(
-        FORCING_QUANTITIES["temperature"][1], unmark(DEGREE), [9.9, 11.1, None, 10.0]
+        FORCING_QUANTITIES["temperature"][1], unmark(DEGREE), [88.8, 99.9, None, 77.7]
     )
     balance = run_amg(forcing(data), parameters=catalogue())
     steps = balance.total_stock.steps

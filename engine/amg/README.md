@@ -278,7 +278,7 @@ run_amg(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonBalance
 
 Only **AMG-A**, the annual published reference that takes part in the selection (D80). AMG-M, the monthly variant, is experimental under D80 and is not built (EP5 OPEN 1).
 
-1. **Steps.** One step per agricultural year of the horizon, from its first month (C5.3), each of length one `yr` (C1.1: one agricultural year). Months after the last whole agricultural year make one more step, which is not computed: its inputs are missing, reason `NOT_COMPUTABLE`, "not a whole agricultural year" (the core then reports the step `MISSING_INPUT` naming them).
+1. **Steps.** One step per agricultural year of the horizon, from its first month (C5.3), each of length one `yr` (C1.1: one agricultural year). Months after the last whole agricultural year make one more step, which is not computed: its inputs are missing, reason `NOT_COMPUTABLE`, "not a whole agricultural year" (the core then reports the step `MISSING_INPUT` naming them). Why `NOT_COMPUTABLE` and not `NO_COVERAGE` is EP5 OPEN 12.
 2. **Initial state.** `initial_state(total_carbon, stable_fraction)` of the core: the starting soil carbon of the forcing and `amg_stable_fraction`.
 3. **Each step.** `humified_input` of the core, over every series of `annual_carbon_inputs` (keyed by the series' quantity, each with the humification coefficient of its `origin`). `rate_coefficient` of the core: the potential rate times the five modifiers of the core (temperature and moisture of that agricultural year; clay, carbonate and pH of the soil). `run` of the core with scheme `explicit` (EP5 OPEN 3).
 4. **Trend.** `trend_measures` of the core over the total stocks and elapsed times of the run. `mean_over_cycles` is given no cycle boundaries, because `CarbonForcing` carries no rotation cycle: it is always missing, `MISSING_INPUT`, naming that input, and also the first missing stock when there is one (EP5 OPEN 6).
@@ -328,13 +328,17 @@ The twelve parameters of the table [Constants a person has to transcribe](#const
 
 Once the initial state is missing, every step, stock, flow and trend value is missing and names it (the core's `run` and `trend_measures`).
 
+### A change to a case of the core
+
+`test_amg.py` stated, in `test_no_entry_point_yet`, that the package has no `run_amg` ("EP5 is OPEN"). That cannot hold once EP5 exists, so unit `l1/amg-ep5` replaced it with `test_entry_point_is_run_amg_of_entry_module`, which checks that `engine.amg.run_amg` is the function of `entry.py`. It is the only change to `test_amg.py`; its row in [PROPOSED cases](#proposed-cases) says so. No other module of the core was changed.
+
 ### The runner
 
 `api/engines.py` imports each engine by module path and function name, with `importlib.import_module` and `getattr`; `engine.amg` with `run_amg` resolves to this function (`test_the_runner_finds_run_amg_by_its_module_path_and_name`). But the runner does not import EP5 today. Its list `DISCOVERED` holds EP2, EP1 and EP3 only, and `EngineFunctions` has no field for EP5. It writes the carbon modules `residues`, `amg` and `rothc` as `not_available`, `NOT_AVAILABLE`, "no carbon engine is built yet", and `soil_carbon_trend` as missing, `NOT_AVAILABLE`, for each carbon model. Nothing in `api/` produces a `CarbonForcing`. So with this unit the running app returns the same response as before (EP5 OPEN 9 and 10).
 
 ## EP5 run_amg: PROPOSED cases
 
-Each case is a test function of `test_entry.py`; a test checks that this list and the file agree. Every number in the tests is a PLACEHOLDER; computed numbers are compared with the core functions called a second time, or with the mass balance. The PLACEHOLDER records pass `check_catalogue` only in their in-memory copy with the word replaced, as in `engine/water/`.
+Each case is a test function of `test_entry.py`; a test checks that this list and the file agree. Every number in the tests is a PLACEHOLDER, plainly unreal with repeated digits (a stable fraction of 0.999, a starting stock of 99999.9, a clay content of 999.9, temperatures near 100); computed numbers are compared with the core functions called a second time, or with the mass balance, to the precision of the stocks. The PLACEHOLDER records pass `check_catalogue` only in their in-memory copy with the word replaced, as in `engine/water/`.
 
 | Case | What it shows |
 |---|---|
@@ -374,6 +378,8 @@ Each item is a question a person answers; the role is named. None is answered by
 9. **`contracts/ENTRYPOINTS.md`, for a later L0 unit.** EP5 should say: Status `PROPOSED`; return type `CarbonBalance` of `contracts/carbon_balance/models.py` (PROPOSED); signature `run_amg(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonBalance` (`parameters` keyword-only, as the runner passes it); AMG-A only (D80), variant `amg_a`; `soil_carbon_trend` travels inside the balance (Q14 (c)); the row `soil_carbon_trend` of "From the entry points to one response" names EP5 and EP6. EP6 should name the same return type. For Q14 (a), the state at the end is the last step of each stock series.
 10. **The runner (`api/engines.py`, platform developer).** To use EP5 it needs: an entry `EntryPoint("EP5", "amg", "engine.amg", "run_amg")` in its discovery and a field in `EngineFunctions`; a `CarbonForcing` for the request (no adapter builds one: a port and an adapter of lane L2a); a call `run_amg(forcing, parameters=...)` with the catalogue it already loads; a check that the result is a `CarbonBalance`; the module status of `amg` from the values of the balance; and copying `balance.soil_carbon_trend` into `ResultsPerRotation.soil_carbon_trend` in place of the missing values for `amg`, keeping `rothc` missing while EP6 is not built. Whether the response also carries the stocks (a new part of the response) is for the platform developer and the interface developer.
 11. **The source text of a value** (question 11 of `contracts/results/README.md`). PROPOSED here: it names the engine, the variant, the scheme, the forcing quantities and the parameter records. For the lead developer.
+
+12. **Which reason code for the months after the last whole agricultural year.** PROPOSED: `NOT_COMPUTABLE`, not `NO_COVERAGE`. C5.5 gives `NO_COVERAGE` to an agricultural year that *the data series* does not cover from its first day to its last: it is about the extent of the data (C3.2: "the data source has no data for this place or this period"). Here the months are inside the horizon the run is asked for, and the forcing may hold values for every one of them; what fails is the method, whose annual step (AMG-A, D80) covers whole agricultural years only. That is the case C3.2 and G4 give to `NOT_COMPUTABLE`: "the inputs are present but the method cannot produce a value for this case". A year that the data does not cover arrives in the forcing as a value already missing with `NO_COVERAGE` (C5.5, applied by the producer of `CarbonForcing`), and run_amg passes that reason on unchanged in the step's detail. In practice the case arises only for a forcing without annual series, because `CarbonForcing` requires a horizon of whole agricultural years whenever it carries one. For the lead developer, who may instead make such a horizon an invalid forcing.
 
 ## EP5 run_amg: not verified
 
