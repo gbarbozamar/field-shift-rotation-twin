@@ -5,6 +5,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | Date (UTC-3) | Lane | Unit or files | Tool | What the AI did | Reviewed by a person |
 |---|---|---|---|---|---|
 | 2026-11-14 | Bootstrap | `README.md`, `NOTICE`, `ATTRIBUTIONS.md`, `AI_USE_LOG.md`, `.gitignore`, `docs/DEVELOPMENT_BLUEPRINT.md` | Claude Code (Anthropic) | Drafted the working rules and the development blueprint from the team's planning notes. Wrote no engine, adapter, interface or test code | Pending team review |
+| 2026-11-14 | Bootstrap | `docs/DEVELOPMENT_BLUEPRINT.md` | Claude Code (Anthropic) | Added the units and rules that four planning sessions reported as missing: parameter catalogue layout, uncertainty in the conventions, engine entry points, Platform examples, strings and shared value display moved to Block 0, CP1 seam unit | Pending team review |
 
 Rules:
 
