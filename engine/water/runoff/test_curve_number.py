@@ -49,11 +49,12 @@ README = (HERE / "README.md").read_text(encoding="utf-8")
 MODULES = sorted(p for p in HERE.glob("*.py") if not p.name.startswith("test_"))
 
 # PLACEHOLDER constants, plainly not real. With them the retention is
-# S = 3 * (6 / CN - 0.2), which is zero at CN = 30 and below zero above it.
+# S = 3 * (11.25 / CN - 0.375), which is zero at CN = 30 and below zero above
+# it.
 CONSTANTS = CurveNumberConstants(
     initial_abstraction_ratio=0.5,  # PLACEHOLDER
-    retention_numerator=6.0,  # PLACEHOLDER
-    retention_offset=0.2,  # PLACEHOLDER
+    retention_numerator=11.25,  # PLACEHOLDER
+    retention_offset=0.375,  # PLACEHOLDER
     retention_unit_factor=3.0,  # PLACEHOLDER
 )
 TOP_CURVE_NUMBER = 30.0  # PLACEHOLDER: where S is zero with CONSTANTS
@@ -94,7 +95,7 @@ def test_runoff_follows_the_proposed_forms():
             got = runoff_depth(precipitation, curve, constants=CONSTANTS)
             assert got == pytest.approx(_by_hand(precipitation, curve, CONSTANTS))
     s = potential_retention(10.0, constants=CONSTANTS)
-    assert s == pytest.approx(3.0 * (6.0 / 10.0 - 0.2))
+    assert s == pytest.approx(3.0 * (11.25 / 10.0 - 0.375))  # PLACEHOLDER
     assert initial_abstraction(s, constants=CONSTANTS) == pytest.approx(0.5 * s)
 
 
@@ -192,6 +193,35 @@ def test_a_negative_initial_abstraction_ratio_is_not_computable():
     assert "initial_abstraction_ratio" in ia.detail
     q = runoff_depth(12.0, 10.0, constants=constants)
     assert isinstance(q, Missing) and "initial_abstraction_ratio" in q.detail
+
+
+@pytest.mark.parametrize("name", ["retention_numerator", "retention_unit_factor"])
+@pytest.mark.parametrize("value", [-3.0, -1e-9])  # PLACEHOLDER
+def test_a_negative_retention_constant_is_not_computable_and_named(name, value):
+    s = potential_retention(10.0, constants=_with(**{name: value}))
+    assert s == Missing(
+        reason="NOT_COMPUTABLE", detail=f"constant '{name}' is below zero"
+    )
+    assert "curve_number" not in s.detail
+    q = runoff_depth(12.0, 10.0, constants=_with(**{name: value}))
+    assert isinstance(q, Missing) and f"constant '{name}' is below zero" in q.detail
+    assert "curve_number" not in q.detail
+
+
+@pytest.mark.parametrize("name", ["retention_numerator", "retention_unit_factor"])
+@pytest.mark.parametrize("value", [0.0, -0.0, 0])
+def test_a_zero_retention_constant_is_not_computable_and_named(name, value):
+    s = potential_retention(10.0, constants=_with(**{name: value}))
+    assert s == Missing(reason="NOT_COMPUTABLE", detail=f"constant '{name}' is zero")
+    q = runoff_depth(12.0, 10.0, constants=_with(**{name: value}))
+    assert isinstance(q, Missing) and f"constant '{name}' is zero" in q.detail
+    # Not the whole precipitation run off silently.
+    assert q != 12.0
+
+
+def test_a_retention_constant_is_checked_before_the_curve_number():
+    s = potential_retention(-1.0, constants=_with(retention_unit_factor=-3.0))
+    assert "retention_unit_factor" in s.detail and "curve_number" not in s.detail
 
 
 def test_a_negative_retention_given_to_the_initial_abstraction_is_not_computable():

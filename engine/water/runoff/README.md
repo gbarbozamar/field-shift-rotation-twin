@@ -73,13 +73,15 @@ Each form is PROPOSED and its source is CITATION NEEDED. The rules are choices o
 | F2 | Initial abstraction: `Ia = initial_abstraction_ratio · S` |
 | F3 | Runoff: `Q = 0` when `P ≤ Ia`; otherwise `Q = (P − Ia)² / (P − Ia + S)`. The code evaluates it as `(P − Ia) · ((P − Ia) / (P − Ia + S))`, the same expression |
 | R1 | **Admissible curve number**, with no number of its own: greater than zero, and its retention by F1 is a finite number not below zero. Outside that, the retention is missing with `NOT_COMPUTABLE`, naming `curve_number`, and nothing is clipped. Whether the method states a narrower range is OPEN 2 |
-| R2 | A negative precipitation, a negative initial-abstraction ratio, a non-finite operand, or an overflow gives `NOT_COMPUTABLE`, naming the operand; nothing is clipped |
+| R2 | A negative precipitation, a negative initial-abstraction ratio, a non-finite operand, or an overflow gives `NOT_COMPUTABLE`, naming the operand; nothing is clipped. The constants of F1 have their own checks (R9) |
 | R3 | **Runoff never above the precipitation.** With `S ≥ 0` (R1) and `Ia ≥ 0` (R2), F3 gives `0 ≤ Q ≤ P − Ia ≤ P`. The order of evaluation in F3 keeps this under floating-point rounding too: the ratio is not above one and `P − Ia` is not above `P`. The rule of the balance that limits runoff to the precipitation (its R6) therefore never acts on this runoff |
-| R4 | Missing in, missing out (C3.1, C3.3): a missing precipitation, curve number or constant gives a missing runoff with `MISSING_INPUT`, and its `detail` names every missing operand with its own reason, through the quantity that needs it (for example `potential retention (MISSING_INPUT: input 'curve_number' (NOT_DECLARED))`). A missing operand is reported before a non-finite one. Never zero |
+| R4 | Missing in, missing out (C3.1, C3.3): a missing precipitation, curve number or constant gives a missing runoff with `MISSING_INPUT`, and its `detail` names every missing operand with its own reason, through the quantity that needs it (for example `potential retention (MISSING_INPUT: input 'curve_number' (NOT_DECLARED))`). Never zero |
 | R5 | The precipitation is needed only by the runoff: a missing precipitation leaves the retention and the initial abstraction of the day computed |
-| R6 | Unit guard: a precipitation in a unit string other than `mm day-1` is not converted. The runoff is missing with `unit_guard_reason`, naming both unit strings. Strings are compared exactly. Order: a missing operand first (`MISSING_INPUT`), then the unit, then a non-finite or negative precipitation |
+| R6 | Order of the checks of a day: moved to OPEN 12; kept in the code |
 | R7 | No state from day to day: `run_runoff` is `runoff_day` applied to each day, in the order given; it neither sorts nor checks that the days are consecutive |
-| R8 | Caller defects raise: `TypeError` for an operand that is neither a number nor `contracts.results.models.Missing` (a boolean, text, `None`, the `Missing` of `contracts/inputs/`), for constants, days or a precipitation of the wrong class, for a date that is a `datetime`; `ValueError` for a reason code outside C3.2. A missing value never raises |
+| R8 | Which caller defects raise: moved to OPEN 13; kept in the code |
+| R9 | **A `retention_numerator` or a `retention_unit_factor` below zero or equal to zero** gives a missing retention with `NOT_COMPUTABLE`, whose `detail` names that constant (`constant '<name>' is below zero`, `constant '<name>' is zero`). A zero unit factor would otherwise give a retention of zero for every curve number, so the whole precipitation would run off silently; a zero or negative numerator would make the failure read as a curve number outside its range. PROPOSED; see OPEN 14 |
+| R10 | The constants of F1 are checked before the curve number, so that the reason names the operand that failed. A missing or non-finite operand is still reported first (R4) |
 
 ## Constants a person has to transcribe
 
@@ -115,6 +117,9 @@ The identifier of a case is the name of its test function in `test_curve_number.
 | `a-curve-number-whose-retention-is-below-zero-is-not-clipped` | Above the top of the range: missing, not the value at the top |
 | `a-negative-precipitation-is-not-computable` | `NOT_COMPUTABLE`, naming the precipitation, in `runoff_depth` and `runoff_day` |
 | `a-negative-initial-abstraction-ratio-is-not-computable` | `NOT_COMPUTABLE`, naming the ratio (R3) |
+| `a-negative-retention-constant-is-not-computable-and-named` | A negative `retention_numerator` or `retention_unit_factor`: `NOT_COMPUTABLE`, naming that constant and not `curve_number` (R9) |
+| `a-zero-retention-constant-is-not-computable-and-named` | A zero `retention_numerator` or `retention_unit_factor`: `NOT_COMPUTABLE`, naming that constant; the runoff is not the whole precipitation (R9) |
+| `a-retention-constant-is-checked-before-the-curve-number` | With both a bad constant and a bad curve number, the constant is named (R10) |
 | `a-negative-retention-given-to-the-initial-abstraction-is-not-computable` | `initial_abstraction` refuses a negative retention |
 | `a-non-finite-input-or-constant-is-not-computable` | Infinite, minus infinite and not a number, for the precipitation, the curve number and every constant |
 | `an-overflow-is-not-computable` | A retention or a denominator that overflows is `NOT_COMPUTABLE`, not zero |
@@ -136,7 +141,7 @@ The identifier of a case is the name of its test function in `test_curve_number.
 |---|---|
 | `the-precipitation-unit-is-that-of-climate-quantities` | Identifier and unit string are those of the CQ1 row of `contracts/CLIMATE_QUANTITIES.md` |
 | `a-precipitation-in-another-unit-is-not-converted` | Other unit strings, near spellings included, give the caller's reason code, naming both strings; also on a dry day |
-| `the-unit-guard-order-missing-then-unit-then-non-finite` | R6 order |
+| `the-unit-guard-order-missing-then-unit-then-non-finite` | The order of OPEN 12 |
 
 ### One day and a sequence of days
 
@@ -159,8 +164,8 @@ The identifier of a case is the name of its test function in `test_curve_number.
 
 | Case | What is checked |
 |---|---|
-| `wrong-types-raise-type-error` | R8 |
-| `a-reason-code-outside-c32-raises-value-error` | R8 |
+| `wrong-types-raise-type-error` | The defects of OPEN 13 |
+| `a-reason-code-outside-c32-raises-value-error` | The defects of OPEN 13 |
 | `same-arguments-give-the-same-result-and-are-not-changed` | G1 |
 | `the-module-holds-no-number-other-than-zero` | No constant of the method in the code |
 | `no-constant-and-no-public-argument-has-a-default` | No default anywhere |
@@ -191,6 +196,9 @@ Each question names the role that answers it.
 9. **Where the constants come from at run time.** D46 and D56 wait for the platform developer's approval in #144; the caller passes `CurveNumberConstants`. How the catalogue becomes that object is the unit of EP3. *Lead developer, with the platform developer.*
 10. **Reading the precipitation from `SiteClimate`.** This unit takes the precipitation of each day as `PrecipitationValue`; a function that reads the `precipitation` series of a `SiteClimate` (with its time zone, C6) belongs with EP3 or a later unit. *Lead developer.*
 11. **What the result carries.** No contract carries the daily runoff (Q10 (b) of `contracts/ENTRYPOINTS.md`); no unit string, provenance label (C4.3: `DERIVED` from an `OBSERVED` series) or range is attached here. *Lead developer.*
+12. **Order of the checks of a day (former R6).** Not asked by the brief; kept in the code and tested. A missing operand is reported first (`MISSING_INPUT`, naming every one); then a precipitation in another unit string (`unit_guard_reason`, naming both strings, compared exactly); then a non-finite or negative precipitation (`NOT_COMPUTABLE`). Within the retention, the constants of F1 come before the curve number (R10). Is this order wanted? *Lead developer.*
+13. **Which caller defects raise (former R8).** Not asked by the brief; kept in the code and tested. `TypeError` for an operand that is neither a number nor `contracts.results.models.Missing` (a boolean, text, `None`, the `Missing` of `contracts/inputs/`), for constants, days or a precipitation of the wrong class, and for a date that is a `datetime`; `ValueError` for a reason code outside C3.2. A missing value never raises. G5 allows `TypeError` for an argument of the wrong type at an entry point; whether an internal unit may raise these, or should answer them by G4, is Q7 of `contracts/ENTRYPOINTS.md`. *Platform developer (Q7); lead developer.*
+14. **Sign of the constants of F1 (R9).** PROPOSED: `retention_numerator` and `retention_unit_factor` must be greater than zero. A person confirms this against the source. `retention_offset` has no sign check of its own: a negative offset keeps the retention above zero for every curve number and breaks no guarantee of R3; whether the source allows it is for the same person. *Science reviewers.*
 
 ## Not in this unit
 

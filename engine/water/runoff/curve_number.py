@@ -200,6 +200,11 @@ def potential_retention(
 
     - A missing curve number or constant: ``MISSING_INPUT``, naming each.
     - A non-finite one: ``NOT_COMPUTABLE``, naming each.
+    - A ``retention_numerator`` or ``retention_unit_factor`` below zero or
+      equal to zero: ``NOT_COMPUTABLE``, naming that constant (PROPOSED). A
+      zero unit factor would give a retention of zero for every curve number,
+      so the whole precipitation would run off; a zero numerator would make
+      the retention the same for every curve number.
     - A curve number outside its admissible range: ``NOT_COMPUTABLE``. PROPOSED
       reading of the admissible range, with no number of its own: the curve
       number is greater than zero and the retention it gives is a finite
@@ -216,6 +221,14 @@ def potential_retention(
     )
     if absent is not None:
         return absent
+    # The constants are checked before the curve number, so that the reason
+    # names the operand that failed (README, rules R9 and R10).
+    for name in ("retention_numerator", "retention_unit_factor"):
+        value = getattr(constants, name)
+        if value < 0:
+            return _not_computable(f"constant '{name}' is below zero")
+        if value == 0:
+            return _not_computable(f"constant '{name}' is zero")
     if curve_number <= 0:
         return _not_computable(
             "input 'curve_number' is outside its admissible range: "
