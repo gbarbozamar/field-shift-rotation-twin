@@ -28,8 +28,10 @@ with ``NOT_AVAILABLE``.
 The files are read again on each call. A file that is absent, cannot be read
 or is malformed, or tables that disagree, give ``data=None``, ``unavailable``,
 ``NOT_AVAILABLE`` and a ``detail``; ``api/config.py`` checks the same files at
-start-up and refuses to start on any of these. A field that is not declared,
-or a soil group that no table lists, gives ``unavailable``, ``MISSING_INPUT``.
+start-up and refuses to start on any of these. A field that is not declared
+gives ``unavailable``, ``NOT_DECLARED``; a soil group that no table lists gives
+``unavailable``, ``NO_COVERAGE``. A group that only some tables list gets what
+those tables list, and ``SourceInfo.detail`` says how many tables do not.
 It never raises for a file.
 
 Status: PROPOSED (blueprint section 3.7), including the file layout, the
@@ -61,7 +63,8 @@ SOIL_TABLES_ID = "soil_tables"
 
 # PROPOSED: the reasons of C3.2 this source answers with.
 FILE_REASON = "NOT_AVAILABLE"  # a file absent or malformed, as the example source
-NOT_DECLARED_REASON = "MISSING_INPUT"  # no soil group for the field, or no row
+NOT_DECLARED_REASON = "NOT_DECLARED"  # the field's soil group is not declared
+NO_COVERAGE_REASON = "NO_COVERAGE"  # no table lists the declared soil group
 SLOPE_REASON = "NOT_AVAILABLE"  # slope from an elevation model is not built
 
 # The contract keeps the unit of a missing value (C3.1). No slope unit is
@@ -75,6 +78,11 @@ SLOPE_DETAIL = (
 DETAIL_FIELD_NOT_DECLARED = (
     "the field of the request (its case_id and field_id) has no soil group in "
     "the soil-groups declaration"
+)
+# The soil group is never repeated in a detail: it will be a value submitted
+# by the user (OPEN 26). It travels only in ``SourceInfo.request``.
+DETAIL_GROUP_NOT_LISTED = (
+    "the soil group declared for the field is listed by no soil table"
 )
 DETAIL_IDENTIFIERS_REFUSED = (
     "the requested case_id or field_id is refused by the contract model SiteSoilSlope"
@@ -170,6 +178,8 @@ def load_soil_table(path: str | os.PathLike[str]) -> SoilTable:
         if name in groups:
             raise SoilFileError(f"{where} repeats the soil group of an earlier group")
         rows = _list(group["soil_properties"], f"soil_properties of {where}")
+        if not rows:
+            raise SoilFileError(f"soil_properties of {where} is empty")
         properties: list[SoilProperty] = []
         for row_number, row in enumerate(rows, start=1):
             try:
@@ -263,17 +273,23 @@ class SoilTableSource:
         source_id: str = SOIL_TABLES_ID,
         now: Callable[[], dt.datetime] = _utc_now,
     ) -> None:
-        if isinstance(table_paths, (str, os.PathLike)) or not all(
-            isinstance(p, (str, os.PathLike)) for p in table_paths
-        ):
+        if isinstance(table_paths, (str, os.PathLike)):
             raise TypeError("SoilTableSource needs a sequence of soil table paths")
-        if not table_paths:
+        try:
+            paths = tuple(table_paths)  # copied first: a generator is read once
+        except TypeError:
+            raise TypeError(
+                "SoilTableSource needs a sequence of soil table paths"
+            ) from None
+        if not all(isinstance(p, (str, os.PathLike)) for p in paths):
+            raise TypeError("SoilTableSource needs a sequence of soil table paths")
+        if not paths:
             raise ValueError("SoilTableSource needs at least one soil table")
         if not isinstance(groups_path, (str, os.PathLike)):
             raise TypeError("SoilTableSource needs the path of the soil-groups file")
         if not isinstance(source_id, str) or not source_id.strip():
             raise ValueError("source_id is non-empty text")
-        self._table_paths = tuple(Path(p) for p in table_paths)
+        self._table_paths = tuple(Path(p) for p in paths)
         self._groups_path = Path(groups_path)
         self._source_id = source_id
         self._now = now
@@ -332,13 +348,19 @@ class SoilTableSource:
         listing = [table for table in tables if group in table.groups]
         if not listing:
             return self._unavailable(
-                request,
-                NOT_DECLARED_REASON,
-                f"the soil group '{group}' declared for the field is listed by "
-                "no soil table",
+                request, NO_COVERAGE_REASON, DETAIL_GROUP_NOT_LISTED
             )
+        # Only the files the answer is built from: the declaration and the
+        # tables that list the group.
         example_data = declarations.example_data or any(
-            table.example_data for table in tables
+            table.example_data for table in listing
+        )
+        not_listing = len(tables) - len(listing)
+        detail = (
+            f"{not_listing} of the {len(tables)} soil tables do not list the soil "
+            "group declared for the field; their properties are not in the answer"
+            if not_listing
+            else None
         )
         slope = {
             "value": None,
@@ -366,12 +388,15 @@ class SoilTableSource:
         # The dataset reference of each table that lists the group, in order.
         attribution = "; ".join(table.source for table in listing)
         if example_data:
-            info = self._info(request, state="example", attribution=attribution)
+            info = self._info(
+                request, state="example", attribution=attribution, detail=detail
+            )
         else:
             info = self._info(
                 request,
                 state="fresh",
                 retrieved_at=self._retrieved_now(),
                 attribution=attribution,
+                detail=detail,
             )
         return SoilSlopeResult(data=data, source=info)

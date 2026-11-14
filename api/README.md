@@ -74,8 +74,10 @@ A valid request always answers `200`, also when nothing could be computed:
   `example_data: true`, otherwise `fresh` with `retrieved_at` (the files are
   read during the call); `request` holds `case_id`, `field_id` and, once
   found, the declared `soil_group`; `attribution` joins the `source` of each
-  table that lists the group. An undeclared field, or a soil group no table
-  lists, is `unavailable` / `MISSING_INPUT`; a file that is absent or
+  table that lists the group. An undeclared field is `unavailable` /
+  `NOT_DECLARED`, a soil group no table lists `unavailable` / `NO_COVERAGE`;
+  a group only some tables list is served with a `detail` saying how many
+  tables do not list it; a file that is absent or
   malformed is `unavailable` / `NOT_AVAILABLE` (adapters/README.md,
   PROPOSED).
 - `result_missing` is non-null exactly when `result` is null (**PROPOSED**:

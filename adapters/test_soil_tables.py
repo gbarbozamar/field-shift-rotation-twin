@@ -157,7 +157,7 @@ def test_the_identifiers_are_never_rewritten(tmp_path):
         declarations(("OTHER_CASE", FIELD, "PLACEHOLDER_GROUP_A")),
     )
     result = source([TABLE], groups).get_soil_slope(CASE, FIELD)
-    assert_unavailable(result, "MISSING_INPUT")
+    assert_unavailable(result, "NOT_DECLARED")
     data = source([TABLE], groups).get_soil_slope("OTHER_CASE", FIELD).data
     assert (data.case_id, data.field_id) == ("OTHER_CASE", FIELD)
 
@@ -193,6 +193,29 @@ def test_two_tables_are_merged_per_group_in_their_order(tmp_path):
     )
 
 
+@pytest.mark.parametrize("example", [False, True])
+def test_a_group_some_tables_do_not_list_is_said_in_the_detail(tmp_path, example):
+    first = write(tmp_path, "a.json", table({"G1": [present("q_one")]}))
+    second = write(tmp_path, "b.json", table({"G2": [present("q_two")]}))
+    third = write(tmp_path, "c.json", table({"G2": [present("q_three")]}))
+    groups = write(
+        tmp_path, "g.json", declarations((CASE, FIELD, "G1"), example=example)
+    )
+    result = source([first, second, third], groups).get_soil_slope(CASE, FIELD)
+    assert result.source.state == ("example" if example else "fresh")
+    assert [p.quantity for p in result.data.soil_properties] == ["q_one"]
+    assert result.source.detail.startswith("2 of the 3 soil tables do not list")
+    assert "G1" not in result.source.detail
+
+
+def test_a_group_every_table_lists_has_no_detail(tmp_path):
+    first = write(tmp_path, "a.json", table({"G1": [present("q_one")]}))
+    second = write(tmp_path, "b.json", table({"G1": [present("q_two")]}))
+    groups = write(tmp_path, "g.json", declarations((CASE, FIELD, "G1")))
+    result = source([first, second], groups).get_soil_slope(CASE, FIELD)
+    assert result.source.detail is None
+
+
 def test_the_same_quantity_in_two_tables_is_refused(tmp_path):
     first = write(tmp_path, "a.json", table({"G1": [present("q_one", 1.0)]}))
     second = write(tmp_path, "b.json", table({"G1": [present("q_one", 2.0)]}))
@@ -213,19 +236,20 @@ def test_the_same_quantity_for_two_different_groups_is_fine(tmp_path):
 # --- 3: every absence is an answer, never an exception, never zero ------------
 
 
-def test_an_undeclared_field_is_missing_input():
+def test_an_undeclared_field_is_not_declared():
     result = source([TABLE], GROUPS).get_soil_slope(CASE, "PLACEHOLDER_NOT_DECLARED")
-    detail = assert_unavailable(result, "MISSING_INPUT")
+    detail = assert_unavailable(result, "NOT_DECLARED")
     assert "declaration" in detail
     assert "PLACEHOLDER_NOT_DECLARED" not in detail  # a submitted value is not repeated
 
 
-def test_a_group_no_table_lists_is_missing_input_naming_the_group():
+def test_a_group_no_table_lists_is_no_coverage_without_repeating_the_group():
     result = source([TABLE], GROUPS).get_soil_slope(
         CASE, "PLACEHOLDER_FIELD_NOT_IN_ANY_TABLE"
     )
-    detail = assert_unavailable(result, "MISSING_INPUT")
-    assert "PLACEHOLDER_GROUP_NOT_IN_ANY_TABLE" in detail
+    detail = assert_unavailable(result, "NO_COVERAGE")
+    assert "PLACEHOLDER_GROUP_NOT_IN_ANY_TABLE" not in detail
+    assert "listed by no soil table" in detail
     assert result.source.request["soil_group"] == "PLACEHOLDER_GROUP_NOT_IN_ANY_TABLE"
 
 
@@ -257,6 +281,8 @@ def _table_variants() -> list[Any]:
     rows = same_quantity["groups"][0]["soil_properties"]
     rows[1]["quantity"] = rows[0]["quantity"]
     unknown = {**base, SECRET: SECRET}
+    empty_group = copy.deepcopy(base)
+    empty_group["groups"][0]["soil_properties"] = []
     return [
         f"{{ {SECRET}",
         [SECRET],
@@ -272,6 +298,7 @@ def _table_variants() -> list[Any]:
         as_text,
         twice,
         same_quantity,
+        empty_group,
     ]
 
 
@@ -363,13 +390,23 @@ def test_example_data_propagates_and_sets_the_state(
     assert result.source.missing_reason is None
 
 
-def test_one_example_table_among_several_makes_the_document_example(tmp_path):
+def test_an_example_table_listing_the_group_makes_the_document_example(tmp_path):
     first = write(tmp_path, "a.json", table({"G1": [present("q_one")]}))
-    second = write(tmp_path, "b.json", table({"G9": [present("q_two")]}, example=True))
+    second = write(tmp_path, "b.json", table({"G1": [present("q_two")]}, example=True))
     groups = write(tmp_path, "g.json", declarations((CASE, FIELD, "G1")))
     result = source([first, second], groups).get_soil_slope(CASE, FIELD)
     assert result.data.example_data is True
     assert result.source.state == "example"
+
+
+def test_an_example_table_not_listing_the_group_does_not_count(tmp_path):
+    first = write(tmp_path, "a.json", table({"G1": [present("q_one")]}))
+    second = write(tmp_path, "b.json", table({"G9": [present("q_two")]}, example=True))
+    groups = write(tmp_path, "g.json", declarations((CASE, FIELD, "G1")))
+    result = source([first, second], groups).get_soil_slope(CASE, FIELD)
+    assert result.data.example_data is False
+    assert result.source.state == "fresh"
+    assert result.source.retrieved_at == MOMENT
 
 
 def test_a_clock_without_a_time_zone_is_a_defect(tmp_path):
@@ -394,6 +431,22 @@ def test_construction_needs_a_groups_path_and_a_source_id():
         SoilTableSource([TABLE], None)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         SoilTableSource([TABLE], GROUPS, source_id=" ")
+
+
+def test_a_generator_of_paths_is_copied_before_it_is_checked():
+    soil = SoilTableSource((path for path in [TABLE]), GROUPS, now=lambda: MOMENT)
+    first = soil.get_soil_slope(CASE, FIELD)
+    second = soil.get_soil_slope(CASE, FIELD)
+    assert first.data is not None and second.data == first.data
+
+
+def test_an_empty_group_is_refused_by_position(tmp_path):
+    document = table({"PLACEHOLDER_SECRET_GROUP": []})
+    path = write(tmp_path, "t.json", document)
+    with pytest.raises(SoilFileError, match="group number 1") as caught:
+        load_soil_table(path)
+    assert "is empty" in str(caught.value)
+    assert "PLACEHOLDER_SECRET_GROUP" not in str(caught.value)
 
 
 def test_no_table_is_refused_by_the_loader():

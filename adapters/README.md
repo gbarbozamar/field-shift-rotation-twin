@@ -192,7 +192,7 @@ A **soil table** (template `examples/PLACEHOLDER_soil_table.json`), one file per
 |---|---|
 | `source` | Non-empty text: the reference of the dataset (a citation, supplied by the person). Copied into `SourceInfo.attribution` |
 | `example_data` | `true` or `false` |
-| `groups` | List of `{"soil_group": <non-empty text>, "soil_properties": [...]}`. A soil group appears once per table |
+| `groups` | List of `{"soil_group": <non-empty text>, "soil_properties": [...]}`. A soil group appears once per table, with at least one property (an empty list is refused) |
 | `soil_properties` | Each item loads into `contracts.inputs.SoilProperty` unchanged (a value with unit, provenance, source or assumption mark, range or `range_missing`; or missing with its reason, C3). One `quantity` once per group |
 
 Why one file per dataset rather than one file with every property: each dataset has its own citation and its own licence (D49 may forbid committing one of them), so a person can add, replace or withhold one table without touching the other. Two tables that give the same `quantity` for one soil group are refused (which one would win is a decision).
@@ -213,11 +213,14 @@ For a `case_id` and `field_id`, with the files read again on each call:
 | Situation | Answer |
 |---|---|
 | Field declared, its soil group listed by at least one table | `SiteSoilSlope` under the identifiers of the request (never rewritten, unlike the example source): the properties of every table that lists the group, unchanged, in the order of `table_paths` and then of the rows. A property missing in a table stays missing with its own reason |
-| Always | `slope_length` and `slope_steepness` missing, `NOT_AVAILABLE`, detail naming D48 (elevation model and polygon-to-point OPEN), unit `OPEN` (the contract keeps a unit on a missing value and none is decided) |
-| `example_data` | `true` when the declaration or any table says so; then `state="example"`. Otherwise `state="fresh"` with `retrieved_at` (the files were read during the call). No new state |
+| Always | `slope_length` and `slope_steepness` missing, `NOT_AVAILABLE`, detail naming D48 (elevation model and polygon-to-point OPEN), unit `OPEN` (the contract keeps a unit on a missing value and none is decided). **For the interface lane:** the unit of a missing slope reads `OPEN` (OPEN 28); show it as "unit not decided", not as a unit |
+| `example_data` | `true` when the declaration or any table **that lists the group** says so (only the files the answer is built from); then `state="example"`. Otherwise `state="fresh"` with `retrieved_at` (the files were read during the call). No new state |
 | `SourceInfo.request` | `case_id`, `field_id` and, once found, the declared `soil_group` (the only place the soil group reaches the response: the contract has no field for it) |
-| Field not declared | `data=None`, `unavailable`, `MISSING_INPUT`, a detail that does not repeat the submitted identifiers |
-| Declared soil group listed by no table | `unavailable`, `MISSING_INPUT`, a detail naming the group. A group listed by only some tables gets what those tables list: there is no list of expected properties without inventing one |
+| Group listed by only some tables | What those tables list (no typed missing property is invented: there is no list of expected properties), and `SourceInfo.detail` says how many of the configured tables do not list the group, in state `example` or `fresh` |
+| Field not declared | `data=None`, `unavailable`, `NOT_DECLARED` (C3.2: the user is asked for the soil group, M1.3, and it was not given), a detail that does not repeat the submitted identifiers |
+| Declared soil group listed by no table | `unavailable`, `NO_COVERAGE` (C3.2: the data source has no data for this soil group, the closest of the closed list) |
+
+No `detail` repeats a soil group or a submitted identifier: the soil group will be a value the user submits (OPEN 26). The soil group travels only in `SourceInfo.request["soil_group"]`.
 | A file absent, unreadable, not JSON, or rejected by its loader; two tables giving one quantity for one group | `unavailable`, `NOT_AVAILABLE`, a detail naming which file and where (position), never its content or path |
 
 It never raises for a file. `api/config.py` loads and checks the same files at start-up and refuses to start (`ConfigError`) on every file problem above, as it does for `SOIL_SLOPE_EXAMPLE_FILE` and `POWER_SETTINGS_FILE`; the request-time answer covers a file that breaks after start-up. A field not declared or a group not listed is data, not configuration: the server starts.
@@ -263,7 +266,8 @@ Designed by the builder sessions; a person accepts or corrects them in the pull 
 
 Unit `l2/soil-tables`:
 
-- Everything in "Soil by soil group": the two file layouts, one file per dataset, the declaration keyed by `case_id` and `field_id`, the source identifier `soil_tables`, the reasons (`MISSING_INPUT` for an undeclared field or an unlisted group, `NOT_AVAILABLE` for a file problem and for slope), the slope unit `OPEN`, the states `example` / `fresh`, `request` and `attribution`, every `detail` text, refusing two tables with one quantity for one group, reading the files on each call.
+- Everything in "Soil by soil group": the two file layouts, one file per dataset, the declaration keyed by `case_id` and `field_id`, the source identifier `soil_tables`, the reasons (`NOT_DECLARED` for an undeclared field, `NO_COVERAGE` for a group no table lists, `NOT_AVAILABLE` for a file problem and for slope), the `detail` for a group only some tables list, `example_data` from the files used only, refusing a group with no property, the slope unit `OPEN`, the states `example` / `fresh`, `request` and `attribution`, every `detail` text, refusing two tables with one quantity for one group, reading the files on each call.
+- For the reviewers to confirm: `state="fresh"` with `retrieved_at` is used for files a person supplies that are read on each call (the files are not fetched from a remote source, and `cached` would not fit either).
 - The templates `examples/PLACEHOLDER_soil_table.json` and `examples/PLACEHOLDER_soil_groups.json`, and the test cases in `test_soil_tables.py`.
 
 Unit `l2/runner-partial`:
@@ -352,5 +356,5 @@ Each item is a question a person answers. Until then the setting has no value an
 - OPEN 25: **The soil-loss tolerance** (`docs/METHODS.md` M1.3 OPEN): its source, and whether it travels in a soil table. For the science reviewers.
 - OPEN 26: **Who declares a field's soil group in the product, and how it reaches the backend.** Today a person writes `SOIL_GROUPS_FILE`; M1.3 says the user confirms it. The interface lane (later) and the platform developer; the field-identity contract (D19) may be its place.
 - OPEN 27: **Where does the soil group travel in the contract?** `SiteSoilSlope` has no field for it, so it reaches the response only in `sources[].request`; nor can the `DECLARED` label of the declaration be carried. For lane L0 (`contracts/`).
-- OPEN 28: **The unit string of a slope value that is missing.** The contract keeps a unit on a missing value; none is decided, so the source writes `OPEN`. For the science reviewers (with OPEN 23) and lane L0.
+- OPEN 28: **The unit string of a slope value that is missing.** The contract keeps a unit on a missing value; none is decided, so the source writes `OPEN`. The interface lane shows it as "unit not decided". For the science reviewers (with OPEN 23) and lane L0.
 - **D46, the argument `parameters`:** agreed by the platform developer, waiting for `contracts/ENTRYPOINTS.md` to state it. No adapter change.

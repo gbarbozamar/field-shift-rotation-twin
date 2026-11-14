@@ -645,16 +645,6 @@ def test_both_soil_variables_wire_the_soil_table_source(engines_hidden):
     }
 
 
-def test_the_soil_table_source_gives_data_of_the_requested_field():
-    """Whatever engines exist, the site data is never of another field (D14)."""
-    response = TestClient(build_app(load_config(SOIL_TABLES_ENVIRON))).post(
-        ROUTE, json=BODY
-    )
-    assert response.status_code == 200
-    missing = response.json()["result_missing"]
-    assert missing is None or OTHER_FIELD not in (missing["detail"] or "")
-
-
 def test_an_undeclared_field_is_reported_in_sources(engines_hidden):
     body = {**BODY, "site": {**BODY["site"], "field_id": "PLACEHOLDER_UNDECLARED"}}
     response = TestClient(build_app(load_config(SOIL_TABLES_ENVIRON))).post(
@@ -664,7 +654,7 @@ def test_an_undeclared_field_is_reported_in_sources(engines_hidden):
     assert (soil["id"], soil["state"], soil["missing_reason"]) == (
         SOIL_TABLES_ID,
         "unavailable",
-        "MISSING_INPUT",
+        "NOT_DECLARED",
     )
 
 
@@ -675,6 +665,109 @@ def test_an_undeclared_field_is_reported_in_sources(engines_hidden):
 def test_one_soil_variable_without_the_other(given, absent):
     error = config_error({given: SOIL_TABLES_ENVIRON[given]})
     assert f"{given} is set without {absent}" in str(error)
+
+
+@pytest.mark.parametrize("blank", ["", " ", "\t"])
+@pytest.mark.parametrize(
+    "given, absent",
+    [(SOIL_TABLE_FILES, SOIL_GROUPS_FILE), (SOIL_GROUPS_FILE, SOIL_TABLE_FILES)],
+)
+def test_a_blank_soil_variable_counts_as_unset(given, absent, blank):
+    error = config_error({given: SOIL_TABLES_ENVIRON[given], absent: blank})
+    assert f"{given} is set without {absent}" in str(error)
+
+
+def test_the_missing_slope_reaches_the_runner_without_error(monkeypatch):
+    """With no engine assumed, the source's document reaches the runner whole."""
+    from api import app as app_module
+
+    received: list[Any] = []
+    real = app_module.EntryPointEngines
+
+    class Recording:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self._inner = real(*args, **kwargs)
+
+        def run(self, rotation, climate, soil_slope):
+            received.append(soil_slope)
+            return self._inner.run(rotation, climate, soil_slope)
+
+    monkeypatch.setattr(app_module, "EntryPointEngines", Recording)
+    response = TestClient(build_app(load_config(SOIL_TABLES_ENVIRON))).post(
+        ROUTE, json=BODY
+    )
+    assert response.status_code == 200
+    (soil_result,) = received
+    for value in (soil_result.data.slope_length, soil_result.data.slope_steepness):
+        assert value.value is None
+        assert value.missing.reason == "NOT_AVAILABLE"
+    for module in response.json()["modules"]:
+        assert module["state"] in ("available", "degraded", "not_available")
+
+
+class ExampleClimate:
+    """A fake climate source: the PLACEHOLDER contract example, for the request's field."""
+
+    source_id = "PLACEHOLDER_climate"
+    contract = "site_data_climate"
+
+    def get_climate(self, request):
+        from adapters.ports import ClimateResult, SourceInfo
+        from contracts.inputs import SiteClimate
+
+        path = (
+            ROOT / "contracts" / "inputs" / "examples" / "PLACEHOLDER_site_climate.json"
+        )
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document.update(case_id=request.case_id, field_id=request.field_id)
+        return ClimateResult(
+            data=SiteClimate.model_validate(document),
+            source=SourceInfo(
+                id=self.source_id, contract=self.contract, state="example"
+            ),
+        )
+
+
+def test_the_missing_slope_reaches_the_engines_and_the_route_answers(tmp_path):
+    """Climate present and the field of the rotation declared, so every engine
+    that exists is called with the missing slope; none is assumed to exist."""
+    from adapters.soil_tables import SoilTableSource
+    from contracts.results.models import ResultsPerRotation
+
+    case_id, field_id = ROTATION["case_id"], ROTATION["field_id"]
+    groups = tmp_path / "groups.json"
+    groups.write_text(
+        json.dumps(
+            {
+                "example_data": True,
+                "declarations": [
+                    {
+                        "case_id": case_id,
+                        "field_id": field_id,
+                        "soil_group": "PLACEHOLDER_GROUP_A",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    body = {**BODY, "site": {**BODY["site"], "case_id": case_id, "field_id": field_id}}
+    app = create_app(
+        [],
+        climate=ExampleClimate(),
+        soil_slope=SoilTableSource([SOIL_TABLE_TEMPLATE], groups),
+        settings=RunSettings(
+            start_date=dt.date(1900, 1, 1), end_date=dt.date(1900, 1, 3)
+        ),
+    )
+    response = TestClient(app).post(ROUTE, json=body)
+    assert response.status_code == 200
+    answer = response.json()
+    assert [s["state"] for s in answer["sources"]] == ["example", "example"]
+    if answer["result"] is not None:
+        ResultsPerRotation.model_validate(answer["result"])
+    else:
+        assert OTHER_FIELD not in (answer["result_missing"]["detail"] or "")
 
 
 def test_the_soil_tables_and_the_example_together_are_refused():
