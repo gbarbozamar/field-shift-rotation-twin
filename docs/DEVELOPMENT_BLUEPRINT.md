@@ -150,8 +150,15 @@ Before engine code, each producer writes by hand an example of what it will emit
 | `CarbonForcing` | Platform → Engines, Platform (RothC) | Same inputs, climate and horizon for both carbon models |
 | `ModelState` | Engines, Platform → Lead | Same starting soil carbon across models; no resets between crops |
 | `CarbonBalance` | Engines, Platform → Interface | Month, year and rotation; each model labelled; typed absences |
+| Engine entry points | Lead, Engines → Platform | The route calls engines through agreed signatures |
 
-**Conventions sheet** (`contracts/CONVENTIONS.md`, first unit of the lead): unit and direction of each indicator; how a missing value and its reason travel; provenance label per value (`DECLARED`, `OBSERVED`, `DERIVED`, `SIMULATED`); numbering of months and agricultural years; time zone of every daily series.
+**Conventions sheet** (`contracts/CONVENTIONS.md`, first unit of the lead): unit and direction of each indicator; how an uncertainty range travels with a value; how a missing value and its reason travel; provenance label per value (`DECLARED`, `OBSERVED`, `DERIVED`, `SIMULATED`); numbering of months and agricultural years; time zone of every daily series.
+
+**Engine entry points** (`contracts/ENTRYPOINTS.md`): the name, arguments and return type of the one public function of each engine. The engine's lane and the platform developer agree on it before Block 1, so the route is built against signatures and not against unfinished engines.
+
+### Open decision
+
+Section 2 says nobody edits another lane's folder, and this section says each producer writes its own example. Until the lead developer decides otherwise: the producer writes the example by hand in the issue, an L0 builder lands it under `contracts/`, and the consumer approves the pull request.
 
 ## 6. Integration
 
@@ -174,6 +181,8 @@ Ten minutes, standing. One shared demonstration on the public URL by someone who
 | **CP4** | Sunday 12:00 | **Feature freeze** |
 | **CP5** | Sunday 18:00 | **Code freeze.** Only fixes that keep the demonstration working |
 
+At CP1 climate is real. Soil and slope can still come from the accepted example, shown as example data, because their adapter lands in Block 2.
+
 If CP1 fails, Core, Engines and the platform route stop everything else until it passes. Interface and the decision layer continue.
 
 ## 8. Work packages
@@ -184,19 +193,19 @@ Units are listed in landing order. Codes in brackets are acceptance tests of the
 
 | Lane | Units | Parallel sessions |
 |---|---|---|
-| L0 Core | Conventions sheet · contract schemas with hand-written examples · validation harness layout (where an expected value and its citation live) | 2 builders, 1 verifier |
+| L0 Core | Conventions sheet · contract schemas with hand-written examples · validation harness layout (where an expected value and its citation live) · parameter catalogue layout in `params/` (how a value, its range and its citation are stored; no values) | 2 builders, 1 verifier |
 | L1 Engines | Calendar example signed by Core · rotation definition agreed with Interface | 1 builder |
-| L2 Platform | Backend skeleton · CI with all scans · public deploy of `main` | 2 builders, 1 verifier |
-| L3 Interface | Frontend skeleton and static deploy · multi-field identity screen on example data | 2 builders |
+| L2 Platform | Hand-written examples of the contracts Platform produces: site data (climate; soil and slope) and decision output · backend skeleton · CI with all scans · public deploy of `main` | 2 builders, 1 verifier |
+| L3 Interface | Frontend skeleton and static deploy · all strings in one English file · shared display of a value (unit, provenance and source, or missing with its reason) · multi-field identity screen on example data | 2 builders |
 
 ### Block 1 — one rotation end to end, until CP1
 
 | Lane | Units | Parallel sessions |
 |---|---|---|
-| L0 Core | Slope length and steepness equations [E3] · monthly erosivity fraction · annual soil-loss equation with unit guard [E8] and invariants [E9] | 3 builders, 1 verifier |
-| L1 Engines | Calendar engine with feasibility check (an infeasible calendar returns no ranking) · reference evapotranspiration against a worked FAO-56 example [H2] · water balance skeleton | 3 builders, 1 verifier |
+| L0 Core | Engine entry points agreed with Platform · slope length and steepness equations [E3] · monthly erosivity fraction · annual soil-loss equation with unit guard [E8] and invariants [E9] | 3 builders, 1 verifier |
+| L1 Engines | Calendar engine with feasibility check (an infeasible calendar returns no ranking) · reference evapotranspiration against a worked FAO-56 example [H2], in `engine/water/et0/` · water balance skeleton, in `engine/water/balance/` | 3 builders, 1 verifier |
 | L2 Platform | NASA POWER adapter, meteorology and IMERG precipitation, in UTC, first response cached per case · route for one rotation · decision functions on hand-made tables [D1, D2, D5, D6, D7] | 3 builders, 1 verifier |
-| L3 Interface | Entry screen, map, site sheet · rotation ribbon · all strings in one English file | 2 builders, 1 verifier |
+| L3 Interface | Entry screen · map · site sheet (three units) · rotation ribbon · replace the examples with the Platform route for one rotation (the CP1 seam) | 2 builders, 1 verifier |
 
 ### Block 2 — two clocks and the decision, until CP2
 
