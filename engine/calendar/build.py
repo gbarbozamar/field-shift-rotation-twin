@@ -91,20 +91,30 @@ def _build(
         case_id=rotation.case_id,
         field_id=rotation.field_id,
         rotation_id=rotation.rotation_id,
-        ag_year_start=AgYearStart(
-            month=None,
-            missing=Missing(
-                reason="NOT_DECLARED",
-                detail=(
-                    "the rotation definition carries no start month of the "
-                    "agricultural year (C5.4)"
-                ),
-            ),
-        ),
+        ag_year_start=_copy_start_month(rotation),
         start_date=min(placed),
         end_date=max(placed),
         feasibility=check_feasibility(rotation, rules),
         components=components,
+    )
+
+
+def _copy_start_month(rotation: RotationDefinition) -> AgYearStart:
+    """The start month of the agricultural year, copied from the definition.
+
+    Decision D8 of issue #77: the start month travels in the rotation
+    definition and the calendar engine copies it into the calendar. Each field
+    is copied as the definition gives it; nothing is converted or invented.
+    The definition never carries a missing month (D7), so ``missing`` stays
+    empty.
+    """
+    declared = rotation.ag_year_start
+    return AgYearStart(
+        month=declared.month,
+        provisional=declared.provisional,
+        provenance=declared.provenance,
+        source=declared.source,
+        assumption=declared.assumption,
     )
 
 

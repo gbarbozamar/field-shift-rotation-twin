@@ -23,8 +23,9 @@ from pathlib import Path
 from typing import Any, get_args
 
 import pytest
+from pydantic import ValidationError
 
-from contracts.inputs.rotation_calendar import RotationCalendar
+from contracts.inputs.rotation_calendar import AgYearStart, RotationCalendar
 from contracts.rotation_definition.common import DateValue as DeclaredDate
 from contracts.rotation_definition.common import ReasonCode
 from contracts.rotation_definition.rotation_definition import RotationDefinition
@@ -182,17 +183,63 @@ def test_calendar_runs_from_the_earliest_to_the_latest_declared_date():
 # --- What the definition does not carry ---------------------------------------
 
 
-def test_start_month_of_the_agricultural_year_is_missing_not_declared():
-    start = build_rotation_calendar(definition()).ag_year_start
-    assert start.month is None
-    assert start.provisional is None
-    assert start.provenance is None
-    assert start.missing.reason == "NOT_DECLARED"
+def _start_month_as_in_the_example(data: dict[str, Any]) -> None:
+    pass
+
+
+def _start_month_with_the_assumption_mark(data: dict[str, Any]) -> None:
+    start = data["ag_year_start"]
+    del start["source"]
+    start["assumption"] = True
+
+
+def _start_month_not_provisional(data: dict[str, Any]) -> None:
+    # Not a proposal to allow it: question 28 of the definition README is
+    # open. The engine copies the mark either way.
+    data["ag_year_start"]["provisional"] = False
+
+
+def _start_month_one_month_later(data: dict[str, Any]) -> None:
+    # Any other month of C5.4, computed from the example: shows that the
+    # month is copied, not written by the engine.
+    data["ag_year_start"]["month"] = data["ag_year_start"]["month"] % 12 + 1
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        _start_month_as_in_the_example,
+        _start_month_with_the_assumption_mark,
+        _start_month_not_provisional,
+        _start_month_one_month_later,
+    ],
+    ids=lambda change: change.__name__.strip("_").replace("_", "-"),
+)
+def test_start_month_of_the_agricultural_year_is_copied_from_the_definition(change):
+    # D8 of issue #77: the calendar engine copies the start month of the
+    # definition into the calendar, field by field.
+    data = example()
+    change(data)
+    rotation = definition(data)
+    declared = rotation.ag_year_start
+    start = build_rotation_calendar(rotation).ag_year_start
+    assert type(start) is AgYearStart
+    assert start.month == declared.month
+    assert start.provisional is declared.provisional
+    assert start.provenance == declared.provenance
+    assert start.source == declared.source
+    assert start.assumption is declared.assumption
+    assert start.missing is None
+    assert start.model_dump() == {**declared.model_dump(), "missing": None}
 
 
 def test_periods_are_empty():
-    calendar = build_rotation_calendar(definition())
-    assert [component.periods for component in calendar.components] == [[], []]
+    rotation = definition()
+    calendar = build_rotation_calendar(rotation)
+    assert len(calendar.components) == len(rotation.components)
+    assert [component.periods for component in calendar.components] == [
+        [] for _ in rotation.components
+    ]
 
 
 def test_repeats_changes_nothing():
@@ -207,7 +254,7 @@ def test_repeats_changes_nothing():
 
 def test_components_keep_the_order_of_the_definition_list():
     data = example()
-    data["components"].reverse()  # positions stay 1 and 2: now listed 2, 1
+    data["components"].reverse()  # positions stay 1 to 3: now listed 3, 2, 1
     calendar = build_rotation_calendar(definition(data))
     assert [c.component_id for c in calendar.components] == [
         c["component_id"] for c in data["components"]
@@ -395,6 +442,7 @@ def test_changing_the_result_does_not_change_the_argument():
     before = rotation.model_dump_json()
     calendar = build_rotation_calendar(rotation)
     calendar.components[0].start.source = "changed by the test"
+    calendar.ag_year_start.source = "changed by the test"
     calendar.components.clear()
     assert rotation.model_dump_json() == before
 
@@ -433,20 +481,44 @@ def test_contract_models_are_imported_through_the_contracts_path():
 # --- No valid form ----------------------------------------------------------------
 
 
-def test_definition_with_no_date_has_no_valid_calendar():
+def test_definition_with_no_date_is_rejected_when_loaded():
+    # D21 of issue #77: N1 cannot come from a loaded definition, so the route
+    # answers 422 before any engine is called.
     data = example()
     for component in data["components"]:
         component["sowing"] = copy.deepcopy(NOT_DECLARED)
         component["harvest"] = copy.deepcopy(NOT_DECLARED)
+    with pytest.raises(ValidationError, match="D21"):
+        definition(data)
+
+
+def test_definition_with_no_component_is_rejected_when_loaded():
+    # D21 of issue #77: N2 cannot come from a loaded definition either.
+    data = example()
+    data["components"] = []
+    with pytest.raises(ValidationError, match="D21"):
+        definition(data)
+
+
+def test_definition_with_no_date_has_no_valid_calendar():
+    # Rejected when a definition is loaded (D21); the instance is changed
+    # afterwards: assignment is not validated.
+    rotation = definition()
+    for component in rotation.components:
+        component.sowing = DeclaredDate.model_validate(NOT_DECLARED)
+        component.harvest = DeclaredDate.model_validate(NOT_DECLARED)
+    assert declared_dates(rotation) == set()
     with pytest.raises(NoValidCalendarForm):
-        build_rotation_calendar(definition(data))
+        build_rotation_calendar(rotation)
 
 
 def test_definition_with_no_component_has_no_valid_calendar():
-    data = example()
-    data["components"] = []
+    # Rejected when a definition is loaded (D21); the instance is changed
+    # afterwards.
+    rotation = definition()
+    rotation.components.clear()
     with pytest.raises(NoValidCalendarForm):
-        build_rotation_calendar(definition(data))
+        build_rotation_calendar(rotation)
 
 
 def test_two_components_with_one_identifier_have_no_valid_calendar():
@@ -460,8 +532,9 @@ def test_two_components_with_one_identifier_have_no_valid_calendar():
 def test_only_dates_that_cannot_be_placed_have_no_valid_calendar():
     # One component, changed after loading so that its harvest is before its
     # sowing: neither date is placed, so the calendar has no date at all.
+    # Keeping only the first component keeps its position (1) valid.
     data = example()
-    del data["components"][1]
+    data["components"] = data["components"][:1]
     rotation = definition(data)
     only = rotation.components[0]
     only.harvest = DeclaredDate(
