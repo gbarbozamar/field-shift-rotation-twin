@@ -30,7 +30,7 @@ Five people. Three write code by orchestrating AI sessions across four lanes; tw
 
 **Wherever this document names a role, it means that person:** lead developer and engines developer, Gustavo; platform developer, Enzo; interface developer, Martín; science reviewers, Adrian and Leonardo.
 
-**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to Enzo, the platform developer. L2b, decision and carbon, belongs to Martín, the interface developer, together with L3. Both use branches named `l2/<unit>`. Each sub-lane has its own acceptance limit (section 3.2). In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy.
+**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to Enzo, the platform developer. L2b, decision and carbon, belongs to Martín, the interface developer, together with L3. Both use branches named `l2/<unit>`. Each sub-lane has its own acceptance limit (section 3.2). In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy. If L3 together with L2b is too much for one developer, `engine/rothc/` moves to L2a: Martín says so at a checkpoint and the move is written here. It is not carried silently.
 
 **One lane, one set of folders.** Nobody edits another lane's folder. A contract changes only at a checkpoint, with notice to everyone.
 
@@ -311,5 +311,6 @@ A pull request labelled `science` cannot merge without one reviewer approval. No
 | A control fails | It is recorded as failed. The module is shown as degraded or not available |
 | A source is down | Use the cached first response. A fallback source is a science decision |
 | Two units wait for acceptance | No new unit in that lane until one is accepted. L2a and L2b count separately |
+| L3 together with L2b is too much for the interface developer | Says so at a checkpoint. `engine/rothc/` moves to L2a and the change is written in section 2 |
 | Quota of one developer runs out | Their open units are re-briefed to another developer's sessions at the next checkpoint |
 | A session produces a value, threshold or citation | Discard it. A person supplies it |
