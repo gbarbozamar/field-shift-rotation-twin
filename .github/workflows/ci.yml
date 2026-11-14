@@ -46,10 +46,11 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Build
+      - name: Test and build
         working-directory: web
         run: |
           npm ci
+          npm test
           npm run build
 
   # Check 3. Agreed with the lead developer (#18): every folder under
