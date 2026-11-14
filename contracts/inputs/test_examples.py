@@ -32,6 +32,20 @@ CONTRACTS = {
     "soil": (SiteSoilSlope, "PLACEHOLDER_site_soil_slope.json"),
 }
 
+# The chain set (unit l0/chain-examples, issue #168): the same two contracts,
+# with the case and field of the rotation definition example. Their whole run
+# is tested in validation/test_chain_examples.py.
+CHAIN = {
+    "chain-climate": (SiteClimate, "PLACEHOLDER_chain_site_climate.json"),
+    "chain-soil": (SiteSoilSlope, "PLACEHOLDER_chain_site_soil_slope.json"),
+}
+ROTATION_EXAMPLE = (
+    HERE.parent
+    / "rotation_definition"
+    / "examples"
+    / "PLACEHOLDER_rotation_definition.json"
+)
+
 Mutation = Callable[[dict[str, Any]], None]
 
 
@@ -708,9 +722,32 @@ def test_climate_example_point_is_marked_as_no_real_place(name: str) -> None:
     assert "not a real place" in item["source"]
 
 
+@pytest.mark.parametrize("contract", sorted(CHAIN))
+def test_chain_example_loads_into_its_model(contract: str) -> None:
+    model, filename = CHAIN[contract]
+    text = (EXAMPLES / filename).read_text(encoding="utf-8")
+    loaded = model.model_validate_json(text)
+    # Nothing is added, dropped or changed on the way through the model.
+    assert json.loads(loaded.model_dump_json(exclude_unset=True)) == json.loads(text)
+    assert model.model_validate(json.loads(text)) == loaded
+
+
+@pytest.mark.parametrize("contract", sorted(CHAIN))
+def test_chain_example_is_example_data_of_the_rotation_example(contract: str) -> None:
+    _, filename = CHAIN[contract]
+    assert filename.startswith("PLACEHOLDER_chain_")
+    data = json.loads((EXAMPLES / filename).read_text(encoding="utf-8"))
+    rotation = json.loads(ROTATION_EXAMPLE.read_text(encoding="utf-8"))
+    assert data["example_data"] is True
+    assert data["case_id"] == rotation["case_id"]
+    assert data["field_id"] == rotation["field_id"]
+
+
 def test_every_example_file_has_a_model() -> None:
     on_disk = sorted(path.name for path in EXAMPLES.iterdir())
-    assert on_disk == sorted(filename for _, filename in CONTRACTS.values())
+    assert on_disk == sorted(
+        filename for _, filename in [*CONTRACTS.values(), *CHAIN.values()]
+    )
 
 
 @pytest.mark.parametrize(
