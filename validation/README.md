@@ -13,6 +13,7 @@ Where an expected value lives with its source, where a run of the validation pro
 | `validation/README.md` | This document: layout, record format, proposed cases, open questions |
 | `validation/records.py` | The record format in code and the check that rejects a malformed record |
 | `validation/test_layout.py` | Acceptance test. Run with `python -m pytest validation/` |
+| `validation/test_chain_examples.py` | End-to-end chain on the examples (unit l0/chain-examples, issue #168): the rotation definition example and the chain examples of `contracts/inputs/examples/` through EP2, EP1 and EP3 and the real runner of `api/engines.py`, in process, no network. It shows that the chain is wired; it is not a result. Unlike the rest of this folder it imports the application (`api/`, `engine/`, `params/`), so it needs the project's dependencies, not only the standard library |
 | `validation/expected/<id>.json` | One file per **expected value**, with its citation and the two persons who transcribed and checked it |
 | `validation/runs/<id>.json` | One file per **protocol run** |
 | `validation/results/<id>.json` | One file per **result** of one test in one run, whatever its outcome |
@@ -308,6 +309,20 @@ For a person to approve. The code in the first column is the start of the test i
 
 One more test, without a case code, checks that every case code above appears in this section.
 
+### Chain of the examples (`test_chain_examples.py`)
+
+The code is the start of the test name. Every number in the examples and in the test catalogue is PLACEHOLDER; no case holds an expected value of the science. The agricultural years are computed in the test, day by day, from the dates of the series and the start month of the rotation definition example (C5.3, D47). A test without a case code checks that every code below appears in this section.
+
+| Case | What is checked |
+|---|---|
+| CH01 | Each chain example loads into its contract model with nothing added, dropped or changed, carries `example_data: true`, and names exactly the `case_id` and `field_id` of the rotation definition example |
+| CH02 | The climate example covers every day of at least one whole agricultural year (D47, start month of the rotation definition example) for every daily quantity EP1 and EP3 read, with no day missing, all in one time zone (C6.3) |
+| CH03 | The example values are plainly PLACEHOLDER: every daily series holds the same number on every day, every source starts with the word PLACEHOLDER, and the point keeps its placeholder unit |
+| CH04 | The runner finds EP2, EP1 and EP3 at their paths of `contracts/ENTRYPOINTS.md` (none is "not built"), calls them once each in that order on the calendar EP2 built and the two examples, and passes EP1 the catalogue object it was given; the calendar is feasible and names the rotation example's case and field |
+| CH05 | With the empty catalogue `{}`: a `ResultsPerRotation` that survives a JSON round trip; soil loss and water exposure are each the engine's output, not the not-built form, with one item per agricultural year of the record; every value is missing with its reason, none is an identity absence (site data of another field), none is `NO_COVERAGE` in a covered year; the annual soil loss names every parameter EP1 reads; the runner passes the output of EP1 and of EP3 unchanged |
+| CH06 | With a complete PLACEHOLDER catalogue that passes `params.catalogue.check_catalogue` (and whose marked copy does not): the annual soil loss of each covered year is a number equal to `engine/erosion/equation.py` applied to the catalogue's factors, LS through `engine/erosion/ls.py`, provenance `DERIVED`; every monthly value stays missing; EP3 gives no number (C1.4, D61), so its reason is asserted instead: every item missing, not `NO_COVERAGE` in a covered year, not an identity absence, and equal to EP3's own output for the same arguments (its detail text is EP3's and is not asserted) |
+| CH07 | Through `POST /api/rotations/run` of `api.main.create_app` (its default engines, the catalogue passed as `parameters`), with each of the two catalogues: `200`, and the `result` loads into `ResultsPerRotation` and equals the runner's |
+
 ## OPEN
 
 Questions a person has to answer. The builder session did not decide them.
@@ -323,6 +338,19 @@ Questions a person has to answer. The builder session did not decide them.
 9. **Outcome words.** Are three words enough? In this proposal, code that stops with an error counts as `failed`. Is a separate word needed for it?
 10. **One file per result, in one flat folder.** Is this still workable when a full protocol run writes many results, or should results be grouped by run?
 11. **Package name and working directory.** Tests import this folder as the package `validation`, which works when pytest runs from the repository root. A root dependency manifest, which this unit may not write, would fix this for every lane.
+
+### Chain of the examples
+
+Raised by unit l0/chain-examples (issue #168). The builder session did not decide them.
+
+12. **The chain test imports the application.** This folder was standard library only; `test_chain_examples.py` imports `api/`, `engine/`, `params/`, pydantic and FastAPI, because the brief places it here. Should it stay here or move to a folder of end-to-end tests? *Lead developer; platform developer.*
+13. **The length unit of the chain soil example, `example_length_unit`, does not carry the word PLACEHOLDER.** The catalogue refuses the word in a record, and `engine/erosion/ls.py` requires the unit-length record to carry exactly the slope length's unit string, so a marked string could never match a record that passes the check. Is an unmarked, unreal unit string acceptable in an example, or should both carry a decided length unit? *Lead developer; science reviewers.*
+14. **The steepness unit of the chain soil example is `percent`**, the string EP1 reads as `ls.SlopeUnit.PERCENT` (EP1's PROPOSED reading; question 18 of `contracts/inputs/README.md` is open). *Science reviewers; lead developer.*
+15. **The climate series of the chain example use the unit strings of `contracts/CLIMATE_QUANTITIES.md`** with plainly unreal numbers, so that a unit guard (EP3 of #165) does not stand in for the reason a value is missing. Should an example carry decided unit strings next to numbers that are not data? *Lead developer.*
+16. **The calendar and the record do not overlap.** The calendar EP2 builds from the rotation definition example runs from 2027 to 2028; the climate example covers 2001 to 2002. EP1 and EP3 lay out the years of the record (D47) whatever the calendar's dates, and how the rotation is repeated over the years of the record is not decided (Q5 of `contracts/ENTRYPOINTS.md`, OPEN 2 of `engine/erosion/SOIL_LOSS.md`). The chain test does not depend on it. *Lead developer.*
+17. **No soil property in the chain soil example.** EP1 reads K from the catalogue, not from the soil data; whether K should come from the soil tables (D48) is OPEN 13 of `engine/erosion/SOIL_LOSS.md`. *Lead developer; platform developer.*
+18. **The point of the chain climate example keeps the placeholder unit `PLACEHOLDER_unit`**, as in the example it copies, so its numbers are not a place. EP3 as PR #165 chains it reads the point through the unit guard of D55 (`degree`, `degree`, `m`), so with #165 every covered year of the chain stops there (`MISSING_INPUT`, unit not accepted) before the catalogue or C1.4 is reached; the test passes either way. Writing D55's unit strings into the example would turn its numbers into a real point on Earth. Should the chain example carry them, and with which illustrative numbers? *Lead developer.*
+19. **Serving the chain soil example in the running app** (`SOIL_SLOPE_EXAMPLE_FILE`, D38) is not part of this unit; which file holds the demonstration values is a person's decision. *Platform developer; lead developer.*
 
 ## Environment
 
