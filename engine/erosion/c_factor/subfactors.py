@@ -120,9 +120,10 @@ def canopy_subfactor(
 
     - ``MISSING_INPUT`` when an argument is missing; the detail names each one.
     - ``NOT_COMPUTABLE`` when an argument is not a finite number, when
-      ``canopy_cover`` is outside zero to one, when ``fall_height`` is
-      negative (each named; nothing is clipped), when the two unit strings
-      differ, or when the form gives no finite real number.
+      ``canopy_cover`` is outside zero to one, when ``fall_height`` or
+      ``fall_height_coefficient`` is negative (each named; nothing is
+      clipped; the refusal of a negative coefficient is PROPOSED), when
+      the two unit strings differ, or when the form gives no finite real number.
 
     Raises ``TypeError`` for an argument of another type.
     """
@@ -140,7 +141,12 @@ def canopy_subfactor(
         return values
     refused = outside(
         values, ["canopy_cover"], is_fraction, "is outside zero to one"
-    ) or outside(values, ["fall_height"], is_not_negative, "is negative")
+    ) or outside(
+        values,
+        ["fall_height", "fall_height_coefficient"],
+        is_not_negative,
+        "is negative",
+    )
     if refused is not None:
         return refused
     refused = units_differ(
@@ -181,7 +187,9 @@ def surface_cover_subfactor(
 
     - ``MISSING_INPUT`` when an argument is missing; the detail names each one.
     - ``NOT_COMPUTABLE`` when an argument is not a finite number, when the
-      cover is outside zero to one (named; nothing is clipped), or when the
+      cover is outside zero to one or the coefficient is negative (named;
+      nothing is clipped; the refusal of a negative coefficient is
+      PROPOSED: it would give a sub-factor above one), or when the
       form gives no finite real number.
 
     Raises ``TypeError`` for an argument of another type.
@@ -196,7 +204,7 @@ def surface_cover_subfactor(
         return values
     refused = outside(
         values, ["surface_residue_cover"], is_fraction, "is outside zero to one"
-    )
+    ) or outside(values, ["surface_cover_coefficient"], is_not_negative, "is negative")
     if refused is not None:
         return refused
     try:

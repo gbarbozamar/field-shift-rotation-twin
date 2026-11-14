@@ -78,8 +78,10 @@ def residue_cover_from_mass(
 
     - ``MISSING_INPUT`` when an argument is missing; the detail names each one.
     - ``NOT_COMPUTABLE`` when an argument is not a finite number, when the
-      mass is negative (named; nothing is clipped), when the two unit strings
-      differ, or when the form gives no finite real number.
+      mass or the coefficient is negative (named; nothing is clipped; the
+      refusal of a negative coefficient is PROPOSED: it would give a cover
+      outside zero to one), when the two unit strings differ, or when the
+      form gives no finite real number.
 
     Raises ``TypeError`` for an argument of another type.
     """
@@ -94,7 +96,12 @@ def residue_cover_from_mass(
     values = numbers_or_missing(numbers)
     if isinstance(values, ResultMissing):
         return values
-    refused = outside(values, ["residue_mass"], is_not_negative, "is negative")
+    refused = outside(
+        values,
+        ["residue_mass", "mass_cover_coefficient"],
+        is_not_negative,
+        "is negative",
+    )
     if refused is not None:
         return refused
     refused = units_differ(

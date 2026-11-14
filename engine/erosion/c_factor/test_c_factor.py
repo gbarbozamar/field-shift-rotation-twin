@@ -476,6 +476,28 @@ def test_rotation_c_fractions_that_add_up_within_the_tolerance_are_reported_as_s
     assert exact.fractions_add_up is True
 
 
+@pytest.mark.parametrize(
+    "value", [-0.4, 1.4, -1e-9, 1 + 1e-9], ids=["-0.4", "1.4", "below", "above"]
+)
+def test_rotation_c_erosivity_fraction_outside_zero_to_one_is_not_computed(value):
+    result = rotation(months=months_of([(0.5, 0.5), (value, 0.25)]))
+    assert_missing(result.value, "NOT_COMPUTABLE")
+    assert "PLACEHOLDER month 1" in result.value.detail
+    assert "PLACEHOLDER month 0" not in result.value.detail
+    assert "outside zero to one" in result.value.detail
+    assert_missing(result.fraction_sum, "NOT_COMPUTABLE")
+    assert isinstance(result.fractions_add_up, ResultMissing)
+    # Fractions that add up to the number of years are refused all the same.
+    balanced = rotation(months=months_of([(-0.4, 0.5), (1.4, 0.25)]))
+    assert_missing(balanced.value, "NOT_COMPUTABLE")
+    assert "PLACEHOLDER month 0" in balanced.value.detail
+    assert "PLACEHOLDER month 1" in balanced.value.detail
+    for bound in [0.0, 1.0]:
+        accepted = rotation(months=months_of([(bound, 0.5), (1.0 - bound, 0.25)]))
+        assert isinstance(accepted.value, float)
+        assert accepted.fraction_sum == 1.0
+
+
 def test_rotation_c_records_the_subfactors_set_to_one():
     result = rotation()
     assert result.set_to_one == SET_TO_ONE
@@ -516,6 +538,46 @@ def test_cover_fraction_outside_zero_to_one_is_not_computed(value):
     for bound in [0.0, 1.0]:
         assert isinstance(canopy(canopy_cover=bound), float)
         assert isinstance(surface(surface_residue_cover=bound), float)
+
+
+COEFFICIENTS_NOT_NEGATIVE = [
+    (canopy, "fall_height_coefficient"),
+    (surface, "surface_cover_coefficient"),
+    (cover, "mass_cover_coefficient"),
+]
+
+
+@pytest.mark.parametrize("value", [-0.777, -1e-9], ids=["negative", "a-hair-below"])
+@pytest.mark.parametrize(
+    ("call", "name"),
+    COEFFICIENTS_NOT_NEGATIVE,
+    ids=[name for _, name in COEFFICIENTS_NOT_NEGATIVE],
+)
+def test_negative_coefficient_is_refused_and_named(call, name, value):
+    result = call(**{name: value})
+    assert_missing(result, "NOT_COMPUTABLE")
+    assert name in result.detail
+    assert "negative" in result.detail
+    assert isinstance(call(**{name: 0.0}), float)
+
+
+def test_with_coefficients_not_negative_each_result_stays_within_zero_to_one():
+    for coefficient in [0.0, 0.111, 1.11, 111.0]:
+        for fraction in GRID:
+            for height in [0.0, 1.11, 99.9]:
+                cc = canopy(
+                    canopy_cover=fraction,
+                    fall_height=height,
+                    fall_height_coefficient=coefficient,
+                )
+                assert 0.0 <= cc <= 1.0
+            sc = surface(
+                surface_residue_cover=fraction, surface_cover_coefficient=coefficient
+            )
+            assert 0.0 <= sc <= 1.0
+        for mass in [0.0, 0.11, 11.1, 1110.0]:
+            residue_cover = cover(residue_mass=mass, mass_cover_coefficient=coefficient)
+            assert 0.0 <= residue_cover <= 1.0
 
 
 def test_negative_mass_or_height_is_not_computed():
@@ -595,17 +657,12 @@ def test_units_that_differ_are_not_computed():
 
 
 def test_form_without_a_finite_result_is_not_computed():
-    assert_missing(
-        canopy(fall_height_coefficient=-1e300, fall_height=1e10), "NOT_COMPUTABLE"
-    )
-    assert_missing(surface(surface_cover_coefficient=-1e300, surface_residue_cover=1.0), "NOT_COMPUTABLE")  # fmt: skip
-    assert_missing(
-        cover(mass_cover_coefficient=-1e300, residue_mass=1e10), "NOT_COMPUTABLE"
-    )
+    # With coefficients that are not negative, the three exponential forms
+    # stay within zero to one; the product and the sum can still overflow.
     assert_missing(
         soil_loss_ratio(canopy=1e300, surface_cover=1e300).value, "NOT_COMPUTABLE"
     )
-    big = rotation(months=months_of([(1e300, 1e300), (0.5, 0.5)]))
+    big = rotation(months=months_of([(1.0, 1e308), (1.0, 1e308)]))
     assert_missing(big.value, "NOT_COMPUTABLE")
 
 

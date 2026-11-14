@@ -34,8 +34,10 @@ from ._numbers import (
     check_types,
     describe_missing,
     finite,
+    is_fraction,
     is_missing,
     numbers_or_missing,
+    outside,
     real,
 )
 from .subfactors import DECLARED_LIMIT, SET_TO_ONE, SoilLossRatio
@@ -70,7 +72,8 @@ class RotationC:
 
     - ``value``: ``C``, or the ``Missing`` of the results contract with its reason.
     - ``fraction_sum``: the sum of the erosivity fractions of all months, or
-      a ``Missing`` when a fraction is missing or not a finite number. It is
+      a ``Missing`` when a fraction is missing, not a finite number, or
+      outside zero to one. It is
       reported whether or not ``value`` is computed.
     - ``expected_fraction_sum``: the number of years of the rotation, or a
       ``Missing`` when that number is missing or not usable.
@@ -147,6 +150,12 @@ def _expected_sum(
     return years
 
 
+def _fractions_outside(values: dict[str, float]) -> ResultMissing | None:
+    """``NOT_COMPUTABLE`` naming every month whose erosivity fraction is outside zero to one."""
+    names = [name for name in values if name.startswith("erosivity_fraction of ")]
+    return outside(values, names, is_fraction, "is outside zero to one")
+
+
 def _fraction_sum(months: Sequence[MonthOfRotation]) -> float | ResultMissing:
     if not months:
         return ResultMissing(
@@ -162,6 +171,9 @@ def _fraction_sum(months: Sequence[MonthOfRotation]) -> float | ResultMissing:
     )
     if isinstance(values, ResultMissing):
         return values
+    refused = _fractions_outside(values)
+    if refused is not None:
+        return refused
     try:
         return real(sum(values.values()))
     except ArithmeticError:
@@ -219,6 +231,9 @@ def _value(
     values = numbers_or_missing(numbers)
     if isinstance(values, ResultMissing):
         return values
+    refused = _fractions_outside(values)
+    if refused is not None:
+        return refused
     if isinstance(expected, ResultMissing):
         return expected
     try:
@@ -265,8 +280,10 @@ def rotation_c(
       month is missing, or the number of years is; the detail names every
       such month and part with its own reason. Never zero.
     - ``NOT_COMPUTABLE`` when there is no month, when the number of years is
-      not above zero, when a fraction or a ratio is not a finite number, or
-      when ``C`` is not a finite number.
+      not above zero, when a fraction or a ratio is not a finite number, when
+      a fraction is outside zero to one (the detail names every such month;
+      nothing is clipped; PROPOSED), or when ``C`` is not a finite number.
+      ``fraction_sum`` is then ``NOT_COMPUTABLE`` as well.
 
     The fractions are never normalised: when they do not add up to the
     number of years, ``C`` is still the formula of M1.5 on the fractions as
