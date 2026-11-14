@@ -72,6 +72,14 @@ const WORDING_SHEET: Record<string, string> = {
   'home.shell': 'Placeholder shell page. Screens will be added by later units.',
   'home.route': 'Current hash route: {route}',
   'home.backend': 'Backend: {api}',
+  'identity.title': 'Fields',
+  'identity.case_label': 'Case',
+  'identity.banner_title': 'Example data',
+  'identity.banner_text':
+    'This screen shows illustrative placeholder fields over a generic rural area. No real field is described.',
+  'identity.selected': 'Selected',
+  'identity.field_id_label': 'Identifier',
+  'identity.empty_list': 'The example case has no fields.',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
 }

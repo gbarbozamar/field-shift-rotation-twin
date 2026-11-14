@@ -61,6 +61,14 @@ export const strings = {
   'home.backend': 'Backend: {api}',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
+  'identity.title': 'Fields',
+  'identity.case_label': 'Case',
+  'identity.banner_title': 'Example data',
+  'identity.banner_text':
+    'This screen shows illustrative placeholder fields over a generic rural area. No real field is described.',
+  'identity.selected': 'Selected',
+  'identity.field_id_label': 'Identifier',
+  'identity.empty_list': 'The example case has no fields.',
 } as const
 
 export type StringKey = keyof typeof strings
