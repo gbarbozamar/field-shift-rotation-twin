@@ -848,10 +848,12 @@ def test_the_modules_hold_no_number_but_zero_and_one():
         assert numbers <= {0, 1}, (path.name, numbers)
 
 
-def test_no_entry_point_yet():
+def test_entry_point_is_run_amg_of_entry_module():
+    # Unit l1/amg-ep5 (issue #192) adds EP5; its own cases are in test_entry.py.
     import engine.amg
+    import engine.amg.entry
 
-    assert not hasattr(engine.amg, "run_amg"), "EP5 is OPEN in contracts/ENTRYPOINTS.md"
+    assert engine.amg.run_amg is engine.amg.entry.run_amg
 
 
 # --- README.md -------------------------------------------------------------------
