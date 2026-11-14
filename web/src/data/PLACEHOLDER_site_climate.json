@@ -1,0 +1,110 @@
+{
+  "contract": "site_data_climate",
+  "example_data": true,
+  "case_id": "PLACEHOLDER-case",
+  "field_id": "PLACEHOLDER-field",
+  "point": {
+    "latitude": {
+      "value": 1.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, not a real place, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    },
+    "longitude": {
+      "value": 2.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, not a real place, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    },
+    "elevation": {
+      "value": 3.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, not a real place, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    }
+  },
+  "daily_series": [
+    {
+      "quantity": "precipitation",
+      "unit": "PLACEHOLDER_unit",
+      "time_zone": "UTC",
+      "start_date": "2001-01-01",
+      "end_date": "2001-01-05",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NO_COVERAGE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "days": [
+        { "date": "2001-01-01", "value": 1.0 },
+        { "date": "2001-01-02", "value": 0.0 },
+        {
+          "date": "2001-01-03",
+          "value": null,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER: example of a day without data"
+          }
+        },
+        { "date": "2001-01-04", "value": 2.0 },
+        { "date": "2001-01-05", "value": 3.0 }
+      ]
+    },
+    {
+      "quantity": "placeholder_meteorological_quantity",
+      "unit": "PLACEHOLDER_unit",
+      "time_zone": "UTC",
+      "start_date": "2001-01-01",
+      "end_date": "2001-01-03",
+      "days": [
+        {
+          "date": "2001-01-01",
+          "value": null,
+          "missing": { "reason": "SOURCE_UNAVAILABLE" }
+        },
+        {
+          "date": "2001-01-02",
+          "value": null,
+          "missing": { "reason": "SOURCE_UNAVAILABLE" }
+        },
+        {
+          "date": "2001-01-03",
+          "value": null,
+          "missing": { "reason": "SOURCE_UNAVAILABLE" }
+        }
+      ]
+    }
+  ],
+  "monthly_series": [
+    {
+      "quantity": "placeholder_monthly_quantity",
+      "unit": "PLACEHOLDER_unit",
+      "start": { "year": 2001, "month": 12 },
+      "end": { "year": 2002, "month": 2 },
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NO_COVERAGE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "months": [
+        { "year": 2001, "month": 12, "value": 1.0 },
+        { "year": 2002, "month": 1, "value": 2.0 },
+        { "year": 2002, "month": 2, "value": 3.0 }
+      ]
+    }
+  ]
+}
