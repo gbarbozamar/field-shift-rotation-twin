@@ -1,0 +1,32 @@
+# Provisional workflow: it only runs the existing Python tests.
+# The full pipeline (all checks of docs/DEVELOPMENT_BLUEPRINT.md section 6)
+# belongs to sub-lane L2a; the platform developer replaces or extends this file.
+
+name: Tests (provisional)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: python -m pip install pytest
+
+      - name: Run the tests
+        run: python -m pytest validation/ params/
