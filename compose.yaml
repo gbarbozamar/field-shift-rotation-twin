@@ -7,6 +7,12 @@ services:
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       CORS_ORIGINS: http://localhost:5173
+      # Not switched on: each is a decision of a person (api/README.md, "Configuration").
+      # POWER_SETTINGS_FILE: JSON settings of the NASA POWER adapter (template: adapters/examples/PLACEHOLDER_power_settings.json)
+      # CLIMATE_CACHE_DIR: folder of the climate response cache; required with POWER_SETTINGS_FILE
+      # CLIMATE_START_DATE: first day of the climate record period, YYYY-MM-DD; set with CLIMATE_END_DATE
+      # CLIMATE_END_DATE: last day of the climate record period, YYYY-MM-DD, inclusive
+      # SOIL_SLOPE_EXAMPLE_FILE: the accepted soil-and-slope contract example, served as example data
     ports:
       - "8000:8000"
     develop:
