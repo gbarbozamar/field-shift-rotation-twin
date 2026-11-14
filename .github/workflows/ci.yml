@@ -59,19 +59,20 @@ jobs:
           npm ci
           npm run build
 
-  # Check 3. OPEN: the command is agreed with the lead developer once
-  # contracts/ exists.
+  # Check 3. Agreed with the lead developer (#18): every folder under
+  # contracts/ ships a test that loads each example into its model and
+  # rejects each invalid variant.
   contract-validation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.2"
+      - name: Install
+        run: uv sync --frozen
       - name: Validate the contract examples
-        run: |
-          if [ -d contracts ]; then
-            echo "::warning::contracts/ exists but the validation command is not agreed yet"
-          else
-            echo "::notice::Contract validation skipped: contracts/ does not exist yet"
-          fi
+        run: uv run pytest contracts/
 
   # Check 4. Scans the whole history, not only the last commit.
   secret-scan:
