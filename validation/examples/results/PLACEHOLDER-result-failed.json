@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "PLACEHOLDER-result-failed",
+  "run_id": "PLACEHOLDER-run",
+  "test_code": "D999",
+  "expected": {
+    "id": "PLACEHOLDER-expected-text"
+  },
+  "outcome": "failed",
+  "observed": {
+    "text": "PLACEHOLDER observed wording"
+  }
+}

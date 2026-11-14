@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "kind": "expected_value",
+  "id": "PLACEHOLDER-expected-missing",
+  "test_code": "H999",
+  "quantity": "PLACEHOLDER quantity",
+  "value": {
+    "missing_reason": "PLACEHOLDER reason: not transcribed yet"
+  },
+  "citation": {
+    "reference": "PLACEHOLDER citation, not a real source",
+    "locator": "PLACEHOLDER locator"
+  },
+  "transcribed_by": "PLACEHOLDER person A",
+  "checked_by": "PLACEHOLDER person B"
+}
