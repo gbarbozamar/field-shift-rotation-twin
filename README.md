@@ -22,7 +22,7 @@ Read [docs/DEVELOPMENT_BLUEPRINT.md](docs/DEVELOPMENT_BLUEPRINT.md) before openi
 
 ## Lanes
 
-Four developers write code, each orchestrating several AI coding sessions in parallel. Two science reviewers validate and never write code.
+Three developers write code across four lanes, each orchestrating several AI coding sessions in parallel. A developer can own more than one lane. Two science reviewers validate and never write code.
 
 | Lane | Owner (role) | What it builds | Folders |
 |---|---|---|---|

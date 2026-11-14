@@ -17,7 +17,7 @@ This is a working document. It can change at any checkpoint; it never changes si
 
 ## 2. People and lanes
 
-Six people. Four write code by orchestrating AI sessions; two review science and never write code.
+Five people. Three write code by orchestrating AI sessions across four lanes; two review science and never write code. The roles below are roles, not headcount: one developer can hold two of them, and then runs each lane with its own sessions and its own clone of the repository.
 
 | Role | Lane | Owns (folders) | Main responsibility |
 |---|---|---|---|
