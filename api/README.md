@@ -188,22 +188,32 @@ as a Python `repr`, which doubles every backslash of a Windows path (issue
 #18). `api/test_config.py` checks it with a made-up path written with
 backslashes, on any system.
 
+### Variables of the deployed service
+
+For a person to set on the host. The app reads them at start-up; a wrong value makes it refuse to start.
+
+| Variable | Value | Where it comes from |
+|---|---|---|
+| `POWER_SETTINGS_FILE` | `adapters/settings/nasa_power.json` (relative to the working directory of the container, `/app`) | The settings file of the adapter (D20, D37) |
+| `CLIMATE_CACHE_DIR` | The path of the persistent volume of the host | D42. Without a volume the cache is lost at every deploy and the first request of a case fetches again |
+| `CLIMATE_START_DATE` | `2001-01-01` | D29 |
+| `CLIMATE_END_DATE` | `2024-12-31` | D29 |
+| `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
+| `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
+
+With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
+
 ### Running locally with settings
 
 ```bash
-cp adapters/examples/PLACEHOLDER_power_settings.json <a folder outside git>/power_settings.json
-# replace every placeholder with the values the people who own them decided
-POWER_SETTINGS_FILE=<that folder>/power_settings.json \
-CLIMATE_CACHE_DIR=<a folder for the cache> \
+POWER_SETTINGS_FILE=adapters/settings/nasa_power.json \
+CLIMATE_CACHE_DIR=<a folder for the cache, outside git> \
 CLIMATE_START_DATE=<first day> CLIMATE_END_DATE=<last day> \
-SOIL_SLOPE_EXAMPLE_FILE=<the accepted example> \
+SOIL_SLOPE_EXAMPLE_FILE=<the soil-and-slope example> \
 uv run uvicorn api.main:app --reload
 ```
 
-Started with the template unchanged, the server starts but every climate
-request fails (`https://power.invalid/` never resolves): the template is a
-shape, not a configuration. `compose.yaml` lists the variables as comments;
-none is switched on.
+**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on.
 
 ## Interfaces and their implementations
 
@@ -429,6 +439,8 @@ here.
 | D36 | `fill_reason`: `NO_COVERAGE`, for a fill value and for an absent day |
 | D38 | The soil-and-slope example source serves any field, under the identifiers of the request (unit `l2/runner-partial`). Replaces the OPEN "May the accepted soil-and-slope example stand in for any field?" |
 | D51, D52 | A response without a point is usable; one provenance label for the three values of the point |
+| D55 | The unit strings and the label of the point; with it the settings file of the adapter is written (`adapters/settings/nasa_power.json`) |
+| D29 | The climate record period of the deployed service: 2001-01-01 to 2024-12-31 |
 
 ## OPEN
 
@@ -438,12 +450,12 @@ here.
   since nothing would have been computed anyway? Today it answers
   `result: null` with `MISSING_INPUT` (PROPOSED order above). For the lead
   developer.
-- **The settings file of the climate adapter is not written yet.** The unit
-  strings of the point and its provenance label are not decided (questions
-  25, 26 and 28 of `contracts/inputs/README.md`), and `point` is a required
-  setting. For the science reviewers, or the lead developer as for D23 to D35.
-  Until then `POWER_SETTINGS_FILE` stays unset and the climate is reported
-  unavailable.
+- **The first real call has not been made by the deployed app.** Nobody knows
+  yet how long one request for 24 years of seven daily series takes, whether
+  the service accepts that span in one request (the scout report found no
+  published maximum), or whether it fits the host's request timeout. A person
+  watches the first call. If it does not fit: split a prefetch of the site
+  data from the run; no job polling. For the platform developer.
 - **How is the point (latitude, longitude) chosen for a field?** (OPEN in
   `adapters/ports.py`; stays with the science reviewers, D41, D48.)
 - **What the calendar engine gets beyond the rotation definition** (Q8 of

@@ -1,0 +1,61 @@
+{
+  "base_url": "https://power.larc.nasa.gov/api/temporal/daily/point",
+  "community": "ag",
+  "parameters": [
+    {
+      "source_parameter": "IMERG_PRECTOT",
+      "quantity": "precipitation",
+      "unit": "mm day-1",
+      "provenance": "OBSERVED"
+    },
+    {
+      "source_parameter": "PRECTOTCORR",
+      "quantity": "precipitation_reanalysis",
+      "unit": "mm day-1",
+      "provenance": "OBSERVED"
+    },
+    {
+      "source_parameter": "T2M_MAX",
+      "quantity": "air_temperature_max_2m",
+      "unit": "degC",
+      "provenance": "OBSERVED"
+    },
+    {
+      "source_parameter": "T2M_MIN",
+      "quantity": "air_temperature_min_2m",
+      "unit": "degC",
+      "provenance": "OBSERVED"
+    },
+    {
+      "source_parameter": "T2MDEW",
+      "quantity": "dew_point_temperature_2m",
+      "unit": "degC",
+      "provenance": "OBSERVED"
+    },
+    {
+      "source_parameter": "WS2M",
+      "quantity": "wind_speed_2m",
+      "unit": "m s-1",
+      "provenance": "OBSERVED"
+    },
+    {
+      "source_parameter": "ALLSKY_SFC_SW_DWN",
+      "quantity": "solar_radiation",
+      "unit": "MJ m-2 day-1",
+      "provenance": "OBSERVED"
+    }
+  ],
+  "point": {
+    "latitude_unit": "degree",
+    "longitude_unit": "degree",
+    "elevation_unit": "m",
+    "provenance": "OBSERVED"
+  },
+  "optional_arguments": {},
+  "fill_value": -999.0,
+  "fill_reason": "NO_COVERAGE",
+  "range_missing_reason": "NO_COVERAGE",
+  "attribution": "NASA POWER daily point data",
+  "source_id": "nasa_power",
+  "timeout_seconds": 60
+}

@@ -427,3 +427,51 @@ def test_the_default_client_has_the_configured_timeout(tmp_path):
 def test_build_app_needs_an_app_config():
     with pytest.raises(TypeError):
         build_app({})  # type: ignore[arg-type]
+
+
+# --- the real settings file of the adapter -------------------------------------
+
+
+def test_the_committed_settings_file_builds_the_app_with_the_period_of_d29(
+    tmp_path, engines_hidden
+):
+    """The variables of the deployed service (api/README.md), on a fake service."""
+    root = Path(__file__).parent.parent
+    evidence = json.loads(
+        (
+            root / "docs" / "evidence" / "nasa-power-2026-11-14" / "response.json"
+        ).read_text(encoding="utf-8")
+    )
+    requested = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request.url)
+        return httpx.Response(200, json=evidence)
+
+    config = load_config(
+        {
+            "POWER_SETTINGS_FILE": str(
+                root / "adapters" / "settings" / "nasa_power.json"
+            ),
+            "CLIMATE_CACHE_DIR": str(tmp_path / "cache"),
+            "CLIMATE_START_DATE": "2001-01-01",
+            "CLIMATE_END_DATE": "2024-12-31",
+        }
+    )
+    client = TestClient(
+        build_app(
+            config,
+            client_factory=lambda settings: httpx.Client(
+                transport=httpx.MockTransport(handler)
+            ),
+        )
+    )
+    response = client.post(ROUTE, json=BODY)
+    assert response.status_code == 200
+    climate = sources(response)[0]
+    assert (climate["id"], climate["state"]) == ("nasa_power", "fresh")
+    assert len(requested) == 1
+    assert requested[0].host == "power.larc.nasa.gov"
+    assert requested[0].params["start"] == "20010101"
+    assert requested[0].params["end"] == "20241231"
+    assert requested[0].params["community"] == "ag"

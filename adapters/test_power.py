@@ -238,7 +238,7 @@ def test_query_carries_what_is_needed_and_nothing_that_identifies_a_user(tmp_pat
         "start": "19000101",
         "end": "19000103",
         "format": "JSON",
-        "time-standard": "UTC",
+        "time-standard": "utc",
     }
     assert "user" not in params
     assert "cookie" not in {name.lower() for name in sent.headers}
