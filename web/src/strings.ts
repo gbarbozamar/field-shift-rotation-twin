@@ -76,4 +76,12 @@ export const strings = {
   'map.layer.attribution': '© OpenStreetMap contributors',
 } as const
 
+/**
+ * Placeholder names of the templates above that a caller fills through an
+ * object key. Defined once here, beside the template that carries them, so
+ * that no other file has to quote interface wording to fill a placeholder.
+ * They are tokens of the supplied wording, not wording of their own.
+ */
+export const REASON_PHRASE_PLACEHOLDER = 'reason phrase'
+
 export type StringKey = keyof typeof strings
