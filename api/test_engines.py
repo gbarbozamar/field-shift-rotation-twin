@@ -36,17 +36,24 @@ from api.engines import (
     count_values,
     discover_engine_functions,
     module_status_of,
+    part_not_built,
     result_values,
+    soil_loss_values,
 )
 from api.main import create_app
 from api.ports import RotationEngines, RunSettings
 from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
 from contracts.results.models import (
+    DIRECTION_OF,
     TREND_COMPUTATIONS,
+    UNITS_OF,
     Missing,
+    PartNotBuilt,
     ResultsPerRotation,
+    SoilLossNotBuilt,
     SoilLossResults,
     WaterDeficitExposure,
+    WaterDeficitExposureNotBuilt,
 )
 from contracts.rotation_definition import RotationDefinition
 
@@ -531,28 +538,47 @@ def test_site_data_absent(climate_data, soil_data, named):
 
 @pytest.mark.parametrize("absent", ["erosion", "water"])
 def test_one_of_ep1_and_ep3_not_built(absent):
+    """D12: the part of the engine that is not built takes the not-built form."""
     calendar_fn, soil_fn, water_fn = fakes()
     if absent == "erosion":
         soil_fn = None
     else:
         water_fn = None
     result = run(functions(calendar_fn, soil_fn, water_fn))
-    assert result.result is None
+    assembled = result.result
+    assert isinstance(assembled, ResultsPerRotation)
+    assert result.result_missing is None
     assert result.calendar is calendar_fn.answer
-    assert result.result_missing.reason == "NOT_AVAILABLE"
-    path = {"erosion": "engine.erosion", "water": "engine.water"}[absent]
-    assert path in result.result_missing.detail
     assert states(result)[absent] == ("not_available", "NOT_AVAILABLE")
-    # The engine that is built still runs and reports its own state.
+    # The engine that is built still runs; its part is its output, unchanged.
     if absent == "erosion":
-        other, values = "water", water_fn.answer
+        assert isinstance(assembled.soil_loss, SoilLossNotBuilt)
+        assert "engine.erosion.compute_soil_loss" in assembled.soil_loss.missing.detail
         assert len(water_fn.calls) == 1
+        assert all(
+            a is b for a, b in zip(assembled.water_deficit_exposure, water_fn.answer)
+        )
+        assert len(assembled.water_deficit_exposure) == len(water_fn.answer)
+        other, values = "water", water_fn.answer
     else:
-        other, values = "erosion", [*soil_fn.answer.annual, *soil_fn.answer.monthly]
+        assert isinstance(
+            assembled.water_deficit_exposure, WaterDeficitExposureNotBuilt
+        )
+        assert (
+            "engine.water.compute_water_deficit_exposure"
+            in assembled.water_deficit_exposure.missing.detail
+        )
         assert len(soil_fn.calls) == 1
+        assert assembled.soil_loss is soil_fn.answer
+        other, values = "erosion", [*soil_fn.answer.annual, *soil_fn.answer.monthly]
     expected = module_status_of(other, count_values(values))
     assert states(result)[other] == (expected.state, expected.reason)
     assert states(result)["calendar"] == ("available", None)
+    count = count_values(result_values(assembled))
+    assert (result.values_present, result.values_missing) == (
+        count.present,
+        count.missing,
+    )
 
 
 def test_ep1_returns_a_bare_missing():
@@ -1034,3 +1060,233 @@ def test_other_field_inputs_names_only_the_fields_that_differ():
     assert runner.other_field_inputs(
         cal, soil_slope=soil_of_another_field(case_id=OTHER_CASE)
     ) == [("soil_slope", ("case_id",))]
+
+
+# --- 12. partial results: a part whose engine is not built (D12) ---------------
+
+NOT_BUILT_DOCUMENT = example(
+    "results", "PLACEHOLDER_results_per_rotation_not_built.json"
+)
+EP1_PATH = "engine.erosion.compute_soil_loss"
+EP3_PATH = "engine.water.compute_water_deficit_exposure"
+
+
+def calendar_only(**kwargs: Any):
+    calendar_fn = Fake(calendar())
+    return calendar_fn, run(functions(calendar_fn, None, None), **kwargs)
+
+
+def without_detail(part: dict[str, Any]) -> dict[str, Any]:
+    return {**part, "missing": {"reason": part["missing"]["reason"]}}
+
+
+def test_only_the_calendar_built_gives_two_not_built_parts_and_six_carbon_rows():
+    calendar_fn, result = calendar_only(carbon_models=DEFAULT_CARBON_MODELS)
+    assembled = result.result
+    assert isinstance(assembled, ResultsPerRotation)
+    assert result.result_missing is None
+    assert result.calendar is calendar_fn.answer
+    assert isinstance(assembled.soil_loss, SoilLossNotBuilt)
+    assert isinstance(assembled.water_deficit_exposure, WaterDeficitExposureNotBuilt)
+    assert EP1_PATH in assembled.soil_loss.missing.detail
+    assert EP3_PATH in assembled.water_deficit_exposure.missing.detail
+    rows = assembled.soil_carbon_trend
+    assert isinstance(rows, list)  # the six rows, not the not-built form
+    assert sorted((row.carbon_model, row.computation) for row in rows) == sorted(
+        (model, computation)
+        for model in ("amg", "rothc")
+        for computation in TREND_COMPUTATIONS
+    )
+    assert all(row.value is None for row in rows)
+    assert all(row.missing.reason == "NOT_AVAILABLE" for row in rows)
+    assert states(result) == {
+        "calendar": ("available", None),
+        "erosion": ("not_available", "NOT_AVAILABLE"),
+        "water": ("not_available", "NOT_AVAILABLE"),
+        **CARBON_STATES,
+    }
+    # Each not-built part counts as one missing value (PROPOSED).
+    assert (result.values_present, result.values_missing) == (0, 2 + len(rows))
+
+
+def test_the_not_built_parts_carry_the_constants_of_the_contract():
+    _, result = calendar_only()
+    soil = result.result.soil_loss
+    water_part = result.result.water_deficit_exposure
+    for part, indicator in (
+        (soil, "soil_loss"),
+        (water_part, "water_deficit_exposure"),
+    ):
+        assert part.indicator == indicator
+        assert part.direction == DIRECTION_OF[indicator]
+        assert tuple(part.units) == UNITS_OF[indicator]
+        assert part.missing.reason == "NOT_AVAILABLE"
+    # The same as the accepted example, except the detail text.
+    for name, part in (("soil_loss", soil), ("water_deficit_exposure", water_part)):
+        assert without_detail(part.model_dump(mode="json")) == without_detail(
+            NOT_BUILT_DOCUMENT[name]
+        )
+    assert part_not_built(SoilLossNotBuilt, runner.EROSION) == soil
+
+
+@pytest.mark.parametrize(
+    "built, outcome",
+    [
+        ("none", "no_result"),
+        ("erosion", "partial"),
+        # The PLACEHOLDER water output holds no present value, and no example
+        # holds one, so no value is present and the rule of the route gives
+        # ``no_result``. No number is written here to make it ``partial``.
+        ("water", "no_result"),
+    ],
+)
+def test_the_route_answers_a_result_that_loads_back(built, outcome):
+    calendar_fn, soil_fn, water_fn = fakes()
+    engines = EntryPointEngines(
+        functions(
+            calendar_fn,
+            soil_fn if built == "erosion" else None,
+            water_fn if built == "water" else None,
+        ),
+        carbon_models=DEFAULT_CARBON_MODELS,
+    )
+    response = client(engines).post(ROUTE, json=BODY)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["outcome"] == outcome
+    assert body["result_missing"] is None
+    loaded = ResultsPerRotation.model_validate_json(json.dumps(body["result"]))
+    parts = {
+        "soil_loss": loaded.soil_loss,
+        "water_deficit_exposure": loaded.water_deficit_exposure,
+    }
+    not_built = [name for name, part in parts.items() if isinstance(part, PartNotBuilt)]
+    assert not_built == [
+        name
+        for name, engine in (
+            ("soil_loss", "erosion"),
+            ("water_deficit_exposure", "water"),
+        )
+        if engine != built
+    ]
+    for name in not_built:
+        assert numbers_in(body["result"][name]) == []
+    if built == "erosion":
+        assert loaded.soil_loss == soil_fn.answer
+    if built == "water":
+        assert loaded.water_deficit_exposure == water_fn.answer
+
+
+def test_count_values_on_a_result_with_not_built_parts():
+    _, nothing = calendar_only()
+    values = result_values(nothing.result)
+    count = count_values(values)
+    assert count.present == 0
+    assert count.missing == 2 + 3 * len(CARBON_MODELS)
+    assert count.first_missing == nothing.result.soil_loss.missing
+    assert soil_loss_values(nothing.result.soil_loss) == [nothing.result.soil_loss]
+
+    _, with_soil, _ = fakes()
+    partial = run(functions(Fake(calendar()), with_soil, None)).result
+    count = count_values(result_values(partial))
+    loss = count_values(soil_loss_values(with_soil.answer))
+    assert count.present == loss.present > 0
+    assert count.missing == loss.missing + 1 + 3 * len(CARBON_MODELS)
+
+
+# What keeps its present answer (D12 allows the not-built form only for an
+# engine that is not built): one test per row.
+
+
+def test_still_no_result_when_the_calendar_engine_is_not_built():
+    result = run(EngineFunctions(), carbon_models=DEFAULT_CARBON_MODELS)
+    assert result.calendar is None
+    assert result.result is None
+    assert result.result_missing.reason == "NOT_AVAILABLE"
+    assert "engine.calendar.build_rotation_calendar" in result.result_missing.detail
+
+
+@pytest.mark.parametrize(
+    "climate_data, soil_data", [(None, SOIL_SLOPE), (CLIMATE, None), (None, None)]
+)
+def test_still_no_result_when_an_input_is_absent(climate_data, soil_data):
+    """PROPOSED: inputs absent and engines not built is still MISSING_INPUT."""
+    _, result = calendar_only(
+        climate=climate_result(climate_data), soil=soil_result(soil_data)
+    )
+    assert result.result is None
+    assert result.calendar is not None
+    assert result.result_missing.reason == "MISSING_INPUT"
+    assert states(result)["erosion"] == ("not_available", "NOT_AVAILABLE")
+    assert states(result)["water"] == ("not_available", "NOT_AVAILABLE")
+
+
+def test_still_no_result_for_site_data_of_another_field():
+    _, result = calendar_only(
+        soil=soil_result(soil_of_another_field(field_id=OTHER_FIELD))
+    )
+    assert result.result is None
+    assert result.result_missing.reason == "MISSING_INPUT"
+    assert result.result_missing.detail.startswith(runner.OTHER_FIELD)
+
+
+def test_still_no_result_when_ep1_returns_a_bare_missing():
+    bare = Missing(reason="MISSING_INPUT", detail="PLACEHOLDER start month")
+    result = run(functions(Fake(calendar()), Fake(bare), None))
+    assert result.result is None
+    assert (result.result_missing.reason, result.result_missing.detail) == (
+        "MISSING_INPUT",
+        "PLACEHOLDER start month",
+    )
+
+
+def test_still_no_result_without_carbon_model_identifiers():
+    _, result = calendar_only(carbon_models=())
+    assert result.result is None
+    assert result.result_missing.reason == "NOT_AVAILABLE"
+    assert "carbon models" in result.result_missing.detail
+
+
+@pytest.mark.parametrize("which", [1, 2])
+def test_a_built_engine_that_returns_the_not_built_form_is_a_defect(which):
+    parts = list(fakes())
+    parts[which] = Fake(
+        part_not_built(SoilLossNotBuilt, runner.EROSION)
+        if which == 1
+        else part_not_built(WaterDeficitExposureNotBuilt, runner.WATER)
+    )
+    engines = EntryPointEngines(functions(*parts), carbon_models=CARBON_MODELS)
+    with pytest.raises(TypeError):
+        engines.run(ROTATION, climate_result(), soil_result())
+    response = client(engines).post(ROUTE, json=BODY, headers={"Origin": ORIGIN})
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+
+
+# --- 13. the example soil and slope stands in for any field (D38) --------------
+
+
+def test_the_example_with_its_own_identifiers_no_longer_answers_another_field(
+    tmp_path, monkeypatch, no_engine_modules
+):
+    """Default engines (a fake package), the example file under other identifiers."""
+    write_package(tmp_path / "package", FAKE_ENGINE_PACKAGE)
+    monkeypatch.syspath_prepend(str(tmp_path / "package"))
+    document = example("inputs", "PLACEHOLDER_site_soil_slope.json")
+    document["case_id"] = "PLACEHOLDER_FILE_CASE"
+    document["field_id"] = "PLACEHOLDER_FILE_FIELD"
+    soil_file = tmp_path / "soil.json"
+    soil_file.write_text(json.dumps(document), encoding="utf-8")
+    app_client = TestClient(
+        create_app(
+            [ORIGIN],
+            climate=FakeClimate(),
+            soil_slope=ExampleSoilSlopeSource(soil_file),
+            settings=PERIOD,
+        )
+    )
+    body = app_client.post(ROUTE, json=BODY).json()
+    assert body["result_missing"] is None
+    assert body["result"] is not None
+    assert body["sources"][1]["state"] == "example"
+    assert "PLACEHOLDER_FILE" not in json.dumps(body)
