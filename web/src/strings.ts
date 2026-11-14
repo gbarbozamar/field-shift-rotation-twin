@@ -17,6 +17,8 @@
  *                plus api.code.shown for the raw code
  * - home.*       the shell page (heading, intro, placeholder, diagnostics)
  * - common.*     shared loading and error wording
+ * - identity.*   the fields screen (title, banner, list wording)
+ * - map.*        the map screen (title, select hint, base-layer attribution)
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -69,6 +71,9 @@ export const strings = {
   'identity.selected': 'Selected',
   'identity.field_id_label': 'Identifier',
   'identity.empty_list': 'The example case has no fields.',
+  'map.title': 'Fields',
+  'map.select_hint': 'Select a field on the map or the list',
+  'map.layer.attribution': '© OpenStreetMap contributors',
 } as const
 
 export type StringKey = keyof typeof strings

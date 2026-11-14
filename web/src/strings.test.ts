@@ -80,6 +80,9 @@ const WORDING_SHEET: Record<string, string> = {
   'identity.selected': 'Selected',
   'identity.field_id_label': 'Identifier',
   'identity.empty_list': 'The example case has no fields.',
+  'map.title': 'Fields',
+  'map.select_hint': 'Select a field on the map or the list',
+  'map.layer.attribution': '© OpenStreetMap contributors',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
 }
