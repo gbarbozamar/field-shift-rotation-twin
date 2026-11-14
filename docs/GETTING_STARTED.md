@@ -67,7 +67,7 @@ Follow section 3.3 of the blueprint. In short:
 5. CI passes, the consumer of the seam approves, then squash merge.
 6. Add one line to `AI_USE_LOG.md`, and a row to `ATTRIBUTIONS.md` for anything new you used.
 
-Limits: at most three builders in flight; no new unit while two of yours wait for acceptance; nothing runs unattended against `main`.
+Limits: at most three builders in flight; no new unit in a lane while two units of that lane wait for acceptance, with L2a and L2b counted separately; nothing runs unattended against `main`.
 
 ### 6. What you never hand to a session
 
