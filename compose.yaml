@@ -1,20 +1,40 @@
-# Local development. Start with:  docker compose watch
-# Code edits are synced into the container and uvicorn reloads;
-# a change to pyproject.toml or uv.lock rebuilds the image.
+# Local development of the whole app. Start with:  docker compose watch
+#
+#   frontend  http://localhost:5173/field-shift-rotation-twin/
+#   backend   http://localhost:8000  (interactive page: /docs)
+#
+# Backend: code edits are synced into the container and uvicorn reloads; a
+# change to pyproject.toml or uv.lock rebuilds the image.
+# It fetches real climate data and keeps it in the volume climate_cache.
+# Frontend: web/ is mounted into a Node container that runs the Vite dev
+# server, so an edit shows in the browser at once. Its node_modules live in
+# a volume, not in web/ on the host; a change to web/package-lock.json
+# restarts the service, which installs again.
+# Other host ports, when 5173 or 8000 are taken:
+#   WEB_PORT=5174 API_PORT=8010 docker compose watch
+# (the backend then allows the frontend at that port: CORS_ORIGINS follows WEB_PORT)
 services:
   api:
     build: .
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
-      CORS_ORIGINS: http://localhost:5173
-      # Not switched on: each is a decision of a person (api/README.md, "Configuration").
-      # POWER_SETTINGS_FILE: JSON settings of the NASA POWER adapter (template: adapters/examples/PLACEHOLDER_power_settings.json)
-      # CLIMATE_CACHE_DIR: folder of the climate response cache; required with POWER_SETTINGS_FILE
-      # CLIMATE_START_DATE: first day of the climate record period, YYYY-MM-DD; set with CLIMATE_END_DATE
-      # CLIMATE_END_DATE: last day of the climate record period, YYYY-MM-DD, inclusive
-      # SOIL_SLOPE_EXAMPLE_FILE: the accepted soil-and-slope contract example, served as example data
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-5173}
+      # Real climate data, on by default here. The first request of a place
+      # asks the NASA POWER service once; the answer is kept in the volume
+      # climate_cache and reused, also after the containers are removed.
+      # To run without calling the service, start with the three empty:
+      #   POWER_SETTINGS_FILE= CLIMATE_START_DATE= CLIMATE_END_DATE= docker compose watch
+      POWER_SETTINGS_FILE: ${POWER_SETTINGS_FILE-adapters/settings/nasa_power.json}
+      CLIMATE_CACHE_DIR: /data/climate-cache
+      CLIMATE_START_DATE: ${CLIMATE_START_DATE-2001-01-01}
+      CLIMATE_END_DATE: ${CLIMATE_END_DATE-2024-12-31}
+      # Soil and slope: the PLACEHOLDER example, to exercise the whole route.
+      # Its numbers mean nothing and it is shown as example data.
+      SOIL_SLOPE_EXAMPLE_FILE: ${SOIL_SLOPE_EXAMPLE_FILE-contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json}
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - climate_cache:/data
     develop:
       watch:
         - action: sync
@@ -23,7 +43,40 @@ services:
         - action: sync
           path: ./adapters
           target: /app/adapters
+        - action: sync
+          path: ./contracts
+          target: /app/contracts
+        - action: sync
+          path: ./engine
+          target: /app/engine
+        - action: sync
+          path: ./params
+          target: /app/params
         - action: rebuild
           path: pyproject.toml
         - action: rebuild
           path: uv.lock
+
+  web:
+    image: node:22-slim
+    working_dir: /web
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
+    environment:
+      # Read by the frontend at start (web/src/lib/api.ts): the backend above.
+      VITE_API_URL: http://localhost:${API_PORT:-8000}
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./web:/web
+      - web_node_modules:/web/node_modules
+    develop:
+      watch:
+        - action: restart
+          path: ./web/package-lock.json
+
+volumes:
+  web_node_modules:
+  # The climate response cache. `docker compose down` keeps it;
+  # `docker compose down --volumes` empties it, and the next request asks the
+  # service again.
+  climate_cache:

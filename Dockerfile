@@ -19,7 +19,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
-RUN useradd --create-home app && chown -R app /app
+# /data holds what must outlive a container: the climate response cache.
+# It is created here and owned by the app user, so that a named volume
+# mounted on it starts with that owner and the cache can write.
+RUN useradd --create-home app && mkdir -p /data/climate-cache && chown -R app /app /data
 USER app
 
 EXPOSE 8000
