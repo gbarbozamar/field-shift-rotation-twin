@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 
 from adapters._fakes import full_document, settings_fields
 from adapters.example_soil_slope import EXAMPLE_SOIL_SLOPE_ID
+from adapters.soil_tables import SOIL_TABLES_ID
 from api import config as config_module
 from api.app import create_app
 from api.config import (
@@ -31,13 +32,17 @@ from api.config import (
     CLIMATE_START_DATE,
     CORS_ORIGINS,
     POWER_SETTINGS_FILE,
+    SOIL_GROUPS_FILE,
     SOIL_SLOPE_EXAMPLE_FILE,
+    SOIL_TABLE_FILES,
     VARIABLES,
     AppConfig,
     ConfigError,
+    SoilTablesConfig,
     build_app,
     load_config,
 )
+from api.engines import OTHER_FIELD
 from api.ports import RunSettings
 from api.standins import CLIMATE_STANDIN_ID, SOIL_SLOPE_STANDIN_ID
 
@@ -606,3 +611,130 @@ def test_load_config_and_build_app_pass_the_same_catalogue(monkeypatch, tmp_path
     build_app(config)
     (engines,) = built
     assert engines.parameters is config.parameters
+
+
+# --- the soil-table source (unit l2/soil-tables) -------------------------------
+
+ADAPTER_EXAMPLES = ROOT / "adapters" / "examples"
+SOIL_TABLE_TEMPLATE = ADAPTER_EXAMPLES / "PLACEHOLDER_soil_table.json"
+SOIL_GROUPS_TEMPLATE = ADAPTER_EXAMPLES / "PLACEHOLDER_soil_groups.json"
+SOIL_TABLES_ENVIRON = {
+    SOIL_TABLE_FILES: str(SOIL_TABLE_TEMPLATE),
+    SOIL_GROUPS_FILE: str(SOIL_GROUPS_TEMPLATE),
+}
+
+
+def test_both_soil_variables_wire_the_soil_table_source(engines_hidden):
+    config = load_config(SOIL_TABLES_ENVIRON)
+    assert config.soil_tables == SoilTablesConfig(
+        table_files=(SOIL_TABLE_TEMPLATE,), groups_file=SOIL_GROUPS_TEMPLATE
+    )
+    assert config.soil_slope_example_file is None
+    response = TestClient(build_app(config)).post(ROUTE, json=BODY)
+    soil = sources(response)[1]
+    assert (soil["id"], soil["contract"], soil["state"]) == (
+        SOIL_TABLES_ID,
+        "site_data_soil_slope",
+        "example",
+    )
+    assert soil["missing_reason"] is None
+    assert soil["request"] == {
+        "case_id": BODY["site"]["case_id"],
+        "field_id": BODY["site"]["field_id"],
+        "soil_group": "PLACEHOLDER_GROUP_A",
+    }
+
+
+def test_the_soil_table_source_gives_data_of_the_requested_field():
+    """Whatever engines exist, the site data is never of another field (D14)."""
+    response = TestClient(build_app(load_config(SOIL_TABLES_ENVIRON))).post(
+        ROUTE, json=BODY
+    )
+    assert response.status_code == 200
+    missing = response.json()["result_missing"]
+    assert missing is None or OTHER_FIELD not in (missing["detail"] or "")
+
+
+def test_an_undeclared_field_is_reported_in_sources(engines_hidden):
+    body = {**BODY, "site": {**BODY["site"], "field_id": "PLACEHOLDER_UNDECLARED"}}
+    response = TestClient(build_app(load_config(SOIL_TABLES_ENVIRON))).post(
+        ROUTE, json=body
+    )
+    soil = sources(response)[1]
+    assert (soil["id"], soil["state"], soil["missing_reason"]) == (
+        SOIL_TABLES_ID,
+        "unavailable",
+        "MISSING_INPUT",
+    )
+
+
+@pytest.mark.parametrize(
+    "given, absent",
+    [(SOIL_TABLE_FILES, SOIL_GROUPS_FILE), (SOIL_GROUPS_FILE, SOIL_TABLE_FILES)],
+)
+def test_one_soil_variable_without_the_other(given, absent):
+    error = config_error({given: SOIL_TABLES_ENVIRON[given]})
+    assert f"{given} is set without {absent}" in str(error)
+
+
+def test_the_soil_tables_and_the_example_together_are_refused():
+    error = config_error(
+        {**SOIL_TABLES_ENVIRON, SOIL_SLOPE_EXAMPLE_FILE: str(SOIL_SLOPE_FILE)}
+    )
+    for name in (SOIL_SLOPE_EXAMPLE_FILE, SOIL_TABLE_FILES, SOIL_GROUPS_FILE):
+        assert name in str(error)
+
+
+def test_build_app_refuses_two_soil_sources():
+    config = AppConfig(
+        soil_slope_example_file=SOIL_SLOPE_FILE,
+        soil_tables=SoilTablesConfig(
+            table_files=(SOIL_TABLE_TEMPLATE,), groups_file=SOIL_GROUPS_TEMPLATE
+        ),
+    )
+    with pytest.raises(ConfigError):
+        build_app(config)
+
+
+@pytest.mark.parametrize("variable", [SOIL_TABLE_FILES, SOIL_GROUPS_FILE])
+def test_a_soil_file_absent_names_the_variable_and_the_path_plainly(variable):
+    environ = {**SOIL_TABLES_ENVIRON, variable: BACKSLASH_PATH}
+    error = config_error(environ)
+    assert variable in str(error)
+    assert f"'{BACKSLASH_PATH}'" in str(error)
+    assert "\\\\" not in str(error)
+    assert "does not exist" in str(error)
+
+
+@pytest.mark.parametrize("variable", [SOIL_TABLE_FILES, SOIL_GROUPS_FILE])
+def test_a_malformed_soil_file_refuses_start_up(tmp_path, variable):
+    path = tmp_path / "soil.json"
+    path.write_text(json.dumps({SECRET: SECRET}), encoding="utf-8")
+    error = config_error({**SOIL_TABLES_ENVIRON, variable: str(path)})
+    assert variable in str(error)
+    assert f"'{path}'" in str(error)
+    assert SECRET not in str(error)
+
+
+def test_one_table_file_named_twice_refuses_start_up():
+    twice = f"{SOIL_TABLE_TEMPLATE},{SOIL_TABLE_TEMPLATE}"
+    error = config_error({**SOIL_TABLES_ENVIRON, SOIL_TABLE_FILES: twice})
+    assert SOIL_TABLE_FILES in str(error)
+    assert "twice" in str(error)
+
+
+def test_two_table_files_with_the_same_quantity_refuse_start_up(tmp_path):
+    copy_path = tmp_path / "copy.json"
+    copy_path.write_text(SOIL_TABLE_TEMPLATE.read_text(encoding="utf-8"), "utf-8")
+    environ = {
+        **SOIL_TABLES_ENVIRON,
+        SOIL_TABLE_FILES: f"{SOIL_TABLE_TEMPLATE}, {copy_path}",
+    }
+    error = config_error(environ)
+    assert SOIL_TABLE_FILES in str(error)
+    assert "same quantity" in str(error)
+
+
+def test_an_empty_item_in_the_table_list_refuses_start_up():
+    environ = {**SOIL_TABLES_ENVIRON, SOIL_TABLE_FILES: f"{SOIL_TABLE_TEMPLATE},"}
+    assert SOIL_TABLE_FILES in str(config_error(environ))

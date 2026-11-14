@@ -69,6 +69,15 @@ A valid request always answers `200`, also when nothing could be computed:
 - Example data is marked next to the result, not inside it (decision Q16):
   a source that is the accepted contract example has `sources[].state ==
   "example"`.
+- The soil-table source (`SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE`) reports
+  `soil_tables` in `sources`: `example` when any of its files says
+  `example_data: true`, otherwise `fresh` with `retrieved_at` (the files are
+  read during the call); `request` holds `case_id`, `field_id` and, once
+  found, the declared `soil_group`; `attribution` joins the `source` of each
+  table that lists the group. An undeclared field, or a soil group no table
+  lists, is `unavailable` / `MISSING_INPUT`; a file that is absent or
+  malformed is `unavailable` / `NOT_AVAILABLE` (adapters/README.md,
+  PROPOSED).
 - `result_missing` is non-null exactly when `result` is null (**PROPOSED**:
   the key is always present, `null` when there is a result).
 - `outcome` (`derive_outcome`, **PROPOSED**), from what `EnginesResult`
@@ -159,6 +168,8 @@ only its path and the reason.
 | `CLIMATE_CACHE_DIR` | Folder of the `FileCache` of climate responses. Not created or checked at start-up beyond being non-empty: `FileCache` creates it on first write | Required when `POWER_SETTINGS_FILE` is set; alone it is ignored |
 | `CLIMATE_START_DATE`, `CLIMATE_END_DATE` | The climate record period (`RunSettings`), `YYYY-MM-DD`, inclusive | No period: the climate source is not called (unchanged) |
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
+| `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
+| `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -182,6 +193,14 @@ on `httpx.MockTransport`.
   does not load into `SiteSoilSlope`, or has `example_data` false. This is an
   extra, earlier guard: `ExampleSoilSlopeSource` itself still answers
   `unavailable` for these when used directly.
+- Only one of `SOIL_TABLE_FILES` and `SOIL_GROUPS_FILE` set; both set together
+  with `SOIL_SLOPE_EXAMPLE_FILE` (one soil-and-slope source at a time); an
+  empty item in `SOIL_TABLE_FILES` or one file named twice; a soil file that
+  does not exist, cannot be read, is not JSON or is rejected by its loader
+  (`load_soil_table`, `load_soil_groups`; the message names the variable, the
+  path and the position of the problem, never the content); two tables that
+  give the same quantity for one soil group. The source still answers
+  `unavailable` for a file that breaks after start-up. PROPOSED.
 - The parameter catalogue in `params/records/` has any problem of
   `load_folder` or `check_catalogue` (not a variable; see "The parameter
   catalogue" under the engine runner). An empty catalogue starts.
@@ -202,6 +221,7 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `CLIMATE_START_DATE` | `2001-01-01` | D29 |
 | `CLIMATE_END_DATE` | `2024-12-31` | D29 |
 | `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
+| `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
@@ -227,7 +247,7 @@ settings=None)` receives the implementations; `None` means the default.
 | Interface | Defined in | Default | Default behaviour | Still to come |
 |---|---|---|---|---|
 | `ClimateSource` | `adapters/ports.py` | Stand-in `ClimateUnavailable` | `data=None`, `unavailable`, `NOT_AVAILABLE` | The NASA POWER adapter (`adapters/power.py`) is wired by `POWER_SETTINGS_FILE` (see Configuration); its settings are OPEN in `adapters/README.md` |
-| `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is wired by `SOIL_SLOPE_EXAMPLE_FILE` and serves the example for any field (D38). Then the adapters of soil and slope from public data (D48, D49) |
+| `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is wired by `SOIL_SLOPE_EXAMPLE_FILE` and serves the example for any field (D38); `adapters.soil_tables.SoilTableSource(table_paths, groups_path)` is wired by `SOIL_TABLE_FILES` and `SOIL_GROUPS_FILE` (soil by soil group, D48, D49; slope not built). Then slope from an elevation model (D48) |
 | `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; a soil-loss or water engine that is not found gives its part in the not-built form (D12) | Nothing in `api/`: each engine is picked up when its lane lands it |
 | `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
 
@@ -472,6 +492,13 @@ result and not both zero with one (checked at construction).
   test of `api/test_config.py`. The outcome of the case "only EP3 built"
   is `no_result` in the test, because the PLACEHOLDER water output holds no
   present value and no number is written in a test to change that.
+
+- Unit `l2/soil-tables`: the variables `SOIL_TABLE_FILES` and
+  `SOIL_GROUPS_FILE` (both or neither), `SoilTablesConfig`,
+  `AppConfig.soil_tables`, the `ConfigError` for the example and the tables
+  together (in `load_config` and again in `build_app`), loading and checking
+  every soil file at start-up, the messages, and the test cases of the
+  soil-table section of `api/test_config.py`.
 
 ## Decided
 
