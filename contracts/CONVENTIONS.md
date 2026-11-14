@@ -4,12 +4,14 @@ Shared conventions that every contract, engine, adapter and screen in this repos
 
 ## How to read this sheet
 
-- This sheet is a **proposal written by a builder session** (blueprint section 3.7). Nothing here is in force until a person approves the pull request. It is a science-class change, so it also needs a science reviewer.
-- Every convention has an identifier (`C<section>.<item>`) and exactly one status:
+- This sheet was written by a builder session (blueprint section 3.7). The items marked `PROPOSED` are proposals of the session. The items marked `DECIDED` hold decisions of a person, transcribed by the session. Nothing here is in force until a person approves the pull request. It is a science-class change, so it also needs a science reviewer.
+- Every convention has an identifier (`C<section>.<item>`) and exactly one status, given on its `Status:` line:
   - `PROPOSED`: the session proposes it. A person accepts it or corrects it in the pull request.
-  - `OPEN`: the session cannot responsibly propose it. The item states the question a person has to answer and, where useful, the options.
+  - `DECIDED`: a person decided it. The status line names who decided and when, and says whether acceptance by a science reviewer is pending.
+  - `OPEN`: nobody has decided it. The item states the question a person has to answer and, where useful, the options.
+- A decision can leave a part for a person to supply. That part is listed inside the item as a sub-point marked `OPEN`, with its question, or as `CITATION NEEDED`. The status of the item is the one on its `Status:` line.
 - To review, answer per identifier: accept, correct, or (for `OPEN`) decide.
-- The numbers in this sheet are only labels: item numbers, month numbers and exponents in unit strings. The sheet contains no parameter value, threshold, uncertainty range or expected value. Those are supplied by people and live in the parameter catalogue, the test plan and the validation files.
+- The numbers in this sheet are only labels: item numbers, month numbers, exponents in unit strings and the date of a decision. The sheet contains no parameter value, threshold, uncertainty range or expected value. Those are supplied by people and live in the parameter catalogue, the test plan and the validation files.
 - Field names given here say what travels with a value. The exact shape of each contract is fixed by its schema and its accepted example, which are separate units.
 - Where a source would have to be cited, the text says `CITATION NEEDED`. A person supplies the citation.
 
@@ -22,7 +24,7 @@ Status: PROPOSED
 - The product reports three indicators per rotation, the ones named in the README: soil loss, exposure to water deficit, and the trend of soil carbon. Their identifiers are `soil_loss`, `water_deficit_exposure` and `soil_carbon_trend`.
 - Identifiers are lower case with underscores. They are the same in every contract, file and screen. Display names shown to the user are interface text and are not fixed here.
 - Every indicator value carries its unit as a string, written exactly as in this sheet. A consumer checks the unit it receives and never assumes it.
-- In unit strings, `t` is the metric tonne, `ha` is the hectare, `yr` is one agricultural year (section 5), `month` is one calendar month, `days` is a count of days, and `t C` is tonnes of carbon.
+- In unit strings, `t` is the metric tonne, `ha` is the hectare, `yr` is one agricultural year (section 5), `month` is one calendar month, `t C` is tonnes of carbon, and `dimensionless` marks a value that has no unit.
 - Every indicator has a direction, one of `lower_is_better` or `higher_is_better`. The direction says which way is preferable when two rotations are compared. It is not a threshold and it does not say when a difference matters; that is decided only by the test plan.
 - Every indicator value follows sections 2, 3 and 4: it carries its uncertainty range, or it is missing with a reason, and it carries a provenance label.
 
@@ -36,42 +38,37 @@ Status: PROPOSED
 | Quantity | Mass of soil lost per unit of field area per unit of time |
 | Unit | `t ha-1 yr-1` |
 | Time basis | One value per agricultural year. Where a contract asks for a monthly breakdown, one value per calendar month in `t ha-1 month-1`; the monthly values of an agricultural year add up to its annual value |
-| Sign | Never negative |
 | Direction | `lower_is_better` |
 
 The method that produces the value is not defined here. Its description and its source belong to the method documentation: CITATION NEEDED.
 
-### C1.3 Exposure to water deficit: identifier, time basis and direction
+### C1.3 Exposure to water deficit: identifier, unit, time basis and direction
 
 Status: PROPOSED
+
+The quantity, the unit and the direction below follow the decision recorded under C1.4.
 
 | Aspect | Convention |
 |---|---|
 | Identifier | `water_deficit_exposure` |
-| Unit | `days yr-1`, and `days month-1` for a monthly breakdown. This unit holds only if the definition decided under C1.4 is a count of days. If the definition is another kind of quantity, the unit follows that definition and this row is corrected with it |
-| Time basis | One value per agricultural year. Where a contract asks for a monthly breakdown, one value per calendar month |
-| Sign | Never negative |
-| Direction | `lower_is_better` |
+| Quantity | The ratio between water transpired and water demanded over the critical period of the crop (C1.4) |
+| Unit | None: the value is a ratio and has no unit (C1.4). Its unit string is `dimensionless`; it is never left empty |
+| Time basis | The critical period of the crop (C1.4). `OPEN`: how the values of the crops of a rotation give one value per agricultural year or per rotation, and whether a monthly breakdown exists for this indicator, is not decided. Question for the science reviewers: **on which time basis is the ratio reported for a rotation?** |
+| Direction | `higher_is_better` (C1.4) |
 
-No threshold appears in this sheet or in any engine. The threshold that the definition needs lives only in the test plan.
+No threshold appears in this sheet. Thresholds live only in the test plan (blueprint section 5).
 
 ### C1.4 Exposure to water deficit: scientific definition
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **what exactly is counted or measured as "exposure to water deficit"?** The answer has to state:
+- One measure decides: the ratio between water transpired and water demanded over the critical period of the crop.
+- The other three measures (days below a threshold, days below a threshold in the critical period, accumulated shortfall as a depth of water) are computed from the same daily balance and reported as descriptive only: no threshold, no weight in the decision.
 
-1. Which quantity is compared with the threshold, or accumulated. Options:
-   - (a) a count of days on which a state of the daily water balance is below a threshold held in the test plan;
-   - (b) the same count, restricted to periods that matter for the crop in the ground;
-   - (c) an accumulated shortfall of water over the period, expressed as a depth of water;
-   - (d) a dimensionless ratio between water supplied and water demanded over the period.
-2. Which state of the water balance is used (for example the water stored in the soil, or the gap between demand and supply).
-3. Whether days without a crop in the ground count.
-4. The unit that follows from the answer, so that C1.3 can be confirmed or corrected.
-5. The source of the definition: CITATION NEEDED.
+Still to be supplied by a person:
 
-Until this is answered, no engine reports `water_deficit_exposure` as anything but missing.
+- `OPEN`: the definition of the critical period per crop. Question for the science reviewers: **which period of each crop is its critical period?**
+- The source of the measure: CITATION NEEDED.
 
 ### C1.5 Trend of soil carbon: identifier, unit, time basis and direction
 
@@ -80,27 +77,28 @@ Status: PROPOSED
 | Aspect | Convention |
 |---|---|
 | Identifier | `soil_carbon_trend` |
-| Quantity | Mean change per year of the stock of soil organic carbon per unit of field area |
+| Quantity | Change per year of the stock of soil carbon per unit of field area, obtained by one of the three computations of C1.6. The default, and the one used to compare rotations when the user has not chosen, is end minus start over the horizon (C1.6) |
 | Unit | `t C ha-1 yr-1` |
-| Time basis | One value per rotation and per carbon model, over the simulation horizon that both carbon models share. Stocks by month, year and rotation are not this indicator; they travel in the carbon balance contract |
+| Time basis | One value per rotation, per carbon model and per computation, over the simulation horizon that both carbon models share. Stocks by month, year and rotation are not this indicator; they travel in the carbon balance contract |
 | Sign | Signed. Positive means the stock increases; negative means it decreases |
 | Direction | `higher_is_better` |
 
-Each value names the carbon model that produced it. Values from different models are never averaged or merged into one value by an engine.
+Each value names the carbon model and the computation that produced it. Values from different models are never averaged or merged into one value by an engine.
 
 ### C1.6 Trend of soil carbon: what the trend is computed over
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Questions for the science reviewers:
+- All three computations are produced, and the user chooses which to see:
+  - end minus start over the horizon;
+  - slope of a fitted line;
+  - mean change over whole rotation cycles.
+- The default, and the one used to compare rotations when the user has not chosen, is end minus start over the horizon.
 
-1. **To which soil depth does the stock refer?** The depth is a parameter value and is supplied by a person. Both carbon models must refer to the same depth.
-2. **How is the trend computed from the simulated stocks?** Options:
-   - (a) the stock at the end of the horizon minus the stock at the start, divided by the length of the horizon;
-   - (b) the slope of a line fitted to the yearly stocks over the horizon;
-   - (c) the mean change over whole rotation cycles only, leaving out an incomplete last cycle.
-3. **Which horizon?** The length of the horizon is a value supplied by a person and belongs to the carbon forcing contract, not to this sheet.
-4. The source of the chosen computation: CITATION NEEDED.
+Still to be supplied by a person:
+
+- `OPEN`: the soil depth and the horizon. They are values; they live in the parameter catalogue and in the carbon forcing contract, not in this sheet. Questions for the science reviewers: **to which soil depth does the stock refer, and over which horizon is the trend computed?**
+- The source of each computation: CITATION NEEDED.
 
 ## 2. How an uncertainty range travels with a value
 
@@ -111,7 +109,7 @@ Status: PROPOSED
 - A value and its uncertainty range travel together as one item. The range is never sent in a separate table, in a note or as text after the number.
 - The range is a pair of bounds, `low` and `high`, in the same unit as the value. The bounds are absolute quantities, not a percentage of the value and not a distance from it.
 - `low` is not greater than the value, and the value is not greater than `high`. An item that breaks this order is invalid.
-- The range carries a label, `kind`, that names what the range represents. The list of allowed labels is decided under C2.3.
+- The range carries a label, `kind`, that names what the range represents. The list of allowed labels is still to be supplied (C2.3).
 - The two bounds travel together or not at all.
 
 ### C2.2 A value without a range says so
@@ -124,16 +122,15 @@ Status: PROPOSED
 
 ### C2.3 What a range represents
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **what does the range around a reported value mean, and may more than one meaning be used?** Options:
+More than one meaning is allowed. Every range carries its `kind` label so that they are never confused.
 
-- (a) the lowest and highest result obtained when the uncertain inputs are set to the bounds recorded in the parameter catalogue;
-- (b) the spread of the result across the years of the climate record;
-- (c) a statistical interval at a level stated in the test plan;
-- (d) more than one of these, each range carrying its `kind` label so that they are never confused.
+Still to be supplied by a person:
 
-The answer fixes the list of allowed `kind` labels. Any level or bound it needs is a value supplied by a person. The source of the method: CITATION NEEDED.
+- `OPEN`: the closed list of `kind` labels. Question for the science reviewers: **which meanings of a range are allowed, and what is the label of each?**
+- Any level or bound that a meaning needs is a value supplied by a person.
+- The source of the method behind each meaning: CITATION NEEDED.
 
 ## 3. How a missing value and its reason travel
 
@@ -167,20 +164,21 @@ The list is closed. A new code is a contract change and is added only at a check
 
 Status: PROPOSED
 
-- A result that needs a missing input is itself missing, with reason `MISSING_INPUT`. Nothing is filled in, interpolated or replaced by a default without a decision under C3.4.
+- A result that needs a missing input is itself missing, with reason `MISSING_INPUT`. Nothing is filled in, interpolated or replaced by a default, except by the gap filling decided under C3.4.
 - The interface shows a missing value as missing, with its reason. It never shows a blank or a zero in its place.
 
 ### C3.4 Gaps inside a series that is aggregated
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **may a monthly or yearly value be computed from a daily series that has missing days?** Options:
+A monthly or yearly value may be computed from a daily series that has missing days, after filling the gaps with a method chosen by a person. The filled values are labelled as filled.
 
-- (a) never: one missing day makes the aggregate missing;
-- (b) yes, up to a tolerance; the tolerance is a threshold supplied by a person and lives only in the test plan;
-- (c) yes, after filling the gaps with a method chosen by a person; the filled values are then labelled under section 4 and the method needs its source: CITATION NEEDED.
+Still to be supplied by a person:
 
-Until this is answered, C3.3 applies and the aggregate is missing.
+- `OPEN`: the gap-filling method. Question for the science reviewers: **with which method are the gaps of a daily series filled?**
+- The source of the method: CITATION NEEDED.
+
+Until a person supplies the method, no gap is filled and C3.3 applies.
 
 ## 4. Provenance label per value
 
@@ -192,8 +190,8 @@ Every value that is not missing carries exactly one of four labels, written in u
 
 | Label | Meaning |
 |---|---|
-| `DECLARED` | Stated by the user for this case, for example the rotation and its management |
-| `OBSERVED` | Taken from a measurement or from an observational data source, unchanged except for a change of unit |
+| `DECLARED` | Stated by the user for this case, for example the rotation and its management; or declared by the project, for a parameter from the catalogue or an assumption (C4.5) |
+| `OBSERVED` | Taken from a measurement or from an observational data source, unchanged except for a change of unit. This includes a data product that is itself modelled (C4.4) |
 | `DERIVED` | Computed from other values by a fixed formula or by aggregation, without running a model through time |
 | `SIMULATED` | Produced by running a model through time steps |
 
@@ -213,34 +211,25 @@ Status: PROPOSED
 - A change of unit alone keeps the label of the input.
 - A value aggregated or computed by a fixed formula from inputs that are `DECLARED`, `OBSERVED` or `DERIVED` is `DERIVED`.
 - A value that depends on at least one `SIMULATED` input is `SIMULATED`.
+- The label of the soil-loss indicator is fixed by C4.6.
 
 ### C4.4 Data products that are themselves modelled
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **which label does a value carry when it is retrieved from a data source whose values come from a model or a retrieval algorithm rather than from a direct measurement at the field?** This concerns gridded climate, precipitation, soil and terrain products. Options:
-
-- (a) `OBSERVED`, with the product named as the source;
-- (b) `SIMULATED`;
-- (c) decided per source and recorded next to each adapter.
-
-The answer also fixes the word the interface uses for these values, which is a decision people keep (blueprint section 3.5).
+A value taken from a data product that is itself modelled carries the label `OBSERVED`, with the product named as the source.
 
 ### C4.5 Parameters from the catalogue and assumptions
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers and the lead developer: **which label does a parameter value taken from the parameter catalogue carry, and which label does an assumption carry?** Options:
-
-- (a) `DECLARED`, read as declared by the project, with the citation as source;
-- (b) `DERIVED`;
-- (c) no provenance label: parameters and assumptions carry only their source or the "assumption" mark, and the four labels apply to case data and results only.
+A parameter from the catalogue, and an assumption, carry the label `DECLARED`, read as declared by the project, with the citation as source.
 
 ### C4.6 Label of the soil-loss indicator
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **is the soil loss computed by an annual equation `DERIVED` or `SIMULATED`?** Under C4.3 it would be `DERIVED` unless one of its inputs is `SIMULATED`. The answer decides the word shown next to the value in the interface.
+The soil-loss indicator carries the label `DERIVED`.
 
 ## 5. Numbering of months and agricultural years
 
@@ -263,27 +252,27 @@ Status: PROPOSED
 
 Status: PROPOSED
 
-- An agricultural year is twelve consecutive calendar months beginning at the start month decided under C5.4.
+- An agricultural year is twelve consecutive calendar months beginning at the start month of the case (C5.4).
 - An agricultural year is identified by the calendar year in which it begins, in a field named `ag_year`. A bare `year` always means the calendar year.
 - Months inside an agricultural year keep their calendar numbers. There is no second numbering of months counted from the start of the agricultural year.
 
 ### C5.4 Start month of the agricultural year
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **in which calendar month does the agricultural year begin?** Options:
+- The start month is a value per case, to be determined by remote sensing by the science reviewers.
+- Until that exists: a month declared by a person per case, marked provisional, and replaced when the determination from imagery is available.
 
-- (a) one start month for the whole project;
-- (b) a start month per region or hemisphere, recorded with the case;
-- (c) a start month taken from the rotation the user declares.
+Still to be supplied by a person:
 
-The start month is a value supplied by a person. Its source, if it follows a published convention: CITATION NEEDED.
+- `OPEN`: the provisional month of each case. Question for the person who declares the case: **in which calendar month does the agricultural year of this case begin, provisionally?**
+- `OPEN`: the remote-sensing method. Question for the science reviewers: **with which method is the start month determined from imagery?** The source of that method: CITATION NEEDED.
 
 ### C5.5 Incomplete agricultural years
 
 Status: PROPOSED
 
-An agricultural year that the data series does not cover from its first day to its last is not reported as a full year. Its yearly values are missing with reason `NO_COVERAGE`, unless a decision under C3.4 allows otherwise.
+An agricultural year that the data series does not cover from its first day to its last is not reported as a full year. Its yearly values are missing with reason `NO_COVERAGE`, unless its gaps are filled as decided under C3.4.
 
 ## 6. Time zone of every daily series
 
@@ -299,9 +288,11 @@ Status: PROPOSED
 
 Status: PROPOSED
 
-Daily series delivered by the NASA POWER adapter, meteorology and precipitation, are in UTC (blueprint section 8; decision of the lead developer). Their `time_zone` is the string `UTC`.
+A daily series delivered by the NASA POWER adapter is delivered in UTC (blueprint section 8; decision of the lead developer). Its `time_zone` is the string `UTC`.
 
-How the service itself defines the day of its daily values is checked by a person against the public documentation of the service when the adapter is built: CITATION NEEDED.
+This sheet does not say which series that adapter delivers. Whether precipitation comes through it or directly from another source is left to the science reviewers (`docs/GETTING_STARTED.md`); if it comes directly, C6.4 applies to it.
+
+How the service itself defines the day of its daily values, and how UTC is requested, is checked by a person against the public documentation of the service when the adapter is built: CITATION NEEDED.
 
 ### C6.3 Series produced by an engine
 
@@ -319,14 +310,9 @@ The time zone of a daily series from any source other than the NASA POWER adapte
 
 ### C6.5 A day in UTC is not the local day at the field
 
-Status: OPEN
+Status: DECIDED (lead developer, 14 November 2026; acceptance by a science reviewer pending)
 
-Question for the science reviewers: **is it acceptable that daily processes at the field are driven by days defined in UTC, which do not line up with the local day?** Options:
-
-- (a) accept it and state it as a limit in the method documentation;
-- (b) require the adapter to deliver days defined in local time where the source allows it.
-
-This does not reopen C6.2; it asks how the consequence is handled and described.
+Daily processes at the field are driven by days defined in UTC, which do not line up with the local day. This is accepted and stated as a limit in the method documentation.
 
 ## Not covered by this sheet
 
