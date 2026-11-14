@@ -23,9 +23,12 @@ Five people. Three write code by orchestrating AI sessions across four lanes; tw
 |---|---|---|---|
 | **Lead developer** | L0 Core | `contracts/`, `params/` (structure), `engine/erosion/`, `validation/` | Contracts and conventions, erosion engine, validation harness, integration authority |
 | **Engines developer** | L1 Engines | `engine/calendar/`, `engine/water/`, `engine/residues/`, `engine/amg/` | Rotation calendar, water balance, residue ledger, AMG carbon |
-| **Platform developer** | L2 Platform | `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/`, CI and deploy | Data adapters, decision layer, RothC, API, saved case, pipeline |
+| **Platform developer** | L2a Platform: data and service | `adapters/`, `api/`, CI and deploy | Data adapters, API, pipeline and deploy |
+| **Interface developer** | L2b Platform: decision and carbon | `decision/`, `engine/rothc/`, `demo/` | Decision layer, RothC, saved case |
 | **Interface developer** | L3 Interface | `web/` | Multi-field map, rotation editor, results, printable sheet, demo path |
 | **Science reviewers** (2) | — | `docs/VALIDATION.md`, review of `params/` and expected values | Calibration, uncertainty ranges, test design, validation, plan adaptation |
+
+**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to the platform developer. L2b, decision and carbon, belongs to the interface developer, together with L3. Both use branches named `l2/<unit>`. In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy.
 
 **One lane, one set of folders.** Nobody edits another lane's folder. A contract changes only at a checkpoint, with notice to everyone.
 
@@ -111,13 +114,13 @@ For conventions, definitions, contract field lists and the design of test cases,
 |---|---|---|
 | `contracts/` | Schemas and accepted examples of every contract; conventions sheet | Lead |
 | `params/` | Crop and rotation parameters, each with its citation | Lead (structure); science reviewers accept values |
-| `engine/` | Pure functions and their tests, one subfolder per engine | Lead, Engines, Platform (RothC) |
-| `adapters/` | One module per data source | Platform |
-| `decision/` | Limits, counts by year, paired differences, state, tipping, measurement priority | Platform |
-| `api/` | HTTP routes | Platform |
+| `engine/` | Pure functions and their tests, one subfolder per engine | Lead, Engines; RothC is L2b |
+| `adapters/` | One module per data source | Platform (L2a) |
+| `decision/` | Limits, counts by year, paired differences, state, tipping, measurement priority | Interface developer (L2b) |
+| `api/` | HTTP routes | Platform (L2a) |
 | `web/` | Frontend | Interface |
 | `validation/` | Expected values with source, protocol runs, results including failures | Lead; science reviewers |
-| `demo/` | Demonstration cases and their cache; opens without a backend | Platform |
+| `demo/` | Demonstration cases and their cache; opens without a backend | Interface developer (L2b) |
 | `docs/` | Method, limits, validation, this blueprint | Shared |
 
 Folders are created by the first unit that needs them.
@@ -161,6 +164,8 @@ Before engine code, each producer writes by hand an example of what it will emit
 | `ModelState` | Engines, Platform → Lead | Same starting soil carbon across models; no resets between crops |
 | `CarbonBalance` | Engines, Platform → Interface | Month, year and rotation; each model labelled; typed absences |
 | Engine entry points | Lead, Engines → Platform | The route calls engines through agreed signatures |
+
+Where this table says Platform: site data and `CarbonForcing` come from L2a; decision output, saved case and the RothC side of the carbon contracts come from L2b.
 
 **Conventions sheet** (`contracts/CONVENTIONS.md`, first unit of the lead): unit and direction of each indicator; how an uncertainty range travels with a value; how a missing value and its reason travel; provenance label per value (`DECLARED`, `OBSERVED`, `DERIVED`, `SIMULATED`); numbering of months and agricultural years; time zone of every daily series.
 
