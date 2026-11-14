@@ -30,7 +30,7 @@ Provisional environment: Python 3.12 and pytest; standard library otherwise.
 - One record per file, UTF-8, extension `.json`. Subfolders are allowed and carry no meaning.
 - Convention, not enforced: name the file after the record, `<id>.json` or `<id>.<scope words>.json`.
 - What identifies a record is its `id` and `scope`, not its path.
-- A file with a repeated key, or with `NaN` or `Infinity`, is rejected. So is a file with a number that cannot be held without change: too large, too small, or written with more digits than a float keeps.
+- A file with a repeated key, or with `NaN` or `Infinity`, is rejected.
 - Nothing is skipped without a message. Every file under `records/` is read: a file that is not a `.json` file is reported, and so is a folder whose name ends in `.json`. The only exception is `records/README.md`.
 - A `.json` file anywhere else under `params/`, other than under `examples/`, is reported: it would never be checked or read.
 - A file that cannot be read is one problem, and the rest of the folder still loads.
@@ -61,11 +61,11 @@ Provisional environment: Python 3.12 and pytest; standard library otherwise.
 |---|---|---|
 | `id` | yes | Name of the quantity. Starts with a letter; letters, digits and `_` only |
 | `scope` | yes | What the value applies to: an object using only the scope keys below, each with a non-empty string. `{}` means no restriction is stated |
-| `value` | yes | A finite number that reads back unchanged, or `null` together with `value_missing_reason` |
+| `value` | yes | A finite number, or `null` together with `value_missing_reason`. An integer must be one that a float holds exactly |
 | `value_missing_reason` | only when `value` is `null` | Non-empty text. Not allowed next to a value, not even as `null` |
 | `unit` | yes | Non-empty text. Also required when the value is missing: the unit the value would have |
 | `range` | yes | The uncertainty range: an object with `low`, `high` and `basis`, or `null` together with `range_missing_reason` |
-| `range.low`, `range.high` | yes | Finite numbers that read back unchanged, in the unit of the record, `low` ≤ `high`. A value that is present lies between them |
+| `range.low`, `range.high` | yes | Finite numbers in the unit of the record, `low` ≤ `high`. An integer must be one that a float holds exactly. A value that is present lies between them |
 | `range.basis` | yes | Non-empty text: what the range represents, as the source states it |
 | `range_missing_reason` | only when `range` is `null` | Non-empty text. Not allowed next to a range, not even as `null` |
 | `citation` | yes | An object with `reference` and `locator`. May be `null` only when `value` and `range` are both `null`: a number needs a citation |
@@ -90,9 +90,13 @@ Two records are the same record when they have the same `id` and the same `scope
 
 A missing value is written `"value": null` with its reason. It stays missing: `read_value` returns a `Missing` object that carries the reason, is not a number, is not equal to zero and fails in arithmetic. A record that leaves the `value` field out is rejected; it is not read as missing. A value of `0` is a value. The same holds for `range` and `read_range`.
 
-### Numbers read back unchanged
+### How numbers are read
 
-The reading functions return floats. A number that a float cannot hold exactly is a problem, not a silent change: an integer too large or too precise for a float is rejected by the record check, and number text that a float cannot hold without change is rejected when the file is read.
+The reading functions return floats.
+
+- **An integer** is read from the file exactly. An integer that a float cannot hold exactly, as `value` or as a range bound, is rejected by the record check: reading it would change it silently.
+- **A number written with a fraction or an exponent** is read as the nearest float, as JSON readers do. Writing more digits than a float keeps is accepted; the extra digits are not kept.
+- At the limits of a float this means: such a number too large for a float is read as infinity and rejected by the record check as not finite; one too small for a float is read as zero and accepted.
 
 ### Placeholders
 
@@ -163,11 +167,12 @@ One code per defect of issue 21. Each case failed on the code before the fix.
 | F1a | A file nested deeply enough to exhaust the parser is one problem for that file, and the other files still load. The placeholder check reads an item of any depth, and an item that contains itself, without failing |
 | F1b | A folder whose name ends in `.json` inside the catalogue is one problem; the files inside it and beside it still load |
 | F1c | An integer too large for a float, as `value`, `range.low` or `range.high`, is a problem of the record; the checks and the reading functions do not fail on it |
-| F2 | A number that cannot be read back unchanged is rejected: an integer that a float cannot hold exactly, as `value` or as a range bound; and, in a file, number text that a float cannot hold without change (more digits than a float keeps, too large, or so small that it would become zero). An integer that a float holds exactly, and ordinary number text, are accepted |
+| F2 | An integer that cannot be read back unchanged is rejected: one that a float cannot hold exactly, as `value` or as a range bound. An integer that a float holds exactly, and ordinary number text, are accepted |
+| F2b | A decimal written with more digits than a float keeps is accepted and read as the nearest float, in the text of a file and in a whole record file that is loaded, checked and read |
 | F3a | A `.json` file directly in `params/`, or in a folder other than `records/` and `examples/`, in any letter case of the extension, is reported |
 | F3b | A file inside the catalogue that is not a `.json` file is reported: other extensions, an upper-case extension, no extension, a README in a subfolder. Only the README at the top of the folder is skipped |
 | F3c | The duplicate check reports a record it cannot compare (not an object, malformed `id`, malformed `scope`) instead of skipping it. The catalogue check reports such a record once, with the reason |
-| F4 | A record whose value is missing and whose citation is `null` is rejected when it carries a numeric range: a range needs a citation. The same record with a citation is accepted |
+| F4 | A record whose value is missing and whose citation is `null` is rejected when it carries a numeric range: a range needs a citation. The same record with a citation is accepted. When the range is not an object, only that problem is reported |
 | F5a | `value_missing_reason` next to a value, zero included, and `range_missing_reason` next to a range, are rejected even when given as `null` |
 | F5b | `read_value` and `read_range` refuse any record that contains the word PLACEHOLDER, with or without a value, in any letter case; no file in `examples/` can be read as a parameter |
 | F5c | The check run by the acceptance test reads every file under `records/`: a file that is not a record fails it; a `params/` folder without `records/` is a problem |

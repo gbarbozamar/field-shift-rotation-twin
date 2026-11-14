@@ -14,7 +14,6 @@ raise ``ValueError`` and nothing else.
 
 from __future__ import annotations
 
-import decimal
 import json
 import math
 import os
@@ -211,7 +210,8 @@ def _check_citation(record: dict) -> list[str]:
         # PROPOSED: no citation only when there is no number to cite.
         if "value" not in record or record["value"] is not None:
             return ["a record with a value needs a citation"]
-        if record.get("range") is not None:
+        # A range that is not an object is reported by the range check alone.
+        if isinstance(record.get("range"), dict):
             return [
                 "a range needs a citation: 'citation' may be null only when "
                 "'value' and 'range' are both null"
@@ -410,10 +410,10 @@ def check_catalogue(records: Any) -> list[str]:
 def parse_record_text(text: Any) -> Any:
     """Parse the text of one record file.
 
-    Stricter than plain JSON, because each of these would let a value
-    change silently: a repeated key; the constants NaN and Infinity; a
-    number that a float cannot hold without change (too large, too small
-    or with more digits than a float keeps).
+    Stricter than plain JSON in two ways: a repeated key and the constants
+    NaN and Infinity are errors, because each would let a value change
+    silently. Numbers are read as JSON readers do: an integer exactly, a
+    number with a fraction or an exponent as the nearest float.
 
     Raises ``ValueError``, and nothing else, when the text is unusable.
     """
@@ -430,24 +430,9 @@ def parse_record_text(text: Any) -> Any:
     def reject_constant(name: str) -> Any:
         raise ValueError(f"'{name}' is not a number that a record may hold")
 
-    def exact_float(written: str) -> float:
-        number = float(written)
-        try:
-            unchanged = math.isfinite(number) and (
-                decimal.Decimal(written) == decimal.Decimal(repr(number))
-            )
-        except decimal.InvalidOperation:
-            unchanged = False
-        if not unchanged:
-            raise ValueError(f"the number {written[:40]} cannot be held without change")
-        return number
-
     try:
         return json.loads(
-            text,
-            object_pairs_hook=reject_repeated_keys,
-            parse_constant=reject_constant,
-            parse_float=exact_float,
+            text, object_pairs_hook=reject_repeated_keys, parse_constant=reject_constant
         )
     except RecursionError:
         raise ValueError("the content is nested too deeply") from None

@@ -634,12 +634,28 @@ def test_f2_integer_that_reads_back_unchanged_is_accepted():
 
 
 @pytest.mark.parametrize(
-    "number",
-    ["2.00000000000000000001", "9007199254740993.0", "1e400", "-1e400", "1e-400"],
+    "written, nearest",
+    [
+        ("2.00000000000000000001", 2.0),
+        ("0.33333333333333333", 0.3333333333333333),
+        ("9007199254740993.0", 9007199254740992.0),
+    ],
 )
-def test_f2_number_text_that_a_float_cannot_hold_is_rejected(number):
-    with pytest.raises(ValueError, match="without change"):
-        parse_record_text('{"id": "PLACEHOLDER_parameter", "value": %s}' % number)
+def test_f2b_decimal_with_many_digits_is_read_as_the_nearest_float(written, nearest):
+    text = '{"id": "PLACEHOLDER_parameter", "value": %s}' % written
+    assert parse_record_text(text)["value"] == nearest
+
+
+def test_f2b_record_file_with_a_long_decimal_is_accepted_and_read(tmp_path):
+    written = "2.00000000000000000001"
+    text = json.dumps(placeholder_record(value="@")).replace('"@"', written)
+    assert written in text
+    (tmp_path / "long.json").write_text(text, encoding="utf-8")
+
+    records, problems = load_folder(tmp_path)
+    assert problems == []
+    assert check_record(records["long.json"]) == []
+    assert read_value(unmarked(records["long.json"])) == 2.0
 
 
 @pytest.mark.parametrize("number", ["2.0", "2.50", "0.1", "-0.0", "1e-5", "1E5", "2"])
@@ -707,6 +723,11 @@ def test_f4_numeric_range_needs_a_citation():
     with pytest.raises(ValueError):
         read_range(unmarked(record))
     assert check_record(missing_value_record()) == []  # same range, with a citation
+
+
+def test_f4_malformed_range_without_citation_reports_only_the_real_problem():
+    record = missing_value_record(citation=None, range=[1.0, 3.0])
+    assert check_record(record) == ["'range' must be a JSON object, or null with a reason"]
 
 
 @pytest.mark.parametrize(
