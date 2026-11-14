@@ -1,16 +1,22 @@
-"""Acceptance test of unit l1/water-entrypoint (issue #134).
+"""Acceptance test of unit l1/water-ep3-parameters (issue #153).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases"; a test checks that the two lists
 agree. The identifier of a case is the name of its test function without
 ``test_``, with hyphens.
 
-Every input is built from the PLACEHOLDER examples of
-``contracts/inputs/examples/``, loaded and then changed in memory. A longer
-daily series repeats the items of the example ``precipitation`` series in
-order, under the quantity identifier it stands for; no number is written here.
-Expected agricultural years are computed from the dates of the series, day by
-day, independently of the module under test.
+Inputs are built from the PLACEHOLDER examples of ``contracts/inputs/examples/``,
+loaded and changed in memory. Every number written here is a PLACEHOLDER,
+plainly not real: none is a value of the method, none comes from a source.
+
+The parameter catalogue of a test is built in the record format of
+``params/README.md``, every record carrying the word PLACEHOLDER. The readers
+of ``params.catalogue`` refuse such a record, and ``check_catalogue`` rejects
+it, so a test passes the in-memory copy in which the word is replaced by
+``UNMARKED_TEST_ONLY``, as ``params/test_layout.py`` does (question 12 of
+``params/README.md``). The crop identifiers of the test calendar are unmarked
+the same way, so that a crop scope of the catalogue names them. Nothing
+without the word is written to a file.
 
 Run from the repository root: ``py -3.12 -m pytest engine/water/test_exposure.py``.
 """
@@ -22,9 +28,9 @@ import copy
 import datetime as dt
 import inspect
 import json
+import math
 import re
 import sys
-from dataclasses import fields
 from pathlib import Path
 from typing import Any, get_args
 
@@ -36,14 +42,15 @@ from contracts.inputs.site_soil_slope import SiteSoilSlope
 from contracts.results.models import (
     DIRECTION_OF,
     UNIT_WATER_DEFICIT_EXPOSURE,
+    Missing,
     ReasonCode,
     ResultsPerRotation,
     WaterDeficitExposure,
 )
+from engine.water import _parameters
 from engine.water import exposure as module
-from engine.water.balance import CropDay, run_balance
-from engine.water.et0 import Et0Constants
 from engine.water.et0.quantities import CLIMATE_QUANTITIES
+from params.catalogue import check_catalogue, check_record
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
@@ -53,6 +60,149 @@ PRECIPITATION = "precipitation"  # decision D23 of issue #77
 DAILY_INPUTS = (PRECIPITATION, *CLIMATE_QUANTITIES)
 REASON_CODES = set(get_args(ReasonCode))
 ONE_DAY = dt.timedelta(days=1)
+MARK = "PLACEHOLDER"
+UNMARKED = "UNMARKED_TEST_ONLY"
+NO_CROP_SCOPE = '{"management": "no_crop"}'
+
+# --- PLACEHOLDER numbers: plainly not real, chosen only so that every part
+# accepts them and the chain gives a number every day. They are written with
+# repeated digits, or as zero or one where the structure of a form needs the
+# identity element; each zero and one is explained where it is written. None
+# is a value of the method and none comes from a source. ---------------------
+
+# The daily values of each series, repeated in turn. A precipitation of zero is
+# a dry day, needed so that the layers dry out between wet days.
+PLACEHOLDER_DAILY = {
+    PRECIPITATION: [0.0, 0.0, 6.66, 0.0, 1.11, 0.0, 0.0, 14.44, 0.0, 0.0, 0.0, 0.0],
+    "air_temperature_max_2m": [3.33, 4.44, 5.55],
+    "air_temperature_min_2m": [1.11, 2.22],
+    "dew_point_temperature_2m": [0.55],
+    "wind_speed_2m": [1.11, 2.22],
+    "solar_radiation": [2.22, 3.33, 4.44],
+}
+# Every constant of the method not listed here is one: the identity element of
+# the factor, exponent or divisor it is in the PROPOSED forms of the parts.
+PLACEHOLDER_SITE = {
+    # Zero, structurally: with no albedo and no longwave term the net radiation
+    # is the solar radiation, so it stays above the soil heat flux and the
+    # reference evapotranspiration stays above zero, which the balance needs.
+    "net_shortwave_albedo": 0.0,
+    "net_longwave_stefan_boltzmann": 0.0,
+    # Zero, structurally: the inverse distance and the declination stay
+    # constant, so the sunset hour angle exists on every day of the year.
+    "inverse_relative_distance_amplitude": 0.0,
+    "solar_declination_amplitude": 0.0,
+    # Zero, structurally: the pressure does not depend on the elevation, so
+    # the bracket of its form stays above zero at any elevation.
+    "atmospheric_pressure_lapse_rate": 0.0,
+    "soil_heat_flux_daily_value": 1.11,
+    "initial_abstraction_ratio": 0.555,
+    "retention_numerator": 2.22,
+    "retention_unit_factor": 4.44,
+    "initial_depletion": 1.11,
+    "total_evaporable_water": 4.44,
+    "readily_evaporable_water": 2.22,
+    "wetted_fraction": 0.777,
+    "margin_above_basal": 0.555,
+    "minimum_crop_coefficient": 0.222,
+    "minimum_relative_humidity": 3.33,
+    "column_capacity": 22.2,
+    "column_depth": 2.22,
+    "initial_storage": 11.1,
+}
+PLACEHOLDER_DAY = {
+    "basal_crop_coefficient": {"crop-a": 0.555, "crop-b": 0.777, "no_crop": 0.333},
+    "crop_height": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 0.111},
+    "cover_fraction_exponent": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 1.11},
+    "curve_number": {"crop-a": 1.11, "crop-b": 0.555, "no_crop": 1.11},
+}
+PLACEHOLDER_CROP = {
+    "root_depth": {"crop-a": 1.11, "crop-b": 2.22},
+    "readily_available_fraction": {"crop-a": 0.444, "crop-b": 0.888},
+}
+CROPS = ("crop-a", "crop-b")
+
+
+# --- the catalogue -------------------------------------------------------------
+
+
+def placeholder_record(parameter_id: str, value: float, scope: dict) -> dict:
+    """One record in the format of params/README.md, marked PLACEHOLDER."""
+    return {
+        "id": parameter_id,
+        "scope": scope,
+        "value": value,
+        "unit": "PLACEHOLDER_unit",
+        "range": {
+            "low": value,
+            "high": value,
+            "basis": "PLACEHOLDER: not a range of any source",
+        },
+        "citation": {
+            "reference": "PLACEHOLDER reference. This is not a publication.",
+            "locator": "PLACEHOLDER locator",
+        },
+        "transcribed_by": "PLACEHOLDER_person_one",
+        "checked_by": "PLACEHOLDER_person_two",
+    }
+
+
+def crop_word(crop: str) -> str:
+    return f"PLACEHOLDER-{crop}"
+
+
+def scope_of(crop: str) -> dict:
+    if crop == "no_crop":
+        return {"management": "no_crop"}
+    return {"crop": crop_word(crop)}
+
+
+def marked_catalogue() -> dict[str, dict]:
+    """Every parameter the chain reads, keyed as load_folder keys a record."""
+    records = []
+    for parameter_id in module.SITE_PARAMETERS:
+        value = PLACEHOLDER_SITE.get(parameter_id, 1.0)
+        records.append(placeholder_record(parameter_id, value, {}))
+    for parameter_id, by_crop in (*PLACEHOLDER_DAY.items(), *PLACEHOLDER_CROP.items()):
+        for crop, value in by_crop.items():
+            records.append(placeholder_record(parameter_id, value, scope_of(crop)))
+    return {
+        f"PLACEHOLDER_{position}.json": record
+        for position, record in enumerate(records)
+    }
+
+
+def unmarked(item: Any) -> Any:
+    """The in-memory copy in which the word PLACEHOLDER is replaced."""
+    return json.loads(json.dumps(item).replace(MARK, UNMARKED))
+
+
+def catalogue() -> dict[str, dict]:
+    return unmarked(marked_catalogue())
+
+
+def catalogue_with(
+    changes: dict[tuple[str, str | None], dict | None],
+) -> dict[str, dict]:
+    """The catalogue with some records replaced (or removed, ``None``).
+
+    A key is ``(id, crop)``; ``crop`` is ``None`` for a parameter of the site.
+    """
+    records = marked_catalogue()
+    for name, record in list(records.items()):
+        crop = None
+        scope = record["scope"]
+        if scope:
+            crop = (
+                "no_crop" if "management" in scope else scope["crop"].split("-", 1)[1]
+            )
+        key = (record["id"], crop)
+        if key in changes:
+            if changes[key] is None:
+                del records[name]
+            else:
+                records[name] = changes[key]
+    return unmarked(records)
 
 
 # --- inputs built from the examples ------------------------------------------
@@ -87,40 +237,6 @@ def example_precipitation() -> dict[str, Any]:
     return series
 
 
-def example_start() -> dt.date:
-    return dt.date.fromisoformat(example_precipitation()["start_date"])
-
-
-def daily_series(
-    quantity: str, first: dt.date, last: dt.date, *, with_gaps: bool = False
-) -> dict[str, Any]:
-    """The example ``precipitation`` series stretched from ``first`` to ``last``.
-
-    Each day takes, in turn, the item of an example day: only the days with a
-    value, or, ``with_gaps``, every example day including those held missing.
-    """
-    series = copy.deepcopy(example_precipitation())
-    items = [
-        {k: v for k, v in item.items() if k != "date"}
-        for item in series["days"]
-        if with_gaps or item.get("missing") is None
-    ]
-    days = []
-    day = first
-    position = 0
-    while day <= last:
-        days.append({"date": day.isoformat(), **items[position % len(items)]})
-        day += ONE_DAY
-        position += 1
-    series.update(
-        quantity=quantity,
-        start_date=first.isoformat(),
-        end_date=last.isoformat(),
-        days=days,
-    )
-    return series
-
-
 def first_day_of(ag_year: int) -> dt.date:
     return dt.date(ag_year, start_month(), 1)
 
@@ -130,13 +246,55 @@ def last_day_of(ag_year: int) -> dt.date:
 
 
 def several_full_years() -> tuple[dt.date, dt.date]:
-    """From the first day of the agricultural year that begins in the calendar
-    year of the example's first day, to the last day of the one two later."""
-    first_ag_year = example_start().year
+    """Three agricultural years, from the one that begins in the example's first year."""
+    first_ag_year = dt.date.fromisoformat(example_precipitation()["start_date"]).year
     return first_day_of(first_ag_year), last_day_of(first_ag_year + 2)
 
 
-def climate_with(series: list[dict[str, Any]]) -> SiteClimate:
+def daily_series(
+    quantity: str,
+    first: dt.date,
+    last: dt.date,
+    *,
+    held_missing: tuple[dt.date, ...] = (),
+) -> dict[str, Any]:
+    """One series of the chain in its accepted unit, from ``first`` to ``last``."""
+    series = copy.deepcopy(example_precipitation())
+    values = PLACEHOLDER_DAILY[quantity]
+    days = []
+    day = first
+    position = 0
+    while day <= last:
+        if day in held_missing:
+            days.append(
+                {
+                    "date": day.isoformat(),
+                    "value": None,
+                    "missing": {
+                        "reason": "SOURCE_UNAVAILABLE",
+                        "detail": "PLACEHOLDER",
+                    },
+                }
+            )
+        else:
+            days.append(
+                {"date": day.isoformat(), "value": values[position % len(values)]}
+            )
+        day += ONE_DAY
+        position += 1
+    series.update(
+        quantity=quantity,
+        unit=module.ACCEPTED_DAILY_UNITS[quantity],
+        start_date=first.isoformat(),
+        end_date=last.isoformat(),
+        days=days,
+    )
+    return series
+
+
+def climate_with(
+    series: list[dict[str, Any]], *, point_units: bool = True
+) -> SiteClimate:
     document = climate_document()
     others = [
         item
@@ -144,6 +302,11 @@ def climate_with(series: list[dict[str, Any]]) -> SiteClimate:
         if item["quantity"] not in DAILY_INPUTS
     ]
     document["daily_series"] = others + series
+    if point_units:
+        document["point"]["latitude"]["unit"] = (
+            module.POINT_UNITS.latitude_decimal_degrees
+        )
+        document["point"]["elevation"]["unit"] = module.POINT_UNITS.elevation
     return SiteClimate.model_validate(document)
 
 
@@ -151,17 +314,47 @@ def climate(
     span: tuple[dt.date, dt.date] | None = None,
     *,
     quantities: tuple[str, ...] = DAILY_INPUTS,
-    with_gaps: bool = False,
+    held_missing: tuple[dt.date, ...] = (),
 ) -> SiteClimate:
     """The six daily series the water chain reads, over one span."""
     first, last = span or several_full_years()
     return climate_with(
-        [daily_series(name, first, last, with_gaps=with_gaps) for name in quantities]
+        [
+            daily_series(name, first, last, held_missing=held_missing)
+            for name in quantities
+        ]
     )
 
 
 def calendar() -> RotationCalendar:
+    """The example calendar as it is."""
     return RotationCalendar.model_validate(calendar_document())
+
+
+def chain_calendar_document() -> dict[str, Any]:
+    """The example calendar over the three years of ``several_full_years``.
+
+    One component is added, copied from the second with its dates moved into
+    the third year, and the crop identifiers are unmarked.
+    """
+    document = calendar_document()
+    first, last = several_full_years()
+    document["start_date"] = first.isoformat()
+    document["end_date"] = last.isoformat()
+    added = copy.deepcopy(document["components"][1])
+    added["component_id"] = "PLACEHOLDER-component-4"
+    added["start"]["date"] = (
+        first_day_of(first.year + 2) + dt.timedelta(days=62)
+    ).isoformat()
+    added["end"]["date"] = (last - dt.timedelta(days=91)).isoformat()
+    document["components"].append(added)
+    for component in document["components"]:
+        component["crop_id"] = unmarked(component["crop_id"])
+    return document
+
+
+def chain_calendar() -> RotationCalendar:
+    return RotationCalendar.model_validate(chain_calendar_document())
 
 
 def soil() -> SiteSoilSlope:
@@ -172,11 +365,36 @@ def run(
     calendar_: RotationCalendar | None = None,
     climate_: SiteClimate | None = None,
     soil_: SiteSoilSlope | None = None,
+    parameters: dict | None = None,
 ) -> list[WaterDeficitExposure]:
     return module.compute_water_deficit_exposure(
-        calendar=calendar_ if calendar_ is not None else calendar(),
+        calendar=calendar_ if calendar_ is not None else chain_calendar(),
         climate=climate_ if climate_ is not None else climate(),
         soil_slope=soil_ if soil_ is not None else soil(),
+        parameters=parameters if parameters is not None else catalogue(),
+    )
+
+
+def chain(
+    calendar_: RotationCalendar | None = None,
+    climate_: SiteClimate | None = None,
+    parameters: dict | None = None,
+) -> list[module.ChainDay]:
+    """The daily chain the entry point reduces, over the days it runs on."""
+    calendar_ = calendar_ if calendar_ is not None else chain_calendar()
+    climate_ = climate_ if climate_ is not None else climate()
+    by_quantity = {
+        series.quantity: series
+        for series in climate_.daily_series
+        if series.quantity in DAILY_INPUTS
+    }
+    return module._run_chain(
+        calendar_,
+        climate_,
+        _parameters.Catalogue(parameters if parameters is not None else catalogue()),
+        by_quantity,
+        module._chain_days(by_quantity[PRECIPITATION], list(by_quantity), by_quantity),
+        module._Notes(),
     )
 
 
@@ -192,7 +410,7 @@ def expected_ag_years(first: dt.date, last: dt.date) -> list[int]:
 
 
 def infeasible_calendar() -> RotationCalendar:
-    document = calendar_document()
+    document = chain_calendar_document()
     document["feasibility"] = {
         "feasible": False,
         "violations": [{"rule": "PLACEHOLDER-rule", "component_ids": []}],
@@ -201,7 +419,7 @@ def infeasible_calendar() -> RotationCalendar:
 
 
 def calendar_without_start_month() -> RotationCalendar:
-    document = calendar_document()
+    document = chain_calendar_document()
     document["ag_year_start"] = {
         "month": None,
         "missing": {"reason": "NOT_DECLARED", "detail": "PLACEHOLDER"},
@@ -210,17 +428,8 @@ def calendar_without_start_month() -> RotationCalendar:
 
 
 def items_of(detail: str) -> list[str]:
-    """The items of a ``MISSING_INPUT`` detail, after its opening sentence."""
-    return detail.split(": ", 1)[1].split("; ")
-
-
-def codes_of(detail: str) -> list[str]:
-    """The reason code of each item, ``OPEN`` for an item whose code is not decided."""
-    codes = []
-    for item in items_of(detail):
-        code = item.split(" ", 2)[1].rstrip(":")
-        codes.append("OPEN" if code == "(reason" else code)
-    return codes
+    """The items of a detail of a year the chain did not compute, after its first sentence."""
+    return detail.split("); ", 1)[1].split("; ")
 
 
 def assert_loads(result: list[WaterDeficitExposure]) -> None:
@@ -234,11 +443,272 @@ def assert_loads(result: list[WaterDeficitExposure]) -> None:
         assert WaterDeficitExposure.model_validate_json(json.dumps(document)) == item
 
 
-# --- the cases ---------------------------------------------------------------
+def assert_definition_incomplete(item: WaterDeficitExposure) -> None:
+    assert item.missing.reason == "NOT_AVAILABLE"
+    assert "C1.4" in item.missing.detail
+    assert "D61" in item.missing.detail
+    assert "computed on every day of the year" in item.missing.detail
+
+
+def no_record_item(detail: str, scope: str) -> str:
+    """The item naming the parameters with no record in one scope, or ''."""
+    prefix = f"parameter MISSING_INPUT: parameters with no record in parameters (D56), scope {scope}: "
+    found = [entry for entry in detail.split("; ") if entry.startswith(prefix)]
+    return found[0] if found else ""
+
+
+def is_number(value: object) -> bool:
+    return isinstance(value, float) and math.isfinite(value)
+
+
+# --- the cases: the catalogue -------------------------------------------------
+
+
+def test_placeholder_catalogue_passes_check_catalogue_and_every_year_is_computed():
+    parameters = catalogue()
+    assert check_catalogue(parameters) == []
+    assert all(check_record(record) == [] for record in marked_catalogue().values())
+    assert check_catalogue(marked_catalogue()) != []  # the marked records are refused
+    result = run(parameters=parameters)
+    assert_loads(result)
+    assert [item.ag_year for item in result] == expected_ag_years(*several_full_years())
+    for item in result:
+        assert item.value is None
+        assert_definition_incomplete(item)
+
+
+def test_the_chain_gives_a_number_every_day_from_each_part():
+    days = chain()
+    first, last = several_full_years()
+    assert [day.date for day in days] == [
+        first + ONE_DAY * position for position in range((last - first).days + 1)
+    ]
+    for day in days:
+        assert is_number(day.reference_evapotranspiration)
+        assert is_number(day.runoff.runoff)
+        assert is_number(day.surface_layer.evaporation_coefficient)
+        assert is_number(day.surface_layer.depletion_end)
+        assert is_number(day.balance.storage_start)
+        assert is_number(day.balance.storage_end)
+    # The chain passes each part's output to the next one, unchanged.
+    for day in days:
+        assert day.balance.runoff == day.runoff.runoff
+        assert day.surface_layer.runoff == day.runoff.runoff
+        assert day.balance.evaporation_demanded == pytest.approx(
+            day.surface_layer.evaporation_coefficient * day.reference_evapotranspiration
+        )
+    # The balance is never reset: each day starts where the day before ended.
+    for before, after in zip(days, days[1:]):
+        assert after.balance.storage_start == before.balance.storage_end
+        assert after.surface_layer.depletion_start == before.surface_layer.depletion_end
+    assert days[0].balance.storage_start == PLACEHOLDER_SITE["initial_storage"]
+
+
+def test_daily_balance_closes_its_mass_every_day():
+    days = chain()
+    capacity = PLACEHOLDER_SITE["column_capacity"]
+    branches = {"drainage": 0, "runoff": 0, "crop": 0, "no_crop": 0}
+    for day in days:
+        b = day.balance
+        flows = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
+        assert all(is_number(flow) and flow >= 0 for flow in flows)
+        change = b.storage_end - b.storage_start
+        balance = (
+            b.precipitation - b.runoff - b.evaporation - b.transpiration - b.drainage
+        )
+        scale = max(abs(term) for term in (b.storage_start, b.storage_end, *flows))
+        assert abs(change - balance) <= 64 * sys.float_info.epsilon * max(scale, 1.0)
+        assert 0 <= b.storage_end <= capacity
+        branches["drainage"] += b.drainage > 0
+        branches["runoff"] += b.runoff > 0
+        branches["crop" if is_number(b.stress_coefficient) else "no_crop"] += 1
+    assert all(count > 0 for count in branches.values()), branches
+
+
+def test_crop_of_each_day_follows_the_calendar():
+    calendar_ = chain_calendar()
+    components = [
+        (component.start.date, component.end.date, component.crop_id.split("-", 1)[1])
+        for component in calendar_.components
+    ]
+    for day in chain(calendar_):
+        crops = [crop for start, end, crop in components if start <= day.date <= end]
+        b = day.balance
+        if crops:
+            (crop,) = crops
+            kcb = PLACEHOLDER_DAY["basal_crop_coefficient"][crop]
+            assert b.transpiration_demanded == pytest.approx(
+                kcb * day.reference_evapotranspiration
+            )
+            assert is_number(b.stress_coefficient)
+        else:
+            assert b.transpiration == 0
+            assert isinstance(b.transpiration_demanded, Missing)
+            assert b.transpiration_demanded.reason == "NOT_APPLICABLE"
+
+
+def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by_id_and_scope():
+    span = several_full_years()
+    calendar_ = chain_calendar()
+    result = run(calendar_=calendar_, parameters={})
+    assert_loads(result)
+    assert [item.ag_year for item in result] == expected_ag_years(*span)
+    assert result
+    for item in result:
+        assert item.missing.reason == "MISSING_INPUT"
+        detail = item.missing.detail
+        site = no_record_item(detail, "{}")
+        for parameter_id in module.SITE_PARAMETERS:
+            assert f"'{parameter_id}'" in site
+        no_crop = no_record_item(detail, NO_CROP_SCOPE)
+        for parameter_id in module.DAY_PARAMETERS:
+            assert f"'{parameter_id}'" in no_crop
+        for parameter_id in module.CROP_PARAMETERS:
+            assert f"'{parameter_id}'" not in no_crop
+        last = last_day_of(item.ag_year)
+        for component in calendar_.components:
+            scope = json.dumps({"crop": component.crop_id})
+            named = no_record_item(detail, scope)
+            if component.start.date <= last:
+                for parameter_id in (*module.DAY_PARAMETERS, *module.CROP_PARAMETERS):
+                    assert f"'{parameter_id}'" in named
+            elif not any(
+                other.crop_id == component.crop_id and other.start.date <= last
+                for other in calendar_.components
+            ):
+                assert named == ""
+        assert "C1.4" in detail
+
+
+@pytest.mark.parametrize(
+    "key",
+    [(name, None) for name in module.SITE_PARAMETERS]
+    + [(name, crop) for name in module.DAY_PARAMETERS for crop in (*CROPS, "no_crop")]
+    + [(name, crop) for name in module.CROP_PARAMETERS for crop in CROPS],
+)
+def test_parameter_with_no_record_is_missing_input_naming_it_and_no_other(key):
+    parameter_id, crop = key
+    result = run(parameters=catalogue_with({key: None}))
+    scope = "{}" if crop is None else json.dumps(unmarked(scope_of(crop)))
+    missing = [item for item in result if item.missing.reason != "NOT_AVAILABLE"]
+    assert missing, "the parameter is needed by some year"
+    for item in missing:
+        assert item.missing.reason == "MISSING_INPUT"
+        named = no_record_item(item.missing.detail, scope)
+        assert named.endswith(f": '{parameter_id}'")
+        assert item.missing.detail.count("parameters with no record") == 1
+    # The years before the one that first needs it are computed.
+    computed = [item for item in result if item.missing.reason == "NOT_AVAILABLE"]
+    assert all(item.ag_year < missing[0].ag_year for item in computed)
+
+
+def test_record_with_null_value_is_missing_input_repeating_its_reason():
+    for key in (
+        ("column_capacity", None),
+        ("net_shortwave_albedo", None),
+        ("curve_number", "crop-a"),
+    ):
+        parameter_id, crop = key
+        record = placeholder_record(
+            parameter_id, 1.0, {} if crop is None else scope_of(crop)
+        )
+        record.update(
+            value=None,
+            value_missing_reason="PLACEHOLDER reason: no value is recorded",
+            range=None,
+            range_missing_reason="PLACEHOLDER reason: no range is recorded",
+            citation=None,
+        )
+        assert check_record(record) == []
+        parameters = catalogue_with({key: record})
+        assert check_catalogue(parameters) == []
+        result = run(parameters=parameters)
+        missing = [item for item in result if item.missing.reason != "NOT_AVAILABLE"]
+        assert missing
+        for item in missing:
+            assert item.missing.reason == "MISSING_INPUT"
+            assert f"parameter '{parameter_id}'" in item.missing.detail
+            assert (
+                "the record holds no value: UNMARKED_TEST_ONLY reason: no value is recorded"
+                in item.missing.detail
+            )
+            assert "parameters with no record" not in item.missing.detail
+
+
+def test_record_that_read_value_refuses_is_missing_input_naming_why():
+    marked = placeholder_record("column_depth", 2.0, {})
+    same_persons = unmarked(placeholder_record("column_depth", 2.0, {}))
+    same_persons["checked_by"] = same_persons["transcribed_by"]
+    cases = {
+        "contains the word PLACEHOLDER": catalogue_with({("column_depth", None): None})
+        | {"marked.json": marked},
+        "are the same person": catalogue_with({("column_depth", None): same_persons}),
+        "two records share this id and scope": catalogue()
+        | {"duplicate.json": unmarked(placeholder_record("column_depth", 2.0, {}))},
+    }
+    for why, parameters in cases.items():
+        result = run(parameters=parameters)
+        assert result
+        for item in result:
+            assert item.missing.reason == "MISSING_INPUT"
+            assert (
+                "parameter 'column_depth' with scope {}: the record is not read"
+                in item.missing.detail
+            )
+            assert why in item.missing.detail
+
+
+def test_malformed_record_makes_every_parameter_missing_input_naming_it():
+    broken = unmarked(placeholder_record("column_depth", 2.22, {}))
+    for defect in ("id", "scope"):
+        record = dict(broken)
+        del record[defect]
+        parameters = catalogue() | {"broken/record.json": record}
+        assert check_catalogue(parameters) != []
+        result = run(parameters=parameters)
+        assert_loads(result)
+        assert result
+        for item in result:
+            assert item.missing.reason == "MISSING_INPUT"
+            detail = item.missing.detail
+            assert (
+                "parameters that cannot be looked up: the record(s) "
+                "'broken/record.json' have no well-formed 'id' and 'scope'"
+            ) in detail
+            assert "F3c" in detail
+            assert "parameters with no record" not in detail
+            named = [
+                entry
+                for entry in detail.split("; ")
+                if entry.startswith(
+                    "parameter MISSING_INPUT: parameters that cannot be looked up, scope {}: "
+                )
+            ]
+            assert len(named) == 1
+            for parameter_id in module.SITE_PARAMETERS:
+                assert f"'{parameter_id}'" in named[0]
+
+
+def test_parameter_outside_what_a_part_accepts_is_not_computable_and_raises_nothing():
+    too_deep = unmarked(placeholder_record("root_depth", 3.0, scope_of("crop-a")))
+    result = run(parameters=catalogue_with({("root_depth", "crop-a"): too_deep}))
+    assert_loads(result)
+    assert result[0].missing.reason == "NOT_COMPUTABLE"
+    assert "the daily balance refuses a value" in result[0].missing.detail
+    assert "root_depth" in result[0].missing.detail
+    for item in result:
+        assert item.missing.reason in ("NOT_COMPUTABLE", "MISSING_INPUT")
+
+
+# --- the cases of #135, with the catalogue ------------------------------------
 
 
 def test_examples_as_they_are_load_and_every_item_is_missing():
-    result = run(climate_=SiteClimate.model_validate(climate_document()))
+    result = run(
+        calendar_=calendar(),
+        climate_=SiteClimate.model_validate(climate_document()),
+        parameters={},
+    )
     assert_loads(result)
     series = example_precipitation()
     span = (
@@ -276,51 +746,19 @@ def test_several_agricultural_years_load_into_results_per_rotation():
     assert list(loaded.water_deficit_exposure) == result
 
 
-def test_every_covered_year_is_missing_input_naming_each_part():
-    result = run()
-    assert result
-    for item in result:
-        assert item.missing.reason == "MISSING_INPUT"
-        detail = item.missing.detail
-        items = items_of(detail)
-        parts = [entry.split(" ", 1)[0] for entry in items]
-        assert parts == ["ET0"] * 3 + ["balance"] * 4 + ["indicator"]
-        assert codes_of(detail) == [
-            "MISSING_INPUT",
-            "MISSING_INPUT",
-            "MISSING_INPUT",
-            "MISSING_INPUT",
-            "MISSING_INPUT",
-            "NOT_AVAILABLE",
-            "NOT_AVAILABLE",
-            "OPEN",
-        ]
-        for name in (field.name for field in fields(Et0Constants)):
-            assert name in items[0]
-        assert "D46" in items[0]
-        assert "Q11" in items[1]
-        assert "PointUnits" in items[2]
-        for name, parameter in inspect.signature(run_balance).parameters.items():
-            if parameter.kind is inspect.Parameter.KEYWORD_ONLY:
-                assert name in items[3]
-        for name in (field.name for field in fields(CropDay)):
-            assert name in items[4]
-        assert "Curve Number" in items[5]
-        assert "surface-layer" in items[6]
-        assert "question 4 of contracts/results/README.md" in items[7]
-        assert "C1.4" in items[7]
-        for code in codes_of(detail):
-            assert code == "OPEN" or code in REASON_CODES
-
-
 def test_infeasible_calendar_makes_every_item_not_computable():
     first, last = several_full_years()
     span = (first + ONE_DAY, last)  # the first year is not covered whole
-    result = run(calendar_=infeasible_calendar(), climate_=climate(span))
-    assert [item.ag_year for item in result] == expected_ag_years(*span)
-    for item in result:
-        assert item.missing.reason == "NOT_COMPUTABLE"
-        assert "infeasible" in item.missing.detail
+    for parameters in (catalogue(), {}):
+        result = run(
+            calendar_=infeasible_calendar(),
+            climate_=climate(span),
+            parameters=parameters,
+        )
+        assert [item.ag_year for item in result] == expected_ag_years(*span)
+        for item in result:
+            assert item.missing.reason == "NOT_COMPUTABLE"
+            assert "infeasible" in item.missing.detail
 
 
 def test_year_not_covered_by_a_series_is_no_coverage():
@@ -336,7 +774,7 @@ def test_year_not_covered_by_a_series_is_no_coverage():
             assert f"'{PRECIPITATION}'" in item.missing.detail
             assert "C5.5" in item.missing.detail
         else:
-            assert item.missing.reason == "MISSING_INPUT"
+            assert_definition_incomplete(item)
 
     # One input of the reference evapotranspiration is shorter than the record.
     for short in CLIMATE_QUANTITIES:
@@ -350,18 +788,19 @@ def test_year_not_covered_by_a_series_is_no_coverage():
         assert f"'{short}'" in result[-1].missing.detail
         assert f"'{PRECIPITATION}'" not in result[-1].missing.detail
         for item in result[:-1]:
-            assert item.missing.reason == "MISSING_INPUT"
+            assert_definition_incomplete(item)
 
 
 def test_series_one_day_short_at_each_end_leaves_first_and_last_not_covered():
     first, last = several_full_years()
     exact = run(climate_=climate((first, last)))
-    assert {item.missing.reason for item in exact} == {"MISSING_INPUT"}
+    for item in exact:
+        assert_definition_incomplete(item)
     short = run(climate_=climate((first + ONE_DAY, last - ONE_DAY)))
     assert [item.ag_year for item in short] == [item.ag_year for item in exact]
     reasons = [item.missing.reason for item in short]
     assert reasons[0] == reasons[-1] == "NO_COVERAGE"
-    assert set(reasons[1:-1]) == {"MISSING_INPUT"}
+    assert set(reasons[1:-1]) == {"NOT_AVAILABLE"}
 
 
 def test_absent_daily_series_is_missing_input_naming_it():
@@ -381,34 +820,40 @@ def test_absent_daily_series_is_missing_input_naming_it():
 
 
 def test_days_held_missing_are_missing_input_naming_the_series():
-    result = run(climate_=climate(with_gaps=True))
-    assert result
-    for item in result:
+    first, _ = several_full_years()
+    held = first_day_of(first.year + 1) + dt.timedelta(days=100)
+    result = run(climate_=climate(held_missing=(held,)))
+    computed, holding, after = result
+    assert_definition_incomplete(computed)
+    for item in (holding, after):
         assert item.missing.reason == "MISSING_INPUT"
-        inputs = [
-            entry
-            for entry in items_of(item.missing.detail)
-            if entry.startswith("input")
-        ]
-        assert len(inputs) == len(DAILY_INPUTS)
-        for name, entry in zip(DAILY_INPUTS, inputs, strict=True):
-            assert entry.startswith("input MISSING_INPUT")
-            assert f"'{name}'" in entry
-            assert f"agricultural year {item.ag_year}" in entry
-            first_held = dt.date.fromisoformat(
-                entry.rsplit("the first on ", 1)[1].split(",", 1)[0]
-            )
-            assert first_day_of(item.ag_year) <= first_held <= last_day_of(item.ag_year)
+        assert held.isoformat() in item.missing.detail
+    inputs = [
+        entry for entry in items_of(holding.missing.detail) if entry.startswith("input")
+    ]
+    assert len(inputs) == len(DAILY_INPUTS)
+    for name, entry in zip(DAILY_INPUTS, inputs, strict=True):
+        assert entry.startswith("input MISSING_INPUT")
+        assert f"'{name}'" in entry
+        assert f"agricultural year {holding.ag_year}" in entry
+        assert f"the first on {held.isoformat()}" in entry
+    # No gap is filled: the balance does not restart after the held day.
+    assert not [
+        entry for entry in items_of(after.missing.detail) if entry.startswith("input")
+    ]
+    assert "missing since" in after.missing.detail
 
 
 @pytest.mark.parametrize(
     "names", [("latitude",), ("elevation",), ("latitude", "elevation"), ("longitude",)]
 )
-def test_missing_point_value_is_named_in_an_et0_item(names):
+def test_missing_point_value_is_named_in_an_input_item(names):
     document = climate_document()
     document["daily_series"] = [
         daily_series(name, *several_full_years()) for name in DAILY_INPUTS
     ]
+    document["point"]["latitude"]["unit"] = module.POINT_UNITS.latitude_decimal_degrees
+    document["point"]["elevation"]["unit"] = module.POINT_UNITS.elevation
     for name in names:
         unit = document["point"][name]["unit"]
         document["point"][name] = {
@@ -417,16 +862,20 @@ def test_missing_point_value_is_named_in_an_et0_item(names):
             "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
         }
     result = run(climate_=SiteClimate.model_validate(document))
+    read = [name for name in names if name != "longitude"]
     for item in result:
+        if not read:
+            assert_definition_incomplete(item)
+            continue
+        assert item.missing.reason == "MISSING_INPUT"
         point_items = [
             entry
             for entry in items_of(item.missing.detail)
             if "point of the climate record" in entry
         ]
-        read = [name for name in names if name != "longitude"]
         assert len(point_items) == len(read)
         for name, entry in zip(read, point_items, strict=True):
-            assert entry.startswith(f"ET0 NO_COVERAGE: {name} is missing")
+            assert entry.startswith(f"input NO_COVERAGE: the {name} of the point")
             assert entry.endswith(": PLACEHOLDER")
         assert "longitude" not in item.missing.detail
 
@@ -440,6 +889,29 @@ def test_series_in_different_time_zones_make_every_item_not_computable():
     for item in result:
         assert item.missing.reason == "NOT_COMPUTABLE"
         assert "C6.3" in item.missing.detail
+
+
+def test_input_in_a_unit_not_accepted_is_missing_input_naming_it_and_q11():
+    first, last = several_full_years()
+    for name in DAILY_INPUTS:
+        series = [daily_series(other, first, last) for other in DAILY_INPUTS]
+        series[DAILY_INPUTS.index(name)]["unit"] = "PLACEHOLDER_unit"
+        result = run(climate_=climate_with(series))
+        for item in result:
+            assert item.missing.reason == "MISSING_INPUT"
+            assert (
+                f"the daily series '{name}' is in the unit 'PLACEHOLDER_unit'"
+                in item.missing.detail
+            )
+            assert "Q11" in item.missing.detail
+    point = climate_with(
+        [daily_series(other, first, last) for other in DAILY_INPUTS], point_units=False
+    )
+    for item in run(climate_=point):
+        assert item.missing.reason == "MISSING_INPUT"
+        assert "the latitude of the point" in item.missing.detail
+        assert "the elevation of the point" in item.missing.detail
+        assert "D55" in item.missing.detail
 
 
 def test_start_month_missing_returns_one_item_for_the_rotation():
@@ -461,10 +933,10 @@ def test_no_precipitation_series_returns_one_item_for_the_rotation():
     assert f"'{PRECIPITATION}'" in item.missing.detail
 
 
-def test_calendar_dates_outside_the_record_keep_the_years_of_the_record():
+def test_calendar_dates_outside_the_record_keep_the_years_and_leave_the_crop_unknown():
     span = several_full_years()
     reference = run(climate_=climate(span))
-    document = calendar_document()
+    document = chain_calendar_document()
     start = dt.date.fromisoformat(document["start_date"])
     end = dt.date.fromisoformat(document["end_date"])
     shift = span[1] - start + ONE_DAY
@@ -478,7 +950,12 @@ def test_calendar_dates_outside_the_record_keep_the_years_of_the_record():
                     edge[key]["date"] = moved.isoformat()
     moved_calendar = RotationCalendar.model_validate(document)
     assert moved_calendar.start_date > span[1]
-    assert run(calendar_=moved_calendar, climate_=climate(span)) == reference
+    result = run(calendar_=moved_calendar, climate_=climate(span))
+    assert [item.ag_year for item in result] == [item.ag_year for item in reference]
+    for item in result:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert "Q5" in item.missing.detail
+        assert "outside the dates of the calendar" in item.missing.detail
 
 
 def every_kind_of_result() -> list[list[WaterDeficitExposure]]:
@@ -487,15 +964,27 @@ def every_kind_of_result() -> list[list[WaterDeficitExposure]]:
     mixed = [daily_series(name, first, last) for name in DAILY_INPUTS]
     mixed[-1]["time_zone"] = "PLACEHOLDER_other_time_zone"
     return [
-        run(climate_=SiteClimate.model_validate(climate_document())),
+        run(
+            calendar_=calendar(),
+            climate_=SiteClimate.model_validate(climate_document()),
+            parameters={},
+        ),
         run(),
-        run(climate_=climate(with_gaps=True)),
+        run(parameters={}),
+        run(climate_=climate(held_missing=(first + ONE_DAY,))),
         run(climate_=climate((first + ONE_DAY, last - ONE_DAY))),
         run(climate_=climate(quantities=DAILY_INPUTS[:-1])),
         run(calendar_=infeasible_calendar()),
         run(climate_=climate_with(mixed)),
+        run(
+            climate_=climate_with(
+                [daily_series(name, first, last) for name in DAILY_INPUTS],
+                point_units=False,
+            )
+        ),
         run(calendar_=calendar_without_start_month()),
         run(climate_=climate(quantities=CLIMATE_QUANTITIES)),
+        run(calendar_=calendar()),
     ]
 
 
@@ -515,6 +1004,9 @@ def test_the_list_is_never_empty_and_no_item_is_a_number():
         assert len(set(ag_years)) == len(ag_years)
 
 
+# --- the caller (G3, G5) and purity (G1) --------------------------------------
+
+
 @pytest.mark.parametrize("argument", ["climate", "soil_slope"])
 @pytest.mark.parametrize("field", ["case_id", "field_id"])
 def test_arguments_of_another_case_or_field_raise_value_error(argument, field):
@@ -522,7 +1014,12 @@ def test_arguments_of_another_case_or_field_raise_value_error(argument, field):
     model = {"climate": SiteClimate, "soil_slope": SiteSoilSlope}[argument]
     document = loader()
     document[field] = f"{document[field]}-other"
-    arguments = {"calendar": calendar(), "climate": climate(), "soil_slope": soil()}
+    arguments = {
+        "calendar": chain_calendar(),
+        "climate": climate(),
+        "soil_slope": soil(),
+        "parameters": catalogue(),
+    }
     arguments[argument] = model.model_validate(document)
     with pytest.raises(ValueError, match=field):
         module.compute_water_deficit_exposure(**arguments)
@@ -530,8 +1027,13 @@ def test_arguments_of_another_case_or_field_raise_value_error(argument, field):
 
 @pytest.mark.parametrize("argument", ["calendar", "climate", "soil_slope"])
 def test_argument_that_is_not_its_model_raises_type_error(argument):
-    arguments = {"calendar": calendar(), "climate": climate(), "soil_slope": soil()}
-    other_model = soil() if argument != "soil_slope" else calendar()
+    arguments = {
+        "calendar": chain_calendar(),
+        "climate": climate(),
+        "soil_slope": soil(),
+        "parameters": catalogue(),
+    }
+    other_model = soil() if argument != "soil_slope" else chain_calendar()
     for wrong in (arguments[argument].model_dump(mode="json"), other_model):
         given = dict(arguments)
         given[argument] = wrong
@@ -539,39 +1041,96 @@ def test_argument_that_is_not_its_model_raises_type_error(argument):
             module.compute_water_deficit_exposure(**given)
 
 
-def test_arguments_unchanged_and_second_call_equal():
+def test_parameters_missing_positional_or_not_a_dict_raises_type_error():
     arguments = {
-        "calendar": calendar(),
-        "climate": climate(with_gaps=True),
+        "calendar": chain_calendar(),
+        "climate": climate(),
         "soil_slope": soil(),
     }
-    before = copy.deepcopy(arguments)
-    first = module.compute_water_deficit_exposure(**arguments)
-    assert arguments == before
-    assert module.compute_water_deficit_exposure(**arguments) == first
+    with pytest.raises(TypeError, match="parameters"):
+        module.compute_water_deficit_exposure(**arguments)
+    with pytest.raises(TypeError):
+        module.compute_water_deficit_exposure(*arguments.values(), catalogue())
+    records = list(catalogue().values())
+    for wrong in (
+        records,
+        tuple(records),
+        json.dumps(catalogue()),
+        None,
+        {position: record for position, record in enumerate(records)},
+        {"records.json": records},
+        {"record.json": "PLACEHOLDER"},
+    ):
+        with pytest.raises(TypeError, match="parameters"):
+            module.compute_water_deficit_exposure(**arguments, parameters=wrong)
 
 
-def test_module_imports_only_allowed_modules_and_holds_only_the_integer_one():
-    tree = ast.parse((HERE / "exposure.py").read_text("utf-8"))
+def test_arguments_unchanged_and_second_call_equal():
+    for parameters in (catalogue(), {}):
+        arguments = {
+            "calendar": chain_calendar(),
+            "climate": climate(held_missing=(several_full_years()[1],)),
+            "soil_slope": soil(),
+            "parameters": parameters,
+        }
+        before = copy.deepcopy(arguments)
+        first = module.compute_water_deficit_exposure(**arguments)
+        assert arguments == before
+        assert module.compute_water_deficit_exposure(**arguments) == first
+
+
+# --- the module ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("file_name", "allowed"),
+    [
+        (
+            "exposure.py",
+            lambda name: (
+                name.startswith("contracts.inputs.")
+                or name == "contracts.results.models"
+                or name
+                in (
+                    "engine.water",
+                    "engine.water._parameters",
+                    "engine.water.et0",
+                    "engine.water.et0.quantities",
+                    "engine.water.runoff",
+                )
+            ),
+        ),
+        (
+            "_parameters.py",
+            lambda name: name in ("contracts.results.models", "params.catalogue"),
+        ),
+    ],
+)
+def test_modules_import_only_allowed_modules_and_hold_only_the_integer_one(
+    file_name, allowed
+):
+    source = (HERE / file_name).read_text("utf-8")
+    tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
             assert node.level == 0, "relative import"
             names = [node.module]
+            if node.module == "params.catalogue":
+                assert {alias.name for alias in node.names} <= {
+                    "Missing",
+                    "identity",
+                    "read_value",
+                    "read_range",
+                }
         else:
             continue
         for name in names:
             top = name.split(".")[0]
-            allowed = (
-                top in sys.stdlib_module_names
-                or name.startswith("contracts.inputs.")
-                or name == "contracts.results.models"
-                or name in ("engine.water.et0", "engine.water.et0.quantities")
-                or name == "engine.water.balance"
-            )
-            assert allowed, name
+            assert top in sys.stdlib_module_names or allowed(name), name
             assert top not in ("os", "io", "pathlib", "socket", "time", "random")
+    assert "load_folder" not in source.replace("``params.catalogue.load_folder``", "")
     numbers = {
         node.value
         for node in ast.walk(tree)
@@ -579,7 +1138,7 @@ def test_module_imports_only_allowed_modules_and_holds_only_the_integer_one():
         and isinstance(node.value, (int, float, complex))
         and not isinstance(node.value, bool)
     }
-    assert numbers == {1}
+    assert numbers <= {1}
     format_specs = [
         node
         for node in ast.walk(tree)
@@ -588,13 +1147,53 @@ def test_module_imports_only_allowed_modules_and_holds_only_the_integer_one():
     assert format_specs == [], "a format specification can hide a number"
 
 
-def test_package_exposes_compute_water_deficit_exposure_with_exactly_three_parameters():
+def test_package_exposes_the_entry_point_with_parameters_by_keyword_and_no_default():
     from engine.water import compute_water_deficit_exposure
 
     assert compute_water_deficit_exposure is module.compute_water_deficit_exposure
     parameters = inspect.signature(compute_water_deficit_exposure).parameters
-    assert list(parameters) == ["calendar", "climate", "soil_slope"]
+    assert list(parameters) == ["calendar", "climate", "soil_slope", "parameters"]
     assert all(p.default is inspect.Parameter.empty for p in parameters.values())
+    assert parameters["parameters"].kind is inspect.Parameter.KEYWORD_ONLY
+
+
+def test_parameter_identifiers_are_well_formed_and_unique():
+    names = [*module.SITE_PARAMETERS, *module.DAY_PARAMETERS, *module.CROP_PARAMETERS]
+    assert len(names) == len(set(names))
+    for name in names:
+        assert re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name), name
+    readme = (HERE / "et0" / "README.md").read_text("utf-8")
+    for group, fields_ in module.ET0_PARAMETERS.items():
+        for field in fields_:
+            assert f"| `{group}.{field}` |" in readme
+    for part, ids in (
+        ("runoff", module.RUNOFF_PARAMETERS),
+        (
+            "evaporation",
+            [n for n in module.SURFACE_LAYER_PARAMETERS if n != "initial_depletion"],
+        ),
+    ):
+        text = (HERE / part / "README.md").read_text("utf-8")
+        for name in ids:
+            assert f"| `{name}` |" in text, name
+    evaporation_readme = (HERE / "evaporation" / "README.md").read_text("utf-8")
+    for field in module.UPPER_LIMIT_FIELDS:
+        assert f"| `upper_limit.{field}` |" in evaporation_readme
+
+
+def test_parameter_table_matches_exposure_md():
+    text = (HERE / "EXPOSURE.md").read_text("utf-8")
+    section = text.split("## Parameters", 1)[1].split("\n## ", 1)[0]
+    rows = re.findall(
+        r"^\| `([A-Za-z0-9_]+)` \| ([^|]+) \|", section, flags=re.MULTILINE
+    )
+    by_scope: dict[str, list[str]] = {}
+    for name, scope in rows:
+        by_scope.setdefault(scope.strip(), []).append(name)
+    assert sorted(by_scope) == ["crop", "crop or no crop", "site"]
+    assert sorted(by_scope["site"]) == sorted(module.SITE_PARAMETERS)
+    assert sorted(by_scope["crop or no crop"]) == sorted(module.DAY_PARAMETERS)
+    assert sorted(by_scope["crop"]) == sorted(module.CROP_PARAMETERS)
 
 
 def test_runner_discovers_the_entry_point():
@@ -604,25 +1203,21 @@ def test_runner_discovers_the_entry_point():
     assert found.compute_water_deficit_exposure is module.compute_water_deficit_exposure
 
 
-def test_route_answers_with_a_water_part_that_loads_into_results_per_rotation():
+def test_route_answers_with_a_water_part_when_the_runner_passes_parameters():
     """In process, with the examples, no network.
 
-    EP2 is replaced by the example calendar, which carries a start month: the
-    calendar engine on ``main`` writes the start month as missing until the
-    rotation definition carries it (#129), and then EP1 returns one ``Missing``
-    and the route has no ``ResultsPerRotation`` at all. EP1 and EP3 are the
-    functions the runner discovers.
+    The runner of ``api/engines.py`` passes ``parameters`` to EP3 by keyword
+    (D46, D56, #160); here it is given the empty catalogue, the catalogue of
+    ``params/records/`` today, and EP3 is passed to it unwrapped. EP2 is
+    replaced by the example calendar, which carries a start month, and EP1 is
+    left out (not built), so that this case checks the water part alone. The
+    next case runs every discovered engine.
     """
     from fastapi.testclient import TestClient
 
     from adapters.example_soil_slope import ExampleSoilSlopeSource
     from adapters.ports import ClimateRequest, ClimateResult, SourceInfo
-    from api.engines import (
-        DEFAULT_CARBON_MODELS,
-        EngineFunctions,
-        EntryPointEngines,
-        discover_engine_functions,
-    )
+    from api.engines import DEFAULT_CARBON_MODELS, EngineFunctions, EntryPointEngines
     from api.main import create_app
     from api.ports import RunSettings
 
@@ -641,14 +1236,14 @@ def test_route_answers_with_a_water_part_that_loads_into_results_per_rotation():
                 ),
             )
 
-    found = discover_engine_functions()
     engines = EntryPointEngines(
         EngineFunctions(
             build_rotation_calendar=lambda rotation: calendar(),
-            compute_soil_loss=found.compute_soil_loss,
-            compute_water_deficit_exposure=found.compute_water_deficit_exposure,
+            compute_soil_loss=None,
+            compute_water_deficit_exposure=module.compute_water_deficit_exposure,
         ),
         carbon_models=DEFAULT_CARBON_MODELS,
+        parameters={},
     )
     rotation = json.loads(
         (
@@ -685,14 +1280,113 @@ def test_route_answers_with_a_water_part_that_loads_into_results_per_rotation():
     assert response.status_code == 200, response.text
     answer = response.json()
     result = ResultsPerRotation.model_validate(answer["result"])
-    water = result.water_deficit_exposure
-    assert isinstance(water, list)
-    assert water == module.compute_water_deficit_exposure(
-        calendar=calendar(), climate=example_climate, soil_slope=soil()
+    water_part = result.water_deficit_exposure
+    assert isinstance(water_part, list)
+    assert water_part == module.compute_water_deficit_exposure(
+        calendar=calendar(), climate=example_climate, soil_slope=soil(), parameters={}
     )
     (water_module,) = [m for m in answer["modules"] if m["id"] == "water"]
     assert water_module["state"] == "not_available"
-    assert water_module["reason"] == water[0].missing.reason
+    assert water_module["reason"] == water_part[0].missing.reason
+
+
+def test_route_through_the_real_runner_passes_parameters_and_the_water_part_loads():
+    """In process, with the examples, no network, nothing wrapped or replaced.
+
+    Every engine is the one ``discover_engine_functions`` finds (EP2, EP1 and
+    this EP3), run by ``EntryPointEngines`` with the test catalogue as
+    ``parameters``, exactly as the app passes the loaded catalogue (#160).
+    The climate source serves the example climate under the identifiers of
+    the request, so that the runner calls EP1 and EP3.
+    """
+    from fastapi.testclient import TestClient
+
+    from adapters.example_soil_slope import ExampleSoilSlopeSource
+    from adapters.ports import ClimateRequest, ClimateResult, SourceInfo
+    from api.engines import (
+        DEFAULT_CARBON_MODELS,
+        EntryPointEngines,
+        discover_engine_functions,
+    )
+    from api.main import create_app
+    from api.ports import RunSettings
+    from api.rotation_validator import load_rotation_definition
+
+    served: list[SiteClimate] = []
+
+    class ExampleClimate:
+        source_id = "PLACEHOLDER_CLIMATE"
+        contract = "site_data_climate"
+
+        def get_climate(self, request: ClimateRequest) -> ClimateResult:
+            document = climate_document()
+            document["case_id"] = request.case_id
+            document["field_id"] = request.field_id
+            served.append(SiteClimate.model_validate(document))
+            return ClimateResult(
+                data=served[-1],
+                source=SourceInfo(
+                    id=self.source_id, contract=self.contract, state="example"
+                ),
+            )
+
+    found = discover_engine_functions()
+    assert found.compute_water_deficit_exposure is module.compute_water_deficit_exposure
+    parameters = catalogue()
+    engines = EntryPointEngines(
+        found, carbon_models=DEFAULT_CARBON_MODELS, parameters=parameters
+    )
+    rotation = json.loads(
+        (
+            ROOT
+            / "contracts"
+            / "rotation_definition"
+            / "examples"
+            / "PLACEHOLDER_rotation_definition.json"
+        ).read_text("utf-8")
+    )
+    series = example_precipitation()
+    body = {
+        "site": {
+            "case_id": rotation["case_id"],
+            "field_id": rotation["field_id"],
+            "latitude": 1.0,
+            "longitude": 2.0,
+        },
+        "rotation": rotation,
+    }
+    app = create_app(
+        [],
+        climate=ExampleClimate(),
+        soil_slope=ExampleSoilSlopeSource(
+            EXAMPLES / "PLACEHOLDER_site_soil_slope.json"
+        ),
+        engines=engines,
+        settings=RunSettings(
+            start_date=dt.date.fromisoformat(series["start_date"]),
+            end_date=dt.date.fromisoformat(series["end_date"]),
+        ),
+    )
+    response = TestClient(app).post("/api/rotations/run", json=body)
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    result = ResultsPerRotation.model_validate(answer["result"])
+    water_part = result.water_deficit_exposure
+    assert isinstance(water_part, list)
+    assert_loads(water_part)
+    (climate_served,) = served
+    the_calendar = found.build_rotation_calendar(load_rotation_definition(rotation))
+    assert water_part == module.compute_water_deficit_exposure(
+        calendar=the_calendar,
+        climate=climate_served,
+        soil_slope=soil().model_copy(
+            update={"case_id": rotation["case_id"], "field_id": rotation["field_id"]}
+        ),
+        parameters=parameters,
+    )
+    (water_module,) = [m for m in answer["modules"] if m["id"] == "water"]
+    assert water_module["state"] == "not_available"
+    assert water_module["reason"] == water_part[0].missing.reason
 
 
 def test_proposed_cases_match_exposure_md():
