@@ -46,15 +46,15 @@ The method that produces the value is not defined here. Its description and its 
 
 Status: PROPOSED
 
-The quantity, the unit and the direction below follow the decision recorded under C1.4.
+The direction and the absence of a unit below are not proposals of the session. The lead developer stated them on 14 November 2026 as a consequence of the decision recorded under C1.4: with a ratio of water transpired to water demanded, higher is better and the value has no unit. Acceptance by a science reviewer is pending. The rest of this item is proposed by the session.
 
 | Aspect | Convention |
 |---|---|
 | Identifier | `water_deficit_exposure` |
 | Quantity | The ratio between water transpired and water demanded over the critical period of the crop (C1.4) |
-| Unit | None: the value is a ratio and has no unit (C1.4). Its unit string is `dimensionless`; it is never left empty |
+| Unit | None: the value has no unit (lead developer, as stated above). Proposed by the session: its unit string is `dimensionless`, and it is never left empty |
 | Time basis | The critical period of the crop (C1.4). `OPEN`: how the values of the crops of a rotation give one value per agricultural year or per rotation, and whether a monthly breakdown exists for this indicator, is not decided. Question for the science reviewers: **on which time basis is the ratio reported for a rotation?** |
-| Direction | `higher_is_better` (C1.4) |
+| Direction | `higher_is_better` (lead developer, as stated above) |
 
 No threshold appears in this sheet. Thresholds live only in the test plan (blueprint section 5).
 
@@ -168,7 +168,7 @@ The list is closed. A new code is a contract change and is added only at a check
 
 Status: PROPOSED
 
-- A result that needs a missing input is itself missing, with reason `MISSING_INPUT`. Nothing is filled in, interpolated or replaced by a default, except by the gap filling decided under C3.4.
+- A result that needs a missing input is itself missing, with reason `MISSING_INPUT`. Nothing is filled in, interpolated or replaced by a default, except by the gap filling decided under C3.4. Until a person supplies the method that C3.4 asks for, no gap is filled.
 - The interface shows a missing value as missing, with its reason. It never shows a blank or a zero in its place.
 
 ### C3.4 Gaps inside a series that is aggregated
@@ -181,8 +181,6 @@ Still to be supplied by a person:
 
 - `OPEN`: the gap-filling method. Question for the science reviewers: **with which method are the gaps of a daily series filled?**
 - The source of the method: CITATION NEEDED.
-
-Until a person supplies the method, no gap is filled and C3.3 applies.
 
 ## 4. Provenance label per value
 
@@ -276,7 +274,7 @@ Still to be supplied by a person:
 
 Status: PROPOSED
 
-An agricultural year that the data series does not cover from its first day to its last is not reported as a full year. Its yearly values are missing with reason `NO_COVERAGE`, unless its gaps are filled as decided under C3.4.
+An agricultural year that the data series does not cover from its first day to its last is not reported as a full year. Its yearly values are missing with reason `NO_COVERAGE`.
 
 ## 6. Time zone of every daily series
 
@@ -294,7 +292,7 @@ Status: PROPOSED
 
 A daily series delivered by the NASA POWER adapter is delivered in UTC (blueprint section 8; decision of the lead developer). Its `time_zone` is the string `UTC`.
 
-This sheet does not say which series that adapter delivers. Whether precipitation comes through it or directly from another source is left to the science reviewers (`docs/GETTING_STARTED.md`); if it comes directly, C6.4 applies to it.
+This sheet does not say which series that adapter delivers. Whether IMERG precipitation comes through NASA POWER or directly is left to the science reviewers (`docs/GETTING_STARTED.md`).
 
 How the service itself defines the day of its daily values, and how UTC is requested, is checked by a person against the public documentation of the service when the adapter is built: CITATION NEEDED.
 
