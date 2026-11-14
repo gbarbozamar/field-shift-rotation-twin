@@ -15,9 +15,9 @@ keyword argument ``parameters`` (Q3, D46, D56).
   value of its whole-factor record, and ``P``;
 - a monthly value is ``R`` of the month (the level times the climatological
   fraction of the month, ``engine/erosion/r_factor/climatology.py``, from
-  twelve records) times ``K``, ``LS``, ``C`` and ``P``. Until the licence of
-  the climatology is confirmed and the twelve records exist, every month is
-  missing, naming them.
+  twelve records) times ``K``, ``LS``, ``C`` and ``P``. The licence of the
+  climatology is settled (D101); until the twelve records exist, every month
+  is missing, naming them.
 
 ``compute_soil_loss_daily_index`` keeps the daily-index route available, off
 the main path: ``R`` through the daily erosivity index of ``r_factor/`` and
@@ -97,9 +97,10 @@ K_ID = "rusle_k_factor"
 P_ID = "rusle_p_factor"
 
 # The whole-factor record of C: on the main route C is this single declared
-# value until the licence of the climatology is confirmed (docs/METHODS.md
-# M1.2, D69, D84, USER-G). Not read on the daily-index route, which computes C
-# through c_factor/ (OPEN 12 of SOIL_LOSS.md).
+# value (docs/METHODS.md M1.2; D69, D84, D101, USER-G), PROPOSED to stay so
+# because a C computed through c_factor/ needs the crop of each day of the
+# record and D47 repetition is not built (OPEN 12 and 28 of SOIL_LOSS.md). Not
+# read on the daily-index route, which computes C through c_factor/.
 C_ID = "rusle_c_factor"
 
 # The twelve monthly erosivity values of the climatology at the point (D69,
@@ -251,14 +252,14 @@ MONTHLY_NOT_FORMED = (
 )
 CLIMATOLOGY_PART = (
     "the climatological monthly fraction of R of docs/METHODS.md M1.2 (decisions "
-    "D69 and D84 of issue #77, USER-G; engine/erosion/r_factor/climatology.py); "
-    "no value of the climatology is committed until its licence is confirmed (D69)"
+    "D69, D84 and D101 of issue #77, USER-G; engine/erosion/r_factor/climatology.py)"
 )
 DECLARED_C = (
     "C is the single declared value of the record "
-    f"'{C_ID}' (DECLARED): docs/METHODS.md M1.2 keeps C a single declared value "
-    "until the licence of the climatology is confirmed (decisions D69 and D84 of "
-    "issue #77, USER-G)"
+    f"'{C_ID}' (DECLARED; docs/METHODS.md M1.2, decisions D69, D84 and D101 of "
+    "issue #77, USER-G): a C computed through engine/erosion/c_factor/ needs the "
+    "crop of each day of the climate record, and the rotation is not yet repeated "
+    "over the years of the record (D47; OPEN 28 of engine/erosion/SOIL_LOSS.md)"
 )
 RANGE_NOT_BUILT = (
     "how an uncertainty range passes through the product of docs/METHODS.md M1.1 "
