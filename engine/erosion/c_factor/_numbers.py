@@ -7,7 +7,8 @@ that is not a finite number, or that lies outside what a quantity can be,
 makes it ``NOT_COMPUTABLE``. Nothing is clipped, filled or defaulted.
 
 This module holds no number of the method. The only numbers in it are the
-bounds zero and one of a fraction, which are what the word "fraction" means.
+bounds zero and one of a fraction, which are what the word "fraction" means,
+and the hundred percent of a whole, which is what the word "percent" means.
 """
 
 from __future__ import annotations
@@ -27,6 +28,11 @@ MISSING_SHAPES = (InputMissing, ResultMissing)
 # does not accept" is not decided: Q11 of contracts/ENTRYPOINTS.md. The same
 # choice as engine/erosion/ls.py.
 REASON_UNIT_NOT_ACCEPTED = "NOT_COMPUTABLE"
+
+# Percent in a whole: the definition of the word "percent", not a value of
+# the method. Used where S1 writes a cover in percent (decision PC-1 of
+# docs/SCIENCE_DECISIONS.md).
+PERCENT_PER_FRACTION = 100
 
 Number = int | float
 NumberOrMissing = int | float | InputMissing | ResultMissing

@@ -18,8 +18,10 @@ from .subfactors import (
     SET_TO_ONE,
     SoilLossRatio,
     canopy_subfactor,
+    effective_canopy_cover,
     soil_loss_ratio,
     surface_cover_subfactor,
+    surface_cover_subfactor_percent,
 )
 
 __all__ = [
@@ -29,10 +31,12 @@ __all__ = [
     "RotationC",
     "SoilLossRatio",
     "canopy_subfactor",
+    "effective_canopy_cover",
     "residue_cover_from_mass",
     "residue_mass_after_decay",
     "residue_mass_over_time",
     "rotation_c",
     "soil_loss_ratio",
     "surface_cover_subfactor",
+    "surface_cover_subfactor_percent",
 ]

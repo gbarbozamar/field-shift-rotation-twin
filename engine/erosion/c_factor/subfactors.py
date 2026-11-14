@@ -3,9 +3,20 @@
 Decision D45 of issue #77 keeps two sub-factors of source S1: canopy cover,
 and surface residue cover. The other sub-factors (surface roughness, soil
 biomass, soil consolidation, prior land use) are set to one as a declared
-limit of the method. The soil-loss ratio of a period is the product of the
+limit of the method; the lead developer's decision PC-3 of
+docs/SCIENCE_DECISIONS.md (14 November 2026) adds ridge height and antecedent
+soil moisture, the two other sub-factors of S1 Eq. 6.1, to that list. The soil-loss ratio of a period is the product of the
 sub-factors; this module multiplies the two that are kept, and records the
-four that are set to one in every result, so the limit is never silent.
+sub-factors that are set to one in every result, so the limit is never
+silent.
+
+Decision PC-1 of docs/SCIENCE_DECISIONS.md follows S1 for the two kept
+sub-factors: the canopy sub-factor takes the effective canopy cover of S1
+Eq. 6.5 (``effective_canopy_cover``), and the surface-cover sub-factor takes
+the coefficient of S1 Eq. 6.6 per percent of cover, with the random roughness
+at the value of the unit plot so that its term is one
+(``surface_cover_subfactor_percent``). ``surface_cover_subfactor`` is kept
+unchanged for the callers written before PC-1.
 
 The forms below are PROPOSED. Their source is to be confirmed by a person
 against S1; the session that wrote them did not read S1, and it writes no
@@ -39,6 +50,7 @@ from ._numbers import (
     check_text,
     check_types,
     is_fraction,
+    PERCENT_PER_FRACTION,
     is_not_negative,
     no_finite_result,
     numbers_or_missing,
@@ -52,24 +64,31 @@ __all__ = [
     "SET_TO_ONE",
     "SoilLossRatio",
     "canopy_subfactor",
+    "effective_canopy_cover",
     "soil_loss_ratio",
     "surface_cover_subfactor",
+    "surface_cover_subfactor_percent",
 ]
 
-# D45 of issue #77: the sub-factors of S1 that are not computed and stand at
-# one. Their names are PROPOSED identifiers, in the order D45 lists them.
+# D45 of issue #77, completed by decision PC-3 of docs/SCIENCE_DECISIONS.md:
+# the sub-factors of S1 that are not computed and stand at one. Their names
+# are PROPOSED identifiers: the four of D45 in its order, then the two that
+# PC-3 adds.
 SET_TO_ONE: tuple[str, ...] = (
     "surface_roughness",
     "soil_biomass",
     "soil_consolidation",
     "prior_land_use",
+    "ridge_height",
+    "antecedent_soil_moisture",
 )
 
 # Where the limit is declared. A pointer for the reader of a result, not the
 # text on the limits of the method (that is a separate unit, M1.1).
 DECLARED_LIMIT = (
     "sub-factors set to one as a declared limit of the method: "
-    "decision D45 of issue #77, docs/METHODS.md M1.5"
+    "decision D45 of issue #77, completed by PC-3, and the simplifications "
+    "PC-2 and PC-3 of docs/SCIENCE_DECISIONS.md; docs/METHODS.md M1.5"
 )
 
 
@@ -108,6 +127,8 @@ def canopy_subfactor(
     Arguments, all by name and none with a default:
 
     - ``canopy_cover``: the fraction of the soil under the canopy, zero to one.
+      Under decision PC-1 it is the **effective** canopy cover of S1 Eq. 6.5,
+      the result of ``effective_canopy_cover``.
     - ``fall_height``: the fall height of drops from the canopy, zero or more.
     - ``fall_height_unit``: the unit string of ``fall_height``.
     - ``fall_height_coefficient``: the constant of the form, from the
@@ -165,6 +186,95 @@ def canopy_subfactor(
         return real(1 - values["canopy_cover"] * exponential)
     except (ArithmeticError, OverflowError):
         return no_finite_result("canopy_subfactor", "CC")
+
+
+def effective_canopy_cover(
+    *,
+    canopy_cover: NumberOrMissing,
+    ground_cover: NumberOrMissing,
+) -> float | ResultMissing:
+    """The effective canopy cover of S1 Eq. 6.5 (decision PC-1). PROPOSED form.
+
+    ``effective = canopy_cover * (1 - ground_cover)``: the canopy counts only
+    where the ground beneath it is not already covered.
+
+    Arguments, all by name and none with a default, both fractions of the
+    soil from zero to one: ``canopy_cover`` and ``ground_cover``.
+
+    Returns the effective cover, or a ``Missing``: ``MISSING_INPUT`` naming
+    each missing argument; ``NOT_COMPUTABLE`` for an argument that is not a
+    finite number or lies outside zero to one (named; nothing is clipped).
+
+    Raises ``TypeError`` for an argument of another type.
+    """
+    numbers = {"canopy_cover": canopy_cover, "ground_cover": ground_cover}
+    check_types(numbers)
+    values = numbers_or_missing(numbers)
+    if isinstance(values, ResultMissing):
+        return values
+    refused = outside(
+        values, ["canopy_cover", "ground_cover"], is_fraction, "is outside zero to one"
+    )
+    if refused is not None:
+        return refused
+    try:
+        return real(values["canopy_cover"] * (1 - values["ground_cover"]))
+    except ArithmeticError:
+        return no_finite_result("effective_canopy_cover", "the effective cover")
+
+
+def surface_cover_subfactor_percent(
+    *,
+    surface_residue_cover: NumberOrMissing,
+    surface_cover_coefficient_per_percent: NumberOrMissing,
+) -> float | ResultMissing:
+    """The surface-cover sub-factor of S1 Eq. 6.6 under decision PC-1. PROPOSED form.
+
+    ``SC = exp(-b * cover_percent)``, with ``cover_percent`` the cover in
+    percent and ``b`` the coefficient of S1 per percent of cover. The
+    roughness term of Eq. 6.6 stands at one: the random roughness takes the
+    value of the unit plot (PC-1).
+
+    Arguments, all by name and none with a default:
+
+    - ``surface_residue_cover``: the fraction of the soil covered, zero to
+      one, as ``residue_cover_from_mass`` returns it. It is turned into
+      percent here.
+    - ``surface_cover_coefficient_per_percent``: ``b`` of S1, in percent to
+      the minus one, from the parameter catalogue.
+
+    Returns ``SC``, or a ``Missing``: ``MISSING_INPUT`` naming each missing
+    argument; ``NOT_COMPUTABLE`` when an argument is not a finite number, the
+    cover lies outside zero to one or the coefficient is negative (named;
+    nothing is clipped), or the form gives no finite real number.
+
+    Raises ``TypeError`` for an argument of another type.
+    """
+    numbers = {
+        "surface_residue_cover": surface_residue_cover,
+        "surface_cover_coefficient_per_percent": surface_cover_coefficient_per_percent,
+    }
+    check_types(numbers)
+    values = numbers_or_missing(numbers)
+    if isinstance(values, ResultMissing):
+        return values
+    refused = outside(
+        values, ["surface_residue_cover"], is_fraction, "is outside zero to one"
+    ) or outside(
+        values,
+        ["surface_cover_coefficient_per_percent"],
+        is_not_negative,
+        "is negative",
+    )
+    if refused is not None:
+        return refused
+    try:
+        cover_percent = values["surface_residue_cover"] * PERCENT_PER_FRACTION
+        return real(
+            math.exp(-values["surface_cover_coefficient_per_percent"] * cover_percent)
+        )
+    except (ArithmeticError, OverflowError):
+        return no_finite_result("surface_cover_subfactor_percent", "SC")
 
 
 def surface_cover_subfactor(
@@ -226,8 +336,8 @@ def soil_loss_ratio(
 
     ``canopy`` is the result of ``canopy_subfactor`` and ``surface_cover`` the
     result of ``surface_cover_subfactor``, each a number or a ``Missing``.
-    The four other sub-factors of S1 are not multiplied: they stand at one
-    by D45 and are named in ``set_to_one`` of the result.
+    The other sub-factors of S1 are not multiplied: they stand at one by
+    D45 and PC-3 and are named in ``set_to_one`` of the result.
 
     ``value`` of the result is the product, or a ``Missing``:
 

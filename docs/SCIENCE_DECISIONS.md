@@ -115,7 +115,7 @@ Later decisions that relaxed an earlier restriction are applied as relaxed, for 
 
 ## Findings of the AI pre-check (14 November 2026)
 
-**Findings, not decisions.** An AI session opened the sources and compared them with the code (snapshot `7df4463`, then `ac7184c`; the forms checked did not change between the two). No person has checked these readings under D34. "Recommendation" is the AI's, marked as such, and is not a decision.
+**Findings, not decisions** (the choices they opened were taken afterwards as PC-1 to PC-7, in the next section). An AI session opened the sources and compared them with the code (snapshot `7df4463`, then `ac7184c`; the forms checked did not change between the two). No person has checked these readings under D34. "Recommendation" is the AI's, marked as such, and is not a decision.
 
 | # | Finding | Source and locator | What the code does | Choice it opens |
 |---|---|---|---|---|
@@ -129,6 +129,22 @@ Later decisions that relaxed an earlier restriction are applied as relaxed, for 
 | 8 | **Curve Number (F42 to F44, P18)**: the algebraic forms match NRCS (2004), National Engineering Handbook Part 630, ch. 10, Eq. 10-9 to 10-13 (pp. 10-3, 10-4); the 2025 edition, section 630.113G, p. 21, says that using it as a loss in continuous simulation is outside its intended use | As stated | The forms of `engine/water/runoff/` | Whether CN is admitted in the continuous balance of D44, declared as an adaptation (P18); the CN table is not chosen |
 | 9 | **Rounding oddities of FAO-56 Example 18** (the row of es printed without the halving, a printed deficit that differs from the difference shown, rounded intermediates) do **not** authorise inventing a tolerance | FAO-56 ch. 4, Example 18 | `test_h2.py` is skipped | The printed figure and the tolerance of H2 (P20), lead developer |
 | 10 | **The secondary mention of 7 t ha-1** is not adopted as the tolerance T of the soil: it cites no primary norm and prints no per-year unit in that passage | Carrasco-Letelier and Beretta-Blanco (2017), *Ciencia e Investigación Agraria* 44(2), p. 190 | No tolerance is read | T stays `OPEN` (M1.3); erosion admissibility "not evaluated" (D60, USER-Q) |
+
+## Lead decisions on the pre-check findings (PC-1 to PC-7)
+
+Accepted by the lead developer on 14 November 2026, in an explicit chat reply to the integration session ("Sí, las 7", choosing the seven options the session had recommended). They are lead decisions: the recommendation was the AI's, the choice is the lead developer's. They decide methods and scope; **they check no published value** (D34): every coefficient they touch still enters `params/records/` only after the lead developer checks it at its locator (D66).
+
+| Id | Finding | Decision | Lane that applies it | State in this branch |
+|---|---|---|---|---|
+| PC-1 | 1 (F09, F10) | Follow S1 for the two kept sub-factors: the canopy sub-factor takes the **effective canopy cover**, canopy cover times one minus the ground cover beneath it (S1 Eq. 6.5); the ground-cover sub-factor takes the coefficient `b` of S1 Eq. 6.6 **per percent of cover**, with the cover in percent and the random roughness at the value of the unit plot, so that the roughness term of Eq. 6.6 is one | L0 (`engine/erosion/c_factor/`); EP1 wiring in `soil_loss.py` (#173) | Built: `effective_canopy_cover`, `surface_cover_subfactor_percent` (added; `surface_cover_subfactor` kept unchanged for the callers written before PC-1). EP1 still to switch |
+| PC-2 | 3 (F13, F14) | For the first release, residue decay at a **constant rate by residue type**, without the daily moisture and temperature modifiers of S1 Eq. 10.4 to 10.6, **declared as a simplification** of the method | L0 | Declared (`DECLARED_LIMIT`, `c_factor/README.md` OPEN 2, M1.5) |
+| PC-3 | 2 (F11, F15) | Ridge height and antecedent soil moisture join the sub-factors set to one (with the four of D45); the monthly weighting of `rotation_c` is **declared a partial stage** of the classical daily route of USER-L | L0 | Built: `SET_TO_ONE` has six names; declared in M1.5 |
+| PC-4 | 4 (F33, F36) | Apply the bounds FAO-56 prescribes: **Rs/Rso at most 1** in the net longwave radiation (Eq. 39), and **wind speed at least 0.5 m s-1** where Eq. 6 is used (chapter 3, "Missing wind speed data") | L1 (`engine/water/et0/`) | Not built here (another lane); handed to the coordinating session |
+| PC-5 | 6 (F52) | Leaving out Tew in the surface-layer balance is **declared as a limit of the method, with its scope**: rain-fed (no irrigation term, D44), and Tew omitted although, with a 0.10 m evaporation layer (USER-AG) and shallow early roots, the surface layer is a large share of the early root zone, which is where the omission weighs most | L1 (`engine/water/evaporation/`) | Declared in M2.2; the README of the lane to be updated by L1 |
+| PC-6 | 8 (F42 to F44, P18) | The source of the forms of the Curve Number is **NRCS (2004), National Engineering Handbook Part 630, chapter 10** (Sources S11 of `docs/METHODS.md`); its use as the loss of a **continuous** daily balance is **declared an adaptation**, since the 2025 edition (section 630.113G) places that use outside the intended one. The table of curve numbers is **not** chosen by this decision | L0 (`docs/METHODS.md`); L1 (`engine/water/runoff/`) | M2.2 and Sources updated; the README of the lane to be updated by L1 |
+| PC-7 | 7 (F16, P23) | `control_monthly_erosivity` is marked **without a source** and stays **out of the route of the first release** (D69) | L0 (`engine/erosion/r_factor/`) | Marked in its docstring and in `r_factor/README.md` OPEN 7 |
+
+Findings 5, 9 and 10 needed no choice: the code keeps the mean temperature (no subtraction), no tolerance is taken from the rounding of Example 18, and the 7 t ha-1 mention is not adopted as T.
 
 ## Pending human signature (D34, D66)
 
@@ -150,4 +166,4 @@ Counts of the AI pre-check, from the copies of the check sheets (the originals o
 
 ## To record in issue #77
 
-The `USER-` decisions above, with the later soybean-material acceptance, are not in issue #77. Recording them there (with the next free `D` numbers) is the lead developer's or the coordinating session's act; this session publishes nothing.
+The `USER-` decisions above, with the later soybean-material acceptance, and PC-1 to PC-7 are not in issue #77. The lead developer authorised recording them there with the account `gbarbozamar`, through the coordinating session that numbers decisions in #77. Recording them there (with the next free `D` numbers) is the lead developer's or the coordinating session's act; this session publishes nothing.

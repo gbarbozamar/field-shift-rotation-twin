@@ -58,7 +58,7 @@ Two parts, from two sources:
 - `OPEN` under D69: which licence governs the climatology (one distributor's copy states conditions that contradict the licence of the Zenodo record). The team confirms it before any value is committed; until then the monthly values stay `NOT_AVAILABLE` and `C` is a single declared value.
 - The form is built in `engine/erosion/r_factor/climatology.py` (PROPOSED); it holds no value of the climatology.
 - `OPEN`: how the mean annual level of S4 reaches the field. D68 of issue #77 and a later instruction of the lead developer that keeps the choice pending are being reconciled; see "Pending" in [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md).
-- Finding of the AI pre-check (F16, not a decision): S4 prints regressions of the **annual** `R` only and gives no monthly distribution in pages 92 to 93, so the control of the third row of the first table has no published monthly form among the pages read (`engine/erosion/r_factor/README.md`, OPEN 7).
+- Finding of the AI pre-check (F16, not a decision): S4 prints regressions of the **annual** `R` only and gives no monthly distribution in pages 92 to 93, so the control of the third row of the first table has no published monthly form among the pages read (`engine/erosion/r_factor/README.md`, OPEN 7). Decided (PC-7 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): the control is marked without a source and stays out of the route of the first release.
 
 ### M1.3 Factor K and soil-loss tolerance
 
@@ -105,7 +105,13 @@ The soil-loss ratio of a period comes from the sub-factor equations of RUSLE (ca
 - The source of each input (residue cover at sowing, canopy cover and fall height by stage, the residue type of each crop). Whether the erosion engine takes residue cover from the residue ledger is Q12 of `contracts/ENTRYPOINTS.md`.
 - The level of residue cover at sowing. The share of the soil covered by residue at sowing is the most sensitive input: it is explicit, and the result is shown for more than one level. The generic levels proposed for it were withdrawn (USER-AA of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): local published evidence is needed first.
 
-Findings of the AI pre-check against S1 (not decisions; findings 1 to 3 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): S1 uses the effective canopy cover; its ground-cover sub-factor has a roughness term and takes the cover in percent; it multiplies seven daily sub-factors and integrates daily; and it modifies residue decay by daily moisture and temperature. The forms built in `engine/erosion/c_factor/` are a partial reading of S1. Which simplifications are declared as limits is for the lead developer (questions P16 and P17 of the validation package; `engine/erosion/c_factor/README.md` OPEN 1 to 3, 16, 17).
+Findings of the AI pre-check against S1 (not decisions; findings 1 to 3 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): S1 uses the effective canopy cover; its ground-cover sub-factor has a roughness term and takes the cover in percent; it multiplies seven daily sub-factors and integrates daily; and it modifies residue decay by daily moisture and temperature. The forms built in `engine/erosion/c_factor/` are a partial reading of S1. Decided by the lead developer on 14 November 2026 (PC-1 to PC-3 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)):
+
+- **Canopy:** the canopy sub-factor takes the effective canopy cover of S1 Eq. 6.5 (PC-1).
+- **Ground cover:** the sub-factor of S1 Eq. 6.6, with its coefficient per percent of cover and the random roughness at the value of the unit plot, so that its roughness term is one (PC-1).
+- **Sub-factors set to one:** surface roughness, soil biomass, soil consolidation and prior land use (D45), and ridge height and antecedent soil moisture (PC-3). Declared as a limit of the method.
+- **Residue decay:** a constant rate by residue type, without the moisture and temperature modifiers of S1, declared as a simplification (PC-2).
+- **Integration:** the monthly weighting by the erosivity fraction is a declared partial stage of the classical daily route of RUSLE2 (PC-3, USER-L).
 
 ### M1.6 Factor P
 
@@ -137,6 +143,7 @@ It is checked against the worked example of the manual: test H2 of `docs/VALIDAT
 
 - USER-F of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md): the comparison is at the published precision, and the internal daily state is never rounded. Which printed figure and which tolerance are still for the lead developer; the rounding oddities of the worked example do not supply a tolerance (finding 9).
 - Findings of the AI pre-check (not decisions): the list of symbols of Eq. 39 bounds Rs/Rso at 1, and chapter 3 bounds the wind speed used in Eq. 6; the code applies neither (finding 4, question P21). The image of Eq. 9 prints a minus sign that the text, Box 11 and Example 18 contradict; the code takes the mean and keeps it (finding 5).
+- Decided (PC-4 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): Rs/Rso is bounded at 1 in the net longwave radiation, and the wind speed used in Eq. 6 at 0.5 m s-1 or more, as S10 prescribes. Built by lane L1 in `engine/water/et0/`.
 
 ### M2.2 Daily water balance
 
@@ -154,6 +161,8 @@ D44 does not spell out the symbols of the closure. `engine/water/balance/README.
 
 `OPEN`, for the lead developer and the science reviewers: **the source of the Curve Number method.** D44 names the method and no source, and S10 is not cited for it. Finding of the AI pre-check (not a decision; finding 8): the forms built match the National Engineering Handbook Part 630, chapter 10 (NRCS 2004); its 2025 edition says that using the method as a loss in continuous simulation is outside its intended use, so admitting it in this continuous balance would be a declared adaptation.
 
+`DECIDED` for the source of the forms (PC-6 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md), 14 November 2026): **S11**, chapter 10, for the potential retention, the initial abstraction and the runoff; its use as the daily loss of this continuous balance is **declared an adaptation**. Still `OPEN`: the table of curve numbers by soil and cover, and its source.
+
 `DECIDED` for the exploratory water case (lead developer, 14 November 2026; [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md), section Water). Each value comes from its source under D34; none is written here:
 
 - **Soil:** the full hydraulic profile of Capurro (2017) at the La Estanzuela station, documented to 0.90 m (USER-AE). The station's average available-water reference of the national agroclimate service is a separate reference, not the principal profile. Neither is identified as the soil of another experiment of the case.
@@ -161,7 +170,7 @@ D44 does not spell out the symbols of the closure. `engine/water/balance/README.
 - **Crops:** basal crop coefficients of FAO-56 Table 17 and depletion fractions of Table 22 as a transferred reference, with climatic adjustment and sensitivity (USER-AR); provisional crop-specific root growth of FAO-56 Annex 8 (USER-AO), and for soybean a provisional local curve inferred from Capurro (2016) (USER-AK). No local calibration is claimed.
 - **Initial state:** depletion zero and depletion equal to TAW, the same for every rotation (USER-P).
 - **Agricultural year of the demonstration:** 1 July to 30 June (USER-K), the start month of the case under C5.4.
-- Finding of the AI pre-check (not a decision; finding 6): FAO-56 chapter 7, Eq. 77, carries the transpiration from the surface layer (Tew), which the built step leaves out; the manual allows leaving it out in some cases, and the scope of that simplification is for the lead developer.
+- Finding of the AI pre-check (not a decision; finding 6): FAO-56 chapter 7, Eq. 77, carries the transpiration from the surface layer (Tew), which the built step leaves out; the manual allows leaving it out in some cases, and the scope of that simplification is for the lead developer. Decided (PC-5): the omission is declared as a limit of the method, for a rain-fed balance, stating that with a 0.10 m evaporation layer and shallow early roots the surface layer is a large share of the early root zone, where the omission weighs most.
 
 ### M2.3 Fallback to the single crop coefficient
 
@@ -195,6 +204,7 @@ No value of the water axis is reported today: EP3 chains the four parts day by d
 | S8 | Emberson, R. (2023). Dynamic rainfall erosivity estimates derived from IMERG data. *Hydrology and Earth System Sciences* 27:3547–3563. https://doi.org/10.5194/hess-27-3547-2023 | read |
 | S9 | Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. *Ciencia e Investigación Agraria* 44(1):100–112. https://doi.org/10.7764/rcia.v44i1.1622 | read |
 | S10 | FAO-56. Reference: `OPEN`, `CITATION NEEDED`: a person composes it, as item 17 of the OPEN list of `engine/water/et0/README.md` asks. Issue #13 records how the contents page identifies the document: title line "Crop evapotranspiration - Guidelines for computing crop water requirements - FAO Irrigation and drainage paper 56"; authors R.G. Allen, L.S. Pereira, D. Raes, M. Smith; FAO, Rome, 1998; series mark M-56; ISBN 92-5-104219-5. https://www.fao.org/4/X0490E/x0490e00.htm. Locators used in this file: chapter 4, Example 18, the daily worked example that issue #13 locates for H2 (the definition of H2 is `OPEN` in `docs/VALIDATION.md`, so which example H2 uses is for the science reviewers); chapters 7 and 8, the dual crop coefficient, as D44 names them | located (issue #13 read the online pages on 14 November 2026; the session that wrote this row did not read the source) |
+| S11 | USDA Natural Resources Conservation Service (2004). *National Engineering Handbook*, Part 630 Hydrology, Chapter 10: Estimation of Direct Runoff from Storm Rainfall (210-VI-NEH, July 2004). Scope warning of its 2025 edition: Part 630, Subpart H, section 630.113G (August 2025) | read by the AI pre-check of 14 November 2026 (pp. 10-3 and 10-4); no person's check yet (D34). Chosen as the source of the forms by PC-6 |
 
 For the science reviewers: check every row not marked `read` against the source before a parameter is transcribed from it, and complete the author lists and titles of S3, S5 and S6.
 

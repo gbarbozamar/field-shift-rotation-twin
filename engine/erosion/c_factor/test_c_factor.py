@@ -28,12 +28,14 @@ from engine.erosion.c_factor import (
     MonthOfRotation,
     SoilLossRatio,
     canopy_subfactor,
+    effective_canopy_cover,
     residue_cover_from_mass,
     residue_mass_after_decay,
     residue_mass_over_time,
     rotation_c,
     soil_loss_ratio,
     surface_cover_subfactor,
+    surface_cover_subfactor_percent,
 )
 
 HERE = Path(__file__).parent
@@ -232,6 +234,53 @@ def test_surface_cover_subfactor_follows_the_proposed_form():
         assert_close(surface(surface_residue_cover=residue_cover), expected)
 
 
+def test_effective_canopy_cover_is_the_canopy_over_uncovered_ground():
+    # PLACEHOLDER covers, chosen so that the product is done by hand.
+    assert_close(effective_canopy_cover(canopy_cover=0.5, ground_cover=0.25), 0.375)
+    assert effective_canopy_cover(canopy_cover=0.5, ground_cover=1.0) == 0.0
+    assert effective_canopy_cover(canopy_cover=0.0, ground_cover=0.25) == 0.0
+    for name in ("canopy_cover", "ground_cover"):
+        arguments = {"canopy_cover": 0.5, "ground_cover": 0.25}
+        arguments[name] = 1.5
+        result = effective_canopy_cover(**arguments)
+        assert_missing(result, "NOT_COMPUTABLE")
+        assert name in result.detail
+        for shape in (InputMissing, ResultMissing):
+            arguments[name] = a_missing(shape)
+            result = effective_canopy_cover(**arguments)
+            assert_missing(result, "MISSING_INPUT")
+            assert name in result.detail
+
+
+def test_surface_cover_subfactor_percent_takes_the_coefficient_per_percent():
+    # PLACEHOLDER coefficient per percent and covers.
+    b = 0.0444
+    for cover in (0.0, 0.25, 0.5, 1.0):
+        result = surface_cover_subfactor_percent(
+            surface_residue_cover=cover, surface_cover_coefficient_per_percent=b
+        )
+        assert_close(result, math.exp(-b * cover * 100))
+        same = surface_cover_subfactor(
+            surface_residue_cover=cover, surface_cover_coefficient=b * 100
+        )
+        assert_close(result, same)
+    assert (
+        surface_cover_subfactor_percent(
+            surface_residue_cover=0.0, surface_cover_coefficient_per_percent=b
+        )
+        == 1.0
+    )
+    refused = surface_cover_subfactor_percent(
+        surface_residue_cover=0.5, surface_cover_coefficient_per_percent=-b
+    )
+    assert_missing(refused, "NOT_COMPUTABLE")
+    assert "surface_cover_coefficient_per_percent" in refused.detail
+    outside = surface_cover_subfactor_percent(
+        surface_residue_cover=50.0, surface_cover_coefficient_per_percent=b
+    )
+    assert_missing(outside, "NOT_COMPUTABLE")
+
+
 def test_surface_cover_subfactor_is_one_without_residue():
     for coefficient in [0.0, 4.44, 44.4]:
         result = surface(
@@ -263,6 +312,8 @@ def test_soil_loss_ratio_records_the_subfactors_set_to_one():
         "soil_biomass",
         "soil_consolidation",
         "prior_land_use",
+        "ridge_height",
+        "antecedent_soil_moisture",
     )
     assert SET_TO_ONE == expected
     assert "D45" in DECLARED_LIMIT
@@ -696,7 +747,9 @@ def test_structured_argument_of_another_type_raises_type_error():
 
 PUBLIC_FUNCTIONS = [
     canopy_subfactor,
+    effective_canopy_cover,
     surface_cover_subfactor,
+    surface_cover_subfactor_percent,
     soil_loss_ratio,
     residue_cover_from_mass,
     residue_mass_after_decay,
@@ -725,7 +778,10 @@ def test_the_modules_hold_no_number_but_zero_and_one():
             and isinstance(node.value, (int, float, complex))
             and not isinstance(node.value, bool)
         }
-        assert numbers <= {0, 1}, (path.name, numbers)
+        # _numbers.py also holds the hundred of "percent" (PC-1): a
+        # definition of the word, not a value of the method.
+        allowed = {0, 1, 100} if path.name == "_numbers.py" else {0, 1}
+        assert numbers <= allowed, (path.name, numbers)
 
 
 # --- README.md ---------------------------------------------------------------
@@ -733,6 +789,7 @@ def test_the_modules_hold_no_number_but_zero_and_one():
 CONSTANTS = {
     "fall_height_coefficient",
     "surface_cover_coefficient",
+    "surface_cover_coefficient_per_percent",
     "mass_cover_coefficient",
     "decay_coefficients",
 }

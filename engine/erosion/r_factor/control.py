@@ -15,6 +15,12 @@ The form, PROPOSED until a person checks it against S7 as S4 gives it::
 days: ``mm day-1``, so a depth over the month). Its fractions are those of
 ``erosivity.monthly_fractions`` applied to ``control(month)``.
 
+**Without a source (decision PC-7 of docs/SCIENCE_DECISIONS.md, 14 November
+2026).** The AI pre-check found that S4 prints regressions of the annual R
+only, with no monthly form (finding F16). This form is therefore marked
+without a source and stays out of the route of the first release, whose
+monthly fraction comes from ``climatology.py`` (D69).
+
 **This module holds no coefficient.** ``coefficient`` and ``exponent`` are
 arguments without a default, read by the caller from the parameter catalogue.
 
