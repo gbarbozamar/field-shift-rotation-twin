@@ -2,12 +2,17 @@
 
 The daily erosivity index, its monthly and annual sums, the monthly fractions
 and the yearly ratios (relative terms only), R by year and month from a mean
-annual level supplied by the caller, and the control regression on monthly
-precipitation. Every constant is an argument without a default. See
-``README.md`` in this folder.
+annual level supplied by the caller, the control regression on monthly
+precipitation, and the monthly fraction from a published monthly erosivity
+climatology of decision D69 (``climatology.py``). Every constant is an
+argument without a default. See ``README.md`` in this folder.
 """
 
 from ._checks import REASON_UNIT_NOT_ACCEPTED
+from .climatology import (
+    climatological_monthly_fractions,
+    climatological_r_by_year_and_month,
+)
 from .control import (
     FractionComparison,
     compare_monthly_fractions,
@@ -35,6 +40,8 @@ __all__ = [
     "RFactorParts",
     "annual_sums",
     "checked_daily_precipitation",
+    "climatological_monthly_fractions",
+    "climatological_r_by_year_and_month",
     "compare_monthly_fractions",
     "control_monthly_erosivity",
     "daily_erosivity_index",
