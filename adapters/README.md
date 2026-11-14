@@ -60,7 +60,16 @@ The three parts are replaceable:
 
 An optional keyword `now` supplies the clock (default: the system clock in UTC). Tests fix it.
 
-No settings file is committed: every value in it is a decision listed under OPEN.
+The shape of the settings file is committed as a template:
+[`examples/PLACEHOLDER_power_settings.json`](examples/PLACEHOLDER_power_settings.json).
+**Every value in it is a placeholder** (including the provenance label and the
+reason codes, which only have to be members of their closed lists so that the
+file loads); it is never a usable configuration, and its base URL under
+`https://power.invalid/` never resolves. A person copies it outside the
+repository and writes the values decided under OPEN. `test_settings_file.py`
+loads it with `PowerSettings.from_mapping`, so the documented shape cannot
+drift from the code. The running app reads the file named by
+`POWER_SETTINGS_FILE` (see `api/README.md`, "Configuration").
 
 ## Settings
 
@@ -152,7 +161,7 @@ Two further cases, not failures of the source:
 
 `ExampleSoilSlopeSource(path, *, source_id="soil_slope_example")` implements `SoilSlopeSource`:
 
-- `path` is required and has **no default**. Which file is "the accepted example" is a person's decision, so the source is not wired into the default app. Tests use `contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json`.
+- `path` is required and has **no default**. Which file is "the accepted example" is a person's decision, so the running app serves it only when `SOIL_SLOPE_EXAMPLE_FILE` names the file (`api/README.md`, "Configuration"). Tests use `contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json`.
 - Each call reads the file and loads it into `SiteSoilSlope`, returned unchanged with `state="example"` and no `retrieved_at`. The route shows it as `sources[].state == "example"` next to the result (decision Q16).
 - A file that is absent or cannot be read, that does not load into the model, or whose `example_data` is false gives `data=None`, `unavailable`, `NOT_AVAILABLE` and a `detail`. It never raises for the file.
 - `contract` is read from the `contract` field of `SiteSoilSlope`.
@@ -168,6 +177,10 @@ No network: `httpx.MockTransport` for the service, `tmp_path` for the cache, a f
 ## PROPOSED
 
 Designed by the builder sessions; a person accepts or corrects them in the pull request.
+
+Unit `l2/app-config`:
+
+- The template `examples/PLACEHOLDER_power_settings.json` and `test_settings_file.py`.
 
 Unit `l2/engine-runner`:
 
@@ -218,5 +231,5 @@ Each item is a question a person answers. Until then the setting has no value an
 16. **What are `attribution`, `source_id` and `timeout_seconds`?** The `ATTRIBUTIONS.md` data row for NASA POWER is written by a person when the data is first used for real. For the platform developer.
 17. **What does the adapter do on status 429 (too many requests)?** Today it is one failure like any other; the next call tries again. No retry and no back-off. For the platform developer.
 18. **Should the place the source answered for (grid cell, elevation in the response) travel with the data?** The contract has no field for it (contracts/inputs OPEN 21). For the platform developer and the lead developer.
-19. **Which file is the accepted soil-and-slope example?** (`ExampleSoilSlopeSource(path)`.) The placeholder example's numbers mean nothing, and the engines may reject its units. For the lead developer and the platform developer.
-20. **Is the example served for any field?** It carries its own `case_id` and `field_id` and is returned unchanged whatever field is asked. An engine that receives site data of another field raises `ValueError` (G5), and the route answers `500`. Should the source refuse a request for another field, or the route check the identifiers first? For the platform developer.
+19. **Which file is the accepted soil-and-slope example?** (`ExampleSoilSlopeSource(path)`, set in the running app with `SOIL_SLOPE_EXAMPLE_FILE`.) The placeholder example's numbers mean nothing, and the engines may reject its units. For the lead developer and the platform developer.
+20. **Is the example served for any field?** It carries its own `case_id` and `field_id` and is returned unchanged whatever field is asked. An engine that receives site data of another field raises `ValueError` (G5), and the route answers `500`. Unit `l2/app-config` PROPOSES that the engine runner checks the identifiers first and answers `MISSING_INPUT` without calling the engines (`api/README.md`); whether the example may stand in for any field, and if so whether the source rewrites the identifiers or the engines stop comparing them, is OPEN for the lead developer.

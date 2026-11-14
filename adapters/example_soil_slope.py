@@ -6,7 +6,8 @@ the interface shows it as example data next to the result (decision Q16 of
 contracts/ENTRYPOINTS.md, issue 18).
 
 Which file is "the accepted example" is a person's decision, so the path has
-no default and this source is not wired into the default app. The file is
+no default; the running app serves it only when ``SOIL_SLOPE_EXAMPLE_FILE``
+names the file (api/config.py). The file is
 returned as it is: nothing is filled in, renamed or converted.
 
 A file that is absent, cannot be read, does not load into the model, or is not
