@@ -323,3 +323,12 @@ result and not both zero with one (checked at construction).
   example, which carries its own) makes the engines raise `ValueError` (G5),
   which the route answers `500`. Should the runner or the route check the
   identifiers first and answer with a typed absence? (platform developer).
+
+### No echo of submitted values in a rotation error
+
+PROPOSED. The texts of the rotation errors come from the contract model, and a
+model may write a submitted value into its own message (for example the
+identifier of a component). `RotationDefinitionValidator` replaces any message
+that repeats a submitted value of three characters or more with one fixed text;
+the `path` and the `code` of the detail still say where the problem is and of
+which kind. A message that only names a field of the contract is kept.

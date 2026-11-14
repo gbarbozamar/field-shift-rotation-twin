@@ -145,3 +145,38 @@ def test_an_invalid_rotation_reaches_no_source_and_no_engine():
     response = TestClient(app).post(ROUTE, json={"site": SITE, "rotation": rotation})
     assert response.status_code == 422
     assert counting.calls == 0
+
+
+def harvest_before_sowing(document: dict) -> None:
+    """Break a rule whose message, in the contract model, names the component."""
+    component = document["components"][0]
+    component["component_id"] = MARKER
+    sowing, harvest = component["sowing"]["date"], component["harvest"]["date"]
+    assert sowing is not None and harvest is not None and sowing < harvest
+    component["sowing"]["date"], component["harvest"]["date"] = harvest, sowing
+
+
+def test_a_model_message_that_names_a_submitted_value_is_replaced():
+    from api.rotation_validator import REDACTED_MESSAGE
+
+    details = RotationDefinitionValidator().validate(broken(harvest_before_sowing))
+    assert len(details) == 1
+    assert details[0].message == REDACTED_MESSAGE
+    assert details[0].path == "components.0"
+
+
+def test_the_route_never_echoes_a_value_the_model_writes_in_its_message():
+    response = TestClient(create_app([])).post(
+        ROUTE, json={"site": SITE, "rotation": broken(harvest_before_sowing)}
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "ROTATION_INVALID"
+    assert MARKER not in response.text
+
+
+def test_a_message_without_a_submitted_value_is_kept():
+    details = RotationDefinitionValidator().validate(
+        broken(lambda d: d["components"].append(copy.deepcopy(d["components"][0])))
+    )
+    messages = [d.message for d in details]
+    assert any("component_id" in message for message in messages)
