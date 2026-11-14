@@ -70,7 +70,6 @@ Still to be supplied by a person:
 
 - `OPEN`: the unit and the time basis of the fourth measure. D50 decides neither. Question for the science reviewers: **in which unit, and over which time basis, is the water available at the sowing of the next crop reported?**
 - `OPEN`: whether the field `termination` that the rotation definition now carries (`contracts/rotation_definition/`) is what D50 waits for. Question for the lead developer: **can termination dates be compared now?**
-
 - `OPEN`: the definition of the critical period per crop. Question for the science reviewers: **which period of each crop is its critical period?**
 - `OPEN`: the state of the water balance that the ratio and the descriptive measures use. Question for the science reviewers: **which quantities of the daily water balance are "water transpired" and "water demanded", and which state of the balance do the descriptive measures use?**
 - `OPEN`: days without a crop in the ground. Question for the science reviewers: **do days without a crop in the ground count?**

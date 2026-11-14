@@ -7,7 +7,7 @@ Which method each engine implements, and where it is published. This file names 
 - Every item has one status: `PROPOSED`, `DECIDED` or `OPEN`, with the meaning of blueprint section 3.7 and of `contracts/CONVENTIONS.md`.
 - The items below were transcribed by an AI session from the planning notes of the lead developer, who approved them on 14 November 2026: they are `DECIDED`. They are science class: a science reviewer still has to accept them. A point marked `OPEN` inside a decided item is not decided.
 - Two points that were `OPEN` here, the source of `K` in M1.3 and the units of `R` and `K` in M1.7, were decided by the lead developer on 14 November 2026 and recorded in issue #77 (decisions D10 and D11). An AI session transcribed them into this file. Like the other items of this file, a science reviewer still has to accept them.
-- Section M2 (the water method) and the sub-factors of M1.5 hold decisions D44 and D45 of the lead developer, of 14 November 2026, recorded in [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346). A builder session wrote them into this file. Issue #77 says of them that where they are science class, a science reviewer may still review them: both are science class, so acceptance by a science reviewer is pending.
+- Section M2 (the water method) and the sub-factors of M1.5 hold decisions D44 and D45 of the lead developer, of 14 November 2026, recorded in [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346). A builder session wrote them into this file. Issue #77 says of them that where they are science class, a science reviewer may still review them; it does not say which of them are. This file reads both as science class, like its other items, so it marks acceptance by a science reviewer as pending.
 - A citation here says where a method is published. The column "Read" says how far the planning notes got with the source: `read` (the abstract or the text was read), `fragments` (only fragments of the abstract), or `located` (the reference was found, nothing of it was read). A builder session never takes a number from memory of these sources: it reads it from the parameter catalogue, and returns a missing value with its reason when the catalogue does not have it.
 - If an engine needs a method that is not in this file, that is an `OPEN` point for the lead developer, not something a session chooses.
 
@@ -80,7 +80,7 @@ The soil-loss ratio of a period comes from the sub-factor equations of RUSLE (ca
 
 - Two sub-factors are used: **canopy cover**, and **surface residue cover, with residue decay by residue type**. Both come from the equations of source S1.
 - The other sub-factors (roughness, soil biomass, consolidation, prior land use) are set to one. This is declared as a limit of the method. The text on the limits of the method is the separate unit named in M1.1.
-- Every coefficient of these equations is a parameter in `params/`, transcribed and checked under decision D34 of issue #77. The decision names no equation, coefficient or value, and this file names none.
+- Every coefficient of these equations is to be a parameter in `params/`, transcribed and checked under decision D34 of issue #77. The decision names no equation, coefficient or value, and this file names none.
 
 `OPEN`, for the lead developer and the science reviewers, not answered by D45:
 
@@ -143,7 +143,7 @@ No value of the water axis is computed today: EP3 returns every item missing wit
 
 | Part | Where | State |
 |---|---|---|
-| Reference evapotranspiration (M2.1) | `engine/water/et0/`, pull request #121 | The forms of the equations are written; every constant is an argument the caller supplies, with no default. The test of H2 is written and skipped until its values are transcribed. Its README lists what is still `OPEN` |
+| Reference evapotranspiration (M2.1) | `engine/water/et0/`, pull request #121 | The forms of the equations are written and PROPOSED: a builder session wrote them without the method's text, and a person checks each one against its equation before any number of the folder is used (OPEN 2 of its README). Every constant is an argument the caller supplies, with no default. The test of H2 is written and skipped. As its README says, it waits for the inputs, intermediate results and final value of the worked example, transcribed and checked under D34; the tolerance and printed precision, set by the science reviewers; the constants; and a person's check of the forms. The README lists what else is still `OPEN` |
 | Daily water balance (M2.2) | `engine/water/balance/`, pull request #116 | The single-bucket form only: one layer, as in the fallback of M2.3. Runoff and `Ke` are inputs that the caller supplies; the Curve Number and the surface layer are not built. Every coefficient is an argument with no default |
 | Entry point EP3 of `contracts/ENTRYPOINTS.md` | `engine/water/exposure.py`, pull request #135 | Mechanical form: it lays out the agricultural years and returns every item missing with its reason. It returns no number |
 
@@ -160,9 +160,16 @@ No value of the water axis is computed today: EP3 returns every item missing wit
 | S7 | Renard, K.G., Freimund, J.R. (1994). Using monthly precipitation data to estimate the R-factor in the revised USLE. *Journal of Hydrology* 157:287–306. https://doi.org/10.1016/0022-1694(94)90110-4 | fragments; its equation was taken from S4 |
 | S8 | Emberson, R. (2023). Dynamic rainfall erosivity estimates derived from IMERG data. *Hydrology and Earth System Sciences* 27:3547–3563. https://doi.org/10.5194/hess-27-3547-2023 | read |
 | S9 | Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. *Ciencia e Investigación Agraria* 44(1):100–112. https://doi.org/10.7764/rcia.v44i1.1622 | read |
-| S10 | FAO-56. Reference: `OPEN`, `CITATION NEEDED`: a person composes it, as item 17 of the OPEN list of `engine/water/et0/README.md` asks. Issue #13 records how the contents page identifies the document: title line "Crop evapotranspiration - Guidelines for computing crop water requirements - FAO Irrigation and drainage paper 56"; authors R.G. Allen, L.S. Pereira, D. Raes, M. Smith; FAO, Rome, 1998. https://www.fao.org/4/X0490E/x0490e00.htm. Locators used in this file: chapter 4, Example 18, the daily worked example that issue #13 locates for H2 (the definition of H2 is `OPEN` in `docs/VALIDATION.md`, so which example H2 uses is for the science reviewers); chapters 7 and 8, the dual crop coefficient, as D44 names them | located (issue #13 read the online pages on 14 November 2026; the session that wrote this row did not read the source) |
+| S10 | FAO-56. Reference: `OPEN`, `CITATION NEEDED`: a person composes it, as item 17 of the OPEN list of `engine/water/et0/README.md` asks. Issue #13 records how the contents page identifies the document: title line "Crop evapotranspiration - Guidelines for computing crop water requirements - FAO Irrigation and drainage paper 56"; authors R.G. Allen, L.S. Pereira, D. Raes, M. Smith; FAO, Rome, 1998; series mark M-56; ISBN 92-5-104219-5. https://www.fao.org/4/X0490E/x0490e00.htm. Locators used in this file: chapter 4, Example 18, the daily worked example that issue #13 locates for H2 (the definition of H2 is `OPEN` in `docs/VALIDATION.md`, so which example H2 uses is for the science reviewers); chapters 7 and 8, the dual crop coefficient, as D44 names them | located (issue #13 read the online pages on 14 November 2026; the session that wrote this row did not read the source) |
 
-For the science reviewers: check every row not marked `read` against the source before a parameter is transcribed from it, and complete the author lists and titles of S3, S5 and S6. For the lead developer and the science reviewers: compose the reference of S10, and decide which terms govern its reuse (issue #13).
+For the science reviewers: check every row not marked `read` against the source before a parameter is transcribed from it, and complete the author lists and titles of S3, S5 and S6.
+
+`OPEN` for S10, what a person still has to do under decision D34 of issue #77, for the lead developer and the science reviewers:
+
+- Compose the full citation of S10, and its row in `ATTRIBUTIONS.md`.
+- Confirm in the source that chapters 7 and 8 are the chapters of the dual crop coefficient.
+- Confirm that H2 uses Example 18 of chapter 4.
+- Decide which terms govern the reuse of the text: the contents page says "All rights reserved", and the FAO site-wide terms allow some reuse with acknowledgement (issue #13).
 
 ## Not in this file yet
 
