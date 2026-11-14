@@ -6,7 +6,7 @@ This file holds the acceptance tests that `docs/DEVELOPMENT_BLUEPRINT.md` refers
 
 ## Owner
 
-The science reviewers own this file (blueprint sections 2 and 10). Under section 3.6, a person writes the values of an entry and a second person checks them against the source. Under section 10, the science reviewers check each transcribed value against its source as the second person, and a science reviewer accepts the entry. An AI session supplies none of the items listed in section 3.5.
+The science reviewers own this file (blueprint sections 2 and 10). Under section 3.6, the values of an entry are transcribed from their source as decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622) says, and one person checks them against the source. Section 3.5 of the blueprint states D34. Under section 10, the science reviewers check each transcribed value against its source, as decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622) says (one person checks it, stated in section 3.5 of the blueprint), and a science reviewer accepts the entry.
 
 ## Status of this skeleton
 
@@ -18,10 +18,10 @@ Later change (#138): an AI session proposed the definitions of the D entries as 
 
 ## How an entry gets completed
 
-- **Section 3.5.** The value of a parameter, a threshold or a range, the expected value of a test, and a citation are never delegated to a session. A citation produced by an AI session is a defect.
-- **Section 3.6.** The content of an entry is a science-class change: a person writes the values, a second person checks them against the source, and a science reviewer accepts them.
+- **Section 3.5.** A threshold is never delegated to a session. A value, a unit, a range, an expected result or a citation is transcribed under decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622), which section 3.5 of the blueprint states in full: a reference, a locator, the verbatim text and the date read travel with the transcription, and one person checks it against the source.
+- **Section 3.6.** The content of an entry is a science-class change: the values are transcribed under decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622), one person checks them against the source, and a science reviewer accepts them.
 - **Section 3.7.** For conventions, definitions, contract field lists and the design of test cases, a builder session may write a proposal. Every proposed item is marked `PROPOSED`, and anything the builder cannot responsibly propose is marked `OPEN`, with the question a person has to answer. A proposal takes effect only when a person approves the pull request. This never covers the list in section 3.5: where a parameter value, a threshold, a range, an expected test value or a citation is needed, the builder writes `OPEN` or `CITATION NEEDED` and stops there.
-- **Section 10.** The science reviewers fix thresholds and uncertainty ranges before results are seen, and check each transcribed value against its source as the second person. Nobody approves their own values.
+- **Section 10.** The science reviewers fix thresholds and uncertainty ranges before results are seen, and check each transcribed value against its source, as decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622) says (one person checks it, stated in section 3.5 of the blueprint). Nobody approves their own values.
 
 **A pull request that fills or changes an entry is labelled `science` and cannot merge without the approval of a science reviewer.**
 
@@ -38,8 +38,8 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 | Expected value | `OPEN` | What result counts as correct? |
 | Tolerance | `OPEN` | How far from the expected value may the result be and still pass? |
 | Source | `CITATION NEEDED` | Which published or reference source gives the expected value? It is also recorded in `ATTRIBUTIONS.md` when first used. |
-| Transcribed by | `OPEN` | Which person wrote the values from the source? |
-| Checked by | `OPEN` | Which second person checked the values against the source? |
+| Transcribed by | `OPEN` | Who transcribed the values from the source (D34)? |
+| Checked by | `OPEN` | Which person checked the values against the source (D34)? |
 | Status | `not defined` | — |
 
 ## Open questions about this file

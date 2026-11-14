@@ -45,7 +45,7 @@
       "provenance": "OBSERVED",
       "source": "PLACEHOLDER: example data, no real source",
       "range_missing": {
-        "reason": "NOT_AVAILABLE",
+        "reason": "NO_COVERAGE",
         "detail": "PLACEHOLDER: the example carries no uncertainty range"
       },
       "days": [
@@ -97,7 +97,7 @@
       "provenance": "OBSERVED",
       "source": "PLACEHOLDER: example data, no real source",
       "range_missing": {
-        "reason": "NOT_AVAILABLE",
+        "reason": "NO_COVERAGE",
         "detail": "PLACEHOLDER: the example carries no uncertainty range"
       },
       "months": [
