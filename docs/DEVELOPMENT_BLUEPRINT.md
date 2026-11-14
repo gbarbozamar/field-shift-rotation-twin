@@ -19,16 +19,18 @@ This is a working document. It can change at any checkpoint; it never changes si
 
 Five people. Three write code by orchestrating AI sessions across four lanes; two review science and never write code. The roles below are roles, not headcount: one developer can hold two of them, and then runs each lane with its own sessions and its own clone of the repository.
 
-| Role | Lane | Owns (folders) | Main responsibility |
-|---|---|---|---|
-| **Lead developer** | L0 Core | `contracts/`, `params/` (structure), `engine/erosion/`, `validation/` | Contracts and conventions, erosion engine, validation harness, integration authority |
-| **Engines developer** | L1 Engines | `engine/calendar/`, `engine/water/`, `engine/residues/`, `engine/amg/` | Rotation calendar, water balance, residue ledger, AMG carbon |
-| **Platform developer** | L2a Platform: data and service | `adapters/`, `api/`, CI and deploy | Data adapters, API, pipeline and deploy |
-| **Interface developer** | L2b Platform: decision and carbon | `decision/`, `engine/rothc/`, `demo/` | Decision layer, RothC, saved case |
-| **Interface developer** | L3 Interface | `web/` | Multi-field map, rotation editor, results, printable sheet, demo path |
-| **Science reviewers** (2) | — | `docs/VALIDATION.md`, review of `params/` and expected values | Calibration, uncertainty ranges, test design, validation, plan adaptation |
+| Person | Role | Lane | Owns (folders) | Main responsibility |
+|---|---|---|---|---|
+| **Gustavo** | Lead developer | L0 Core | `contracts/`, `params/` (structure), `engine/erosion/`, `validation/` | Contracts and conventions, erosion engine, validation harness, integration authority |
+| **Gustavo** | Engines developer | L1 Engines | `engine/calendar/`, `engine/water/`, `engine/residues/`, `engine/amg/` | Rotation calendar, water balance, residue ledger, AMG carbon |
+| **Enzo** | Platform developer | L2a Platform: data and service | `adapters/`, `api/`, CI and deploy | Data adapters, API, pipeline and deploy |
+| **Martín** | Interface developer | L2b Platform: decision and carbon | `decision/`, `engine/rothc/`, `demo/` | Decision layer, RothC, saved case |
+| **Martín** | Interface developer | L3 Interface | `web/` | Multi-field map, rotation editor, results, printable sheet, demo path |
+| **Adrian** and **Leonardo** | Science reviewers | — | `docs/VALIDATION.md`, review of `params/` and expected values | Calibration, uncertainty ranges, test design, validation, plan adaptation |
 
-**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to the platform developer. L2b, decision and carbon, belongs to the interface developer, together with L3. Both use branches named `l2/<unit>`. In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy.
+**Wherever this document names a role, it means that person:** lead developer and engines developer, Gustavo; platform developer, Enzo; interface developer, Martín; science reviewers, Adrian and Leonardo.
+
+**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to Enzo, the platform developer. L2b, decision and carbon, belongs to Martín, the interface developer, together with L3. Both use branches named `l2/<unit>`. In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy.
 
 **One lane, one set of folders.** Nobody edits another lane's folder. A contract changes only at a checkpoint, with notice to everyone.
 
@@ -179,7 +181,7 @@ Section 2 says nobody edits another lane's folder, and this section says each pr
 
 - `main` can be shown at any time and deploys by itself.
 - Nobody, person or session, pushes to `main` directly or rewrites its history after the bootstrap commit.
-- Every merge passes CI: tests, frontend build, contract validation, secret scan, scan for company and personal names, dependency licences.
+- Every merge passes CI: tests, frontend build, contract validation, secret scan, scan for company names and for personal names other than the first names of the team in section 2, dependency licences.
 - `main` red: whoever broke it fixes or reverts within 15 minutes.
 - Branch names: `l0/<unit>`, `l1/<unit>`, `l2/<unit>`, `l3/<unit>`.
 
