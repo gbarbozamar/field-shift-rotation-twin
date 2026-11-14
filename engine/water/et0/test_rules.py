@@ -104,6 +104,7 @@ ALLOWED_IMPORTS = {
     "math",
     "statistics",
     "typing",
+    "contracts.inputs.common",
     "contracts.inputs.site_climate",
     "contracts.results.models",
 }

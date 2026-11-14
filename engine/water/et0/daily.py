@@ -22,6 +22,8 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, replace
 
+from contracts.inputs.common import Missing as InputsMissing
+from contracts.inputs.common import Value
 from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.results.models import Missing, ReasonCode
 
@@ -160,6 +162,18 @@ class DailyReferenceEvapotranspiration:
         return self.steps.reference_evapotranspiration
 
 
+def _as_results_missing(missing: InputsMissing) -> Missing:
+    """The same reason and detail, in the ``Missing`` of contracts/results/models.py."""
+    return Missing(reason=missing.reason, detail=missing.detail)
+
+
+def _point_value(value: Value) -> InputValue:
+    """One value of the point of the series (D9), as an input with its unit string."""
+    if value.missing is not None:
+        return InputValue(value=_as_results_missing(value.missing), unit=value.unit)
+    return InputValue(value=value.value, unit=value.unit)
+
+
 def _missing_for_every_input(missing: Missing) -> dict[str, Quantity]:
     return {quantity: missing for quantity in CLIMATE_QUANTITIES}
 
@@ -172,9 +186,7 @@ def _series_values(
     values: dict[dt.date, Quantity] = {}
     for day in series.days:
         if day.missing is not None:
-            value: float | Missing = Missing(
-                reason=day.missing.reason, detail=day.missing.detail
-            )
+            value: float | Missing = _as_results_missing(day.missing)
         else:
             value = day.value
         values[day.date] = read_input(
@@ -189,8 +201,6 @@ def _series_values(
 def reference_evapotranspiration_from_climate(
     climate: SiteClimate,
     *,
-    latitude: InputValue,
-    elevation: InputValue,
     point_units: PointUnits,
     constants: Et0Constants,
     unit_guard_reason: ReasonCode,
@@ -213,10 +223,11 @@ def reference_evapotranspiration_from_climate(
       input of every day is missing, reason ``NOT_COMPUTABLE``, and so is
       the reference evapotranspiration of every day (C6.3, rule G4).
 
-    ``latitude`` and ``elevation`` are the point of the series (D9, D18).
-    They are separate arguments because ``SiteClimate`` on ``main`` does not
-    carry the point yet (unit #94); they pass through the same unit guard,
-    with the unit strings of ``point_units``.
+    Latitude and elevation are read from ``climate.point``, the point the
+    series are valid for (D9, D18). They pass through the same unit guard,
+    with the unit strings of ``point_units``; a value of the point that is
+    missing keeps its reason. Longitude is not read: no equation of the
+    method uses it.
 
     With none of the five series there is no day to answer for, and the list
     is empty (README, OPEN list).
@@ -234,12 +245,15 @@ def reference_evapotranspiration_from_climate(
 
     latitude_degrees = read_input(
         "latitude",
-        latitude,
+        _point_value(climate.point.latitude),
         point_units.latitude_decimal_degrees,
         unit_guard_reason,
     )
     elevation_value = read_input(
-        "elevation", elevation, point_units.elevation, unit_guard_reason
+        "elevation",
+        _point_value(climate.point.elevation),
+        point_units.elevation,
+        unit_guard_reason,
     )
     latitude_radians = eq.latitude_in_radians(latitude_degrees)
 

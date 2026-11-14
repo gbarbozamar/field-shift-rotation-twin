@@ -68,8 +68,32 @@ DAY = {
 POINT_UNITS = PointUnits(
     latitude_decimal_degrees="PLACEHOLDER degrees", elevation="PLACEHOLDER length"
 )
-LATITUDE = InputValue(value=0.0, unit="PLACEHOLDER degrees")
-ELEVATION = InputValue(value=2.0, unit="PLACEHOLDER length")
+LATITUDE = 0.0  # PLACEHOLDER, in "PLACEHOLDER degrees"
+ELEVATION = 2.0  # PLACEHOLDER, in "PLACEHOLDER length"
+LONGITUDE = 3.0  # PLACEHOLDER; no equation reads it
+
+
+def point_value(value, unit):
+    """A ``Value`` of the point (contracts/inputs/common.py), present or missing."""
+    if isinstance(value, dict):  # a missing part
+        return {"value": None, "unit": unit, "missing": value}
+    return {
+        "value": value,
+        "unit": unit,
+        "provenance": "OBSERVED",
+        "source": "PLACEHOLDER: example data, not a real place, no real source",
+        "range_missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+    }
+
+
+def point(*, latitude=None, elevation=None):
+    """The point of the series; each argument replaces one value of it."""
+    return {
+        "latitude": latitude or point_value(LATITUDE, "PLACEHOLDER degrees"),
+        "longitude": point_value(LONGITUDE, "PLACEHOLDER degrees"),
+        "elevation": elevation or point_value(ELEVATION, "PLACEHOLDER length"),
+    }
+
 
 # PLACEHOLDER daily values of the five quantities.
 VALUES = {
@@ -116,9 +140,10 @@ def series(quantity, *, unit=None, time_zone="UTC", dates=None, missing_on=()):
     }
 
 
-def climate(*daily_series):
-    """A SiteClimate built on the placeholder example, with these daily series."""
+def climate(*daily_series, at=None):
+    """A SiteClimate built on the placeholder example, with these series and point."""
     document = json.loads(CLIMATE_EXAMPLE.read_text(encoding="utf-8"))
+    document["point"] = point() if at is None else at
     document["daily_series"] = list(daily_series)
     document["monthly_series"] = []
     return SiteClimate.model_validate(document)
@@ -130,8 +155,6 @@ def all_series(**overrides):
 
 def run(record, **changes):
     arguments = {
-        "latitude": LATITUDE,
-        "elevation": ELEVATION,
         "point_units": POINT_UNITS,
         "constants": PLACEHOLDER_CONSTANTS,
         "unit_guard_reason": GUARD,
@@ -439,8 +462,8 @@ def test_c1_every_day_is_the_composition_of_its_own_inputs():
         )
         assert item.steps == reference_evapotranspiration_day(
             day_of_year=eq.day_of_year(item.date),
-            latitude_radians=eq.latitude_in_radians(LATITUDE.value),
-            elevation=ELEVATION.value,
+            latitude_radians=eq.latitude_in_radians(LATITUDE),
+            elevation=ELEVATION,
             temperature_max=VALUES[TEMPERATURE_MAX],
             temperature_min=VALUES[TEMPERATURE_MIN],
             actual_vapour_pressure=ea,
@@ -516,25 +539,65 @@ def test_c5_series_in_different_time_zones_are_not_combined():
 # --- C6: the point of the series ---
 
 
-def test_c6_a_missing_latitude_makes_every_day_missing_and_names_it():
-    latitude = InputValue(NOT_TRANSCRIBED, "PLACEHOLDER degrees")
-    for item in run(climate(*all_series()), latitude=latitude):
+def test_c6_latitude_and_elevation_are_read_from_the_point_of_the_record():
+    moved = point(
+        latitude=point_value(45.0, "PLACEHOLDER degrees"),
+        elevation=point_value(1.0, "PLACEHOLDER length"),
+    )
+    item = run(climate(*all_series(), at=moved))[0]
+    c = PLACEHOLDER_CONSTANTS
+    assert item.steps.atmospheric_pressure == eq.atmospheric_pressure(
+        1.0, c.atmospheric_pressure
+    )
+    decl = eq.solar_declination(eq.day_of_year(item.date), c.solar_declination)
+    assert item.steps.sunset_hour_angle == eq.sunset_hour_angle(
+        eq.latitude_in_radians(45.0), decl
+    )
+
+
+def test_c6_the_longitude_of_the_point_is_not_read():
+    no_longitude = point()
+    no_longitude["longitude"] = point_value(
+        {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"}, "PLACEHOLDER degrees"
+    )
+    assert run(climate(*all_series(), at=no_longitude)) == run(climate(*all_series()))
+
+
+def test_c6_a_missing_latitude_makes_every_day_missing_with_its_reason():
+    missing = point_value(
+        {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER no point"},
+        "PLACEHOLDER degrees",
+    )
+    for item in run(climate(*all_series(), at=point(latitude=missing))):
         assert item.value.reason == "MISSING_INPUT"
-        assert "latitude" in item.value.detail
+        assert "input 'latitude'" in item.value.detail
+        assert "NO_COVERAGE" in item.value.detail
         assert isinstance(item.steps.atmospheric_pressure, float)
 
 
+def test_c6_a_missing_elevation_makes_the_steps_that_need_it_missing():
+    missing = point_value(
+        {"reason": "SOURCE_UNAVAILABLE", "detail": "PLACEHOLDER"}, "PLACEHOLDER length"
+    )
+    for item in run(climate(*all_series(), at=point(elevation=missing))):
+        assert item.steps.atmospheric_pressure.reason == "MISSING_INPUT"
+        assert "input 'elevation'" in item.steps.atmospheric_pressure.detail
+        assert "SOURCE_UNAVAILABLE" in item.steps.atmospheric_pressure.detail
+        assert isinstance(item.steps.extraterrestrial_radiation, float)
+        assert item.value.reason == "MISSING_INPUT"
+
+
 def test_c6_a_latitude_in_another_unit_is_not_converted():
-    latitude = InputValue(0.0, "PLACEHOLDER radians")
-    for item in run(climate(*all_series()), latitude=latitude):
+    other = point_value(0.0, "PLACEHOLDER radians")
+    for item in run(climate(*all_series(), at=point(latitude=other))):
         assert item.value.reason == "MISSING_INPUT"
         assert GUARD in item.value.detail
         assert "PLACEHOLDER radians" in item.value.detail
 
 
 def test_c6_an_elevation_in_another_unit_is_not_converted():
-    elevation = InputValue(2.0, "PLACEHOLDER other length")
-    for item in run(climate(*all_series()), elevation=elevation):
+    other = point_value(2.0, "PLACEHOLDER other length")
+    for item in run(climate(*all_series(), at=point(elevation=other))):
         assert item.steps.atmospheric_pressure.reason == "MISSING_INPUT"
         assert GUARD in item.steps.atmospheric_pressure.detail
         assert item.value.reason == "MISSING_INPUT"
@@ -591,10 +654,8 @@ def test_c9_the_arguments_are_not_changed_and_the_result_repeats():
     [
         {"point_units": None},
         {"constants": None},
-        {"latitude": 0.0},
-        {"elevation": None},
     ],
-    ids=["point-units", "constants", "latitude", "elevation"],
+    ids=["point-units", "constants"],
 )
 def test_c10_an_argument_of_the_wrong_type_raises(changes):
     with pytest.raises(TypeError):

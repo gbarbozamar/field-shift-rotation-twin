@@ -9,7 +9,7 @@ tests check them against its summary table. A series in another unit string
 is not converted: every value read from it is missing (the unit guard).
 
 The unit strings of latitude and elevation are not decided (question 25 of
-contracts/inputs/README.md in unit #94): the caller supplies them in
+contracts/inputs/README.md): the caller supplies them in
 ``PointUnits``. The reason code of the unit guard is not decided either
 (question Q11 of contracts/ENTRYPOINTS.md): the caller supplies it.
 """
