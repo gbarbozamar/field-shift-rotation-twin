@@ -554,11 +554,16 @@ def test_S18_test_listed_by_a_run_without_a_result_is_reported(tmp_path):
     assert summary["no_result"] == [{"run_id": "PLACEHOLDER-run", "test_code": "D999"}]
 
 
-def test_S19_malformed_failed_result_is_listed_as_rejected_not_lost(tmp_path):
+def test_S19_malformed_failed_result_is_rejected_and_still_reported_as_failed(tmp_path):
     write_full_store(tmp_path)
     write(tmp_path, changed(result_failed, drop_field("observed")))
-    summary = records.summarise(load(tmp_path))
+    store = load(tmp_path)
+    summary = records.summarise(store)
+    assert "PLACEHOLDER-result-failed" not in store.results
     assert summary["failed"] == []
+    assert summary["failed_malformed"] == ["results/PLACEHOLDER-result-failed.json"]
+    assert summary["counts"] == {"passed": 1, "failed": 1, "not_evaluated": 1}
+    assert summary["results_total"] == 3
     assert summary["rejected"] == ["results/PLACEHOLDER-result-failed.json"]
     assert summary["no_result"] == [{"run_id": "PLACEHOLDER-run", "test_code": "D999"}]
 
@@ -666,6 +671,44 @@ def test_S27_deeply_nested_file_is_listed_and_the_rest_still_loads(tmp_path, dep
     store = load(tmp_path)
     assert len(store.expected) == 3 and len(store.runs) == 1 and len(store.results) == 3
     assert len(records.summarise(store)["rejected"]) == 2
+
+
+def test_S28_every_rejected_file_that_says_failed_is_counted_as_failed(tmp_path):
+    write_full_store(tmp_path)
+    folder = tmp_path / "results"
+    # an outcome word that is not allowed, but that plainly means failed
+    write(tmp_path, changed(result_failed, set_field("outcome", " FAILED ")), name="PLACEHOLDER-a.json")
+    # a well-formed failed result under a file name that is not its id
+    write(tmp_path, result_failed(), name="PLACEHOLDER-b.json")
+    # a failed result in the folder of another kind
+    write(tmp_path, result_failed(), folder="runs", name="PLACEHOLDER-c.json")
+    # a failed result with a field nested too deeply to be checked, but not to be read
+    text = json.dumps(result_failed()).replace('"PLACEHOLDER observed wording"', "[" * 400 + "]" * 400)
+    (folder / "PLACEHOLDER-d.json").write_text(text, encoding="utf-8")
+    # rejected files that do not say failed, or that cannot be read at all
+    write(tmp_path, changed(result_passed, drop_field("observed")), name="PLACEHOLDER-e.json")
+    (folder / "PLACEHOLDER-f.json").write_text('{"outcome": "failed"', encoding="utf-8")
+
+    said_failed = [
+        "results/PLACEHOLDER-a.json",
+        "results/PLACEHOLDER-b.json",
+        "results/PLACEHOLDER-d.json",
+        "runs/PLACEHOLDER-c.json",
+    ]
+    for allow_placeholders in (True, False):
+        store = records.load_store(tmp_path, allow_placeholders=allow_placeholders)
+        summary = records.summarise(store)
+        assert set(said_failed) <= set(summary["failed_malformed"])
+        assert "results/PLACEHOLDER-e.json" not in summary["failed_malformed"]
+        assert "results/PLACEHOLDER-f.json" not in summary["failed_malformed"]
+        assert summary["counts"]["failed"] == len(summary["failed"]) + len(summary["failed_malformed"])
+        assert set(summary["failed_malformed"]) <= set(summary["rejected"])
+
+    summary = records.summarise(load(tmp_path))
+    assert summary["failed"] == ["PLACEHOLDER-result-failed"]
+    assert summary["failed_malformed"] == said_failed
+    assert summary["counts"] == {"passed": 1, "failed": 5, "not_evaluated": 1}
+    assert {"results/PLACEHOLDER-e.json", "results/PLACEHOLDER-f.json"} <= set(summary["rejected"])
 
 
 def test_R48_check_references_reports_an_unchecked_record_and_does_not_raise():

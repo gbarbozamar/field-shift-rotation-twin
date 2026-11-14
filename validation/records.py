@@ -412,6 +412,10 @@ class Store:
     ``unresolved`` holds the results that are well-formed on their own but
     point to a run or to an expected value that is not accepted. They are not
     among the accepted ``results``, and their problems are in ``problems``.
+
+    ``failed_malformed`` holds the paths of the rejected files, in any of the
+    three folders, whose record says that its outcome is failed. Nothing else
+    of such a record is trusted.
     """
 
     expected: dict[str, dict]
@@ -419,6 +423,19 @@ class Store:
     results: dict[str, dict]
     problems: tuple[tuple[str, str], ...]  # (file path relative to the store root, message)
     unresolved: dict[str, dict] = field(default_factory=dict)
+    failed_malformed: tuple[str, ...] = ()
+
+
+def _says_failed(record: Any) -> bool:
+    """True when a record, however malformed, says that its outcome is failed.
+
+    Upper or lower case and surrounding spaces do not matter here: 'FAILED' is
+    not an allowed outcome word, but it must not hide a failure.
+    """
+    if not isinstance(record, dict):
+        return False
+    outcome = record.get("outcome")
+    return isinstance(outcome, str) and outcome.strip().casefold() == OUTCOME_FAILED
 
 
 def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict:
@@ -470,6 +487,7 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
     accepted: dict[str, dict[str, dict]] = {kind: {} for kind in FOLDER_BY_KIND}
     paths: dict[tuple[str, str], str] = {}
     problems: list[tuple[str, str]] = []
+    failed_malformed: list[str] = []
 
     if root.is_dir():
         read_elsewhere = set(FOLDER_BY_KIND.values()) | {EXAMPLES_FOLDER}
@@ -496,8 +514,7 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
             try:
                 found = check_record(record, allow_placeholders=allow_placeholders)
             except RecursionError:
-                problems.append((relative, _TOO_DEEP))
-                continue
+                found = [_TOO_DEEP]
             if isinstance(record, dict):
                 record_kind = record.get("kind")
                 if isinstance(record_kind, str) and record_kind in FOLDER_BY_KIND and record_kind != kind:
@@ -510,6 +527,8 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
                     found.append(f"id: the file must be named '{record_id}.json'")
             if found:
                 problems.extend((relative, message) for message in found)
+                if _says_failed(record):
+                    failed_malformed.append(relative)
                 continue
             accepted[kind][record["id"]] = record
             paths[(kind, record["id"])] = relative
@@ -527,6 +546,7 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
         results=results,
         problems=tuple(sorted(problems)),
         unresolved=unresolved,
+        failed_malformed=tuple(sorted(failed_malformed)),
     )
 
 
@@ -547,6 +567,12 @@ def summarise(store: Store) -> dict:
     hidden by a broken reference. With any other outcome it is not counted: a
     pass that cannot be traced to its run and expected value is not a pass.
 
+    A rejected file whose record says that its outcome is failed
+    (``Store.failed_malformed``) is listed by path under ``failed_malformed``
+    and is counted as failed too, so ``counts['failed']`` is the length of
+    ``failed`` plus the length of ``failed_malformed``. Its run and its test
+    are not trusted, so it does not remove a test from ``no_result``.
+
     ``results_total`` is the number of results counted under an outcome.
     """
     counts = {outcome: 0 for outcome in OUTCOMES}
@@ -558,6 +584,7 @@ def summarise(store: Store) -> dict:
         counts[result["outcome"]] += 1
         by_outcome[result["outcome"]].append(result_id)
         reported.add((result["run_id"], result["test_code"]))
+    counts[OUTCOME_FAILED] += len(store.failed_malformed)
     no_result = [
         {"run_id": run_id, "test_code": code}
         for run_id, run in sorted(store.runs.items())
@@ -568,6 +595,7 @@ def summarise(store: Store) -> dict:
         "results_total": sum(counts.values()),
         "counts": counts,
         OUTCOME_FAILED: sorted(by_outcome[OUTCOME_FAILED]),
+        "failed_malformed": sorted(store.failed_malformed),
         OUTCOME_NOT_EVALUATED: sorted(by_outcome[OUTCOME_NOT_EVALUATED]),
         "broken_references": [
             {"id": result_id, "outcome": result["outcome"]}

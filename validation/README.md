@@ -162,11 +162,13 @@ A failed result is a well-formed record. It is stored like any other and it is r
 | `check_record(record, allow_placeholders=False)` | Returns every problem of one record as a list of sentences. An empty list means the record is accepted |
 | `load_store(root, allow_placeholders=False)` | Reads the three folders below `root`, checks every file, then checks what each result points to. Returns the accepted records by id, every problem with its file path, and under `unresolved` the well-formed results whose references are broken. One file that cannot be read, such as one nested too deeply, is listed as a problem and the rest still loads |
 | `check_references(expected, runs, results)` | Checks what each result points to. Given a record that was not checked before, it reports a problem and does not raise |
-| `summarise(store)` | Counts the results by outcome, lists the failed and the not-evaluated ones by id, lists under `broken_references` every well-formed result whose references are broken, lists under `no_result` every test that a run lists without a counted result, and lists under `rejected` every file that was rejected |
+| `summarise(store)` | Counts the results by outcome, lists the failed and the not-evaluated ones by id, lists under `broken_references` every well-formed result whose references are broken, lists under `failed_malformed` every rejected file that says its outcome is failed, lists under `no_result` every test that a run lists without a counted result, and lists under `rejected` every file that was rejected |
 
 Nothing is dropped silently: a malformed record is left out of the accepted ones and is listed with its path and the reason; a failed result is counted and listed as failed.
 
 A result whose references are broken (PROPOSED): a result can be well-formed on its own while the run or the expected value it points to is missing or was rejected. Such a result is not among the accepted ones, its file is listed under `rejected`, and it is listed under `broken_references` with its outcome. If its outcome is `failed`, it is **also counted and listed as failed**: a failure is never hidden by a broken reference. With any other outcome it is not counted: a pass that cannot be traced to its run and its expected value is not a pass. `results_total` is the number of results counted under an outcome.
+
+A malformed record that says failed (PROPOSED): a file in any of the three folders that is rejected for any reason, and whose record says that its outcome is failed, is listed by its path under `failed_malformed` and is **counted as failed**, so `counts.failed` is the length of `failed` plus the length of `failed_malformed`. Upper or lower case and surrounding spaces do not matter for this: `FAILED` is still not an allowed outcome word and the record is still rejected, but it does not hide a failure. Nothing else of such a record is trusted, so its test stays under `no_result`. Two limits: a file that cannot be read as JSON cannot say anything, and a `.json` file outside the three folders is reported but not opened; both appear only under `rejected`.
 
 `python -m pytest validation/` also checks the real store (case S05), so a malformed record added to `expected/`, `runs/` or `results/` makes the acceptance test fail.
 
@@ -277,7 +279,7 @@ For a person to approve. The code in the first column is the start of the test i
 | S16 | A result that points to the expected value of another test is rejected |
 | S17 | A result cannot be passed or failed against an expected value that is missing |
 | S18 | A test that a run lists and that has no result is reported under `no_result` |
-| S19 | A malformed failed result is listed as rejected and its test under `no_result`; it does not vanish |
+| S19 | A malformed failed result is rejected, and is still counted as failed and listed under `failed_malformed`; its test stays under `no_result` |
 | S20 | A file that holds a list instead of an object is rejected |
 | S21 | A failed result whose run record was rejected is still counted and listed as failed, and is listed under `broken_references` and `rejected` |
 | S22 | A failed result whose expected-value record was rejected is still counted and listed as failed, and is listed under `broken_references` and `rejected` |
@@ -286,6 +288,7 @@ For a person to approve. The code in the first column is the start of the test i
 | S25 | A file in a record folder whose name starts with a dot is listed as a problem, whether or not it ends in `.json` |
 | S26 | A `.json` file at the root of the store or in any other folder is listed; `examples/` below the root and files that are not `.json` outside the three folders are not looked at |
 | S27 | A file nested too deeply to be read (500, 5 000 and 100 000 levels) is listed as a problem and the rest of the store still loads |
+| S28 | Every rejected file that says failed is counted as failed: an outcome written ` FAILED `, a failed result under a file name that is not its id, a failed result in the folder of another kind, a failed result with a field nested too deeply to be checked. A rejected result that says passed, and a file that is not valid JSON, are not counted |
 
 One more test, without a case code, checks that every case code above appears in this section.
 
