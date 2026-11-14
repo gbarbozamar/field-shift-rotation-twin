@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "PLACEHOLDER-result-not-evaluated",
+  "run_id": "PLACEHOLDER-run",
+  "test_code": "H999",
+  "expected": {
+    "id": "PLACEHOLDER-expected-missing"
+  },
+  "outcome": "not_evaluated",
+  "observed": {
+    "missing_reason": "PLACEHOLDER reason: nothing was computed"
+  },
+  "reason": "PLACEHOLDER reason: the expected value is missing"
+}

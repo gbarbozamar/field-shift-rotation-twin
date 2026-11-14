@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "kind": "expected_value",
+  "id": "PLACEHOLDER-expected-text",
+  "test_code": "D999",
+  "quantity": "PLACEHOLDER quantity",
+  "value": {
+    "text": "PLACEHOLDER expected wording"
+  },
+  "citation": {
+    "reference": "PLACEHOLDER citation, not a real source",
+    "locator": "PLACEHOLDER locator"
+  },
+  "transcribed_by": "PLACEHOLDER person A",
+  "checked_by": "PLACEHOLDER person B"
+}

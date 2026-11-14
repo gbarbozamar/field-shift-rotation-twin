@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "PLACEHOLDER-result-passed",
+  "run_id": "PLACEHOLDER-run",
+  "test_code": "E999",
+  "expected": {
+    "id": "PLACEHOLDER-expected-number"
+  },
+  "outcome": "passed",
+  "observed": {
+    "number": 123456789.0,
+    "unit": "PLACEHOLDER unit"
+  }
+}
