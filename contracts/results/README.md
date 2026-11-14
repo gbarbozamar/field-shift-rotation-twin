@@ -4,7 +4,7 @@ The two contracts that the engines emit and that the decision layer and the inte
 
 | Contract | Producer → consumer | Model | Example |
 |---|---|---|---|
-| Results per rotation | Lead, Engines → Platform, Interface | `ResultsPerRotation` | `examples/PLACEHOLDER_results_per_rotation.json` |
+| Results per rotation | Lead, Engines → Platform, Interface | `ResultsPerRotation` | `examples/PLACEHOLDER_results_per_rotation.json`; with every part wholly missing (D12): `examples/PLACEHOLDER_results_per_rotation_not_built.json` |
 | Results table | Lead, Engines → Platform | `ResultsTable` | `examples/PLACEHOLDER_results_table.json` |
 
 > **Status: PROPOSED.** The field lists, the examples and the test cases below were written by a builder session (blueprint section 3.7). They take effect only when people approve the pull request: the lane owner, and the consumers of these contracts (the platform developer and the interface developer). Items under `OPEN` need an answer from a person.
@@ -18,7 +18,7 @@ The models follow `contracts/CONVENTIONS.md`, whatever the status of each conven
 | Path | Content |
 |---|---|
 | `models.py` | The Pydantic models and their validation. No value, no threshold, no computation, no file access, no network call |
-| `examples/` | One hand-written placeholder example per contract |
+| `examples/` | One hand-written placeholder example per contract, and one of results per rotation whose three parts are wholly missing because no engine is built (D12) |
 | `test_examples.py` | The acceptance test: each example loads into its model, and each invalid variant is rejected |
 
 Run the test from the repository root:
@@ -106,10 +106,11 @@ Units checked, exactly as the sheet writes them:
 | `case_id` | yes | Identifier of the case. Non-blank text |
 | `field_id` | yes | Identifier of the field. Non-blank text |
 | `rotation_id` | yes | Identifier of the rotation. Non-blank text |
-| `soil_loss.annual` | yes, at least one | One `IndicatorValue` per agricultural year, plus `ag_year` (integer). Unit `t ha-1 yr-1` |
-| `soil_loss.monthly` | yes | The monthly breakdown: one `IndicatorValue` per calendar month, plus `year` (calendar year), `month` (1 to 12) and `ag_year`. Unit `t ha-1 month-1` |
-| `water_deficit_exposure` | yes, at least one | `IndicatorValue` items, plus `time_basis` (`rotation` or `ag_year`) and `ag_year` (only with `time_basis: "ag_year"`) |
-| `soil_carbon_trend` | yes, at least one | `IndicatorValue` items, plus `carbon_model` (non-blank text) and `computation` |
+| `soil_loss` | yes | An object with `annual` and `monthly` (the present form), or the wholly missing form when the erosion engine is not built (D12) |
+| `soil_loss.annual` | yes, at least one, in the present form | One `IndicatorValue` per agricultural year, plus `ag_year` (integer). Unit `t ha-1 yr-1` |
+| `soil_loss.monthly` | yes, in the present form | The monthly breakdown: one `IndicatorValue` per calendar month, plus `year` (calendar year), `month` (1 to 12) and `ag_year`. Unit `t ha-1 month-1` |
+| `water_deficit_exposure` | yes | A list of at least one `IndicatorValue` item, plus `time_basis` (`rotation` or `ag_year`) and `ag_year` (only with `time_basis: "ag_year"`); or the wholly missing form when the water engine is not built (D12) |
+| `soil_carbon_trend` | yes | A list of at least one `IndicatorValue` item, plus `carbon_model` (non-blank text) and `computation`; or the wholly missing form when no carbon engine is built (D12) |
 
 Rules:
 
@@ -120,6 +121,47 @@ Rules:
 - `water_deficit_exposure`: the time basis of this indicator is `OPEN` in the sheet (C1.3). Until it is decided the contract carries either one value for the whole rotation (`time_basis: "rotation"`) or one value per agricultural year (`time_basis: "ag_year"`), never a mix, and no agricultural year twice.
 - `soil_carbon_trend`: one value per carbon model and per computation (C1.5). `computation` is one of `end_minus_start`, `fitted_slope`, `mean_over_cycles`: the three computations of C1.6, in its order, under identifiers proposed here. Every carbon model that appears carries each of the three once (C1.6); one that cannot be computed is there as missing. The default computation is `end_minus_start` (`DEFAULT_TREND_COMPUTATION`).
 - Values of different carbon models are separate items. Nothing in the contract merges or averages them (C1.5).
+- Every rule above is a rule of the present form. A part in the wholly missing form follows the rules of the next section instead.
+
+## A part whose engine is not built (D12; form PROPOSED)
+
+**What is decided** (lead developer, 14 November 2026, decision D12, recorded in [issue #18](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/18#issuecomment-6881785241) and [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6881787420)): each of the three parts `soil_loss`, `water_deficit_exposure` and `soil_carbon_trend` may be wholly missing, **only when the engine that produces it is not built, and only with reason `NOT_AVAILABLE`** (C3.2). A built engine keeps the present form and its rules (G4 of `contracts/ENTRYPOINTS.md`): every agricultural year with its twelve months, every water item with its `time_basis`, every carbon model with its three computations, each value not computed missing with its reason.
+
+**What is PROPOSED here**, for the platform developer and the interface developer to accept or rename (question 21 under `OPEN`): the form below, its field names, and how it is told apart from the present form. No name in this section is decided.
+
+```json
+"soil_loss": {
+  "indicator": "soil_loss",
+  "direction": "lower_is_better",
+  "units": ["t ha-1 yr-1", "t ha-1 month-1"],
+  "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the erosion engine is not built"}
+}
+```
+
+| Field | Required | Rule | Convention |
+|---|---|---|---|
+| `indicator` | yes | The identifier of the part's indicator: `soil_loss` in `soil_loss`, and so on. The indicator of another part is rejected | C1.1, C3.1 |
+| `direction` | yes | The direction the sheet gives for the indicator | C1.1, C3.1 |
+| `units` | yes | Every unit the part carries in its present form, exactly as the sheet writes them, in this order: `soil_loss` `["t ha-1 yr-1", "t ha-1 month-1"]` (annual, then monthly); `water_deficit_exposure` `["dimensionless"]`; `soil_carbon_trend` `["t C ha-1 yr-1"]` | C1.1, C1.2, C1.3, C1.5, C3.1 |
+| `missing` | yes | An object like the `missing` part of a value. `reason` is `NOT_AVAILABLE`, no other code; `detail` is optional and may name the engine that is not built | C3.1, C3.2, D12 |
+
+How C3.1 is kept: C3.1 asks a missing value to keep its identifier and its unit, so a consumer knows what is missing. The wholly missing form keeps the identifier in `indicator`, the direction in `direction`, as every value does (question 18), and the unit in `units`. `units` is a list, and not `unit`, because `soil_loss` carries two units, one for its annual values and one for its monthly values; the other two parts carry one each, in a list of one, so the three parts have the same form.
+
+How the two forms are told apart (PROPOSED):
+
+- `soil_loss`: both forms are objects. An object with a `missing` part is the wholly missing form; the present form has no `missing` part.
+- `water_deficit_exposure` and `soil_carbon_trend`: the present form is a list. The wholly missing form is one object in place of the list. A list that holds the wholly missing object as an item is rejected.
+
+Rules:
+
+- The wholly missing form carries no value of any kind: no `annual`, `monthly`, `value`, `unit`, `range`, `ag_year`, `time_basis`, `carbon_model` or `computation`, nor any other field of the present form or of its items. Each is rejected with a message that names it.
+- Any reason other than `NOT_AVAILABLE` is rejected (D12). An engine that is built and cannot compute keeps the present form and writes each value missing with its reason (G4).
+- Each part is told apart on its own: one, two or all three parts may be wholly missing in one document, and the others keep the present form.
+- The checks of the present form across items (one time basis for water, three computations per carbon model) do not apply to a part that is wholly missing.
+- An accepted document written with `model_dump(mode="json")` loads back unchanged. As everywhere in this contract, never write with `exclude_none=True`.
+- Not covered here: the case where an input is missing (that stays "no result" with `MISSING_INPUT`, a matter of the route), and `ResultsTable`, which has no wholly missing form.
+
+In Python the form is `PartNotBuilt`, with one subclass per part (`SoilLossNotBuilt`, `WaterDeficitExposureNotBuilt`, `SoilCarbonTrendNotBuilt`); the names are PROPOSED. Once this is accepted, a consumer that reads `soil_loss.annual`, or iterates over `water_deficit_exposure` or `soil_carbon_trend`, first checks whether the part is a `PartNotBuilt`.
 
 ## Results table (PROPOSED)
 
@@ -152,7 +194,7 @@ Rules:
 
 ## PROPOSED cases
 
-Each code is tested in `test_examples.py`. An invalid variant is one of the two examples with one thing changed, in memory; unless a case says otherwise it is applied to both examples. A variant must be rejected for one reason only, and the test checks that it is the expected one. No case contains an expected value of the science.
+Each code is tested in `test_examples.py`. Except in the cases N1 to N6, an invalid variant is one of the two examples of the present form with one thing changed, in memory; unless a case says otherwise it is applied to both examples. A variant must be rejected for one reason only, and the test checks that it is the expected one. No case contains an expected value of the science.
 
 The eight variants the brief asks for are U1, P1, M1, M3, R1, I1, I2 and X1.
 
@@ -173,10 +215,11 @@ The eight variants the brief asks for are U1, P1, M1, M3, R1, I1, I2 and X1.
 
 | Code | Case |
 |---|---|
-| E1 | `examples/` holds exactly the two files, both named `PLACEHOLDER_…`. Every text in them that is not a word of a closed list carries the word PLACEHOLDER, and so does the source of every number |
+| E1 | `examples/` holds exactly the three files, all named `PLACEHOLDER_…`. Every text in them that is not a word of a closed list carries the word PLACEHOLDER, and so does the source of every number |
 | E2 | Both examples show `water_deficit_exposure` missing, with its reason, in `dimensionless`, and never as a number |
 | E3 | Both examples name the carbon model and the computation of every `soil_carbon_trend` value, show two carbon models, and show the default computation for each |
 | E4 | Both examples show a number with a range, a number without a range and its reason, a missing value, and all three indicators |
+| E5 | The example of parts not built loads into `ResultsPerRotation`, from JSON text and from parsed JSON, with the same result, and each of its three parts is wholly missing with `NOT_AVAILABLE` |
 
 ### The models against the conventions sheet
 
@@ -247,6 +290,19 @@ These cases read `contracts/CONVENTIONS.md` and fail if the sheet and the models
 | T3 | Soil loss for the whole rotation, or without its agricultural year; a carbon trend for one agricultural year |
 | T4 | A soil-loss row that names a carbon model; a water row that names a computation |
 
+### A part whose engine is not built (D12)
+
+D12 decides that a part may be wholly missing only with `NOT_AVAILABLE`. These cases write the form PROPOSED above; they start from the per-rotation example and replace one, or all three, of its parts.
+
+| Code | Case |
+|---|---|
+| N1 | Each part wholly missing with `NOT_AVAILABLE`, one at a time and all three together, loads; the `detail` may be left out |
+| N2 | Each document accepted by N1, and the example of parts not built, written with `model_dump(mode="json")`, loads back unchanged |
+| N3 | The same documents with each of the other seven reason codes of C3.2 are rejected, one error per wholly missing part, each for the reason |
+| N4 | A wholly missing part that also carries values is rejected: `soil_loss` with `annual`, `monthly`, `value` or `ag_year`; water with `value`, `time_basis` or `ag_year`; carbon with `carbon_model`, `computation` or `unit`. A water or carbon list that holds the wholly missing object as an item is rejected |
+| N5 | A wholly missing part without its indicator, direction, units or `missing` part; with the direction of the other kind; with one of the two soil-loss units, the two in the other order, the unit of another indicator or no unit; with the indicator of another part; with a reason code not in the list; with an unknown field |
+| N6 | The per-rotation example still loads into the present form of each part |
+
 ### The list itself
 
 | Code | Case |
@@ -257,7 +313,7 @@ These cases read `contracts/CONVENTIONS.md` and fail if the sheet and the models
 
 Questions for a person. None is answered by this unit. Items 1 to 6 come from the conventions sheet; the rest are points where the sheet and the blueprint are silent and this unit proposed something.
 
-Item 7 was answered afterwards, in part, by the lead developer on 14 November 2026 (issue #77). The question stays in place, followed by its answer and by what is still `OPEN`. Issue #77 says of its decisions: where they are science class, a science reviewer still has to accept them.
+Item 7 was answered afterwards, in part, by the lead developer on 14 November 2026 (issue #77), and item 14 in part by decision D12 of the same day (issues #18 and #77). The question stays in place, followed by its answer and by what is still `OPEN`. Issue #77 says of its decisions: where they are science class, a science reviewer still has to accept them.
 
 1. **Kinds of range (C2.3).** The closed list of `kind` labels is not supplied. The models accept any non-blank text; the examples use `PLACEHOLDER_range_kind`. When the list exists, `kind` becomes a closed list and no engine can report a range before then.
 2. **Time basis of `water_deficit_exposure` (C1.3).** Not decided. The contracts carry either one value per rotation or one per agricultural year. When it is decided, one of the two goes away. Whether this indicator has a monthly breakdown is part of the same question; today the contracts have none.
@@ -276,12 +332,15 @@ Item 7 was answered afterwards, in part, by the lead developer on 14 November 20
 12. **A missing value without a source.** Proposed: a missing value carries no source and no assumption mark. The sheet does not say.
 13. **Bounds equal to the value.** Proposed: rejected, reading C2.2. This also rejects a range that truly has no width. Confirm.
 14. **Completeness.** Proposed: every agricultural year has its twelve months, every carbon model its three computations, and every rotation of a table the same cells, with missing values written out. This makes documents longer and makes "left out" impossible. Confirm, or name what may be left out.
+   - `DECIDED` in part (decided by the lead developer on 14 November 2026, decision D12, issues #18 and #77): a whole part of results per rotation may be wholly missing, **only when its engine is not built and only with reason `NOT_AVAILABLE`**. For a built engine completeness stays as proposed above. The form of the wholly missing part is PROPOSED by this unit (question 21).
+   - Still `OPEN`, not answered by D12: completeness as a whole (confirm, or name what else may be left out), and whether `ResultsTable` gains a wholly missing form for a rotation whose engine is not built. Today it has none.
 15. **Months add up to the year (C1.2).** The models do not check that the monthly values of an agricultural year add up to its annual value: the check needs a tolerance, which is a value a person supplies. Where does that check live?
 16. **Label of monthly soil loss.** C4.6 fixes `DERIVED` for the soil-loss indicator. The models apply it to the monthly values too. Confirm.
 17. **No bound on any number.** The models check no sign and no limit on any indicator value; the sheet states none. Invariants belong to the tests of the engines.
 18. **`direction` in every value.** Proposed: each value carries the direction of its indicator, so one item is enough for a consumer. The alternative is to state it once per document.
 19. **A shared value item for the other contracts.** Other contracts will carry values with range, missing reason and provenance. `IndicatorValue` is specific to the three indicators. Whether a common item is shared from one place is a decision for the lane owner.
 20. **Repeated keys in a JSON file.** The models load JSON as Pydantic reads it: if a key is written twice in one object, the last one wins and no error is raised. A check for that would have to run before the model.
+21. **Form of a part whose engine is not built (D12).** PROPOSED by unit `l0/results-part-not-built`: an object with `indicator`, `direction`, `units` (a list) and `missing`; for `soil_loss` told apart by its `missing` part, for the two list parts by being an object in place of the list; Python names `PartNotBuilt` and one subclass per part. For the platform developer and the interface developer: **accept the form, or rename any field or class, or choose another way to tell the forms apart** (for example a marker field such as `"status": "not_built"`, or `unit` with only the annual unit of soil loss).
 
 ## Not covered
 
