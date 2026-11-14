@@ -103,8 +103,8 @@ The entries below are the list; this table repeats them. The status of a quantit
 |---|---|---|---|---|---|---|---|---|
 | `CQ1` | `precipitation` | Total precipitation at the surface during the day | `mm day-1` | none | `OBSERVED` | N1 | `IMERG_PRECTOT` of NASA POWER, through the platform adapter (D23) | DECIDED (D23) |
 | `CQ1b` | `precipitation_reanalysis` | Control series of total precipitation at the surface during the day, beside `CQ1`; not a fallback | `mm day-1` | none | `OBSERVED` | Control of `CQ1` (D24) | `PRECTOTCORR` (D24) | DECIDED (D24) |
-| `CQ2` | `air_temperature_max_2m` | Highest air temperature of the day | `degC` | 2 m | `OBSERVED` | N2, N3 | `T2M_MAX`, "Degrees Celsius (C)" | PROPOSED |
-| `CQ3` | `air_temperature_min_2m` | Lowest air temperature of the day | `degC` | 2 m | `OBSERVED` | N2, N3 | `T2M_MIN`, "Degrees Celsius (C)" | PROPOSED |
+| `CQ2` | `air_temperature_max_2m` | Highest air temperature of the day | `degC` | 2 m | `OBSERVED` | N2, N3 | `T2M_MAX`, "Degrees Celsius (C)" | DECIDED (D35) |
+| `CQ3` | `air_temperature_min_2m` | Lowest air temperature of the day | `degC` | 2 m | `OBSERVED` | N2, N3 | `T2M_MIN`, "Degrees Celsius (C)" | DECIDED (D35) |
 | `CQ4` | `dew_point_temperature_2m` | Humidity of the air, as dew point | `degC` | 2 m | `OBSERVED` | N2 | `T2MDEW` (D25) | DECIDED (D25) |
 | `CQ5` | `wind_speed_2m` | Mean wind speed of the day | `m s-1` | 2 m | `OBSERVED` | N2 | `WS2M` (D26) | DECIDED (D26) |
 | `CQ6` | `solar_radiation` | Radiation input of the reference evapotranspiration | `MJ m-2 day-1` (community AG, D28) | none | `OBSERVED` | N2 | `ALLSKY_SFC_SW_DWN` (D27) | DECIDED (D27) |
@@ -172,7 +172,7 @@ What D32 shows: the response labels the unit of `PRECTOTCORR` `mm/day`. Still no
 
 ### CQ2 Daily maximum air temperature
 
-Status: PROPOSED
+Status: DECIDED (decided by the lead developer on 14 November 2026, issue #77, D35)
 
 | Aspect | Entry |
 |---|---|
@@ -191,7 +191,7 @@ What #15 says about it:
 
 ### CQ3 Daily minimum air temperature
 
-Status: PROPOSED
+Status: DECIDED (decided by the lead developer on 14 November 2026, issue #77, D35)
 
 | Aspect | Entry |
 |---|---|
@@ -369,7 +369,7 @@ This file writes no settings. Once a person has answered the questions, each cho
 
 #15 quotes a limit that the list stays under whatever is chosen: "A maximum of 20 parameters can currently be requested in one submission for a single point." (#15, section 7).
 
-The comment of issue #77 with D23 to D32 lists, under "What changes in the repository", for the platform developer: "the settings of the adapter (D20), now that the values are accepted: community `ag`; the six parameters with their identifiers, units and label; `range_missing` reason `NO_COVERAGE`; the period of D29". The comment does not list the six parameters by name; the documented request of D32 asked for seven.
+The comment of issue #77 with D23 to D32 lists, under "What changes in the repository", for the platform developer: "the settings of the adapter (D20), now that the values are accepted: community `ag`; the six parameters with their identifiers, units and label; `range_missing` reason `NO_COVERAGE`; the period of D29". The comment does not list the six parameters by name; the documented request of D32 asked for seven. D35 settles it: the quantities of the settings are the seven of D23 to D27 and D35 (`precipitation`, `precipitation_reanalysis`, `air_temperature_max_2m`, `air_temperature_min_2m`, `dew_point_temperature_2m`, `wind_speed_2m`, `solar_radiation`); "six" in that comment is a miscount.
 
 ## The documented request
 
