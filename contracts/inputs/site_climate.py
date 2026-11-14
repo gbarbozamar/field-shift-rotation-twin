@@ -7,6 +7,10 @@ see ``README.md`` in this folder for what is PROPOSED and what is OPEN.
 No variable of any data source is named here. A series is identified by a
 generic ``quantity`` identifier; which quantities exist, from which source and
 in which unit is OPEN.
+
+The record carries the point its series are valid for: latitude, longitude and
+elevation (issue #77, decision D9). No unit, datum, provenance label or source
+is fixed for them here and no bound is checked; those are OPEN in ``README.md``.
 """
 
 from __future__ import annotations
@@ -24,11 +28,12 @@ from .common import (
     NonEmptyStr,
     Provenance,
     QuantityId,
+    Value,
     check_source_or_assumption,
 )
 
 
-class _Point(ContractModel):
+class _SeriesItem(ContractModel):
     """One value of a series: a number or a ``missing`` part (C3.1)."""
 
     value: (
@@ -37,7 +42,7 @@ class _Point(ContractModel):
     missing: Missing | None = None
 
     @model_validator(mode="after")
-    def _number_or_missing(self) -> _Point:
+    def _number_or_missing(self) -> _SeriesItem:
         if self.value is not None and self.missing is not None:
             raise ValueError(
                 "an item holds a value or a missing part, never both (C3.1)"
@@ -49,11 +54,11 @@ class _Point(ContractModel):
         return self
 
 
-class DailyValue(_Point):
+class DailyValue(_SeriesItem):
     date: IsoDate  # the day in the time zone of the series (C6.1)
 
 
-class MonthlyValue(_Point):
+class MonthlyValue(_SeriesItem):
     year: int  # calendar year (C5.1)
     month: MonthNumber
 
@@ -153,6 +158,24 @@ def _unique_quantities(series: list[_SeriesHeader], what: str) -> None:
         raise ValueError(f"{what}: two series share one quantity identifier")
 
 
+class ClimatePoint(ContractModel):
+    """The point the series of one record are valid for (issue #77, D9).
+
+    The field names are PROPOSED. Each of the three is a ``Value`` of
+    ``common.py``, unchanged: a number with its unit string, its provenance
+    label, its source or assumption mark and its range or the reason it has
+    none; or missing with its reason, keeping its unit.
+
+    Nothing is fixed here that a person has to choose: the unit strings, the
+    datum, the provenance label and the source arrive with the document. No
+    bound is checked on any of the three. All of it is OPEN in ``README.md``.
+    """
+
+    latitude: Value  # unit and datum OPEN
+    longitude: Value  # unit and datum OPEN
+    elevation: Value  # unit, vertical reference and which elevation OPEN
+
+
 class SiteClimate(ContractModel):
     """Climate data of one field of one case."""
 
@@ -160,6 +183,7 @@ class SiteClimate(ContractModel):
     example_data: bool
     case_id: NonEmptyStr
     field_id: NonEmptyStr
+    point: ClimatePoint  # required; each of its values can be missing with its reason
     daily_series: list[DailySeries]
     monthly_series: list[MonthlySeries]
 
