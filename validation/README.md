@@ -20,7 +20,12 @@ Where an expected value lives with its source, where a run of the validation pro
 
 `expected/`, `runs/` and `results/` do not exist yet: each is created by the first unit that stores a record in it. A folder that does not exist holds no record.
 
-Each of the three folders holds only files named `<id>.json`. Anything else in them is reported as a problem. Files whose name starts with a dot are ignored.
+Each of the three folders holds only files named `<id>.json`. Anything else in them is reported as a problem, including a file whose name starts with a dot.
+
+A `.json` file anywhere else below the root of a store is reported as a problem too, so a record saved in a misnamed folder such as `result/` is not lost. Exactly two things are not looked at:
+
+- the folder `examples/` directly below the root, because it is a separate store;
+- outside the three folders, files that are not `.json` files, such as this document and the Python files.
 
 ## Record format (PROPOSED)
 
@@ -155,10 +160,13 @@ A failed result is a well-formed record. It is stored like any other and it is r
 | Function | What it does |
 |---|---|
 | `check_record(record, allow_placeholders=False)` | Returns every problem of one record as a list of sentences. An empty list means the record is accepted |
-| `load_store(root, allow_placeholders=False)` | Reads the three folders below `root`, checks every file, then checks what each result points to. Returns the accepted records by id and every problem with its file path |
-| `summarise(store)` | Counts the accepted results by outcome, lists the failed and the not-evaluated ones by id, lists under `no_result` every test that a run lists without an accepted result, and lists under `rejected` every file that was rejected |
+| `load_store(root, allow_placeholders=False)` | Reads the three folders below `root`, checks every file, then checks what each result points to. Returns the accepted records by id, every problem with its file path, and under `unresolved` the well-formed results whose references are broken. One file that cannot be read, such as one nested too deeply, is listed as a problem and the rest still loads |
+| `check_references(expected, runs, results)` | Checks what each result points to. Given a record that was not checked before, it reports a problem and does not raise |
+| `summarise(store)` | Counts the results by outcome, lists the failed and the not-evaluated ones by id, lists under `broken_references` every well-formed result whose references are broken, lists under `no_result` every test that a run lists without a counted result, and lists under `rejected` every file that was rejected |
 
 Nothing is dropped silently: a malformed record is left out of the accepted ones and is listed with its path and the reason; a failed result is counted and listed as failed.
+
+A result whose references are broken (PROPOSED): a result can be well-formed on its own while the run or the expected value it points to is missing or was rejected. Such a result is not among the accepted ones, its file is listed under `rejected`, and it is listed under `broken_references` with its outcome. If its outcome is `failed`, it is **also counted and listed as failed**: a failure is never hidden by a broken reference. With any other outcome it is not counted: a pass that cannot be traced to its run and its expected value is not a pass. `results_total` is the number of results counted under an outcome.
 
 `python -m pytest validation/` also checks the real store (case S05), so a malformed record added to `expected/`, `runs/` or `results/` makes the acceptance test fail.
 
@@ -245,6 +253,7 @@ For a person to approve. The code in the first column is the start of the test i
 | R45 | A record that is a list, not an object |
 | R46 | A placeholder record, unless placeholders are explicitly allowed |
 | R47 | A record with two faults reports both, not only the first |
+| R48 | `check_references` given records that were not checked (a result without `run_id`, `expected` or `outcome`, with a `run_id` that is not a text, that is not an object, or of another kind; a malformed run; a malformed expected value) reports a problem for each and does not raise |
 
 ### Store on disk
 
@@ -270,6 +279,13 @@ For a person to approve. The code in the first column is the start of the test i
 | S18 | A test that a run lists and that has no result is reported under `no_result` |
 | S19 | A malformed failed result is listed as rejected and its test under `no_result`; it does not vanish |
 | S20 | A file that holds a list instead of an object is rejected |
+| S21 | A failed result whose run record was rejected is still counted and listed as failed, and is listed under `broken_references` and `rejected` |
+| S22 | A failed result whose expected-value record was rejected is still counted and listed as failed, and is listed under `broken_references` and `rejected` |
+| S23 | A passed result with a broken reference is listed under `broken_references` with its outcome and is not counted as passed |
+| S24 | A record in a misnamed folder (`result/` instead of `results/`) is listed as a problem |
+| S25 | A file in a record folder whose name starts with a dot is listed as a problem, whether or not it ends in `.json` |
+| S26 | A `.json` file at the root of the store or in any other folder is listed; `examples/` below the root and files that are not `.json` outside the three folders are not looked at |
+| S27 | A file nested too deeply to be read (500, 5 000 and 100 000 levels) is listed as a problem and the rest of the store still loads |
 
 One more test, without a case code, checks that every case code above appears in this section.
 

@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -51,6 +51,13 @@ STORE_ROOT = Path(__file__).resolve().parent
 _TEST_CODE_RE = re.compile(r"[EHD][0-9]+[a-z]?")
 _ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _UTC_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+
+# A folder with this name directly below the root of a store is a separate
+# store, holding placeholder records only. It is not read with its parent.
+EXAMPLES_FOLDER = "examples"
+
+_TOO_DEEP = "is nested too deeply to be a record"
+_OUTSIDE = "is outside 'expected/', 'runs/' and 'results/': a record lives in one of these three folders"
 
 _PLACEHOLDER_WORD = "placeholder"
 _CITATION_NEEDED = "CITATION NEEDED"
@@ -342,13 +349,31 @@ def check_record(record: Any, *, allow_placeholders: bool = False) -> list[str]:
 # --- checks across records ----------------------------------------------------
 
 
+def _problems_as(record: Any, kind: str) -> list[str]:
+    """Problems of a record that is meant to be of the given kind."""
+    problems = check_record(record, allow_placeholders=True)
+    if not problems and record["kind"] != kind:
+        problems = [f"kind: must be '{kind}' here; got '{record['kind']}'"]
+    return problems
+
+
 def check_references(
     expected: dict[str, dict], runs: dict[str, dict], results: dict[str, dict]
 ) -> dict[str, list[str]]:
-    """Check what each accepted result points to. Returns problems by result id."""
+    """Check what each result points to. Returns problems by result id.
+
+    Never raises on a record that was not checked before: a malformed result
+    gets its own problems, and a malformed run or expected value counts as
+    not accepted.
+    """
+    runs = {key: run for key, run in runs.items() if not _problems_as(run, KIND_RUN)}
+    expected = {key: value for key, value in expected.items() if not _problems_as(value, KIND_EXPECTED)}
     found: dict[str, list[str]] = {}
     for result_id, result in results.items():
-        problems: list[str] = []
+        problems = _problems_as(result, KIND_RESULT)
+        if problems:
+            found[result_id] = problems
+            continue
         run = runs.get(result["run_id"])
         if run is None:
             problems.append(f"run_id: no accepted protocol run has the id '{result['run_id']}'")
@@ -382,12 +407,18 @@ def check_references(
 
 @dataclass(frozen=True)
 class Store:
-    """The accepted records of a store, by id, and every problem found while reading it."""
+    """The accepted records of a store, by id, and every problem found while reading it.
+
+    ``unresolved`` holds the results that are well-formed on their own but
+    point to a run or to an expected value that is not accepted. They are not
+    among the accepted ``results``, and their problems are in ``problems``.
+    """
 
     expected: dict[str, dict]
     runs: dict[str, dict]
     results: dict[str, dict]
     problems: tuple[tuple[str, str], ...]  # (file path relative to the store root, message)
+    unresolved: dict[str, dict] = field(default_factory=dict)
 
 
 def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict:
@@ -416,6 +447,8 @@ def _read_json(path: Path) -> tuple[Any, str | None]:
         )
     except ValueError as exc:
         return None, f"is not valid JSON: {exc}"
+    except RecursionError:
+        return None, _TOO_DEEP
     return record, None
 
 
@@ -424,12 +457,28 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
 
     A malformed record is not returned among the accepted ones, and it is not
     dropped either: it is listed in ``Store.problems`` with its file path.
+    One file that cannot be read never stops the rest from loading.
     A folder that does not exist yet holds no record.
+
+    Everything inside the three record folders is read or reported. Outside
+    them, every ``.json`` file below ``root`` is reported, so a record in a
+    misnamed folder is not lost. Only two things are not looked at: the
+    folder ``examples/`` directly below ``root``, and files outside the three
+    folders that are not ``.json`` files.
     """
     root = Path(root)
     accepted: dict[str, dict[str, dict]] = {kind: {} for kind in FOLDER_BY_KIND}
     paths: dict[tuple[str, str], str] = {}
     problems: list[tuple[str, str]] = []
+
+    if root.is_dir():
+        read_elsewhere = set(FOLDER_BY_KIND.values()) | {EXAMPLES_FOLDER}
+        for path in sorted(root.rglob("*")):
+            parts = path.relative_to(root).parts
+            if parts[0] in read_elsewhere and len(parts) > 1:
+                continue
+            if path.is_file() and path.suffix.lower() == ".json":
+                problems.append(("/".join(parts), _OUTSIDE))
 
     for kind, folder in FOLDER_BY_KIND.items():
         directory = root / folder
@@ -437,8 +486,6 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
             continue
         for path in sorted(directory.iterdir()):
             relative = f"{folder}/{path.name}"
-            if path.name.startswith("."):
-                continue
             if path.is_dir() or path.suffix != ".json":
                 problems.append((relative, "is not a record: this folder holds only files named <id>.json"))
                 continue
@@ -446,7 +493,11 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
             if error is not None:
                 problems.append((relative, error))
                 continue
-            found = check_record(record, allow_placeholders=allow_placeholders)
+            try:
+                found = check_record(record, allow_placeholders=allow_placeholders)
+            except RecursionError:
+                problems.append((relative, _TOO_DEEP))
+                continue
             if isinstance(record, dict):
                 record_kind = record.get("kind")
                 if isinstance(record_kind, str) and record_kind in FOLDER_BY_KIND and record_kind != kind:
@@ -464,9 +515,10 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
             paths[(kind, record["id"])] = relative
 
     results = accepted[KIND_RESULT]
+    unresolved: dict[str, dict] = {}
     broken = check_references(accepted[KIND_EXPECTED], accepted[KIND_RUN], results)
     for result_id, messages in broken.items():
-        del results[result_id]
+        unresolved[result_id] = results.pop(result_id)
         problems.extend((paths[(KIND_RESULT, result_id)], message) for message in messages)
 
     return Store(
@@ -474,6 +526,7 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
         runs=accepted[KIND_RUN],
         results=results,
         problems=tuple(sorted(problems)),
+        unresolved=unresolved,
     )
 
 
@@ -485,13 +538,23 @@ def summarise(store: Store) -> dict:
 
     Every accepted result is counted under its outcome; failed and
     not-evaluated results are listed by id; a test code that a run lists
-    without any accepted result is listed under ``no_result``; every file that
+    without any counted result is listed under ``no_result``; every file that
     was rejected is listed under ``rejected``.
+
+    A well-formed result whose references are broken (``Store.unresolved``) is
+    listed under ``broken_references`` with its outcome. When that outcome is
+    ``failed`` it is also counted and listed as failed: a failure is never
+    hidden by a broken reference. With any other outcome it is not counted: a
+    pass that cannot be traced to its run and expected value is not a pass.
+
+    ``results_total`` is the number of results counted under an outcome.
     """
     counts = {outcome: 0 for outcome in OUTCOMES}
     by_outcome: dict[str, list[str]] = {outcome: [] for outcome in OUTCOMES}
     reported: set[tuple[str, str]] = set()
-    for result_id, result in store.results.items():
+    counted = list(store.results.items())
+    counted += [item for item in store.unresolved.items() if item[1]["outcome"] == OUTCOME_FAILED]
+    for result_id, result in counted:
         counts[result["outcome"]] += 1
         by_outcome[result["outcome"]].append(result_id)
         reported.add((result["run_id"], result["test_code"]))
@@ -502,10 +565,14 @@ def summarise(store: Store) -> dict:
         if (run_id, code) not in reported
     ]
     return {
-        "results_total": len(store.results),
+        "results_total": sum(counts.values()),
         "counts": counts,
         OUTCOME_FAILED: sorted(by_outcome[OUTCOME_FAILED]),
         OUTCOME_NOT_EVALUATED: sorted(by_outcome[OUTCOME_NOT_EVALUATED]),
+        "broken_references": [
+            {"id": result_id, "outcome": result["outcome"]}
+            for result_id, result in sorted(store.unresolved.items())
+        ],
         "no_result": no_result,
         "rejected": sorted({path for path, _ in store.problems}),
     }

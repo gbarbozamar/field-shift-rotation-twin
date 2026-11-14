@@ -571,6 +571,131 @@ def test_S20_file_holding_a_list_is_rejected(tmp_path):
     assert messages(store, "runs/PLACEHOLDER-run.json") == ["record: must be a JSON object"]
 
 
+def test_S21_failed_result_of_a_rejected_run_is_still_reported_as_failed(tmp_path):
+    write_full_store(tmp_path)
+    write(tmp_path, changed(protocol_run, set_field("run_at", "1900-01-01 00:00")))
+    store = load(tmp_path)
+    summary = records.summarise(store)
+    assert store.runs == {} and store.results == {}
+    assert summary["failed"] == ["PLACEHOLDER-result-failed"]
+    assert summary["counts"] == {"passed": 0, "failed": 1, "not_evaluated": 0}
+    assert summary["results_total"] == 1
+    assert summary["broken_references"] == [
+        {"id": "PLACEHOLDER-result-failed", "outcome": "failed"},
+        {"id": "PLACEHOLDER-result-not-evaluated", "outcome": "not_evaluated"},
+        {"id": "PLACEHOLDER-result-passed", "outcome": "passed"},
+    ]
+    assert "runs/PLACEHOLDER-run.json" in summary["rejected"]
+    assert "results/PLACEHOLDER-result-failed.json" in summary["rejected"]
+
+
+def test_S22_failed_result_of_a_rejected_expected_value_is_still_reported_as_failed(tmp_path):
+    write_full_store(tmp_path)
+    write(tmp_path, changed(expected_text, set_field("checked_by", PERSON_A)))
+    store = load(tmp_path)
+    summary = records.summarise(store)
+    assert "PLACEHOLDER-expected-text" not in store.expected
+    assert "PLACEHOLDER-result-failed" not in store.results
+    assert summary["failed"] == ["PLACEHOLDER-result-failed"]
+    assert summary["counts"] == {"passed": 1, "failed": 1, "not_evaluated": 1}
+    assert summary["results_total"] == 3
+    assert summary["broken_references"] == [{"id": "PLACEHOLDER-result-failed", "outcome": "failed"}]
+    assert summary["no_result"] == []
+    assert "results/PLACEHOLDER-result-failed.json" in summary["rejected"]
+
+
+def test_S23_passed_result_with_a_broken_reference_is_listed_but_not_counted_as_passed(tmp_path):
+    write_full_store(tmp_path)
+    (tmp_path / "expected" / "PLACEHOLDER-expected-number.json").unlink()
+    summary = records.summarise(load(tmp_path))
+    assert summary["counts"] == {"passed": 0, "failed": 1, "not_evaluated": 1}
+    assert summary["broken_references"] == [{"id": "PLACEHOLDER-result-passed", "outcome": "passed"}]
+    assert summary["no_result"] == [{"run_id": "PLACEHOLDER-run", "test_code": "E999"}]
+    assert "results/PLACEHOLDER-result-passed.json" in summary["rejected"]
+
+
+def test_S24_record_in_a_misnamed_folder_is_listed(tmp_path):
+    write_full_store(tmp_path)
+    (tmp_path / "results" / "PLACEHOLDER-result-failed.json").unlink()
+    write(tmp_path, result_failed(), folder="result")
+    store = load(tmp_path)
+    assert any("is outside" in m for m in messages(store, "result/PLACEHOLDER-result-failed.json"))
+    summary = records.summarise(store)
+    assert "result/PLACEHOLDER-result-failed.json" in summary["rejected"]
+    assert summary["no_result"] == [{"run_id": "PLACEHOLDER-run", "test_code": "D999"}]
+
+
+def test_S25_file_whose_name_starts_with_a_dot_is_listed(tmp_path):
+    write_full_store(tmp_path)
+    folder = tmp_path / "results"
+    (folder / "PLACEHOLDER-result-failed.json").rename(folder / ".PLACEHOLDER-result-failed.json")
+    (folder / ".PLACEHOLDER-hidden").write_text("PLACEHOLDER", encoding="utf-8")
+    store = load(tmp_path)
+    assert any("must be named" in m for m in messages(store, "results/.PLACEHOLDER-result-failed.json"))
+    assert any("is not a record" in m for m in messages(store, "results/.PLACEHOLDER-hidden"))
+    assert "PLACEHOLDER-result-failed" not in store.results
+
+
+def test_S26_json_file_outside_the_three_folders_is_listed_and_examples_are_not_read(tmp_path):
+    write_full_store(tmp_path)
+    write(tmp_path, protocol_run(), folder=".", name="PLACEHOLDER-stray.json")
+    write(tmp_path, result_failed(), folder="old/results", name="PLACEHOLDER-deeper.JSON")
+    write(tmp_path, result_failed(), folder="examples/results")
+    (tmp_path / "PLACEHOLDER-readme.md").write_text("PLACEHOLDER", encoding="utf-8")
+    store = load(tmp_path)
+    assert sorted({path for path, _ in store.problems}) == [
+        "PLACEHOLDER-stray.json",
+        "old/results/PLACEHOLDER-deeper.JSON",
+    ]
+    assert all("is outside" in message for _, message in store.problems)
+    assert len(store.results) == 3
+
+
+@pytest.mark.parametrize("depth", [500, 5000, 100000])
+def test_S27_deeply_nested_file_is_listed_and_the_rest_still_loads(tmp_path, depth):
+    write_full_store(tmp_path)
+    nested = "[" * depth + "]" * depth
+    (tmp_path / "results" / "PLACEHOLDER-deep-list.json").write_text(nested, encoding="utf-8")
+    text = json.dumps(changed(result_failed, set_field("id", "PLACEHOLDER-deep-field")))
+    text = text.replace('"PLACEHOLDER observed wording"', nested)
+    (tmp_path / "results" / "PLACEHOLDER-deep-field.json").write_text(text, encoding="utf-8")
+    for allow_placeholders in (True, False):
+        store = records.load_store(tmp_path, allow_placeholders=allow_placeholders)
+        assert messages(store, "results/PLACEHOLDER-deep-list.json")
+        assert messages(store, "results/PLACEHOLDER-deep-field.json")
+    store = load(tmp_path)
+    assert len(store.expected) == 3 and len(store.runs) == 1 and len(store.results) == 3
+    assert len(records.summarise(store)["rejected"]) == 2
+
+
+def test_R48_check_references_reports_an_unchecked_record_and_does_not_raise():
+    expected = {"PLACEHOLDER-expected-text": expected_text()}
+    runs = {"PLACEHOLDER-run": protocol_run()}
+    unchecked_results = {
+        "without-run-id": changed(result_failed, drop_field("run_id")),
+        "without-expected": changed(result_failed, drop_field("expected")),
+        "without-outcome": changed(result_failed, drop_field("outcome")),
+        "run-id-not-text": changed(result_failed, set_field("run_id", ["PLACEHOLDER-run"])),
+        "not-an-object": "PLACEHOLDER",
+        "another-kind": protocol_run(),
+    }
+    found = records.check_references(expected, runs, unchecked_results)
+    assert set(found) == set(unchecked_results)
+    assert all(problems for problems in found.values())
+
+    sound = {"PLACEHOLDER-result-failed": result_failed()}
+    assert records.check_references(expected, runs, sound) == {}
+    unchecked_run = {"PLACEHOLDER-run": changed(protocol_run, drop_field("test_codes"))}
+    found = records.check_references(expected, unchecked_run, sound)
+    assert any("no accepted protocol run" in problem for problem in found["PLACEHOLDER-result-failed"])
+    unchecked_expected = {"PLACEHOLDER-expected-text": changed(expected_text, drop_field("value"))}
+    found = records.check_references(unchecked_expected, runs, sound)
+    assert any("no accepted expected value" in problem for problem in found["PLACEHOLDER-result-failed"])
+    wrong_kind = {"PLACEHOLDER-expected-text": protocol_run()}
+    found = records.check_references(wrong_kind, runs, sound)
+    assert any("no accepted expected value" in problem for problem in found["PLACEHOLDER-result-failed"])
+
+
 # --- the README lists every case -----------------------------------------------
 
 
