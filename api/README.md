@@ -182,6 +182,9 @@ on `httpx.MockTransport`.
   does not load into `SiteSoilSlope`, or has `example_data` false. This is an
   extra, earlier guard: `ExampleSoilSlopeSource` itself still answers
   `unavailable` for these when used directly.
+- The parameter catalogue in `params/records/` has any problem of
+  `load_folder` or `check_catalogue` (not a variable; see "The parameter
+  catalogue" under the engine runner). An empty catalogue starts.
 
 A message writes the path plainly between single quotes (`'<path>'`), never
 as a Python `repr`, which doubles every backslash of a Windows path (issue
@@ -259,7 +262,7 @@ removed.
 ## The engine runner (`api/engines.py`)
 
 `EntryPointEngines(functions, *, load_rotation=RotationDefinition.model_validate,
-carbon_models=())` implements `RotationEngines`.
+carbon_models=(), parameters=None)` implements `RotationEngines`.
 
 - `EngineFunctions(build_rotation_calendar, compute_soil_loss,
   compute_water_deficit_exposure)`: each an injected callable, `None` when the
@@ -285,12 +288,16 @@ carbon_models=())` implements `RotationEngines`.
   calendar engine present and the inputs there, the default app therefore
   assembles a `ResultsPerRotation` whose `soil_carbon_trend` holds six missing
   rows.
+- `parameters`: the parameter catalogue (Q3, D46, D56 of issue #77), a
+  `dict`; anything else is a `TypeError`. `None` is the empty catalogue `{}`
+  and reads no file (PROPOSED). See "The parameter catalogue" below.
 
 Call order (accepted in issue 18):
 
 1. EP2 first: `build_rotation_calendar(load_rotation(rotation))`.
 2. EP1 and EP3 with the keyword arguments `calendar`, `climate`, `soil_slope`
-   (G3), also when the calendar is infeasible (G4).
+   (G3), also when the calendar is infeasible (G4), and `parameters` for an
+   engine whose signature takes it (below). EP2 never gets `parameters`.
 3. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
    calendar; `soil_loss` from EP1 and `water_deficit_exposure` from EP3,
    unchanged, or in the not-built form when that engine is not built (D12);
@@ -304,6 +311,44 @@ engine that returns something other than the type its signature names
 `WaterDeficitExposure`) is a defect: `TypeError`, so also `500`. That includes
 a built engine that returns the not-built form of its own part: D12 allows
 that form only for an engine that is not built.
+
+### The parameter catalogue (`parameters`; Q3, D46, D56)
+
+- **Where from:** the folder `params/records/` of the repository, which
+  `contracts/ENTRYPOINTS.md` names. `api/config.py` finds it from the
+  location of the `params` package (`PARAMETERS_FOLDER`), never from the
+  working directory, so it is the same in tests, locally and in the
+  container. It is not an environment variable.
+- **When:** once, at start-up, in `load_config`: `params.catalogue.load_folder`,
+  then `params.catalogue.check_catalogue` on what it returned. Never per
+  request. `load_config(environ, *, parameters_folder=PARAMETERS_FOLDER)`;
+  tests give another folder.
+- **What refuses start-up (PROPOSED):** any problem reported by
+  `load_folder` (a file that is not a `.json` record file, a file that cannot
+  be read as a record, a folder that does not exist) or, when loading
+  reported none, by `check_catalogue` (a malformed record, two records with
+  the same `id` and `scope`, a placeholder). `ConfigError` names the folder
+  between single quotes and lists the problems as those functions wrote
+  them, one per line.
+- **What does not:** an empty catalogue, today's state of `params/records/`
+  (it holds only its `README.md`). The app starts and passes `{}`; an engine
+  then answers `MISSING_INPUT` for each parameter it needs (D56; the
+  engine's business, not the runner's).
+- **What is passed:** exactly the dictionary `load_folder` returned, never
+  edited, filled, defaulted or filtered, kept in `AppConfig.parameters`.
+  `build_app` gives it to `create_app(..., parameters=...)`, which gives it
+  to the default `EntryPointEngines`. `create_app` with `parameters=None`
+  passes `{}`; with `engines` given, `parameters` is a `TypeError` (it
+  would be ignored). The runner passes the same object, by keyword, on every
+  call; it does not copy it per request, and it does not check it again: the
+  check is the one of start-up.
+- **Transition rule (PROPOSED):** EP1 and EP3 gain the argument one by one,
+  in separate pull requests, so the runner passes `parameters=` only to an
+  engine function whose signature has a parameter of that name that a
+  keyword can fill (`takes_parameters`, with `inspect.signature`, read once
+  when `EntryPointEngines` is built). An engine that does not take it is
+  called as before. So this change merges before or after the engines'
+  without coordination. OPEN below: when to drop the check.
 
 ### A part whose engine is not built (D12)
 
@@ -410,6 +455,15 @@ result and not both zero with one (checked at construction).
 - The test cases of `api/test_rotations.py`, `api/test_errors.py`,
   `api/test_engines.py`, `api/test_rotation_validator.py`,
   `api/test_packaging.py`.
+- Unit `l2/runner-parameters`: loading the parameter catalogue at start-up
+  from `params/records/` (`PARAMETERS_FOLDER`, `load_parameters`,
+  `load_config(..., parameters_folder=...)`, `AppConfig.parameters`); every
+  problem of `load_folder` or `check_catalogue` is a `ConfigError` and an
+  empty catalogue is not; the message text; `parameters=None` as the empty
+  catalogue in `EntryPointEngines` and `create_app`; the `TypeError` for
+  `parameters` beside `engines`; the transition rule (`takes_parameters`,
+  read once); the test cases of section 14 of `api/test_engines.py` and of
+  the catalogue section of `api/test_config.py`.
 - Unit `l2/runner-partial`: `part_not_built` and its detail text; counting a
   not-built part as one missing value; the order of the checks when an input
   is absent and an engine is not built (still `MISSING_INPUT`, no result);
@@ -441,6 +495,7 @@ here.
 | D51, D52 | A response without a point is usable; one provenance label for the three values of the point |
 | D55 | The unit strings and the label of the point; with it the settings file of the adapter is written (`adapters/settings/nasa_power.json`) |
 | D29 | The climate record period of the deployed service: 2001-01-01 to 2024-12-31 |
+| D46, D56 (Q3 of `contracts/ENTRYPOINTS.md`) | The runner loads the parameter catalogue and passes it to EP1 and EP3 as the keyword argument `parameters`; EP2 does not change; a parameter not in the catalogue is the engine's `MISSING_INPUT` (unit `l2/runner-parameters`). What the runner does when the catalogue has a problem, left to the platform developer by Q3: start-up fails (PROPOSED above). Replaces the OPEN "D46, the argument `parameters`" |
 
 ## OPEN
 
@@ -468,10 +523,19 @@ here.
   then enforces it with no change here. Until then the runner keeps the
   defensive handling of a bare `Missing` from EP1 (Q4). The first and last
   dates of the calendar remain open.
-- **D46, the argument `parameters`** (the parameter catalogue passed to EP1
-  and EP3): agreed by the platform developer, waiting for
-  `contracts/ENTRYPOINTS.md` to state it. Nothing changes in the runner
-  before that.
+- **When does the signature check of `parameters` go?** Once EP1 and EP3
+  on `main` both take `parameters`, `takes_parameters` can be removed and
+  the argument always passed. For the platform developer.
+- **Should the engines get a read-only view of the catalogue?** The runner
+  passes the same `dict` to every call, so an engine that changed it would
+  change it for every later request. `types.MappingProxyType` would prevent
+  that, but the contract's type is `dict[str, dict]`, not a mapping, so the
+  runner passes the dictionary itself. For the platform developer (and lane
+  L0 for the contract's type).
+- **Should `parameters` become a required argument of `EntryPointEngines`
+  and `create_app`?** Today `None` means the empty catalogue, because a test
+  of lane L1 (`engine/water/test_exposure.py`) builds `EntryPointEngines`
+  without it. For the platform developer.
 - **Which file holds the demonstration values of soil and slope?** A person
   supplies them; the PLACEHOLDER file is for testing the pipeline only (#77).
   D48 and D49 bring soil, slope and available water from public data through
