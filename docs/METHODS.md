@@ -52,12 +52,12 @@ Two parts, from two sources:
 
 | Part | Method of the first release | Source |
 |---|---|---|
-| Fraction of the annual erosivity in each month | The monthly erosivity of a published climatology at the point: the fraction of a month is that month's value over the sum of the twelve | GloREDa (Panagos et al. 2023, Zenodo record 8036998), named by D69 |
+| Fraction of the annual erosivity in each month | The monthly erosivity of a published climatology at the point: the fraction of a month is that month's value over the sum of the twelve | GloREDa (Panagos et al. 2023, Zenodo record 8036998, licence "Creative Commons Attribution 4.0 International", read on 14 November 2026), named by D69 |
 | Variation between years | **Deferred** (USER-G): the same twelve fractions hold for every agricultural year. The climatology gives none; this is declared as a limit of the method (D69) | — |
 
-- `OPEN` under D69: which licence governs the climatology (one distributor's copy states conditions that contradict the licence of the Zenodo record). The team confirms it before any value is committed; until then the monthly values stay `NOT_AVAILABLE` and `C` is a single declared value.
+- `OPEN` under D69: which licence governs the climatology: the copy distributed by ESDAC states conditions that contradict the licence of the Zenodo record. The team confirms it before any value is committed; until then the monthly values stay `NOT_AVAILABLE` and `C` is a single declared value.
 - The form is built in `engine/erosion/r_factor/climatology.py` (PROPOSED); it holds no value of the climatology.
-- `OPEN`: how the mean annual level of S4 reaches the field. D68 of issue #77 and a later instruction of the lead developer that keeps the choice pending are being reconciled; see "Pending" in [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md).
+- `DECIDED` for how the mean annual level of S4 reaches the field (decided by the lead developer on 14 November 2026, [issue #77, D68](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6884997091), confirmed with D71 to D82): **the nearest locality of S4, Cuadro 2, series 1980-2009, declared as the method choice**, with a locality other than Salto, because Cuadro 2 and Cuadro 3 differ for Salto; the source is not corrected and the difference is kept as a note. Which locality applies to the point is declared by a person (D67); see "R and K at the demonstration point" in [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md).
 - Finding of the AI pre-check (F16, not a decision): S4 prints regressions of the **annual** `R` only and gives no monthly distribution in pages 92 to 93, so the control of the third row of the first table has no published monthly form among the pages read (`engine/erosion/r_factor/README.md`, OPEN 7). Decided (PC-7 of [SCIENCE_DECISIONS.md](SCIENCE_DECISIONS.md)): the control is marked without a source and stays out of the route of the first release.
 
 ### M1.3 Factor K and soil-loss tolerance
@@ -65,6 +65,7 @@ Two parts, from two sources:
 The question was: which source the event repository may use.
 
 - `DECIDED` for the source of `K` (decided by the lead developer on 14 November 2026, issue #77, D10; acceptance by a science reviewer pending): **the open dataset of source S9**.
+- `DECIDED` for the `K` of the demonstration point ([issue #77, D70](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6884997091), confirmed with D71 to D82): **the mean `K` of the point's soil class in S9, Table 1, with the class standard deviation as the range**. The header label "mg kg-1" over that column is recorded as a note, not corrected; the unit is confirmed against the paper (D11, M1.7). The soil class of the point is declared by a person (D67).
 - `OPEN` for the soil-loss tolerance: which source the event repository may use. As far as the planning notes record, the dataset of S9 carries `K` and not the tolerance (issue #77).
 
 What the planning notes say, unchanged:

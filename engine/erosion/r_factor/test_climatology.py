@@ -46,7 +46,9 @@ ROUNDING = 1e-12
 # PLACEHOLDER monthly values: month m is worth m, so the sum is 78.
 PLACEHOLDER_MONTHS = {m: float(m) for m in range(1, 13)}
 PLACEHOLDER_SUM = 78.0
-LEVEL = 780.0  # PLACEHOLDER mean annual level: ten times the sum
+LEVEL = (
+    0.78  # PLACEHOLDER mean annual level, plainly not a real R: the sum over a hundred
+)
 
 
 def fractions_of_placeholder():
@@ -112,7 +114,7 @@ def test_r_is_the_level_times_the_fraction_and_repeats_every_year():
     for ag_year, cells in table.items():
         assert len(cells) == 12
         for (_, month), value in cells.items():
-            assert value == pytest.approx(10.0 * month, abs=ROUNDING)
+            assert value == pytest.approx(month / 100, abs=ROUNDING)
         assert math.fsum(cells.values()) == pytest.approx(LEVEL, abs=1e-9)
     assert [table[2001][(2001, m)] for m in range(7, 13)] == [
         table[2002][(2002, m)] for m in range(7, 13)
@@ -174,7 +176,7 @@ def test_r_with_a_missing_or_foreign_level_or_missing_fractions():
     missing = table[2001][(2001, 2)]
     assert isinstance(missing, ResultMissing)
     assert missing.reason == "MISSING_INPUT" and "month 02" in missing.detail
-    assert table[2001][(2001, 3)] == pytest.approx(30.0, abs=ROUNDING)
+    assert table[2001][(2001, 3)] == pytest.approx(0.03, abs=ROUNDING)
 
 
 def test_the_table_of_r_has_the_shape_of_the_daily_index_route():
