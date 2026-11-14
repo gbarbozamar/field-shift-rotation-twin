@@ -7,12 +7,13 @@ Which method each engine implements, and where it is published. This file names 
 - Every item has one status: `PROPOSED`, `DECIDED` or `OPEN`, with the meaning of blueprint section 3.7 and of `contracts/CONVENTIONS.md`.
 - The items below were transcribed by an AI session from the planning notes of the lead developer, who approved them on 14 November 2026: they are `DECIDED`. They are science class: a science reviewer still has to accept them. A point marked `OPEN` inside a decided item is not decided.
 - Two points that were `OPEN` here, the source of `K` in M1.3 and the units of `R` and `K` in M1.7, were decided by the lead developer on 14 November 2026 and recorded in issue #77 (decisions D10 and D11). An AI session transcribed them into this file. Like the other items of this file, a science reviewer still has to accept them.
+- Section M2 (the water method) and the sub-factors of M1.5 hold decisions D44 and D45 of the lead developer, of 14 November 2026, recorded in [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346). A builder session wrote them into this file. Issue #77 says of them that where they are science class, a science reviewer may still review them: both are science class, so acceptance by a science reviewer is pending.
 - A citation here says where a method is published. The column "Read" says how far the planning notes got with the source: `read` (the abstract or the text was read), `fragments` (only fragments of the abstract), or `located` (the reference was found, nothing of it was read). A builder session never takes a number from memory of these sources: it reads it from the parameter catalogue, and returns a missing value with its reason when the catalogue does not have it.
 - If an engine needs a method that is not in this file, that is an `OPEN` point for the lead developer, not something a session chooses.
 
 ## M1 Soil loss: `engine/erosion/`
 
-Status of the whole section: `DECIDED`, except the points marked `OPEN`: in M1.3 the source of the soil-loss tolerance, in M1.5 the sub-factors and the source of each input, and in M1.7 the confirmation of the units against the sources. Acceptance by a science reviewer is pending.
+Status of the whole section: `DECIDED`, except the points marked `OPEN`: in M1.3 the source of the soil-loss tolerance, in M1.5 the source of each input and the level of residue cover at sowing, and in M1.7 the confirmation of the units against the sources. Acceptance by a science reviewer is pending.
 
 ### M1.1 The method
 
@@ -75,7 +76,16 @@ The slope steepness and slope length equations of RUSLE: steepness with two bran
 
 The soil-loss ratio of a period comes from the sub-factor equations of RUSLE (canopy, surface cover, and the other sub-factors of S1). Blueprint section 8 places this unit in Block 2.
 
-`OPEN`, for the lead developer and the science reviewers: which sub-factors are used, and the source of each input (residue cover at sowing, canopy cover and fall height by stage). The share of the soil covered by residue at sowing is the most sensitive input: it is explicit, and the result is shown for more than one level.
+`DECIDED` for the sub-factors (decided by the lead developer on 14 November 2026, [issue #77, D45](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346); acceptance by a science reviewer pending). Before this decision they were `OPEN` here.
+
+- Two sub-factors are used: **canopy cover**, and **surface residue cover, with residue decay by residue type**. Both come from the equations of source S1.
+- The other sub-factors (roughness, soil biomass, consolidation, prior land use) are set to one. This is declared as a limit of the method. The text on the limits of the method is the separate unit named in M1.1.
+- Every coefficient of these equations is a parameter in `params/`, transcribed and checked under decision D34 of issue #77. The decision names no equation, coefficient or value, and this file names none.
+
+`OPEN`, for the lead developer and the science reviewers, not answered by D45:
+
+- The source of each input (residue cover at sowing, canopy cover and fall height by stage, the residue type of each crop). Whether the erosion engine takes residue cover from the residue ledger is Q12 of `contracts/ENTRYPOINTS.md`.
+- The level of residue cover at sowing. The share of the soil covered by residue at sowing is the most sensitive input: it is explicit, and the result is shown for more than one level.
 
 ### M1.6 Factor P
 
@@ -93,6 +103,50 @@ The engine works in the International System and converts at the edge. The unit 
 
 `OPEN`, for a science reviewer: **are the published values of `R` and `K` in these units?** A science reviewer confirms it against the sources before any value is transcribed.
 
+## M2 Water deficit exposure: `engine/water/`
+
+Status of the whole section: `DECIDED` (decided by the lead developer on 14 November 2026, [issue #77, D44](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346)), except the points marked `OPEN`: the citation of S10, the source of the Curve Number method, and where the result says that the fallback of M2.3 was used. Acceptance by a science reviewer is pending.
+
+This section names the method of the reference evapotranspiration and of the daily water balance. The indicator computed from the balance, and its descriptive measures, are defined in C1.4 of `contracts/CONVENTIONS.md`, not here. D44 names no parameter value, coefficient or expected result: each comes from a source, transcribed and checked under decision D34 of issue #77, into `params/`.
+
+### M2.1 Reference evapotranspiration
+
+The daily **FAO-56 Penman-Monteith** method. Source: S10.
+
+It is checked against the worked example of the manual: test H2 of `docs/VALIDATION.md`, whose definition, expected value and tolerance are still `OPEN` there.
+
+### M2.2 Daily water balance
+
+As D44 states it:
+
+- **Daily and continuous** over the whole rotation and all years, **never reset** between crops or years.
+- **A single column per field, rain-fed, no water table, no lateral exchange.**
+- Actual evapotranspiration: `ETa = (Ks · Kcb + Ke) · ET0`, the dual crop coefficient of FAO-56, chapters 7 and 8 (S10).
+- Water stress `Ks` from the depletion, with the readily available fraction of the crop.
+- Soil evaporation `Ke` from the daily balance of the surface layer of FAO-56 (S10).
+- Runoff by the **Curve Number**.
+- Daily mass closure: `ΔS = P − Q − E − T − D`.
+
+D44 does not spell out the symbols of the closure. `engine/water/balance/README.md` (rule R1) reads them as the change of storage in the column over the day (`ΔS`), precipitation (`P`), runoff (`Q`), evaporation (`E`), transpiration (`T`) and drainage (`D`).
+
+`OPEN`, for the lead developer and the science reviewers: **the source of the Curve Number method.** D44 names the method and no source, and S10 is not cited for it.
+
+### M2.3 Fallback to the single crop coefficient
+
+If the crop parameters of the dual coefficient or the values of the surface layer do not arrive, the engine falls back to the **single crop coefficient and one layer, and says so in the result** (D44).
+
+`OPEN`, for the lead developer, who owns the results contract, and the interface developer, who shows it: **where the result says that the fallback was used.** No field of `contracts/results/models.py` is named for it.
+
+### M2.4 What is built today
+
+No value of the water axis is computed today: EP3 returns every item missing with its reason, and `params/records/` holds no parameter.
+
+| Part | Where | State |
+|---|---|---|
+| Reference evapotranspiration (M2.1) | `engine/water/et0/`, pull request #121 | The forms of the equations are written; every constant is an argument the caller supplies, with no default. The test of H2 is written and skipped until its values are transcribed. Its README lists what is still `OPEN` |
+| Daily water balance (M2.2) | `engine/water/balance/`, pull request #116 | The single-bucket form only: one layer, as in the fallback of M2.3. Runoff and `Ke` are inputs that the caller supplies; the Curve Number and the surface layer are not built. Every coefficient is an argument with no default |
+| Entry point EP3 of `contracts/ENTRYPOINTS.md` | `engine/water/exposure.py`, pull request #135 | Mechanical form: it lays out the agricultural years and returns every item missing with its reason. It returns no number |
+
 ## Sources
 
 | Id | Reference | Read |
@@ -106,14 +160,14 @@ The engine works in the International System and converts at the edge. The unit 
 | S7 | Renard, K.G., Freimund, J.R. (1994). Using monthly precipitation data to estimate the R-factor in the revised USLE. *Journal of Hydrology* 157:287–306. https://doi.org/10.1016/0022-1694(94)90110-4 | fragments; its equation was taken from S4 |
 | S8 | Emberson, R. (2023). Dynamic rainfall erosivity estimates derived from IMERG data. *Hydrology and Earth System Sciences* 27:3547–3563. https://doi.org/10.5194/hess-27-3547-2023 | read |
 | S9 | Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. *Ciencia e Investigación Agraria* 44(1):100–112. https://doi.org/10.7764/rcia.v44i1.1622 | read |
+| S10 | FAO-56. Reference: `OPEN`, `CITATION NEEDED`: a person composes it, as item 17 of the OPEN list of `engine/water/et0/README.md` asks. Issue #13 records how the contents page identifies the document: title line "Crop evapotranspiration - Guidelines for computing crop water requirements - FAO Irrigation and drainage paper 56"; authors R.G. Allen, L.S. Pereira, D. Raes, M. Smith; FAO, Rome, 1998. https://www.fao.org/4/X0490E/x0490e00.htm. Locators used in this file: chapter 4, Example 18, the daily worked example that issue #13 locates for H2 (the definition of H2 is `OPEN` in `docs/VALIDATION.md`, so which example H2 uses is for the science reviewers); chapters 7 and 8, the dual crop coefficient, as D44 names them | located (issue #13 read the online pages on 14 November 2026; the session that wrote this row did not read the source) |
 
-For the science reviewers: check every row not marked `read` against the source before a parameter is transcribed from it, and complete the author lists and titles of S3, S5 and S6.
+For the science reviewers: check every row not marked `read` against the source before a parameter is transcribed from it, and complete the author lists and titles of S3, S5 and S6. For the lead developer and the science reviewers: compose the reference of S10, and decide which terms govern its reuse (issue #13).
 
 ## Not in this file yet
 
 `OPEN`, for the lead developer:
 
-- The method of the daily water balance and of the reference evapotranspiration (blueprint section 8 names a worked FAO-56 example as the acceptance test of the second).
 - The methods of the residue ledger and of the two carbon models.
 - The correction of soil loss for soil water, if any is applied.
 - The name of the official program that a person runs for the comparison of blueprint section 8.
