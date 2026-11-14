@@ -12,6 +12,8 @@ from .models import (
     CarbonInputSeries,
     ClimateSeries,
     ForcingHorizon,
+    SoilCoverSeries,
+    StartingStateValue,
 )
 
 __all__ = [
@@ -22,4 +24,6 @@ __all__ = [
     "CarbonInputSeries",
     "ClimateSeries",
     "ForcingHorizon",
+    "SoilCoverSeries",
+    "StartingStateValue",
 ]

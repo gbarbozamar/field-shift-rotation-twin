@@ -14,6 +14,11 @@ The shared parts are imported from ``contracts.inputs``, never copied:
 ``SiteClimate`` (one item per calendar month with its year, C5.1) and the
 soil property item of ``SiteSoilSlope``.
 
+The monthly soil-cover series and the starting state of the soil carbon
+travel inside the forcing, not as separate arguments of the carbon engines
+(decision D65 of issue #77). Which cover quantity and which pools, with
+which identifiers and units, are OPEN.
+
 Models and pure validation only. No network calls, no parameter values.
 """
 
@@ -85,6 +90,28 @@ class CarbonInputSeries(MonthlySeries):
     origin: QuantityId  # vocabulary OPEN
 
 
+class SoilCoverSeries(MonthlySeries):
+    """One monthly soil-cover series of the forcing (D65 of #77).
+
+    The shape of ``MonthlySeries``, unchanged: a ``quantity`` identifier, the
+    unit kept when values are missing, provenance, source or assumption mark,
+    ``range_missing``, and one item per month from ``start`` to ``end``, each
+    a number or missing with its reason. Which cover quantity, how it is
+    written as a number (or whether it needs another shape) and its unit are
+    OPEN.
+    """
+
+
+class StartingStateValue(SoilProperty):
+    """One value of the starting state of the soil carbon (D65 of #77).
+
+    A ``Value`` with a ``quantity`` identifier, as a soil property is: a number
+    with its unit, provenance, source or assumption mark and range (or the
+    reason it has none), or missing with its reason, keeping its unit. Which
+    pools, their identifiers and units, and how the state is obtained are OPEN.
+    """
+
+
 class AnnualValue(_SeriesItem):
     """One value of an annual series: a number or missing with its reason (C3.1).
 
@@ -136,7 +163,7 @@ class AnnualCarbonInputSeries(AnnualSeries):
 
 
 def _unique_quantities(
-    items: Sequence[ClimateSeries | AnnualSeries | SoilProperty], what: str
+    items: Sequence[MonthlySeries | AnnualSeries | SoilProperty], what: str
 ) -> None:
     repeated = sorted(q for q, n in Counter(i.quantity for i in items).items() if n > 1)
     if repeated:
@@ -196,16 +223,22 @@ class CarbonForcing(ContractModel):
     annual_climate: list[AnnualSeries]  # quantities and annual aggregation OPEN
     annual_carbon_inputs: list[AnnualCarbonInputSeries]  # as carbon_inputs
     soil_properties: list[SoilProperty]  # which properties OPEN
+    soil_cover: list[SoilCoverSeries]  # D65; quantity, encoding and unit OPEN
+    starting_state: list[StartingStateValue]  # D65; pools and units OPEN
 
     @model_validator(mode="after")
     def _consistent(self) -> CarbonForcing:
         _unique_quantities(self.climate, "climate")
         _unique_quantities(self.carbon_inputs, "carbon_inputs")
         _unique_quantities(self.soil_properties, "soil_properties")
+        _unique_quantities(self.soil_cover, "soil_cover")
+        _unique_quantities(self.starting_state, "starting_state")
         for series in self.climate:
             _covers_horizon(series, self.horizon, "climate")
         for series in self.carbon_inputs:
             _covers_horizon(series, self.horizon, "carbon_inputs")
+        for series in self.soil_cover:
+            _covers_horizon(series, self.horizon, "soil_cover")
         _unique_quantities(self.annual_climate, "annual_climate")
         _unique_quantities(self.annual_carbon_inputs, "annual_carbon_inputs")
         annual = [
