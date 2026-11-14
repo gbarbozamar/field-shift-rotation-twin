@@ -127,8 +127,9 @@ def last_day_of(ag_year: int) -> dt.date:
 
 # Three spans of the record, all from the dates of the example series.
 def several_full_years() -> tuple[dt.date, dt.date]:
-    """From the first day of the agricultural year after the example's first
-    day, to the last day of the agricultural year two later."""
+    """From the first day of the agricultural year that begins in the calendar
+    year of the example's first day, to the last day of the agricultural year
+    two later."""
     first_ag_year = example_start().year
     return first_day_of(first_ag_year), last_day_of(first_ag_year + 2)
 
@@ -333,6 +334,27 @@ def test_year_or_month_not_covered_by_precipitation_is_no_coverage():
     } == {"MISSING_INPUT", "NO_COVERAGE"}
 
 
+def test_series_one_day_short_at_each_end_leaves_first_and_last_not_covered():
+    full_first, full_last = several_full_years()
+    span = (full_first + ONE_DAY, full_last - ONE_DAY)
+    result = run(climate_=climate(span))
+    assert isinstance(result, SoilLossResults)
+    ag_years = expected_ag_years(*span)
+    assert [item.ag_year for item in result.annual] == ag_years
+
+    reasons = {item.ag_year: item.missing.reason for item in result.annual}
+    assert reasons[ag_years[0]] == "NO_COVERAGE"
+    assert reasons[ag_years[-1]] == "NO_COVERAGE"
+    for ag_year in ag_years[1:-1]:
+        assert reasons[ag_year] == "MISSING_INPUT", ag_year
+
+    months = result.monthly
+    assert months[0].missing.reason == "NO_COVERAGE"
+    assert months[-1].missing.reason == "NO_COVERAGE"
+    for item in months[1:-1]:
+        assert item.missing.reason == "MISSING_INPUT", (item.year, item.month)
+
+
 def test_calendar_dates_outside_the_record_keep_the_years_of_the_record():
     span = several_full_years()
     moved = run(calendar_outside_the_record(), climate(span))
@@ -499,6 +521,12 @@ def test_module_imports_only_allowed_modules_and_holds_only_month_integers():
         and not isinstance(node.value, bool)
     }
     assert numbers == {12, 1}
+    format_specs = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FormattedValue) and node.format_spec is not None
+    ]
+    assert format_specs == [], "a format specification can hide a number"
 
 
 def test_package_exposes_compute_soil_loss_with_exactly_three_parameters():
