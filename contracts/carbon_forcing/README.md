@@ -8,7 +8,9 @@ Status: **PROPOSED** (blueprint section 3.7). Nothing in this folder is in force
 
 Purpose, from blueprint section 5: **the same inputs, climate and horizon for both carbon models.** One document per rotation of one field; the same object is given to `run_amg` (EP5) and to `run_rothc` (EP6) of `contracts/ENTRYPOINTS.md`.
 
-This contract fixes **structure only**: which parts exist, what shape each takes, how an absence travels. It names no quantity a carbon model needs, no unit, no soil depth, no horizon and no rule for making a month or an agricultural year from the daily record. Each of those is under [OPEN](#open), with who answers it.
+**Decision D65 of issue #77** (lead developer, 14 November 2026): EP5 and EP6 keep the same arguments (`forcing` and `parameters`), and **the monthly soil-cover series and the starting state of the soil carbon travel inside this contract**, not as separate arguments. They are the parts `soil_cover` and `starting_state` below. Their fields are PROPOSED; which cover quantity and which pools they hold, with which identifiers and units, stay [OPEN](#open) (items 8 and 9).
+
+This contract fixes **structure only**: which parts exist, what shape each takes, how an absence travels. It names no quantity a carbon model needs, no unit, no soil depth, no horizon, no cover category, no carbon pool and no rule for making a month or an agricultural year from the daily record. Each of those is under [OPEN](#open), with who answers it.
 
 **The example is PLACEHOLDER data.** Every number, identifier, unit string and source string in it is illustrative. It describes no real place, field or producer, and says `"example_data": true`. Its identifiers are those of the input examples (`PLACEHOLDER-case`, `PLACEHOLDER-field`, `PLACEHOLDER-rotation`), since a forcing is built from those inputs.
 
@@ -26,7 +28,7 @@ The model imports, and does not copy, the shared parts of `contracts/inputs/` (s
 
 - `Value` and `Missing` of `common.py`: a number with its unit, provenance, source or assumption mark and range (or the reason it has none); or missing with its reason, keeping its unit (C1.1, C2, C3, C4).
 - `MonthlySeries` and `YearMonth` of `site_climate.py`: a series with a `quantity` identifier, its unit once for the series (kept when values are missing), provenance, source or assumption mark, `range_missing`, a `start` and `end` month, and one item per calendar month with its `year` (C5.1), each a number or missing with its reason.
-- `SoilProperty` of `site_soil_slope.py`: a `Value` with a `quantity` identifier.
+- `SoilProperty` of `site_soil_slope.py`: a `Value` with a `quantity` identifier. `StartingStateValue` has the same shape.
 - `_SeriesItem` and `_SeriesHeader` of `site_climate.py`, for the annual series: an item that holds a number or a `missing` part, never both and never neither, and the header rules of `MonthlySeries`. Both are private names there; they are imported so the rules stay in one place, and lane L0 may make them public later.
 
 Every model rejects unknown fields and does not coerce types: a number or a month written as text is rejected.
@@ -49,6 +51,8 @@ All PROPOSED.
 | `annual_climate` | list of `AnnualSeries` | Required key; an empty list is allowed. The header of `MonthlySeries` (quantity, unit kept when values are missing, provenance, source or assumption mark, `range_missing`), then `first_ag_year`, `last_ag_year` (inclusive) and `years`: one `AnnualValue` (`ag_year`, then a number or missing with its reason) per agricultural year from first to last, in order, no gap, no duplicate. `ag_year` is the calendar year in which the agricultural year begins (C5.3). A `quantity` appears at most once in the list |
 | `annual_carbon_inputs` | list of `AnnualCarbonInputSeries` | As `annual_climate`, and each series also carries `origin`, as `carbon_inputs` does |
 | `soil_properties` | list of `SoilProperty` | As `SiteSoilSlope.soil_properties`. A `quantity` appears at most once in the list |
+| `soil_cover` | list of `SoilCoverSeries` | Required key; an empty list is allowed. The monthly soil-cover series (D65). The shape of `MonthlySeries`, unchanged, with the rules of `climate`: each series runs over exactly the months of the horizon, one item per month, a month without data stays in the series missing with its reason, never zero, and a `quantity` appears at most once in the list. Which cover quantity, how cover is written as a number and in which unit are OPEN (item 8) |
+| `starting_state` | list of `StartingStateValue` | Required key; an empty list is allowed. The starting state of the soil carbon (D65): each item is a `Value` with a `quantity` identifier, as a soil property is: a number with its unit, provenance, source or assumption mark and range (or the reason it has none), or missing with its reason, keeping its unit. A `quantity` appears at most once in the list. PROPOSED: it is the state at the beginning of the first month of the horizon. Which pools, identifiers and units are OPEN (item 9) |
 
 A `quantity` identifier is unique within each list; the same identifier may appear in two different lists (PROPOSED).
 
@@ -58,9 +62,11 @@ How an annual value is made from the monthly values or from the daily record, an
 
 Each monthly series repeats `start` and `end`, which must equal the horizon. That is the shape of `MonthlySeries` reused as it is; the repetition lets a consumer read a series on its own.
 
+An empty `soil_cover` or `starting_state` names no value, so it carries no reason. A carbon engine that needs a quantity the list does not hold answers by G4 of `contracts/ENTRYPOINTS.md`: the result is missing with reason `MISSING_INPUT`, and `detail` names the quantity. The same holds for `climate` and `soil_properties`.
+
 ## Left out, and why
 
-- **The starting soil carbon.** It belongs to `ModelState` ("same starting soil carbon across models", blueprint section 5). Whether it is an argument of the carbon engines, part of what they return, or both is Q14 (a) of `contracts/ENTRYPOINTS.md`.
+- **The state at the end of the horizon.** Whether a carbon engine also returns its final state, inside `CarbonBalance`, is the rest of Q14 (a) of `contracts/ENTRYPOINTS.md`. Blueprint section 5 names a `ModelState` contract ("same starting soil carbon across models"); whether it later takes over the shape of `starting_state` is OPEN (item 9).
 - **Any parameter of one model.** Model parameters come from the parameter catalogue of `params/`, passed to the engines by the runner (decision D46 of issue #77), not in the forcing.
 
 ## PROPOSED cases
@@ -113,6 +119,25 @@ Every case below is a change to the example. The invalid ones must be rejected f
 | `annual-missing-year-written-as-zero` | A missing agricultural year keeps its `missing` part and its value is zero (C3.1) |
 | `annual-year-written-as-text` | An `ag_year` written as text |
 | `annual-carbon-inputs-origin-left-out` | An annual series of carbon inputs without `origin` |
+| `soil-cover-left-out` | No `soil_cover` key |
+| `starting-state-left-out` | No `starting_state` key |
+| `unknown-field-in-soil-cover` | A part the contract does not name, in a soil-cover series |
+| `unknown-field-in-starting-state` | A part the contract does not name, in a starting value |
+| `soil-cover-shorter-than-horizon` | A soil-cover series, consistent in itself, ends one month before the horizon |
+| `soil-cover-one-month-short` | A soil-cover series loses its last month and keeps its `end` |
+| `duplicate-soil-cover-quantity` | Two soil-cover series share one `quantity` |
+| `soil-cover-without-unit` | A soil-cover series has no `unit` (C1.1) |
+| `soil-cover-value-written-as-text` | A soil-cover value written as text |
+| `soil-cover-missing-month-without-reason` | A missing soil-cover month loses its `missing` part (C3.1) |
+| `soil-cover-missing-month-written-as-zero` | A missing soil-cover month keeps its `missing` part and its value is zero (C3.1) |
+| `duplicate-starting-state-quantity` | Two starting values share one `quantity` |
+| `starting-state-quantity-left-out` | A starting value without `quantity` |
+| `starting-state-quantity-not-an-identifier` | The `quantity` of a starting value in upper case |
+| `starting-state-number-written-as-text` | A starting value written as text |
+| `starting-state-without-source` | A present starting value loses its `source` and has no assumption mark (C4.2) |
+| `missing-starting-state-written-as-zero` | The missing starting value keeps its `missing` part and its value is zero (C3.1) |
+| `missing-starting-state-without-reason` | The missing starting value loses its `missing` part (C3.1) |
+| `missing-starting-state-without-unit` | The missing starting value loses its unit (C3.1) |
 
 ### Accepted
 
@@ -124,16 +149,27 @@ Every case below is a change to the example. The invalid ones must be rejected f
 | `empty-annual-lists-with-horizon-not-whole-years` | A horizon of four months with its monthly series, and both annual lists empty |
 | `empty-annual-lists-with-whole-year-horizon` | Both annual lists empty, horizon of twelve months |
 | `same-quantity-in-two-lists` | A carbon input series uses the `quantity` of a climate series |
+| `empty-soil-cover-and-starting-state` | No soil-cover series and no starting value |
+| `soil-cover-all-months-missing-keeps-unit` | Every month of the soil-cover series is missing; the series keeps its unit and carries no provenance, source or range reason |
+| `soil-cover-zero-is-a-real-value` | A soil-cover month holds zero with no `missing` part |
 
 ## OPEN
 
 Each item is a question a person has to answer. Until then the model keeps the generic shape above.
 
-1. **Which climate quantities does each carbon model need, by month, with which identifier and unit?** For the science reviewers; the AMG lane (L1) and the RothC lane (L2b) as consumers.
+1. **Which climate quantities does each carbon model need, by month, with which identifier and unit?** For the science reviewers; the AMG lane (L1) and the RothC lane (L2b) as consumers. Input for RothC: the interface developer transcribed the nine data the RothC users guide of 2014 requires (pp. 6-8) on [#176](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/176#issuecomment-6884985528), with his reading as consumer, not a decision, of where each lives: monthly rainfall, open-pan evaporation and mean air temperature in `climate`; plant residues and farmyard manure in `carbon_inputs`, with two origins; clay content in `soil_properties`; soil cover, bare or vegetated per month, in `soil_cover` (item 8); the depth of the soil layer sampled in `soil_depth`; the decomposability ratio of incoming plant material is model guidance, not forcing data. No identifier, unit or category is taken from that list until a person decides it.
 2. **How is a monthly value made from the daily record of `SiteClimate` (sum, mean or other, per quantity), and what does a month with missing days become?** C3.4 decides that gaps may be filled by a method a person chooses; the method is OPEN there. For the science reviewers.
 3. **Which soil depth, in which unit, and which horizon?** The OPEN item of C1.6. Also whether the horizon must start and end on agricultural-year boundaries when no annual series is present, and whether `horizon.start` must be the start month of the case (C5.3, C5.4). Related and decided: the agricultural years a result lists are every agricultural year of the climate record, 2001-01-01 to 2024-12-31 (D29 of #77), cut by the start month of the case (D47 of #77, `contracts/ENTRYPOINTS.md` Q5); whether the forcing horizon must equal those years is not decided. For the science reviewers.
-4. **Q14 of `contracts/ENTRYPOINTS.md`, as far as it touches this contract.** (a) Does the starting soil carbon (`ModelState`) travel beside the forcing or in it? (b) Do the carbon engines take `ResidueLedger` as an argument, or does `carbon_inputs` hold what comes from it, and which identifiers can `origin` take? (c) Nothing in this contract depends on who computes `soil_carbon_trend`. (d) The contract now carries both monthly and annual series (`annual_climate`, `annual_carbon_inputs`); which one each variant of AMG reads, and how each result is labelled, is for the lead developer. For the lead developer, the interface developer and the platform developer.
+4. **Q14 of `contracts/ENTRYPOINTS.md`, as far as it touches this contract.** (a) Does the starting soil carbon (`ModelState`) travel beside the forcing or in it? **Decided by D65 of #77: in it** (`starting_state`); what it holds is item 9. (b) Do the carbon engines take `ResidueLedger` as an argument, or does `carbon_inputs` hold what comes from it, and which identifiers can `origin` take? (c) Nothing in this contract depends on who computes `soil_carbon_trend`. (d) The contract now carries both monthly and annual series (`annual_climate`, `annual_carbon_inputs`); which one each variant of AMG reads, and how each result is labelled, is for the lead developer. For the lead developer, the interface developer and the platform developer.
 5. **Which soil properties do both models share, with which identifier and unit?** For the science reviewers.
-6. **The producer function.** Where in `adapters/` or `api/` the forcing is built from `SiteClimate`, `SiteSoilSlope` and the residue ledger, and when it is called. For the platform developer, in a later unit.
+6. **The producer function.** Where in `adapters/` or `api/` the forcing is built from `SiteClimate`, `SiteSoilSlope` and the residue ledger, and when it is called. Also what `soil_cover` and `starting_state` are built from, and by whom. For the platform developer, in a later unit.
 7. **How is an annual value made from the monthly values or from the daily record (per quantity), and what does an agricultural year with missing months become?** C5.5 decides only that a year the data does not cover in full is missing with reason `NO_COVERAGE`. Which annual quantities each model needs, with which identifier and unit, is part of the same question. For the science reviewers.
-8. **Where does a monthly soil-cover series (for example vegetated or bare, which the rate modifiers of RothC use) live?** In `climate`, in `carbon_inputs` with an `origin`, or in a third list of monthly series. Raised by the interface developer as RothC consumer on the pull request of this contract. The home is to be decided when the quantities are named (item 1). For the lead developer and the interface developer; which quantity and unit, for the science reviewers.
+8. **The monthly soil-cover series (for example vegetated or bare, which the rate modifiers of RothC use).** Raised by the interface developer as RothC consumer on the pull request of this contract. **Where it lives is decided by D65 of #77: inside the forcing**, not as an argument of EP6; this unit PROPOSES a list of its own, `soil_cover`, in the shape of `MonthlySeries`. The interface developer reads the RothC guide as asking whether the soil is bare or vegetated in each month ([#176](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/176#issuecomment-6884985528), item 6 of the nine data; see item 1). That reading is a category per month; the numeric shape here holds it only once a person decides how a category is written as a number, or replaces the shape (second point below). Still OPEN:
+   - which cover categories or quantity, with which identifier: for the science reviewers; the interface developer for RothC, the lead developer for AMG;
+   - how cover is written as a number (for example a fraction, or one number per category) and in which unit, or whether it needs a shape other than a number (a category per month), which would change `SoilCoverSeries`: for the same roles;
+   - whether AMG reads it at all: for the lead developer.
+9. **The starting state of the soil carbon (`starting_state`, D65 of #77).** Still OPEN:
+   - which pools or quantities it holds (one total stock shared by both models, the pools of each model, or both), with which identifiers and units, and for which soil depth (C1.6): for the science reviewers; the interface developer for RothC, the lead developer for AMG;
+   - how it is obtained (measured, declared, or computed before the horizon) and with which provenance label: for the science reviewers;
+   - whether it is the state at the beginning of the first month of the horizon, as PROPOSED here, or needs a date of its own: for the lead developer and the interface developer;
+   - whether the `ModelState` contract of blueprint section 5 later takes over the shape of `StartingStateValue`, and whether a model also returns its final state (Q14 (a) of `contracts/ENTRYPOINTS.md`): for the lead developer.

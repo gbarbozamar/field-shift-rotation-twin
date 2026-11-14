@@ -349,5 +349,113 @@
         "detail": "PLACEHOLDER: example of a value the source does not have for this place"
       }
     }
+  ],
+  "soil_cover": [
+    {
+      "quantity": "placeholder_soil_cover_quantity_a",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2001,
+        "month": 12
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": 1.0
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": 2.0
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": 3.0
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": 4.0
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": 5.0
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": null,
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER: example of a month whose cover nobody has given"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": 7.0
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": 8.0
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": 9.0
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": 10.0
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": 11.0
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": 12.0
+        }
+      ]
+    }
+  ],
+  "starting_state": [
+    {
+      "quantity": "placeholder_state_quantity_a",
+      "value": 30.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "DECLARED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      }
+    },
+    {
+      "quantity": "placeholder_state_quantity_b",
+      "value": null,
+      "unit": "PLACEHOLDER_unit",
+      "missing": {
+        "reason": "NOT_DECLARED",
+        "detail": "PLACEHOLDER: example of a starting value nobody has given yet"
+      }
+    }
   ]
 }

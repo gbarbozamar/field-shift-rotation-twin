@@ -32,6 +32,9 @@ CARBON = ["carbon_inputs", 0]
 ANNUAL = ["annual_climate", 0]  # the annual series with a value
 ANNUAL_MISSING = ["annual_climate", 1]  # the annual series whose year is missing
 ANNUAL_CARBON = ["annual_carbon_inputs", 0]
+COVER = ["soil_cover", 0]  # the soil-cover series with one missing month
+STATE = ["starting_state", 0]  # the starting value that is present
+STATE_MISSING = ["starting_state", 1]  # the starting value that is missing
 LAST_MONTH = {"year": 2001, "month": 11}  # one month before the end of the horizon
 
 
@@ -129,10 +132,15 @@ def _annual_carbon_shifted(data: dict[str, Any]) -> None:
     series["years"][0]["ag_year"] += 1
 
 
+def _monthly(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every monthly series of the forcing."""
+    return data["climate"] + data["carbon_inputs"] + data["soil_cover"]
+
+
 def _horizon_not_whole_years(data: dict[str, Any]) -> None:
     """Horizon and monthly series shortened by one month, annual series kept."""
     data["horizon"]["end"] = LAST_MONTH
-    for series in data["climate"] + data["carbon_inputs"]:
+    for series in _monthly(data):
         series["months"].pop()
         series["end"] = LAST_MONTH
 
@@ -141,7 +149,7 @@ def _short_horizon_without_annual(data: dict[str, Any]) -> None:
     """A horizon of four months, not a whole agricultural year, no annual series."""
     end = {"year": 2001, "month": 4}
     data["horizon"]["end"] = end
-    for series in data["climate"] + data["carbon_inputs"]:
+    for series in _monthly(data):
         del series["months"][4:]
         series["end"] = end
     data["annual_climate"] = []
@@ -150,6 +158,39 @@ def _short_horizon_without_annual(data: dict[str, Any]) -> None:
 
 def _duplicate_annual_quantity(data: dict[str, Any]) -> None:
     data["annual_climate"][1]["quantity"] = data["annual_climate"][0]["quantity"]
+
+
+def _soil_cover_shorter_than_horizon(data: dict[str, Any]) -> None:
+    """A soil-cover series consistent in itself that stops one month early."""
+    series = data["soil_cover"][0]
+    series["months"].pop()
+    series["end"] = LAST_MONTH
+
+
+def _duplicate_soil_cover_quantity(data: dict[str, Any]) -> None:
+    data["soil_cover"].append(copy.deepcopy(data["soil_cover"][0]))
+
+
+def _duplicate_starting_state_quantity(data: dict[str, Any]) -> None:
+    data["starting_state"][1]["quantity"] = data["starting_state"][0]["quantity"]
+
+
+def _soil_cover_all_missing(data: dict[str, Any]) -> None:
+    series = data["soil_cover"][0]
+    series.update(
+        months=[
+            {
+                "year": item["year"],
+                "month": item["month"],
+                "value": None,
+                "missing": {"reason": "NOT_DECLARED"},
+            }
+            for item in series["months"]
+        ],
+        provenance=None,
+        source=None,
+        range_missing=None,
+    )
 
 
 # (case, mutation, fragment of the error message)
@@ -354,6 +395,100 @@ INVALID: list[tuple[str, Mutation, str]] = [
         drop([*ANNUAL_CARBON, "origin"]),
         "origin: Field required",
     ),
+    ("soil-cover-left-out", drop(["soil_cover"]), "soil_cover: Field required"),
+    (
+        "starting-state-left-out",
+        drop(["starting_state"]),
+        "starting_state: Field required",
+    ),
+    (
+        "unknown-field-in-soil-cover",
+        put([*COVER, "unknown_part"], 1),
+        "soil_cover.0.unknown_part: Extra inputs",
+    ),
+    (
+        "unknown-field-in-starting-state",
+        put([*STATE, "unknown_part"], 1),
+        "starting_state.0.unknown_part: Extra inputs",
+    ),
+    (
+        "soil-cover-shorter-than-horizon",
+        apply(_soil_cover_shorter_than_horizon),
+        (
+            "soil_cover 'placeholder_soil_cover_quantity_a': start and end are "
+            "those of the horizon"
+        ),
+    ),
+    (
+        "soil-cover-one-month-short",
+        drop([*COVER, "months", 11]),
+        "the months stop before end",
+    ),
+    (
+        "duplicate-soil-cover-quantity",
+        apply(_duplicate_soil_cover_quantity),
+        "soil_cover: the quantity identifier 'placeholder_soil_cover_quantity_a'",
+    ),
+    (
+        "soil-cover-without-unit",
+        drop([*COVER, "unit"]),
+        "soil_cover.0.unit: Field required",
+    ),
+    (
+        "soil-cover-value-written-as-text",
+        put([*COVER, "months", 0, "value"], "1.0"),
+        "soil_cover.0.months.0.value: Input should be a valid number",
+    ),
+    (
+        "soil-cover-missing-month-without-reason",
+        drop([*COVER, "months", 5, "missing"]),
+        "a missing value carries a missing part with its reason",
+    ),
+    (
+        "soil-cover-missing-month-written-as-zero",
+        put([*COVER, "months", 5, "value"], 0.0),
+        "an item holds a value or a missing part, never both",
+    ),
+    (
+        "duplicate-starting-state-quantity",
+        apply(_duplicate_starting_state_quantity),
+        "starting_state: the quantity identifier 'placeholder_state_quantity_a'",
+    ),
+    (
+        "starting-state-quantity-left-out",
+        drop([*STATE, "quantity"]),
+        "starting_state.0.quantity: Field required",
+    ),
+    (
+        "starting-state-quantity-not-an-identifier",
+        put([*STATE, "quantity"], "PLACEHOLDER_state"),
+        "starting_state.0.quantity: String should match pattern",
+    ),
+    (
+        "starting-state-number-written-as-text",
+        put([*STATE, "value"], "30.0"),
+        "starting_state.0.value: Input should be a valid number",
+    ),
+    (
+        "starting-state-without-source",
+        drop([*STATE, "source"]),
+        "a value carries a reference to its source or the assumption mark",
+    ),
+    (
+        "missing-starting-state-written-as-zero",
+        put([*STATE_MISSING, "value"], 0.0),
+        "an item holds a value or a missing part, never both",
+    ),
+    (
+        "missing-starting-state-without-reason",
+        drop([*STATE_MISSING, "missing"]),
+        "a missing value carries a missing part with its reason",
+    ),
+    (
+        "missing-starting-state-without-unit",
+        drop([*STATE_MISSING, "unit"]),
+        "starting_state.1.unit: Field required",
+    ),
 ]
 
 # (case, mutation): variants the model accepts.
@@ -396,6 +531,12 @@ VALID: list[tuple[str, Mutation]] = [
         "same-quantity-in-two-lists",
         put([*CARBON, "quantity"], "placeholder_climate_quantity_a"),
     ),
+    (
+        "empty-soil-cover-and-starting-state",
+        apply(lambda data: data.update(soil_cover=[], starting_state=[])),
+    ),
+    ("soil-cover-all-months-missing-keeps-unit", apply(_soil_cover_all_missing)),
+    ("soil-cover-zero-is-a-real-value", put([*COVER, "months", 0, "value"], 0.0)),
 ]
 
 
@@ -428,6 +569,18 @@ def test_example_shows_the_absence_form() -> None:
     ]
     assert missing_months
     assert all(item["missing"]["reason"] for item in missing_months)
+    missing_cover = [
+        item
+        for series in data["soil_cover"]
+        for item in series["months"]
+        if item["value"] is None
+    ]
+    assert missing_cover
+    assert all(item["missing"]["reason"] for item in missing_cover)
+    missing_state = [item for item in data["starting_state"] if item["value"] is None]
+    assert missing_state
+    assert all(item["missing"]["reason"] for item in missing_state)
+    assert all(item["unit"] for item in missing_state)
     missing_years = [
         item
         for series in data["annual_climate"] + data["annual_carbon_inputs"]
@@ -453,15 +606,18 @@ def test_example_holds_placeholders_only() -> None:
         + data["carbon_inputs"]
         + data["annual_climate"]
         + data["annual_carbon_inputs"]
+        + data["soil_cover"]
     )
     for series in every_series:
         units.append(series["unit"])
         assert series["quantity"].startswith("placeholder_")
         if "source" in series:
             assert series["source"].startswith("PLACEHOLDER")
-    for item in data["soil_properties"]:
+    for item in data["soil_properties"] + data["starting_state"]:
         units.append(item["unit"])
         assert item["quantity"].startswith("placeholder_")
+        if "source" in item:
+            assert item["source"].startswith("PLACEHOLDER")
     for series in data["carbon_inputs"] + data["annual_carbon_inputs"]:
         assert series["origin"].startswith("placeholder_")
     assert set(units) == {"PLACEHOLDER_unit"}
