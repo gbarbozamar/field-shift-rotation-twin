@@ -30,7 +30,7 @@ Five people. Three write code by orchestrating AI sessions across four lanes; tw
 
 **Wherever this document names a role, it means that person:** lead developer and engines developer, Gustavo; platform developer, Enzo; interface developer, Martín; science reviewers, Adrian and Leonardo.
 
-**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to Enzo, the platform developer. L2b, decision and carbon, belongs to Martín, the interface developer, together with L3. Both use branches named `l2/<unit>`. In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy.
+**Lane L2 is split in two sub-lanes.** L2a, data and service, belongs to Enzo, the platform developer. L2b, decision and carbon, belongs to Martín, the interface developer, together with L3. Both use branches named `l2/<unit>`. Each sub-lane has its own acceptance limit (section 3.2). In the work packages of section 8, an L2 unit belongs to the sub-lane that owns its folder. The platform developer still decides technical matters for everyone: structure, dependencies and deploy.
 
 **One lane, one set of folders.** Nobody edits another lane's folder. A contract changes only at a checkpoint, with notice to everyone.
 
@@ -60,7 +60,7 @@ Each developer is an orchestrator. The developer plans, briefs, reads diffs and 
 ### 3.2 Parallelism limits
 
 - Up to **three builders in flight** per developer, always on disjoint files.
-- **No new unit is launched while two units of the lane wait for acceptance.**
+- **No new unit is launched while two units of the lane wait for acceptance.** The two sub-lanes of L2 count separately: units of L2a that wait do not stop L2b, and units of L2b that wait do not stop L2a.
 - Nothing runs unattended against `main`. Nothing runs overnight.
 - Each developer reads their remaining quota at every checkpoint and reports it.
 
@@ -310,6 +310,6 @@ A pull request labelled `science` cannot merge without one reviewer approval. No
 | A developer is stuck for more than 20 minutes | Says so. The backup of the lane steps in |
 | A control fails | It is recorded as failed. The module is shown as degraded or not available |
 | A source is down | Use the cached first response. A fallback source is a science decision |
-| Two units wait for acceptance | No new unit in that lane until one is accepted |
+| Two units wait for acceptance | No new unit in that lane until one is accepted. L2a and L2b count separately |
 | Quota of one developer runs out | Their open units are re-briefed to another developer's sessions at the next checkpoint |
 | A session produces a value, threshold or citation | Discard it. A person supplies it |
