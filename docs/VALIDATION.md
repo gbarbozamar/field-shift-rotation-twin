@@ -299,159 +299,159 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
 ### D0
 
 - What it checks (blueprint wording): "trivial comparators [E0, H0, D0]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the trivial comparator of the decision, and the statement of whether it gives the same order as the full decision. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L0 Core
 - Block: "Block 4 — Sunday until CP4"
 - Unit it gates: "trivial comparators [E0, H0, D0]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data. The trivial comparator orders the rotations, per indicator, by the mean over agricultural years of the values, read in the direction of each row (C1.1), ignoring ranges. The test checks that (a) on the hand-made table the comparator returns the order counted by hand, and (b) the report states, per indicator, whether the comparator's order equals the order of the full decision. Pass: (a) and (b) hold. OPEN for the science reviewers: which trivial comparator is used (the mean over agricultural years is the proposal the lead developer approved; under blueprint section 10 the science reviewers read the trivial comparators).
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D1
 
 - What it checks (blueprint wording): "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: counts by year against a declared limit. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data and a declared limit per indicator. For each rotation and indicator, years evaluated is the number of agricultural-year rows that hold a value, and years within the limit is the number of those on the preferred side of the limit, judged by the row's `direction` (C1.1). A row with a missing value is never counted as within or outside the limit: it is reported as not evaluated, with its reason (C3). Pass: both counts equal the counts made by hand on the table, and every missing row appears as not evaluated with its reason. OPEN for the science reviewers: whether a value equal to the limit counts as within (the source of a limit says so); the function takes it as an argument.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D2
 
 - What it checks (blueprint wording): "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: paired differences between two rotations. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data. A difference is computed only between the two rows of a pair, that is rows of two rotations with the same cell (`scenario_id`, `indicator`, `time_basis`, `ag_year`, `carbon_model`, `computation`), never across cells. It is the second rotation of the pair minus the first. Rows whose units differ are refused, with no conversion (C1.1). If either value is missing, the difference is missing with reason `MISSING_INPUT`, naming the missing side (C3.3). Swapping the two rotations changes only the sign. Pass: each of these properties holds on the table, and each computed difference equals the one written by hand. OPEN for the science reviewers: the paired-difference method and the range of a difference (until then the range is missing with its reason, as in #96).
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: OPEN: the numerical tolerance for comparing a computed difference with the one written by hand, set by the person who designs the case.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D3
 
 - What it checks (blueprint wording): "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the tipping point of an uncertain input. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data whose scenarios vary one uncertain input. If the state of the decision is the same for every scenario value of that input, no tipping point is reported, with that reason. If the state changes, the tipping point is reported as the bracket between the two adjacent scenario values where it changes, with the name and unit of the input; no value inside the bracket is interpolated. Pass: on tables built by hand with and without a change of state, the function reports no tipping point, or the bracket chosen by the designer of the table. OPEN for the science reviewers: whether, and by which method, a value inside the bracket may be interpolated.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D4
 
 - What it checks (blueprint wording): "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the measurement priority ("measure first"). PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data whose scenarios vary several uncertain inputs. The priority is given only when the state is not resolved. An input whose scenario values never change the state ranks below an input whose values do. Inputs that tie share a rank. Each item is qualitative: rank, what to measure and why, with no monetary value (#96). Pass: on tables built by hand, the ranks equal the ones the designer of the table wrote, and a resolved state gives no priority list. OPEN for the science reviewers: the measure of how much an input moves the decision, which orders inputs that all change the state.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D5
 
 - What it checks (blueprint wording): "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: direction of each indicator and dominance between rotations. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data. The decision reads the `direction` of each row and never assumes it. A rotation that is no worse than another in every cell and better in at least one is never preferred less than that other rotation. Reordering the rows or the rotations of the table does not change the result. Pass: the three properties hold on tables built by hand, including one where one indicator is `lower_is_better` and another `higher_is_better`.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D6
 
 - What it checks (blueprint wording): "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: missing values and modules not built in the decision. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data with missing values. When every value of an indicator is missing, the decision gives no ranking for that indicator, with the reasons carried through. A missing value, or an indicator that is `NOT_AVAILABLE` (C3.2, D12 of #77), is never counted as zero, as within a limit, or as best or worst, and does not enter the state. The descriptive-only water measures (C1.4, and D50 of #77) never change the state. Pass: on tables built by hand, each of these properties holds, and changing a descriptive-only measure leaves the state unchanged.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D7
 
 - What it checks (blueprint wording): "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the state "not resolved". PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "decision functions on hand-made tables [D1, D2, D5, D6, D7]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data. When the data cannot separate two rotations, the state is "not resolved" and names the indicators that are not resolved. Two rotations with identical rows are never resolved. A paired difference whose range is missing is never resolved. Pass: on tables built by hand, each of these properties holds. OPEN for the science reviewers: the rule that says when the data separate two rotations (it lives in the test plan, blueprint section 5), the exact state names and wording (#96), and how the state treats the two carbon models when they disagree.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D10
 
 - What it checks (blueprint wording): "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the measurement input. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data and a value entered by the user for an input of the priority list. The value enters with label `OBSERVED` (C4.1), its unit, and its range or `range_missing` (C2). A blank value, or a value in a unit other than the expected one, is refused and never taken as zero (C3.1). The decision is recomputed with that input fixed at the measured value; no other input changes. Pass: on tables built by hand, each of these properties holds.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
 
 ### D12
 
 - What it checks (blueprint wording): "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: consistency of tipping point, priority and measurement input. PROPOSED by an AI session; DECIDED by the lead developer, 14 November 2026
 - Lane: L2 Platform
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "tipping point, measurement priority and measurement input [D3, D4, D10, D12]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
+- Definition (PROPOSED by an AI session; logic DECIDED by the lead developer, 14 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`), labelled example data with a tipping point (D3) and a measured value (D10). A measured value on one side of the tipping point gives the state of that side. If the state becomes resolved after the measurement, the priority list is empty (D4). Pass: on tables built by hand, a value on each side of the bracket gives the state of that side, and the priority list empties when the state is resolved.
+- Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
