@@ -1,0 +1,203 @@
+{
+  "contract": "decision_output",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "rotations": ["example-rotation-1", "example-rotation-2"],
+  "scenarios": ["PLACEHOLDER_scenario_one"],
+  "limits": [
+    {
+      "indicator": "soil_loss",
+      "limit": {
+        "value": 7.0,
+        "unit": "t ha-1 yr-1",
+        "range_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: the user declared the limit without a range"
+        },
+        "provenance": "DECLARED",
+        "source": "user"
+      }
+    },
+    {
+      "indicator": "water_deficit_exposure",
+      "limit": {
+        "value": null,
+        "unit": "dimensionless",
+        "missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: no limit is declared for this indicator"
+        }
+      }
+    }
+  ],
+  "counts_by_year": [
+    {
+      "rotation_id": "example-rotation-1",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_loss",
+      "years_evaluated": 1,
+      "years_within_limits": 0,
+      "not_evaluated": [
+        {
+          "time_basis": "ag_year",
+          "ag_year": 2002,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"
+          }
+        }
+      ]
+    },
+    {
+      "rotation_id": "example-rotation-2",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_loss",
+      "years_evaluated": 1,
+      "years_within_limits": 0,
+      "not_evaluated": [
+        {
+          "time_basis": "ag_year",
+          "ag_year": 2002,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"
+          }
+        }
+      ]
+    },
+    {
+      "rotation_id": "example-rotation-1",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "years_evaluated": 0,
+      "years_within_limits": null,
+      "not_evaluated": [
+        {
+          "time_basis": "rotation",
+          "missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"
+          }
+        }
+      ]
+    },
+    {
+      "rotation_id": "example-rotation-2",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "years_evaluated": 0,
+      "years_within_limits": null,
+      "not_evaluated": [
+        {
+          "time_basis": "rotation",
+          "missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"
+          }
+        }
+      ]
+    }
+  ],
+  "paired_differences": [
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_loss",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
+      "difference": {
+        "value": -4.0,
+        "unit": "t ha-1 yr-1",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER detail: the method that gives a paired difference its range is OPEN (docs/VALIDATION.md, D2), so the difference carries no range"
+        },
+        "provenance": "DERIVED",
+        "source": "decision layer"
+      },
+      "method": "OPEN: paired-difference method and citation, person-supplied"
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_loss",
+      "time_basis": "ag_year",
+      "ag_year": 2002,
+      "difference": {
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "missing": {
+          "reason": "MISSING_INPUT",
+          "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+        }
+      },
+      "method": "OPEN: paired-difference method and citation, person-supplied"
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "time_basis": "rotation",
+      "difference": {
+        "value": null,
+        "unit": "dimensionless",
+        "missing": {
+          "reason": "MISSING_INPUT",
+          "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+        }
+      },
+      "method": "OPEN: paired-difference method and citation, person-supplied"
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_carbon_trend",
+      "time_basis": "rotation",
+      "carbon_model": "amg",
+      "computation": "end_minus_start",
+      "difference": {
+        "value": -0.75,
+        "unit": "t C ha-1 yr-1",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER detail: the method that gives a paired difference its range is OPEN (docs/VALIDATION.md, D2), so the difference carries no range"
+        },
+        "provenance": "SIMULATED",
+        "source": "decision layer"
+      },
+      "method": "OPEN: paired-difference method and citation, person-supplied"
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_carbon_trend",
+      "time_basis": "rotation",
+      "carbon_model": "rothc",
+      "computation": "end_minus_start",
+      "difference": {
+        "value": null,
+        "unit": "t C ha-1 yr-1",
+        "missing": {
+          "reason": "MISSING_INPUT",
+          "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+        }
+      },
+      "method": "OPEN: paired-difference method and citation, person-supplied"
+    }
+  ],
+  "state": {
+    "value": "OPEN: exact wording by the science reviewers",
+    "indicators_not_resolved": ["soil_carbon_trend", "soil_loss"],
+    "reasons": [
+      "PLACEHOLDER reason: the wording of a reason comes from deterministic templates that are not written yet"
+    ]
+  },
+  "measure_first": [
+    {
+      "rank": 1,
+      "what": "residue cover at sowing",
+      "why": "illustrative: moves the soil-loss difference more than the evaluated inputs"
+    }
+  ]
+}
