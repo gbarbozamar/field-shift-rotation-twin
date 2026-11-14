@@ -163,11 +163,9 @@ source and reports it `unavailable` / `NOT_AVAILABLE`, under the source's own
 Contract models are imported only as `contracts.inputs`, `contracts.results`
 and `contracts.rotation_definition`, never by the short names, and nothing is
 imported from a `contracts/*/test_examples.py` module. `contracts/__init__.py`
-is landed by lane L0 (issue #71), not by this unit. `api/test_packaging.py`
-checks that no contract folder is loaded under a second name; it is
-**skipped while `contracts/__init__.py` does not exist** and starts running by
-itself once it does (checked by hand: with the file present the whole suite
-passes, that test included).
+was landed by lane L0 (#76). `api/test_packaging.py` checks that no contract
+folder is loaded under a second name; it skips only if that file is ever
+removed.
 
 ## The engine runner (`api/engines.py`)
 

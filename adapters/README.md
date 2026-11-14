@@ -134,7 +134,7 @@ Two further cases, not failures of the source:
 
 ## The mapping (`power_mapping.py`)
 
-`to_site_climate(raw, request, settings) -> dict` is a pure function. It returns a JSON-ready document in the shape of `SiteClimate` (proposed in `contracts/inputs/`, not merged yet):
+`to_site_climate(raw, request, settings) -> dict` is a pure function. It returns a JSON-ready document in the shape of `SiteClimate` (`contracts/inputs/site_climate.py`, on `main` as a proposal); `PowerClimateSource` loads it into that model and returns the instance:
 
 - `contract: "site_data_climate"`, `example_data: false`, `case_id`, `field_id` from the request, `monthly_series: []` (aggregation belongs to the engines).
 - One daily series per `ParameterSpec`, in the configured order, with `quantity`, `unit`, `provenance`, `source` (= `source_id`), `range_missing: {reason: range_missing_reason, detail}`, `time_zone: "UTC"`, `start_date`, `end_date`, `days`.
