@@ -185,6 +185,31 @@ uv run pytest adapters/
 
 No network: `httpx.MockTransport` for the service, `tmp_path` for the cache, a fixed clock. Fake responses are built in the layout of the scout report, with placeholder parameter codes, placeholder numbers (1.0, 2.0, 3.0), a placeholder fill value and dates in the year 1900. `_fakes.py` holds the shared builders; it is not used at run time.
 
+## The real settings
+
+`adapters/settings/nasa_power.json` is the settings file of the deployed adapter. **Every value in it is copied from a recorded decision; none was chosen while writing it.** A correction by a science reviewer is an edit of this file (D37).
+
+| Setting | Value | Decision of issue #77 |
+|---|---|---|
+| `base_url` | `https://power.larc.nasa.gov/api/temporal/daily/point` | The documented request (D32) |
+| `community` | `ag` | D28 |
+| `parameters` | Seven series: `IMERG_PRECTOT` as `precipitation` and `PRECTOTCORR` as `precipitation_reanalysis` (`mm day-1`); `T2M_MAX`, `T2M_MIN` and `T2MDEW` as `air_temperature_max_2m`, `air_temperature_min_2m` and `dew_point_temperature_2m` (`degC`); `WS2M` as `wind_speed_2m` (`m s-1`); `ALLSKY_SFC_SW_DWN` as `solar_radiation` (`MJ m-2 day-1`); all `OBSERVED` | D23 to D27, D35 |
+| `point` | `degree`, `degree`, `m`, `OBSERVED` | D55 |
+| `fill_value` | `-999.0` | Header of the documented response (D32) |
+| `fill_reason` | `NO_COVERAGE` | D36 |
+| `range_missing_reason` | `NO_COVERAGE` | D31 |
+| `optional_arguments` | none | None decided: the service defaults apply (OPEN 4) |
+| `source_id`, `attribution` | `nasa_power`, `NASA POWER daily point data` (its row in `ATTRIBUTIONS.md`) | Platform developer (D20) |
+| `timeout_seconds` | `60` | Platform developer; to adjust after the first real call |
+
+The record period is not in this file: it is `CLIMATE_START_DATE` and `CLIMATE_END_DATE` of the app (D29: 2001-01-01 to 2024-12-31).
+
+`adapters/test_real_settings.py` keeps the file honest without calling the service:
+
+- each series is checked against its row of the summary table of `contracts/CLIMATE_QUANTITIES.md` (identifier, unit string, source parameter, label), so a change of the contract fails the test instead of letting the settings drift;
+- the query the adapter builds for the point and the dates of the documented request equals that request, argument by argument (`docs/evidence/nasa-power-2026-11-14/request.txt`). The UTC argument is written `time-standard=utc`, as that request wrote it;
+- the documented response (`response.json` of the same folder) maps into `SiteClimate`: seven series of ten days, and the point `[-50.0, -35.0, 0.0]` read in GeoJSON order.
+
 ## PROPOSED
 
 Designed by the builder sessions; a person accepts or corrects them in the pull request.
@@ -250,12 +275,14 @@ Decisions of issue #77 that settle what earlier units left PROPOSED or OPEN here
 | D36 | `fill_reason`: `NO_COVERAGE`, for a fill value and for an absent day (was OPEN 6) |
 | D38 | The soil-and-slope example source serves any field, under the identifiers of the request (was OPEN 20; unit `l2/runner-partial`) |
 | D51, D52 | A response without a point is usable; one provenance label for the three values of the point |
+| D55 | The point: latitude and longitude in `degree` (decimal degrees, WGS 84), elevation in `m`, label `OBSERVED` |
+| D32, D20 | Base URL, as the documented request wrote it; `source_id`, `attribution` and `timeout_seconds` chosen by the platform developer (formerly OPEN 15 and 16) |
 
 ## OPEN
 
 Each item is a question a person answers. Until then the setting has no value and the adapter is not constructed for real. The numbers of the earlier list are kept, so references to them stay valid; the decided ones are in [Decided](#decided).
 
-**The settings file is not written in this unit.** The values of D23 to D35 are accepted (D37), but `point` is a required setting and its three unit strings and its provenance label are not decided (questions 25, 26 and 28 of `contracts/inputs/README.md`). For the science reviewers, or the lead developer as for D23 to D35. Until then `POWER_SETTINGS_FILE` stays unset.
+**The settings file is written:** `adapters/settings/nasa_power.json` (see [The real settings](#the-real-settings)). What is left below is what a person still has to answer or check about it.
 
 - OPEN 3: **Does the unit of each source parameter, in the chosen community, equal the configured unit string?** The adapter does not convert. A person checks it against the service. For the science reviewers.
 - OPEN 4: **Which optional arguments are sent, if any (`units`, `site-elevation`, `wind-elevation`, `wind-surface`)?** (`optional_arguments`; empty sends none and the service defaults apply.) For the science reviewers.
@@ -264,8 +291,6 @@ Each item is a question a person answers. Until then the setting has no value an
 - OPEN 10: **How does a field polygon become one point?** `ClimateRequest` carries one point; how it is chosen is OPEN in `ports.py`. For the science reviewers (D41, D48).
 - OPEN 13: **What does an error payload of the service look like, and does a non-empty `messages` list on a response with data mean the data is unusable?** The scout report documents `messages: []` and the status codes, not their content. For the platform developer, after a first real request.
 - OPEN 14: **Does the deploy host keep files between restarts?** D42: a persistent volume is mounted for the cache and its path becomes `CLIMATE_CACHE_DIR`; the path is posted by the lead developer. For the platform developer to set.
-- OPEN 15: **What is the base URL?** The scout report documents the path `/api/temporal/daily/point` and that the specification is served from the service's host; a person confirms the full URL. (`base_url`.) For the science reviewers and the platform developer.
-- OPEN 16: **What are `attribution`, `source_id` and `timeout_seconds`?** The `ATTRIBUTIONS.md` data row for NASA POWER is written by a person when the data is first used for real. For the platform developer.
 - OPEN 17: **What does the adapter do on status 429 (too many requests)?** Today it is one failure like any other; the next call tries again. No retry and no back-off. For the platform developer.
 - OPEN 19: **Which file holds the demonstration values of soil and slope?** A person supplies them; the PLACEHOLDER file is for testing the pipeline only (#77), its numbers mean nothing and the engines may reject its units. D48 and D49 bring soil, slope and available water from public data through adapters of this lane, once the elevation model, the polygon-to-point rule and the licence of D49 are settled. For the science reviewers, the lead developer and the platform developer.
 - **D46, the argument `parameters`:** agreed by the platform developer, waiting for `contracts/ENTRYPOINTS.md` to state it. No adapter change.
