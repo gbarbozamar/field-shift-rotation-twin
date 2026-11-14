@@ -17,6 +17,8 @@ Add a row **when the item is first used**, not at the end.
 | HTTPX (development: test client) | 0.28.1 | https://pypi.org/project/httpx/ | BSD-3-Clause | L2a | 2026-11-14 |
 | pytest (development) | 9.2.0 | https://pypi.org/project/pytest/ | MIT | L2a | 2026-11-14 |
 | Ruff (development) | 0.17.5 | https://pypi.org/project/ruff/ | MIT | L2a | 2026-11-14 |
+| Python container image `python:3.12-slim` | 3.12 | https://hub.docker.com/_/python | PSF-2.0 (Python); Debian packages under their own licences | L2a | 2026-11-14 |
+| uv (container image `ghcr.io/astral-sh/uv`) | 0.12.2 | https://github.com/astral-sh/uv | MIT OR Apache-2.0 | L2a | 2026-11-14 |
 
 ## Tables and publications
 

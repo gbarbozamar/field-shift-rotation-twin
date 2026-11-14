@@ -1,7 +1,8 @@
 """Backend application.
 
 Run locally with ``uv run uvicorn api.main:app --reload`` from the
-repository root.
+repository root, or in a container with ``docker compose watch``
+(edits reload the server; http://localhost:8000/health).
 """
 
 from __future__ import annotations
