@@ -57,4 +57,21 @@ describe('FieldsScreen', () => {
     const html = renderToString(<FieldsScreen />)
     expect(html).not.toContain('aria-pressed="true"')
   })
+
+  it('shows the site sheet select hint when no field is selected', () => {
+    const html = renderToString(<FieldsScreen />)
+    expect(html).toContain(strings['site.title'])
+    expect(html).toContain(strings['site.select_hint'])
+    expect(html).not.toContain(strings['example.banner'])
+  })
+
+  it('shows the site sheet of the selected field after the field list', () => {
+    const selected = exampleCase.fields[0]
+    setSelectedFieldId(selected.field_id)
+    const html = renderToString(<FieldsScreen />)
+    expect(html).toContain(strings['site.title'])
+    expect(html).toContain(strings['example.banner'])
+    const lastField = exampleCase.fields[exampleCase.fields.length - 1]
+    expect(html.indexOf(strings['site.title'])).toBeGreaterThan(html.indexOf(lastField.field_id))
+  })
 })

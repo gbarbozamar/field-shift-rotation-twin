@@ -20,6 +20,8 @@
  * - entry.*      the entry screen (case title, fields count, open action)
  * - identity.*   the fields screen (title, banner, list wording)
  * - map.*        the map screen (title, select hint, base-layer attribution)
+ * - site.*       the site sheet of the selected field (climate monthly series,
+ *                soil and slope), wording addendum Block 3
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -78,6 +80,14 @@ export const strings = {
   'map.title': 'Fields',
   'map.select_hint': 'Select a field on the map or the list',
   'map.layer.attribution': '© OpenStreetMap contributors',
+  'site.title': 'Site data',
+  'site.select_hint': 'Select a field to see its site data',
+  'site.climate_section': 'Climate',
+  'site.soil_section': 'Soil and slope',
+  'site.slope_length': 'Slope length',
+  'site.slope_steepness': 'Slope steepness',
+  'site.series_heading': '{quantity} ({unit})',
+  'site.months_count': '{count} months',
 } as const
 
 /**
