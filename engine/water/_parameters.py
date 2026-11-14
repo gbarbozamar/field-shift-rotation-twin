@@ -20,7 +20,12 @@ What a lookup returns, the rows of G4 of contracts/ENTRYPOINTS.md:
 - a record that ``read_value`` refuses (malformed, or a placeholder), or two
   records with the same ``id`` and ``scope``: ``MISSING_INPUT``, naming the
   parameter and why it is not read (PROPOSED: the value the computation
-  needs is not available to it).
+  needs is not available to it);
+- a record anywhere in ``parameters`` without a well-formed ``id`` and
+  ``scope``: every parameter is ``MISSING_INPUT``, naming it and every such
+  record by its key. It cannot be compared, so it could be a record of any
+  parameter; it is reported, not skipped (F3c of params/README.md), as EP1
+  does in engine/erosion/_parameters.py (PROPOSED).
 
 The lookup is exact: a record with the empty scope is not read in place of
 one that names a crop, nor the other way round (question 5 of
@@ -50,6 +55,7 @@ Scope = tuple[tuple[str, str], ...]
 NO_RECORD = "no record in parameters (D56)"
 NO_VALUE = "the record holds no value"
 NOT_READ = "the record is not read"
+CANNOT_LOOK_UP = "it cannot be looked up"
 
 
 def check_parameters(parameters: object) -> None:
@@ -90,14 +96,16 @@ class Catalogue:
 
     def __init__(self, parameters: Mapping[str, dict]) -> None:
         self._index: dict[object, list[dict]] = {}
+        # The keys of the records without a well-formed id and scope. Such a
+        # record cannot be compared, so it could be a record of any parameter:
+        # it is reported, not skipped (F3c of params/README.md), as EP1 does.
+        self._malformed: list[str] = []
         for name in sorted(parameters):
             record = parameters[name]
             try:
                 key = identity(record)
             except ValueError:
-                # A record without a well-formed id and scope cannot be looked
-                # up by them; params.catalogue.check_catalogue reports it, and
-                # the runner passes only a catalogue that check passed (G3).
+                self._malformed.append(name)
                 continue
             self._index.setdefault(key, []).append(record)
         self._answers: dict[tuple[str, Scope], float | Missing] = {}
@@ -112,6 +120,10 @@ class Catalogue:
         return self._answers[key]
 
     def _read(self, parameter_id: str, scope: Scope, day: dt.date) -> float | Missing:
+        if self._malformed:
+            return self._problem(
+                parameter_id, scope, day, CANNOT_LOOK_UP, self.malformed_text()
+            )
         found = self._index.get(
             identity({"id": parameter_id, "scope": dict(scope)}), []
         )
@@ -148,24 +160,45 @@ class Catalogue:
             reason="MISSING_INPUT", detail=f"{describe(parameter_id, scope)}: {why}"
         )
 
+    def malformed_text(self) -> str:
+        """Why no parameter can be looked up while a record is malformed."""
+        return (
+            "the record(s) "
+            + ", ".join(repr(name) for name in self._malformed)
+            + " have no well-formed 'id' and 'scope', so they cannot be compared "
+            "and could be records of this parameter (F3c of params/README.md); "
+            "params.catalogue.check_catalogue rejects such a catalogue (G3)"
+        )
+
     def problems_until(self, last: dt.date) -> list[str]:
         """The items naming every parameter without a value needed on or before ``last``.
 
-        The parameters with no record are grouped by scope, so that each scope
-        is written once; the others are one item each, with their reason.
+        The parameters with no record, and those that cannot be looked up
+        because a record is malformed, are grouped by scope, so that each scope
+        (and the malformed records) is written once; the others are one item
+        each, with their reason.
         """
-        no_record: dict[Scope, list[str]] = {}
+        grouped: dict[str, dict[Scope, list[str]]] = {NO_RECORD: {}, CANNOT_LOOK_UP: {}}
         others: list[str] = []
         for (parameter_id, scope), (kind, reason, day) in self._problems.items():
             if day > last:
                 continue
-            if kind == NO_RECORD:
-                no_record.setdefault(scope, []).append(parameter_id)
+            if kind in grouped:
+                grouped[kind].setdefault(scope, []).append(parameter_id)
             else:
                 others.append(f"{describe(parameter_id, scope)}: {kind}: {reason}")
         items = [
             f"parameters with no record in parameters (D56), scope "
             f"{scope_text(scope)}: " + ", ".join(f"'{name}'" for name in names)
-            for scope, names in sorted(no_record.items())
+            for scope, names in sorted(grouped[NO_RECORD].items())
         ]
+        if grouped[CANNOT_LOOK_UP]:
+            items.append(
+                "parameters that cannot be looked up: " + self.malformed_text()
+            )
+            items += [
+                f"parameters that cannot be looked up, scope {scope_text(scope)}: "
+                + ", ".join(f"'{name}'" for name in names)
+                for scope, names in sorted(grouped[CANNOT_LOOK_UP].items())
+            ]
         return items + sorted(others)

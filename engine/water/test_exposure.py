@@ -65,46 +65,60 @@ UNMARKED = "UNMARKED_TEST_ONLY"
 NO_CROP_SCOPE = '{"management": "no_crop"}'
 
 # --- PLACEHOLDER numbers: plainly not real, chosen only so that every part
-# accepts them and the chain gives a number every day. ------------------------
+# accepts them and the chain gives a number every day. They are written with
+# repeated digits, or as zero or one where the structure of a form needs the
+# identity element; each zero and one is explained where it is written. None
+# is a value of the method and none comes from a source. ---------------------
 
-# The daily values of each series, repeated in turn.
+# The daily values of each series, repeated in turn. A precipitation of zero is
+# a dry day, needed so that the layers dry out between wet days.
 PLACEHOLDER_DAILY = {
-    PRECIPITATION: [0.0, 0.0, 6.0, 0.0, 1.0, 0.0, 0.0, 14.0, 0.0, 0.0, 0.0, 0.0],
-    "air_temperature_max_2m": [3.0, 4.0, 5.0],
-    "air_temperature_min_2m": [1.0, 2.0],
-    "dew_point_temperature_2m": [0.5],
-    "wind_speed_2m": [1.0, 2.0],
-    "solar_radiation": [2.0, 3.0, 4.0],
+    PRECIPITATION: [0.0, 0.0, 6.66, 0.0, 1.11, 0.0, 0.0, 14.44, 0.0, 0.0, 0.0, 0.0],
+    "air_temperature_max_2m": [3.33, 4.44, 5.55],
+    "air_temperature_min_2m": [1.11, 2.22],
+    "dew_point_temperature_2m": [0.55],
+    "wind_speed_2m": [1.11, 2.22],
+    "solar_radiation": [2.22, 3.33, 4.44],
 }
-# Every constant of the method is one, except these.
+# Every constant of the method not listed here is one: the identity element of
+# the factor, exponent or divisor it is in the PROPOSED forms of the parts.
 PLACEHOLDER_SITE = {
+    # Zero, structurally: with no albedo and no longwave term the net radiation
+    # is the solar radiation, so it stays above the soil heat flux and the
+    # reference evapotranspiration stays above zero, which the balance needs.
     "net_shortwave_albedo": 0.0,
     "net_longwave_stefan_boltzmann": 0.0,
-    "soil_heat_flux_daily_value": 0.0,
+    # Zero, structurally: the inverse distance and the declination stay
+    # constant, so the sunset hour angle exists on every day of the year.
     "inverse_relative_distance_amplitude": 0.0,
     "solar_declination_amplitude": 0.0,
+    # Zero, structurally: the pressure does not depend on the elevation, so
+    # the bracket of its form stays above zero at any elevation.
     "atmospheric_pressure_lapse_rate": 0.0,
-    "initial_abstraction_ratio": 0.5,
-    "retention_numerator": 2.0,
-    "retention_unit_factor": 4.0,
-    "initial_depletion": 0.0,
-    "total_evaporable_water": 4.0,
-    "readily_evaporable_water": 2.0,
-    "margin_above_basal": 0.5,
-    "minimum_crop_coefficient": 0.25,
-    "column_capacity": 20.0,
-    "column_depth": 2.0,
-    "initial_storage": 10.0,
+    "soil_heat_flux_daily_value": 1.11,
+    "initial_abstraction_ratio": 0.555,
+    "retention_numerator": 2.22,
+    "retention_unit_factor": 4.44,
+    "initial_depletion": 1.11,
+    "total_evaporable_water": 4.44,
+    "readily_evaporable_water": 2.22,
+    "wetted_fraction": 0.777,
+    "margin_above_basal": 0.555,
+    "minimum_crop_coefficient": 0.222,
+    "minimum_relative_humidity": 3.33,
+    "column_capacity": 22.2,
+    "column_depth": 2.22,
+    "initial_storage": 11.1,
 }
 PLACEHOLDER_DAY = {
-    "basal_crop_coefficient": {"crop-a": 0.5, "crop-b": 0.75, "no_crop": 0.25},
-    "crop_height": {"crop-a": 1.0, "crop-b": 1.0, "no_crop": 1.0},
-    "cover_fraction_exponent": {"crop-a": 1.0, "crop-b": 1.0, "no_crop": 1.0},
-    "curve_number": {"crop-a": 1.0, "crop-b": 0.5, "no_crop": 1.0},
+    "basal_crop_coefficient": {"crop-a": 0.555, "crop-b": 0.777, "no_crop": 0.333},
+    "crop_height": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 0.111},
+    "cover_fraction_exponent": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 1.11},
+    "curve_number": {"crop-a": 1.11, "crop-b": 0.555, "no_crop": 1.11},
 }
 PLACEHOLDER_CROP = {
-    "root_depth": {"crop-a": 1.0, "crop-b": 2.0},
-    "readily_available_fraction": {"crop-a": 0.5, "crop-b": 0.25},
+    "root_depth": {"crop-a": 1.11, "crop-b": 2.22},
+    "readily_available_fraction": {"crop-a": 0.444, "crop-b": 0.888},
 }
 CROPS = ("crop-a", "crop-b")
 
@@ -644,6 +658,37 @@ def test_record_that_read_value_refuses_is_missing_input_naming_why():
             assert why in item.missing.detail
 
 
+def test_malformed_record_makes_every_parameter_missing_input_naming_it():
+    broken = unmarked(placeholder_record("column_depth", 2.22, {}))
+    for defect in ("id", "scope"):
+        record = dict(broken)
+        del record[defect]
+        parameters = catalogue() | {"broken/record.json": record}
+        assert check_catalogue(parameters) != []
+        result = run(parameters=parameters)
+        assert_loads(result)
+        assert result
+        for item in result:
+            assert item.missing.reason == "MISSING_INPUT"
+            detail = item.missing.detail
+            assert (
+                "parameters that cannot be looked up: the record(s) "
+                "'broken/record.json' have no well-formed 'id' and 'scope'"
+            ) in detail
+            assert "F3c" in detail
+            assert "parameters with no record" not in detail
+            named = [
+                entry
+                for entry in detail.split("; ")
+                if entry.startswith(
+                    "parameter MISSING_INPUT: parameters that cannot be looked up, scope {}: "
+                )
+            ]
+            assert len(named) == 1
+            for parameter_id in module.SITE_PARAMETERS:
+                assert f"'{parameter_id}'" in named[0]
+
+
 def test_parameter_outside_what_a_part_accepts_is_not_computable_and_raises_nothing():
     too_deep = unmarked(placeholder_record("root_depth", 3.0, scope_of("crop-a")))
     result = run(parameters=catalogue_with({("root_depth", "crop-a"): too_deep}))
@@ -1161,12 +1206,12 @@ def test_runner_discovers_the_entry_point():
 def test_route_answers_with_a_water_part_when_the_runner_passes_parameters():
     """In process, with the examples, no network.
 
-    The runner on ``main`` calls EP3 with three arguments; the platform
-    developer's change passes ``parameters`` (D46, D56). Until it lands, this
-    case wraps EP3 so that it receives the empty catalogue, the catalogue of
-    ``params/records/`` today. EP2 is replaced by the example calendar, which
-    carries a start month, and EP1 is left out (not built), so that this case
-    does not depend on the signature of EP1.
+    The runner of ``api/engines.py`` passes ``parameters`` to EP3 by keyword
+    (D46, D56, #160); here it is given the empty catalogue, the catalogue of
+    ``params/records/`` today, and EP3 is passed to it unwrapped. EP2 is
+    replaced by the example calendar, which carries a start month, and EP1 is
+    left out (not built), so that this case checks the water part alone. The
+    next case runs every discovered engine.
     """
     from fastapi.testclient import TestClient
 
@@ -1191,16 +1236,14 @@ def test_route_answers_with_a_water_part_when_the_runner_passes_parameters():
                 ),
             )
 
-    def water(**arguments):
-        return module.compute_water_deficit_exposure(**arguments, parameters={})
-
     engines = EntryPointEngines(
         EngineFunctions(
             build_rotation_calendar=lambda rotation: calendar(),
             compute_soil_loss=None,
-            compute_water_deficit_exposure=water,
+            compute_water_deficit_exposure=module.compute_water_deficit_exposure,
         ),
         carbon_models=DEFAULT_CARBON_MODELS,
+        parameters={},
     )
     rotation = json.loads(
         (
@@ -1241,6 +1284,105 @@ def test_route_answers_with_a_water_part_when_the_runner_passes_parameters():
     assert isinstance(water_part, list)
     assert water_part == module.compute_water_deficit_exposure(
         calendar=calendar(), climate=example_climate, soil_slope=soil(), parameters={}
+    )
+    (water_module,) = [m for m in answer["modules"] if m["id"] == "water"]
+    assert water_module["state"] == "not_available"
+    assert water_module["reason"] == water_part[0].missing.reason
+
+
+def test_route_through_the_real_runner_passes_parameters_and_the_water_part_loads():
+    """In process, with the examples, no network, nothing wrapped or replaced.
+
+    Every engine is the one ``discover_engine_functions`` finds (EP2, EP1 and
+    this EP3), run by ``EntryPointEngines`` with the test catalogue as
+    ``parameters``, exactly as the app passes the loaded catalogue (#160).
+    The climate source serves the example climate under the identifiers of
+    the request, so that the runner calls EP1 and EP3.
+    """
+    from fastapi.testclient import TestClient
+
+    from adapters.example_soil_slope import ExampleSoilSlopeSource
+    from adapters.ports import ClimateRequest, ClimateResult, SourceInfo
+    from api.engines import (
+        DEFAULT_CARBON_MODELS,
+        EntryPointEngines,
+        discover_engine_functions,
+    )
+    from api.main import create_app
+    from api.ports import RunSettings
+    from api.rotation_validator import load_rotation_definition
+
+    served: list[SiteClimate] = []
+
+    class ExampleClimate:
+        source_id = "PLACEHOLDER_CLIMATE"
+        contract = "site_data_climate"
+
+        def get_climate(self, request: ClimateRequest) -> ClimateResult:
+            document = climate_document()
+            document["case_id"] = request.case_id
+            document["field_id"] = request.field_id
+            served.append(SiteClimate.model_validate(document))
+            return ClimateResult(
+                data=served[-1],
+                source=SourceInfo(
+                    id=self.source_id, contract=self.contract, state="example"
+                ),
+            )
+
+    found = discover_engine_functions()
+    assert found.compute_water_deficit_exposure is module.compute_water_deficit_exposure
+    parameters = catalogue()
+    engines = EntryPointEngines(
+        found, carbon_models=DEFAULT_CARBON_MODELS, parameters=parameters
+    )
+    rotation = json.loads(
+        (
+            ROOT
+            / "contracts"
+            / "rotation_definition"
+            / "examples"
+            / "PLACEHOLDER_rotation_definition.json"
+        ).read_text("utf-8")
+    )
+    series = example_precipitation()
+    body = {
+        "site": {
+            "case_id": rotation["case_id"],
+            "field_id": rotation["field_id"],
+            "latitude": 1.0,
+            "longitude": 2.0,
+        },
+        "rotation": rotation,
+    }
+    app = create_app(
+        [],
+        climate=ExampleClimate(),
+        soil_slope=ExampleSoilSlopeSource(
+            EXAMPLES / "PLACEHOLDER_site_soil_slope.json"
+        ),
+        engines=engines,
+        settings=RunSettings(
+            start_date=dt.date.fromisoformat(series["start_date"]),
+            end_date=dt.date.fromisoformat(series["end_date"]),
+        ),
+    )
+    response = TestClient(app).post("/api/rotations/run", json=body)
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    result = ResultsPerRotation.model_validate(answer["result"])
+    water_part = result.water_deficit_exposure
+    assert isinstance(water_part, list)
+    assert_loads(water_part)
+    (climate_served,) = served
+    the_calendar = found.build_rotation_calendar(load_rotation_definition(rotation))
+    assert water_part == module.compute_water_deficit_exposure(
+        calendar=the_calendar,
+        climate=climate_served,
+        soil_slope=soil().model_copy(
+            update={"case_id": rotation["case_id"], "field_id": rotation["field_id"]}
+        ),
+        parameters=parameters,
     )
     (water_module,) = [m for m in answer["modules"] if m["id"] == "water"]
     assert water_module["state"] == "not_available"
