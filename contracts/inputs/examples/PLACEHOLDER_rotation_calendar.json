@@ -1,0 +1,94 @@
+{
+  "contract": "rotation_calendar",
+  "example_data": true,
+  "case_id": "PLACEHOLDER-case",
+  "field_id": "PLACEHOLDER-field",
+  "rotation_id": "PLACEHOLDER-rotation",
+  "ag_year_start": {
+    "month": 7,
+    "provisional": true,
+    "provenance": "DECLARED",
+    "source": "PLACEHOLDER: illustrative month, not declared by a person for any case",
+    "assumption": true
+  },
+  "start_date": "2001-07-01",
+  "end_date": "2003-06-30",
+  "feasibility": {
+    "feasible": true,
+    "violations": []
+  },
+  "components": [
+    {
+      "component_id": "PLACEHOLDER-component-1",
+      "crop_id": "PLACEHOLDER-crop-a",
+      "start": {
+        "date": "2001-09-01",
+        "provenance": "DECLARED",
+        "source": "PLACEHOLDER: example rotation definition, not a real declaration"
+      },
+      "end": {
+        "date": "2002-02-28",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+      },
+      "periods": [
+        {
+          "period_type": "PLACEHOLDER-period-type-1",
+          "start": {
+            "date": "2001-09-01",
+            "provenance": "DERIVED",
+            "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+          },
+          "end": {
+            "date": "2001-11-30",
+            "provenance": "DERIVED",
+            "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+          }
+        },
+        {
+          "period_type": "PLACEHOLDER-period-type-2",
+          "start": {
+            "date": "2001-12-01",
+            "provenance": "DERIVED",
+            "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+          },
+          "end": {
+            "date": "2002-02-28",
+            "provenance": "DERIVED",
+            "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+          }
+        }
+      ]
+    },
+    {
+      "component_id": "PLACEHOLDER-component-2",
+      "crop_id": "PLACEHOLDER-crop-b",
+      "start": {
+        "date": "2002-04-01",
+        "provenance": "DECLARED",
+        "source": "PLACEHOLDER: example rotation definition, not a real declaration"
+      },
+      "end": {
+        "date": "2002-10-31",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+      },
+      "periods": []
+    },
+    {
+      "component_id": "PLACEHOLDER-component-3",
+      "crop_id": "PLACEHOLDER-crop-a",
+      "start": {
+        "date": "2002-12-01",
+        "provenance": "DECLARED",
+        "source": "PLACEHOLDER: example rotation definition, not a real declaration"
+      },
+      "end": {
+        "date": "2003-05-31",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example of a date computed by the calendar engine"
+      },
+      "periods": []
+    }
+  ]
+}

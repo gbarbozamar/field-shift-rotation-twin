@@ -1,0 +1,49 @@
+{
+  "contract": "site_data_soil_slope",
+  "example_data": true,
+  "case_id": "PLACEHOLDER-case",
+  "field_id": "PLACEHOLDER-field",
+  "slope_length": {
+    "value": 1.0,
+    "unit": "PLACEHOLDER_unit",
+    "provenance": "OBSERVED",
+    "source": "PLACEHOLDER: example data, no real source",
+    "range_missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+    }
+  },
+  "slope_steepness": {
+    "value": 2.0,
+    "unit": "PLACEHOLDER_unit",
+    "provenance": "DECLARED",
+    "assumption": true,
+    "range": {
+      "low": 1.0,
+      "high": 3.0,
+      "kind": "PLACEHOLDER_range_kind"
+    }
+  },
+  "soil_properties": [
+    {
+      "quantity": "placeholder_soil_property_a",
+      "value": 4.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    },
+    {
+      "quantity": "placeholder_soil_property_b",
+      "value": null,
+      "unit": "PLACEHOLDER_unit",
+      "missing": {
+        "reason": "NO_COVERAGE",
+        "detail": "PLACEHOLDER: example of a value the source does not have for this place"
+      }
+    }
+  ]
+}
