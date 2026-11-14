@@ -1,8 +1,8 @@
 # Validation protocol
 
-**Skeleton. Nothing in this file is defined yet.**
+**Skeleton, partly filled. The E and H entries are not defined yet. The D entries have their logic decided by the lead developer (14 November 2026); their OPEN items and their acceptance by a science reviewer are still pending.**
 
-This file will hold the acceptance tests that `docs/DEVELOPMENT_BLUEPRINT.md` refers to by codes in square brackets. It has one entry per code named in section 8 of the blueprint, and every scientific field of every entry is open.
+This file holds the acceptance tests that `docs/DEVELOPMENT_BLUEPRINT.md` refers to by codes in square brackets. It has one entry per code named in section 8 of the blueprint. No entry has a numeric value, threshold, numeric tolerance, expected value of the science, source or citation yet.
 
 ## Owner
 
@@ -13,6 +13,8 @@ The science reviewers own this file (blueprint sections 2 and 10). Under section
 This skeleton is a proposal under blueprint section 3.7. It was laid out by an AI builder session and takes effect only when a person approves the pull request. It is a science-class change, so that pull request also needs a science reviewer.
 
 The session supplied the layout and copied the blueprint's wording. It supplied no definition, value, tolerance, data source or citation.
+
+Later change (#138): an AI session proposed the definitions of the D entries as logic on hand-made results tables, and the lead developer approved that logic on 14 November 2026. That change wrote no value, threshold, tolerance, expected value of the science, data source or citation; those stay `OPEN` or `CITATION NEEDED` for the science reviewers.
 
 ## How an entry gets completed
 
