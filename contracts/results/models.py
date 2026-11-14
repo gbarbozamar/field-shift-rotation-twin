@@ -70,6 +70,10 @@ PROVENANCE_OF_SOIL_LOSS = "DERIVED"  # C4.6
 # whole rotation cycles. The sheet names the computations but not their
 # identifiers.
 TrendComputation = Literal["end_minus_start", "fitted_slope", "mean_over_cycles"]
+# Decided (lead developer, 14 November 2026, decision D1 of issue #77): the
+# identifiers of the two carbon models.
+CarbonModel = Literal["amg", "rothc"]
+CARBON_MODELS: tuple[str, ...] = get_args(CarbonModel)
 TREND_COMPUTATIONS: tuple[str, ...] = get_args(TrendComputation)
 DEFAULT_TREND_COMPUTATION = "end_minus_start"  # C1.6
 
@@ -359,7 +363,7 @@ class SoilCarbonTrend(IndicatorValue):
     """Trend of soil carbon of a rotation, for one model and one computation (C1.5)."""
 
     indicator: Literal["soil_carbon_trend"]
-    carbon_model: Text
+    carbon_model: CarbonModel
     computation: TrendComputation
 
 
@@ -559,7 +563,7 @@ class ResultsTableRow(IndicatorValue):
     scenario_id: Text
     time_basis: TimeBasis
     ag_year: int | None = None
-    carbon_model: Text | None = None
+    carbon_model: CarbonModel | None = None
     computation: TrendComputation | None = None
 
     @model_validator(mode="after")

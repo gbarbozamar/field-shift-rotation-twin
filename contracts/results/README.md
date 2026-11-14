@@ -110,7 +110,7 @@ Units checked, exactly as the sheet writes them:
 | `soil_loss.annual` | yes, at least one, in the present form | One `IndicatorValue` per agricultural year, plus `ag_year` (integer). Unit `t ha-1 yr-1` |
 | `soil_loss.monthly` | yes, in the present form | The monthly breakdown: one `IndicatorValue` per calendar month, plus `year` (calendar year), `month` (1 to 12) and `ag_year`. Unit `t ha-1 month-1` |
 | `water_deficit_exposure` | yes | A list of at least one `IndicatorValue` item, plus `time_basis` (`rotation` or `ag_year`) and `ag_year` (only with `time_basis: "ag_year"`); or the wholly missing form when the water engine is not built (D12) |
-| `soil_carbon_trend` | yes | A list of at least one `IndicatorValue` item, plus `carbon_model` (non-blank text) and `computation`; or the wholly missing form when no carbon engine is built (D12) |
+| `soil_carbon_trend` | yes | A list of at least one `IndicatorValue` item, plus `carbon_model` (`amg` or `rothc`, D1) and `computation`; or the wholly missing form when no carbon engine is built (D12) |
 
 Rules:
 
@@ -181,7 +181,7 @@ A row is an `IndicatorValue` plus:
 | `scenario_id` | yes | The run the value comes from: one set of values of the uncertain inputs. Non-blank text. What a scenario holds is not described in this contract (`OPEN`) |
 | `time_basis` | yes | `ag_year` or `rotation` |
 | `ag_year` | with `time_basis: "ag_year"` | The agricultural year (C5.3). Not allowed with `time_basis: "rotation"` |
-| `carbon_model` | for `soil_carbon_trend` only | The carbon model that produced the value |
+| `carbon_model` | for `soil_carbon_trend` only | The carbon model that produced the value: `amg` or `rothc` (D1 of #77) |
 | `computation` | for `soil_carbon_trend` only | The computation that produced the value |
 
 Rules:
@@ -285,6 +285,7 @@ These cases read `contracts/CONVENTIONS.md` and fail if the sheet and the models
 | K1 | A `soil_carbon_trend` value without its carbon model, with a blank one, or without its computation, per rotation and in the table |
 | K2 | A computation that is not one of the three |
 | K3 | A carbon model without one of the three computations, or with one of them twice; no carbon value at all (per rotation only) |
+| K4 | A carbon model that is not `amg` or `rothc` (D1 of #77), including the same word in upper case, per rotation and in the table |
 | T1 | The same cell of a rotation in two rows |
 | T2 | A row left out for one rotation; rotations with different agricultural years or different scenarios; a table without rows |
 | T3 | Soil loss for the whole rotation, or without its agricultural year; a carbon trend for one agricultural year |
@@ -323,7 +324,7 @@ Item 7 was answered afterwards, in part, by the lead developer on 14 November 20
 6. **Soil depth and horizon of the carbon trend (C1.6); start month of the agricultural year (C5.4); gap filling (C3.4).** These contracts do not repeat the soil depth, the horizon or the start month: a consumer reads them from the contract that owns them. They carry no mark for a value computed from a gap-filled series, because no gap is filled until the method is supplied. Does any of the four belong in a results document?
 7. **Identifiers of the carbon models.** `carbon_model` is any non-blank text. Which identifiers do the two carbon models (and the two variants of one of them, if they are reported apart) have, and which contract fixes the list?
    - `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, decision D1): the identifiers of the two carbon models are **`amg`** and **`rothc`**.
-   - Not changed yet: the model still accepts any non-blank text as `carbon_model`, and the examples still carry placeholder identifiers. Issue #77 names no unit that changes the model for this decision.
+   - Applied: `carbon_model` accepts only `amg` and `rothc` (`CarbonModel` in `models.py`), and the examples carry them (case K4). The not-built form carries no carbon model, so it is unchanged.
    - Still `OPEN`, not answered by issue #77: **which identifiers do the two variants of one of the models have, if they are reported apart, and which contract fixes the list?**
 8. **Identifiers of the three computations.** `end_minus_start`, `fitted_slope` and `mean_over_cycles` are proposed here for the three computations of C1.6. Accept or rename.
 9. **Scenarios.** `scenario_id` says which rows of the table come from the same run. Which contract says what a scenario is (which uncertain input, at which level): the test plan? Does the decision layer need the level of the uncertain input in the table itself?

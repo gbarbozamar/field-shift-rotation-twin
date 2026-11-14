@@ -82,7 +82,9 @@ BODY = {
     },
     "rotation": ROTATION,
 }
-CARBON_MODELS = ("PLACEHOLDER_carbon_model_one", "PLACEHOLDER_carbon_model_two")
+# The two carbon models of the contract (decision D1 of issue 77): the results
+# models accept no other identifier.
+CARBON_MODELS = ("amg", "rothc")
 SOIL_SLOPE_FILE = CONTRACTS / "inputs" / "examples" / "PLACEHOLDER_site_soil_slope.json"
 
 
