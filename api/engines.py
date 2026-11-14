@@ -42,6 +42,7 @@ not-built form of a part (D12), all of issue #77.
 from __future__ import annotations
 
 import importlib
+import inspect
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, get_args
@@ -166,6 +167,20 @@ def discover_engine_functions() -> EngineFunctions:
     """Import each engine function by its exact module path and name."""
     return EngineFunctions(
         **{point.function: _import_function(point) for point in DISCOVERED}
+    )
+
+
+def takes_parameters(function: Callable[..., Any]) -> bool:
+    """Whether ``function`` has a parameter named ``parameters`` that a keyword can fill.
+
+    The runner no longer uses this: it always passes ``parameters=`` to EP1 and
+    EP3 (D46, D56). It is kept because ``validation/test_chain_examples.py``
+    (lane L0) imports it; lane L0 may drop that use, and then this goes.
+    """
+    parameter = inspect.signature(function).parameters.get("parameters")
+    return parameter is not None and parameter.kind in (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY,
     )
 
 
