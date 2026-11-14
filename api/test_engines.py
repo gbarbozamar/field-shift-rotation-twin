@@ -1491,3 +1491,24 @@ def test_the_default_app_with_the_engines_of_the_repository_answers_200():
     )
     response = app_client.post(ROUTE, json=BODY)
     assert response.status_code == 200, response.text
+
+
+def test_takes_parameters_helper_kept_for_the_chain_test():
+    """``takes_parameters`` is kept only for ``validation/test_chain_examples.py``."""
+
+    def keyword_only(*, parameters):
+        return parameters
+
+    def positional_or_keyword(parameters):
+        return parameters
+
+    def positional_only(parameters, /):
+        return parameters
+
+    def without(calendar):
+        return calendar
+
+    assert runner.takes_parameters(keyword_only)
+    assert runner.takes_parameters(positional_or_keyword)
+    assert not runner.takes_parameters(positional_only)
+    assert not runner.takes_parameters(without)
