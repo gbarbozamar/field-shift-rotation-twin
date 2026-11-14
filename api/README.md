@@ -318,8 +318,8 @@ Call order (accepted in issue 18):
 
 1. EP2 first: `build_rotation_calendar(load_rotation(rotation))`.
 2. EP1 and EP3 with the keyword arguments `calendar`, `climate`, `soil_slope`
-   (G3), also when the calendar is infeasible (G4), and `parameters` for an
-   engine whose signature takes it (below). EP2 never gets `parameters`.
+   (G3), also when the calendar is infeasible (G4), and `parameters`, always
+   (below). EP2 never gets `parameters`.
 3. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
    calendar; `soil_loss` from EP1 and `water_deficit_exposure` from EP3,
    unchanged, or in the not-built form when that engine is not built (D12);
@@ -364,13 +364,12 @@ that form only for an engine that is not built.
   would be ignored). The runner passes the same object, by keyword, on every
   call; it does not copy it per request, and it does not check it again: the
   check is the one of start-up.
-- **Transition rule (PROPOSED):** EP1 and EP3 gain the argument one by one,
-  in separate pull requests, so the runner passes `parameters=` only to an
-  engine function whose signature has a parameter of that name that a
-  keyword can fill (`takes_parameters`, with `inspect.signature`, read once
-  when `EntryPointEngines` is built). An engine that does not take it is
-  called as before. So this change merges before or after the engines'
-  without coordination. OPEN below: when to drop the check.
+- **Always passed:** EP1 and EP3 get `parameters=` by keyword on every call,
+  as `contracts/ENTRYPOINTS.md` states (decided by the platform developer
+  once both engines take it; unit `l2/runner-always-parameters`). The runner
+  reads no signature and does not adapt: an engine function that does not
+  take `parameters` raises `TypeError` and the route answers `500`, like any
+  engine that does not follow its contract.
 
 ### A part whose engine is not built (D12)
 
@@ -483,9 +482,8 @@ result and not both zero with one (checked at construction).
   problem of `load_folder` or `check_catalogue` is a `ConfigError` and an
   empty catalogue is not; the message text; `parameters=None` as the empty
   catalogue in `EntryPointEngines` and `create_app`; the `TypeError` for
-  `parameters` beside `engines`; the transition rule (`takes_parameters`,
-  read once); the test cases of section 14 of `api/test_engines.py` and of
-  the catalogue section of `api/test_config.py`.
+  `parameters` beside `engines`; the test cases of section 14 of
+  `api/test_engines.py` and of the catalogue section of `api/test_config.py`.
 - Unit `l2/runner-partial`: `part_not_built` and its detail text; counting a
   not-built part as one missing value; the order of the checks when an input
   is absent and an engine is not built (still `MISSING_INPUT`, no result);
@@ -552,9 +550,6 @@ here.
   then enforces it with no change here. Until then the runner keeps the
   defensive handling of a bare `Missing` from EP1 (Q4). The first and last
   dates of the calendar remain open.
-- **When does the signature check of `parameters` go?** Once EP1 and EP3
-  on `main` both take `parameters`, `takes_parameters` can be removed and
-  the argument always passed. For the platform developer.
 - **Should the engines get a read-only view of the catalogue?** The runner
   passes the same `dict` to every call, so an engine that changed it would
   change it for every later request. `types.MappingProxyType` would prevent
@@ -563,8 +558,8 @@ here.
   L0 for the contract's type).
 - **Should `parameters` become a required argument of `EntryPointEngines`
   and `create_app`?** Today `None` means the empty catalogue, because a test
-  of lane L1 (`engine/water/test_exposure.py`) builds `EntryPointEngines`
-  without it. For the platform developer.
+  of lane L1 (`engine/water/test_exposure.py`, on `main` and in #165) builds
+  `EntryPointEngines` without it. For the platform developer.
 - **Which file holds the demonstration values of soil and slope?** A person
   supplies them; the PLACEHOLDER file is for testing the pipeline only (#77).
   D48 and D49 bring soil, slope and available water from public data through
