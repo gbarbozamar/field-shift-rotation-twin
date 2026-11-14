@@ -3,6 +3,38 @@
   "example_data": true,
   "case_id": "PLACEHOLDER-case",
   "field_id": "PLACEHOLDER-field",
+  "point": {
+    "latitude": {
+      "value": 1.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, not a real place, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    },
+    "longitude": {
+      "value": 2.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, not a real place, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    },
+    "elevation": {
+      "value": 3.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, not a real place, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+      }
+    }
+  },
   "daily_series": [
     {
       "quantity": "precipitation",

@@ -78,6 +78,70 @@ MONTHLY = ["monthly_series", 0]
 COMPONENT = ["components", 0]
 PERIOD = ["components", 0, "periods", 0]
 
+# The three values of the point the series are valid for (issue #77, D9).
+POINT_VALUES = ("latitude", "longitude", "elevation")
+
+
+def _point_cases() -> list[tuple[str, str, Mutation, str]]:
+    """The same variants for each of the three values of the point.
+
+    Every fragment names the value, so a variant is not accepted as rejected
+    because of another value of the point.
+    """
+    cases: list[tuple[str, str, Mutation, str]] = []
+    for name in POINT_VALUES:
+        at = ["point", name]
+        where = f"point.{name}"
+        cases += [
+            (
+                f"point-without-{name}",
+                "climate",
+                drop(at),
+                f"{where}: Field required",
+            ),
+            (
+                f"point-{name}-without-unit",
+                "climate",
+                drop([*at, "unit"]),
+                f"{where}.unit: Field required",
+            ),
+            (
+                f"point-{name}-without-provenance-label",
+                "climate",
+                drop([*at, "provenance"]),
+                f"{where}: Value error, value: a value that is not missing "
+                "carries a provenance label",
+            ),
+            (
+                f"point-{name}-without-source-or-assumption-mark",
+                "climate",
+                drop([*at, "source"]),
+                f"{where}: Value error, value: a value carries a reference "
+                "to its source or the assumption mark",
+            ),
+            (
+                f"point-{name}-missing-without-reason",
+                "climate",
+                put(at, {"value": None, "unit": "PLACEHOLDER_unit"}),
+                f"{where}: Value error, value: a missing value carries a "
+                "missing part with its reason",
+            ),
+            (
+                f"point-{name}-not-a-number",
+                "climate",
+                put([*at, "value"], float("nan")),
+                f"{where}.value: Input should be a finite number",
+            ),
+            (
+                f"point-{name}-infinite",
+                "climate",
+                put([*at, "value"], float("inf")),
+                f"{where}.value: Input should be a finite number",
+            ),
+        ]
+    return cases
+
+
 # (case identifier, contract, mutation, fragment of the expected error).
 # The fragment shows that the variant is rejected for the intended reason.
 INVALID: list[tuple[str, str, Mutation, str]] = [
@@ -239,6 +303,21 @@ INVALID: list[tuple[str, str, Mutation, str]] = [
         "climate",
         put(["contract"], "site_data_soil_slope"),
         "contract",
+    ),
+    # --- Site data: climate, the point the series are valid for -------------
+    ("climate-without-point", "climate", drop(["point"]), "point: Field required"),
+    *_point_cases(),
+    (
+        "point-value-written-as-text",
+        "climate",
+        put(["point", "latitude", "value"], "1.0"),
+        "point.latitude.value: Input should be a valid number",
+    ),
+    (
+        "point-unknown-extra-field",
+        "climate",
+        put(["point", "note"], "x"),
+        "point.note: Extra inputs",
     ),
     # --- Site data: soil and slope ------------------------------------------
     ("value-without-unit", "soil", drop(["slope_length", "unit"]), "slope_length.unit"),
@@ -559,6 +638,43 @@ VALID: list[tuple[str, str, Mutation]] = [
             put(["slope_steepness", "range", "low"], 0.0),
         ),
     ),
+    (
+        "accepted-missing-elevation-with-reason",
+        "climate",
+        put(
+            ["point", "elevation"],
+            {
+                "value": None,
+                "unit": "PLACEHOLDER_unit",
+                "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+            },
+        ),
+    ),
+    # Whether a record may travel without its latitude or its longitude is
+    # OPEN in README.md. Until a person answers it the model does not reject
+    # either, when it carries its reason.
+    (
+        "accepted-while-open-missing-latitude-and-longitude-with-reason",
+        "climate",
+        both(
+            put(
+                ["point", "latitude"],
+                {
+                    "value": None,
+                    "unit": "PLACEHOLDER_unit",
+                    "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+                },
+            ),
+            put(
+                ["point", "longitude"],
+                {
+                    "value": None,
+                    "unit": "PLACEHOLDER_unit",
+                    "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+                },
+            ),
+        ),
+    ),
 ]
 
 
@@ -580,6 +696,16 @@ def test_example_is_marked_as_example_data(contract: str) -> None:
     assert data["example_data"] is True
     assert "PLACEHOLDER" in data["case_id"]
     assert "PLACEHOLDER" in data["field_id"]
+
+
+@pytest.mark.parametrize("name", POINT_VALUES)
+def test_climate_example_point_is_marked_as_no_real_place(name: str) -> None:
+    """The point of the example names no unit and no source of a real place."""
+    item = load("climate")["point"][name]
+    assert item["value"] is not None
+    assert item["unit"] == "PLACEHOLDER_unit"
+    assert item["source"].startswith("PLACEHOLDER")
+    assert "not a real place" in item["source"]
 
 
 def test_every_example_file_has_a_model() -> None:
