@@ -6,7 +6,7 @@ This file will hold the acceptance tests that `docs/DEVELOPMENT_BLUEPRINT.md` re
 
 ## Owner
 
-The science reviewers own this file (blueprint sections 2 and 10). They complete every entry. Developers and AI sessions read it; they do not fill it.
+The science reviewers own this file (blueprint sections 2 and 10). Under section 3.6, a person writes the values of an entry and a second person checks them against the source. Under section 10, the science reviewers check each transcribed value against its source as the second person, and a science reviewer accepts the entry. An AI session supplies none of the items listed in section 3.5.
 
 ## Status of this skeleton
 
@@ -18,7 +18,7 @@ The session supplied the layout and copied the blueprint's wording. It supplied 
 
 - **Section 3.5.** The value of a parameter, a threshold or a range, the expected value of a test, and a citation are never delegated to a session. A citation produced by an AI session is a defect.
 - **Section 3.6.** The content of an entry is a science-class change: a person writes the values, a second person checks them against the source, and a science reviewer accepts them.
-- **Section 3.7.** A session may propose layout, and marks it `PROPOSED`. Where a value, a threshold, a range, an expected value or a citation is needed, it writes `OPEN` or `CITATION NEEDED` and stops there.
+- **Section 3.7.** For conventions, definitions, contract field lists and the design of test cases, a builder session may write a proposal. Every proposed item is marked `PROPOSED`, and anything the builder cannot responsibly propose is marked `OPEN`, with the question a person has to answer. A proposal takes effect only when a person approves the pull request. This never covers the list in section 3.5: where a parameter value, a threshold, a range, an expected test value or a citation is needed, the builder writes `OPEN` or `CITATION NEEDED` and stops there.
 - **Section 10.** The science reviewers fix thresholds and uncertainty ranges before results are seen, and check each transcribed value against its source as the second person. Nobody approves their own values.
 
 **A pull request that fills or changes an entry is labelled `science` and cannot merge without the approval of a science reviewer.**
@@ -43,7 +43,7 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 ## Open questions about this file
 
 - OPEN: the blueprint does not say what the first letter of a code stands for. Entries are grouped by that letter and the groups are not named.
-- OPEN: several codes share one wording in the blueprint. What each of those codes covers on its own is for the science reviewers to state; the entries say where this applies.
+- OPEN: several codes share one bracket in the blueprint. What each of those codes covers on its own is for the science reviewers to state; the entries say where this applies. Where the blueprint gives a code its own words inside a longer sentence, the entry quotes those words and gives the sentence as context.
 - OPEN: which values the Status field can take after `not defined`, and who sets each.
 - OPEN: whether an expected value and its citation are written in this file or kept in `validation/` with a pointer from here. The layout of `validation/` is a separate unit.
 - Section 8 is the only source of the codes below. A code that section 8 does not name has no entry. If the protocol has more codes, the science reviewers add them.
@@ -150,8 +150,8 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 
 ### E8
 
-- What it checks (blueprint wording): "annual soil-loss equation with unit guard [E8] and invariants [E9]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- What it checks (blueprint wording): "unit guard [E8]"
+- Context (blueprint wording): "annual soil-loss equation with unit guard [E8] and invariants [E9]"
 - Lane: L0 Core
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "annual soil-loss equation with unit guard [E8] and invariants [E9]"
@@ -166,8 +166,8 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 
 ### E9
 
-- What it checks (blueprint wording): "annual soil-loss equation with unit guard [E8] and invariants [E9]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- What it checks (blueprint wording): "invariants [E9]"
+- Context (blueprint wording): "annual soil-loss equation with unit guard [E8] and invariants [E9]"
 - Lane: L0 Core
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "annual soil-loss equation with unit guard [E8] and invariants [E9]"
@@ -200,8 +200,8 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 
 ### H1
 
-- What it checks (blueprint wording): "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- What it checks (blueprint wording): "public reference case [H1]"
+- Context (blueprint wording): "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
 - Lane: L1 Engines
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
@@ -246,8 +246,8 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 
 ### H7
 
-- What it checks (blueprint wording): "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- What it checks (blueprint wording): "mass closure [H7]"
+- Context (blueprint wording): "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
 - Lane: L1 Engines
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
@@ -262,8 +262,8 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 
 ### H8
 
-- What it checks (blueprint wording): "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- What it checks (blueprint wording): "invariants [H8]"
+- Context (blueprint wording): "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
 - Lane: L1 Engines
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
