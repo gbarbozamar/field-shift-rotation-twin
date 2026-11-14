@@ -15,7 +15,7 @@ Values, ranges and citations are science class (blueprint sections 3.5 and 3.6):
 | `records/` | The catalogue: one JSON file per parameter record. Empty today |
 | `examples/` | Two placeholder records that show the format. Never read as parameters |
 | `catalogue.py` | The record checks. Standard library only |
-| `test_layout.py` | The acceptance test. It also checks every file under `records/` |
+| `test_layout.py` | The acceptance test. It also checks the whole folder: every file under `records/`, and that no record file lies anywhere else |
 
 Run the check from the repository root:
 
@@ -30,7 +30,10 @@ Provisional environment: Python 3.12 and pytest; standard library otherwise.
 - One record per file, UTF-8, extension `.json`. Subfolders are allowed and carry no meaning.
 - Convention, not enforced: name the file after the record, `<id>.json` or `<id>.<scope words>.json`.
 - What identifies a record is its `id` and `scope`, not its path.
-- A file with a repeated key, or with `NaN` or `Infinity`, is rejected.
+- A file with a repeated key, or with `NaN` or `Infinity`, is rejected. So is a file with a number that cannot be held without change: too large, too small, or written with more digits than a float keeps.
+- Nothing is skipped without a message. Every file under `records/` is read: a file that is not a `.json` file is reported, and so is a folder whose name ends in `.json`. The only exception is `records/README.md`.
+- A `.json` file anywhere else under `params/`, other than under `examples/`, is reported: it would never be checked or read.
+- A file that cannot be read is one problem, and the rest of the folder still loads.
 
 ## Record format (PROPOSED)
 
@@ -58,14 +61,14 @@ Provisional environment: Python 3.12 and pytest; standard library otherwise.
 |---|---|---|
 | `id` | yes | Name of the quantity. Starts with a letter; letters, digits and `_` only |
 | `scope` | yes | What the value applies to: an object using only the scope keys below, each with a non-empty string. `{}` means no restriction is stated |
-| `value` | yes | A finite number, or `null` together with `value_missing_reason` |
-| `value_missing_reason` | only when `value` is `null` | Non-empty text. Not allowed next to a value |
+| `value` | yes | A finite number that reads back unchanged, or `null` together with `value_missing_reason` |
+| `value_missing_reason` | only when `value` is `null` | Non-empty text. Not allowed next to a value, not even as `null` |
 | `unit` | yes | Non-empty text. Also required when the value is missing: the unit the value would have |
 | `range` | yes | The uncertainty range: an object with `low`, `high` and `basis`, or `null` together with `range_missing_reason` |
-| `range.low`, `range.high` | yes | Finite numbers in the unit of the record, `low` ≤ `high`. A value that is present lies between them |
+| `range.low`, `range.high` | yes | Finite numbers that read back unchanged, in the unit of the record, `low` ≤ `high`. A value that is present lies between them |
 | `range.basis` | yes | Non-empty text: what the range represents, as the source states it |
-| `range_missing_reason` | only when `range` is `null` | Non-empty text. Not allowed next to a range |
-| `citation` | yes | An object with `reference` and `locator`. May be `null` only when `value` is `null` |
+| `range_missing_reason` | only when `range` is `null` | Non-empty text. Not allowed next to a range, not even as `null` |
+| `citation` | yes | An object with `reference` and `locator`. May be `null` only when `value` and `range` are both `null`: a number needs a citation |
 | `citation.reference` | yes | The full reference of the source, as text |
 | `citation.locator` | yes | Where the value is in the source (table, page, equation), so the checker can find it |
 | `citation.url` | no | Link or identifier of the source |
@@ -87,9 +90,17 @@ Two records are the same record when they have the same `id` and the same `scope
 
 A missing value is written `"value": null` with its reason. It stays missing: `read_value` returns a `Missing` object that carries the reason, is not a number, is not equal to zero and fails in arithmetic. A record that leaves the `value` field out is rejected; it is not read as missing. A value of `0` is a value. The same holds for `range` and `read_range`.
 
+### Numbers read back unchanged
+
+The reading functions return floats. A number that a float cannot hold exactly is a problem, not a silent change: an integer too large or too precise for a float is rejected by the record check, and number text that a float cannot hold without change is rejected when the file is read.
+
 ### Placeholders
 
-A number cannot carry the word PLACEHOLDER. So a placeholder number appears only inside a record whose identifier, unit, citation and persons all carry the word, and the catalogue check rejects any record that contains it anywhere. An example can be well-formed; it can never pass as a parameter.
+A number cannot carry the word PLACEHOLDER. So a placeholder number appears only inside a record whose identifier, unit, citation and persons all carry the word, and the catalogue check rejects any record that contains it anywhere. An example can be well-formed; it can never pass as a parameter: `read_value` and `read_range` refuse a record that contains the word.
+
+### Unchecked input
+
+Every public function of `catalogue.py` accepts any argument. A function that returns problems reports a bad argument as a problem. `read_value`, `read_range`, `identity` and `parse_record_text` raise `ValueError` and nothing else.
 
 A citation that says `CITATION NEEDED` is rejected: it marks an absence, it is not a citation.
 
@@ -104,6 +115,8 @@ A citation that says `CITATION NEEDED` is rejected: it marks an absence, it is n
 
 Each case is a test in `test_layout.py` with the same code. All records in the tests are placeholders: their numbers mean nothing. No case contains an expected value of the science.
 
+The reading functions refuse a placeholder (F5b). To reach their accepting path, cases A1 to A4 and F2 read a copy of a placeholder fixture in which the word is replaced by `UNMARKED_TEST_ONLY`. The copy exists only in memory while the test runs; no fixture is written without the word (F7).
+
 ### Accepted
 
 | Code | Case |
@@ -112,11 +125,11 @@ Each case is a test in `test_layout.py` with the same code. All records in the t
 | A2 | A record whose value is `null` with a reason is accepted. It is read as `Missing` with that reason: not a number, not equal to zero, and arithmetic on it fails |
 | A3 | A record whose range is `null` with a reason is accepted, and the range is read as `Missing` |
 | A4 | A value of `0` is accepted and read as the number zero, not as missing |
-| A5 | A record whose value is missing may have `"citation": null` |
+| A5 | A record whose value and range are both missing may have `"citation": null` (narrowed by F4) |
 | A6 | The same `id` with a different scope, or with the empty scope, is a different record |
 | A7 | The optional fields `note` and `citation.url` are accepted |
 | A8 | The files in `examples/` are well-formed, are all placeholders, and are rejected as a catalogue |
-| A9 | Every file under `records/` passes the catalogue check. Today there is none |
+| A9 | The whole `params/` folder of this repository passes the layout check (widened by F3a and F5c). Today it holds no record |
 
 ### Rejected
 
@@ -139,7 +152,27 @@ Each case is a test in `test_layout.py` with the same code. All records in the t
 | R5 | A record that is not a JSON object; an empty `note` |
 | R6 | A well-formed record that contains the word PLACEHOLDER is rejected from the catalogue. The word is found in any text of the record, in any case, including field names |
 | R7 | A file that is empty, truncated, repeats a key, or holds NaN or Infinity |
-| R7 | A folder check reports the unreadable file, the file that is not an object and the malformed record, each with its path; other file types are ignored; a folder that does not exist is a problem |
+| R7 | A folder check reports the unreadable file, the file that is not an object and the malformed record, each with its path; a folder that does not exist is a problem. The earlier clause "other file types are ignored" is withdrawn: see F3b |
+
+### Fixes (issue 21)
+
+One code per defect of issue 21. Each case failed on the code before the fix.
+
+| Code | Case |
+|---|---|
+| F1a | A file nested deeply enough to exhaust the parser is one problem for that file, and the other files still load. The placeholder check reads an item of any depth, and an item that contains itself, without failing |
+| F1b | A folder whose name ends in `.json` inside the catalogue is one problem; the files inside it and beside it still load |
+| F1c | An integer too large for a float, as `value`, `range.low` or `range.high`, is a problem of the record; the checks and the reading functions do not fail on it |
+| F2 | A number that cannot be read back unchanged is rejected: an integer that a float cannot hold exactly, as `value` or as a range bound; and, in a file, number text that a float cannot hold without change (more digits than a float keeps, too large, or so small that it would become zero). An integer that a float holds exactly, and ordinary number text, are accepted |
+| F3a | A `.json` file directly in `params/`, or in a folder other than `records/` and `examples/`, in any letter case of the extension, is reported |
+| F3b | A file inside the catalogue that is not a `.json` file is reported: other extensions, an upper-case extension, no extension, a README in a subfolder. Only the README at the top of the folder is skipped |
+| F3c | The duplicate check reports a record it cannot compare (not an object, malformed `id`, malformed `scope`) instead of skipping it. The catalogue check reports such a record once, with the reason |
+| F4 | A record whose value is missing and whose citation is `null` is rejected when it carries a numeric range: a range needs a citation. The same record with a citation is accepted |
+| F5a | `value_missing_reason` next to a value, zero included, and `range_missing_reason` next to a range, are rejected even when given as `null` |
+| F5b | `read_value` and `read_range` refuse any record that contains the word PLACEHOLDER, with or without a value, in any letter case; no file in `examples/` can be read as a parameter |
+| F5c | The check run by the acceptance test reads every file under `records/`: a file that is not a record fails it; a `params/` folder without `records/` is a problem |
+| F6 | Every public function, given input it did not check (not an object, wrong types, keys that are not text, huge numbers, a record that contains itself, deep nesting, a path that is not a path), reports a problem or raises `ValueError`, and nothing else. The list of public functions in the test is complete |
+| F7 | In `test_layout.py`, every object literal with a field name of the format, every text holding such a field name in quotes, and every call passing a field name to anything but the placeholder builders, carries the word PLACEHOLDER. So does every file in `examples/` |
 
 ## OPEN
 
@@ -150,8 +183,10 @@ Questions for a person. None is answered by this unit.
 3. **How a person is identified.** `transcribed_by` and `checked_by` hold any non-empty text. The repository is public and CI scans for personal names: which identifier is written here?
 4. **Scope vocabularies.** Who lists the words allowed under `crop`, `stage`, `management`, `soil` and `region`, and where does the list live? Are these five keys the right ones, and is one missing (for example the model a value belongs to)?
 5. **General against specific scope.** When one record has the empty scope and another names a crop, which one does an engine read? This unit only rejects exact duplicates.
-6. **Citation on a missing value.** Proposed: optional, because there may be no source to cite. Confirm, or require it always.
+6. **Citation on a missing value.** Proposed: optional when the range is missing too, because there may be no source to cite. Confirm, or require it always.
 7. **Source of a range.** Ranges are fixed by the science reviewers. May a range come from another source than the value, or from a reviewer's judgement? Then it needs its own citation or an explicit "assumption" mark (ground rule 7), which this format does not have.
 8. **Value inside its range.** Proposed: a value outside `[low, high]` is rejected. Confirm that no accepted source reports it otherwise.
 9. **Link to `ATTRIBUTIONS.md`.** Every publication is also recorded there (ground rule 5). Should `citation` point to that entry instead of repeating the reference?
 10. **File names.** The naming convention is not enforced. Enforce it?
+11. **Files that a system or an editor leaves in `records/`.** They are reported like any other file that is not a record (F3b), so the acceptance test fails on a machine that has one. Keep it that way, or name the files that may be skipped?
+12. **Testing the readers.** The readers refuse a placeholder and every fixture must carry the word, so the tests read an in-memory copy without it (see "PROPOSED cases"). Accept this, or decide another way to test the accepting path.
