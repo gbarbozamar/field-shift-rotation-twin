@@ -1,0 +1,59 @@
+# Publishes the frontend (web/dist/) to GitHub Pages on every push to main.
+# Owned by sub-lane L2a. Decisions of the platform developer (#18): Node 22
+# and npm with the lockfile committed; `npm ci && npm run build` in web/;
+# base path /field-shift-rotation-twin/ (web/vite.config.ts); hash routing,
+# so no fallback page is needed. No secret is used and none is needed.
+
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a deploy in progress is never cancelled.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # Public address of the backend (Railway), not a secret. Read by the
+  # frontend at build time (web/src/lib/api.ts). Recorded in #18.
+  VITE_API_URL: https://api-production-86e398f8.up.railway.app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/configure-pages@v6
+      - name: Build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,14 @@
+# Licences a frontend (npm) dependency may carry. PROPOSED (blueprint
+# section 3.7): the platform developer approves this list.
+# One SPDX identifier per line, written exactly as web/package-lock.json
+# records it. The list is exactly the licences the lockfile carried when the
+# check was added. Every entry is OSI-approved (blueprint section 1, rule 3);
+# for BlueOak-1.0.0 the lead developer confirmed its approval (decision D22,
+# issue #77).
+0BSD
+Apache-2.0
+BlueOak-1.0.0
+BSD-3-Clause
+ISC
+MIT
+MPL-2.0
