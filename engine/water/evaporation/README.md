@@ -146,6 +146,8 @@ The identifier of a case is the name of its test function without `test_`, with 
 | `runoff-above-the-precipitation-is-limited-and-recorded` | Runoff limited to the precipitation; shortfall recorded; the layer is unchanged |
 | `the-reduction-coefficient-follows-the-depletion-at-the-start-of-the-day` | R4 |
 | `evaporation-asking-more-than-the-layer-holds-is-limited-and-recorded` | The layer ends at exactly `TEW`; supplied plus shortfall is the demand |
+| `a-demand-that-nearly-fills-the-layer-never-ends-above-it` | Regression found by the verifier of #151: a demand that nearly fills the room left once ended one rounding step above `TEW`, and the next day raised. The depletion stays within `TEW`, the shortfall is not negative, and supplied never exceeds demanded |
+| `demands-near-the-room-left-keep-every-bound` | Randomized: the first day's demand is set within a few rounding steps of the room left; bounds, shortfall and closure hold on both days |
 | `evaporation-supplied-in-full-has-no-shortfall` | Shortfalls are zero |
 | `full-cover-evaporates-nothing-and-keeps-the-depletion` | R5 |
 | `mass-closure-every-day-on-a-long-series` | R1 every day of three twenty-year PLACEHOLDER series, from an empty and a full layer |

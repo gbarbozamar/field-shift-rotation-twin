@@ -706,13 +706,17 @@ def step(
     room = tew - after_inflow
     if few > 0:
         depth_demanded = evaporation_demanded / few
-        if depth_demanded <= room:
+        # Compare the depletion the demand would reach, as it is computed,
+        # so that a demand that nearly fills the room never ends one rounding
+        # step above ``tew``.
+        if after_inflow + depth_demanded <= tew:
             depth = depth_demanded
             evaporation = evaporation_demanded
             depletion_end = after_inflow + depth
         else:
             depth = room
-            evaporation = few * room
+            # Rounding never turns the limited flow into more than the demand.
+            evaporation = min(few * room, evaporation_demanded)
             depletion_end = tew
     else:
         # No exposed and wetted soil: Ke is zero, so nothing is demanded.
