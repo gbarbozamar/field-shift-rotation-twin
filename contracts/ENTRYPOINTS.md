@@ -9,7 +9,7 @@ The one public function of each engine: where it lives, its name, its arguments 
   - `PROPOSED`: the session proposes the module path, the function name, the arguments and the return type. A person accepts or corrects them in the pull request.
   - `OPEN`: the session cannot responsibly propose the signature. The entry gives a candidate, so that the question is concrete, and names the questions a person has to answer.
 - A `PROPOSED` entry can still depend on a question. Questions are listed once, under [OPEN](#open), as `Q1` to `Q16`, each with the role that answers it.
-- Three questions were answered by the lead developer on 14 November 2026 (issue #77): Q4, Q8 as far as the start month of the agricultural year goes, and Q10 as far as latitude and elevation go. Each keeps its number and its text, and carries the answer under it, marked `DECIDED`. They are a person's decisions, transcribed by a builder session. Issue #77 says of them: where they are science class, a science reviewer still has to accept them. No model and no route changed with these answers: each change is its own later unit, and until it lands the models behave as this file describes them.
+- Three questions were answered by the lead developer on 14 November 2026 (issue #77): Q4, Q8 as far as the start month of the agricultural year goes, and Q10 as far as latitude and elevation go. Each keeps its number and its text, and carries the answer under it, marked `DECIDED`. They are a person's decisions, transcribed by a builder session. Issue #77 says of them: where they are science class, a science reviewer still has to accept them. No model and no route changed with these answers: each change is its own later unit, and until it lands the models behave as this file describes them. Q5 was answered the same day (issue #77, D47) and is recorded the same way.
 - General rules that hold for every entry are `G1` to `G7`. They are all `PROPOSED`.
 - No engine exists yet and the folder `engine/` does not exist. This file contains no code. A signature is written as text, in the notation of Python type hints.
 - This file contains no method, equation, unit, parameter value, threshold or citation. The repository names no soil-loss method and this file names none.
@@ -139,7 +139,7 @@ When it cannot compute:
   - **This point no longer applies once the decision on Q4 is in force.** `DECIDED` by the lead developer on 14 November 2026 (issue #77, D7): the start month is a required part of the request; a request without it is an invalid request, and the route answers it as such and calls no engine. The case "no start month" no longer reaches an engine. The text above is kept to show what was proposed.
   - Not changed yet: `RotationCalendar` still accepts a start month that is missing with its reason, and the signature of this entry is left as it was written. Issue #77 does not say whether the return type changes.
 
-Depends on: Q3 (parameters), Q4 (answered: see the question), Q5 (which agricultural years), Q11 (unit), Q12 (residue ledger).
+Depends on: Q3 (parameters), Q4 (answered: see the question), Q5 (which agricultural years; answered: see the question), Q11 (unit), Q12 (residue ledger).
 
 ### EP2 `engine/calendar/`
 
@@ -212,7 +212,7 @@ When it cannot compute:
 - The list is never empty and an agricultural year is never left out.
 - The time basis of the items is `OPEN` in C1.3. The signature is the same for either answer.
 
-Depends on: Q2, Q3 (parameters), Q5 (which agricultural years), Q10 (inputs and outputs of the water engine; answered for latitude and elevation: they arrive in `climate`, and this signature does not change), Q11 (unit).
+Depends on: Q2, Q3 (parameters), Q5 (which agricultural years; answered: see the question), Q10 (inputs and outputs of the water engine; answered for latitude and elevation: they arrive in `climate`, and this signature does not change), Q11 (unit).
 
 ### EP4 `engine/residues/`
 
@@ -309,6 +309,11 @@ Each item is a question a person can answer. The role that answers it is named a
 - Not changed yet: `RotationCalendar` still accepts a start month that is missing with its reason, the rotation definition does not carry the start month (Q8), and the signature of EP1 is left as it was written. Issue #77 does not say whether the return type of EP1 changes.
 
 **Q5. Which agricultural years does a result list?** The years covered by the calendar (`start_date` to `end_date`), the years of the climate record, or only those in both? EP1 and EP3 must list the same years for one rotation, and no model checks that. This follows from question 6 of `contracts/inputs/README.md`. For the lead developer.
+
+- `DECIDED` (decided by the lead developer on 14 November 2026, [issue #77, D47](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346)): **every agricultural year of the climate record, cut by the start month of the case**, with the rotation repeated over them. The record runs from 2001-01-01 to 2024-12-31 (D29). A calendar whose own dates lie outside the record still runs on the years of the record. So the calendar's `start_date` and `end_date` do not choose the years, and EP1 and EP3 list the same years: those of the record.
+- Still `OPEN`, not answered by issue #77: **how the rotation is repeated over the years of the record**, that is, in which year of the record its first cycle starts and what happens to a cycle that does not fit whole. For the lead developer, as owner of lane L1, and the science reviewers.
+- Still `OPEN`: which daily series marks the record for each engine, when the series of one record do not cover the same days. Issue #77 does not say. Issue #115 proposes the `precipitation` series for EP1. For the lead developer.
+- Not changed yet: no model, engine or route changed with this answer. An agricultural year that the record does not cover from its first day to its last stays missing with reason `NO_COVERAGE` (C5.5).
 
 **Q6. How does a scenario reach an engine, and who gives a value its range?** `scenario_id` is in the rows of `ResultsTable` and not in `ResultsPerRotation`, and no signature here has a scenario argument. Proposed: one call is one scenario; the caller builds one set of arguments per scenario and writes `scenario_id` when it builds the table rows. This holds only if a scenario changes nothing but the arguments of the entry points; a scenario that changes a parameter falls under Q3. Also: with one call per scenario, an engine has nothing to compute a range from, so every number it returns carries `range_missing` and its reason. Is that intended, and which reason code does it use? What a scenario holds is question 9 of `contracts/results/README.md`. For the lead developer; the science reviewers for what a scenario and a range are.
 
