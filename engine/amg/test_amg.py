@@ -747,7 +747,7 @@ def test_argument_that_is_not_finite_is_not_computed(call, name, value):
 def test_items_that_are_not_finite_are_not_computed(value):
     assert_missing(rate(modifiers={"a": value}), "NOT_COMPUTABLE", "'a'")
     assert_missing(humified(carbon_inputs={"origin_a": value, "origin_b": 1.0}), "NOT_COMPUTABLE", "origin_a")  # fmt: skip
-    assert_missing(humified(humification_coefficients={"origin_a": value, "origin_b": 0.1}), "NOT_COMPUTABLE", "origin_a")  # fmt: skip
+    assert_missing(humified(humification_coefficients={"origin_a": value, "origin_b": 0.111}), "NOT_COMPUTABLE", "origin_a")  # fmt: skip
     assert_missing(one_step(state=PoolState(active=value, stable=1.0)), "NOT_COMPUTABLE", "state.active")  # fmt: skip
     for function in (end_minus_start, fitted_slope):
         assert_missing(function(stocks=[1.0, value], times=[0.0, 1.0]), "NOT_COMPUTABLE", "stocks[1]")  # fmt: skip
@@ -774,7 +774,7 @@ def test_structured_argument_of_another_type_raises_type_error():
     with pytest.raises(TypeError, match="carbon_inputs"):
         humified(carbon_inputs=None)
     with pytest.raises(TypeError, match="humification_coefficients"):
-        humified(humification_coefficients={1: 0.5})
+        humified(humification_coefficients={1: 0.555})
     with pytest.raises(TypeError, match="state"):
         one_step(state=(44.4, 22.2))
     with pytest.raises(TypeError, match="state.active"):
@@ -782,9 +782,9 @@ def test_structured_argument_of_another_type_raises_type_error():
     with pytest.raises(TypeError, match="steps"):
         a_run(None)
     with pytest.raises(TypeError, match=re.escape("steps[0]")):
-        a_run([(1.0, 0.1, 1.0)])
+        a_run([(1.11, 0.111, 1.0)])
     with pytest.raises(TypeError, match=re.escape("steps[0].duration")):
-        a_run([StepInput(humified_input=1.0, rate_coefficient=0.1, duration=None)])
+        a_run([StepInput(humified_input=1.11, rate_coefficient=0.111, duration=None)])
     with pytest.raises(TypeError, match="duration_unit"):
         one_step(duration_unit=None)
     with pytest.raises(TypeError, match="temperature_unit"):
