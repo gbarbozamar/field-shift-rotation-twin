@@ -48,6 +48,7 @@ def create_app(
     engines: RotationEngines | None = None,
     rotation_validator: RotationValidator | None = None,
     settings: RunSettings | None = None,
+    parameters: dict[str, dict] | None = None,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -58,7 +59,16 @@ def create_app(
     ``api/standins.py``.
     ``settings=None`` means no climate record period is configured (OPEN for
     the science reviewers).
+    ``parameters`` is the parameter catalogue the default engines pass to EP1
+    and EP3 (Q3, D46, D56 of issue #77), already loaded and checked by the
+    caller (``api.config.build_app`` does both at start-up). ``None`` is the
+    empty catalogue ``{}``; no file is read here. It is not used when
+    ``engines`` is given, so giving both is a ``TypeError``.
     """
+    if engines is not None and parameters is not None:
+        raise TypeError(
+            "parameters is for the default engines; give it to the engines passed in"
+        )
     app = FastAPI(title="Field Shift Rotation Twin")
     install_error_handlers(app)
     app.add_middleware(
@@ -82,7 +92,9 @@ def create_app(
                 engines
                 if engines is not None
                 else EntryPointEngines(
-                    discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS
+                    discover_engine_functions(),
+                    carbon_models=DEFAULT_CARBON_MODELS,
+                    parameters=parameters,
                 )
             ),
             rotation_validator=(
