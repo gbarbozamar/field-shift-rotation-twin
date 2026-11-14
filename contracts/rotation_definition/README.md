@@ -10,6 +10,8 @@ This folder holds a Pydantic model and one example of the "Rotation definition" 
 
 The producer proposed the example, its design choices and five open questions in issue #60. A builder session of lane L0 landed it here, as the open decision of blueprint section 5 says. The example of the issue is the source: its fields, its names and its design choices are kept, except where `contracts/CONVENTIONS.md` requires otherwise. Identifiers such as C3.1 below refer to that sheet.
 
+The lead developer answered the five questions of issue #60, and the question of where the start month of the agricultural year travels, on 14 November 2026 (issue #77, decisions D2 to D6 and D8). The answers are written under [OPEN](#open), each next to its question, marked `DECIDED`. They are a person's decisions, transcribed by a builder session. Issue #77 says of them: where they are science class, a science reviewer still has to accept them. **The model, the example and the test have not changed**: each change of the model is its own later unit, and until it lands the model behaves as this file describes it.
+
 **The example is PLACEHOLDER data.** Every date and identifier in it is illustrative. It describes no real place, no real field and no real producer, and it says `"example_data": true`. The crops are not crops: `crop_id` holds the word PLACEHOLDER.
 
 Acceptance test, from the repository root:
@@ -50,8 +52,8 @@ All PROPOSED. Every model rejects unknown fields and does not coerce types: a nu
 |---|---|---|
 | `component_id` | text | Required, not blank |
 | `position` | integer | Required. Numbers the components inside the cycle, from 1 (issue #60) |
-| `crop_id` | text | Required, not blank. Any text is accepted |
-| `purpose` | `grain`, `cover` or `pasture` | Required. The closed list that issue #60 proposes |
+| `crop_id` | text | Required, not blank. Any text is accepted. `DECIDED` (issue #77, D2): the values come from a closed list in `params/`. The model still accepts any text until that list lands as its own unit |
+| `purpose` | `grain`, `cover` or `pasture` | Required. The closed list that issue #60 proposes. `DECIDED` (issue #77, D6): the list stays |
 | `sowing` | `DateValue` | Required. Can be missing with its reason |
 | `harvest` | `DateValue` | Required. Can be missing with its reason. Not before `sowing`; checked only when both dates are present |
 
@@ -92,15 +94,17 @@ Only the two dates of a component carry a provenance label and a source, as in i
 
 ### Placeholders for open questions
 
-The model answers none of the five questions of issue #60. Where it had to take a shape, the shape is a placeholder:
+The model answers none of the five questions of issue #60. Where it had to take a shape, the shape is a placeholder.
 
-| In the model | Placeholder for |
-|---|---|
-| `crop_id` accepts any text that is not blank | Question 1: the crop vocabulary |
-| `sowing` and `harvest` are exact dates, as in the example | Question 2: exact dates or windows |
-| A component has no field for residue handling, grazing or termination | Question 3: management details |
-| The definition has no `template_id`; components are always written out | Question 4: templates |
-| `purpose` is the list `grain` / `cover` / `pasture`, and a pasture component has no field of its own | Question 5: the `purpose` list |
+The five questions are now answered by a person: `DECIDED` by the lead developer on 14 November 2026, issue #77. The third column gives each decision in short; the full answer is under [OPEN](#open). The first column still describes the model as it is: the model has not changed.
+
+| In the model | Placeholder for | Decision of issue #77 |
+|---|---|---|
+| `crop_id` accepts any text that is not blank | Question 1: the crop vocabulary | D2: a closed list in `params/`. The model still accepts any text until the crop list lands as its own unit |
+| `sowing` and `harvest` are exact dates, as in the example | Question 2: exact dates or windows | D3: exact dates, declared by the user |
+| A component has no field for residue handling, grazing or termination | Question 3: management details | D4: in this contract, per component. The model still has no such field until the management fields land as their own unit |
+| The definition has no `template_id`; components are always written out | Question 4: templates | D5: always explicit components |
+| `purpose` is the list `grain` / `cover` / `pasture`, and a pasture component has no field of its own | Question 5: the `purpose` list | D6: the list stays; no separate pasture fields |
 
 ## PROPOSED cases
 
@@ -168,7 +172,7 @@ The model does not reject these variants **only** until a person decides. No cas
 
 | Case | The variant | Question under OPEN |
 |---|---|---|
-| `accepted-while-open-crop-identifier-as-any-text` | `crop_id` is text taken from no list | 1 |
+| `accepted-while-open-crop-identifier-as-any-text` | `crop_id` is text taken from no list | 1. Now `DECIDED` (issue #77, D2): a closed list in `params/`. The model has not changed and still accepts this variant, until the crop list lands as its own unit |
 | `accepted-while-open-overlapping-components` | The second component is sown before the first is harvested. Neither the conventions sheet nor the blueprint forbids or allows it | 6 |
 | `accepted-while-open-components-not-listed-by-position` | The first component in the list has position 2 and the second has position 1, so neither the list nor the dates follow the positions | 7 |
 | `accepted-while-open-harvest-on-the-day-of-sowing` | A component is harvested on the day it is sown | 8 |
@@ -218,17 +222,26 @@ Not in issue #60 and added by the landing: the file name `PLACEHOLDER_rotation_d
 
 ## OPEN
 
-Each item is a question a person has to answer. The role that answers it is named at the end of the item.
+Each item is a question a person has to answer. The role that answers it is named at the end of the item. An item that a person has answered keeps its number and its question, and carries the answer under it, marked `DECIDED`.
 
 ### The five questions of issue #60
 
-Copied from the issue. They stay open; the model answers none of them (see [Placeholders for open questions](#placeholders-for-open-questions)).
+Copied from the issue. The lead developer answered the five on 14 November 2026 (issue #77, decisions D2 to D6). Each question stays in place, followed by its answer and by the part a person still has to supply. The model answers none of them and has not changed (see [Placeholders for open questions](#placeholders-for-open-questions)).
 
 1. **Crop vocabulary**: where do `crop_id` values come from — a closed list in `params/`, or free text? The engines and the C-factor must recognise them. For the engines developer; the lead developer for a list in `params/`.
+   - `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, D2): **a closed list in `params/`**, which the interface shows and the engines recognise.
+   - Still `OPEN`, to be supplied by people: **which crops are in the list?** For the lead developer, for the list in `params/`.
+   - Not changed yet: `crop_id` accepts any text that is not blank. The crop list in `params/` is a later unit, once people supply the crops.
 2. **Exact dates vs windows**: does the user declare exact sowing/harvest dates, or a window / relative rule that the calendar engine resolves into the exact dates of PR #54? For the engines developer, agreed with the interface developer.
+   - `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, D3): **exact dates**, declared by the user.
 3. **Management details**: do residue handling, grazing or cover-crop termination travel in this contract, in a separate management contract, or stay out of the event core? For the engines developer, agreed with the interface developer.
+   - `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, D4): **in the rotation definition contract**, per component.
+   - Still `OPEN`, to be supplied by people: **which management fields does a component carry, under which names, and what may each hold?** For the interface developer, who is the producer of the contract and proposes them.
+   - Not changed yet: a component has no field for residue handling, grazing or termination. The rotation definition gains the management fields in a later unit, for the interface developer.
 4. **Templates**: may the interface submit a `template_id` that the engines expand, or always inline components? (Affects whether the rotation ribbon is display-only or editable — an open L3 scope decision.) For the engines developer; the interface developer for the scope of the ribbon.
+   - `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, D5): **always explicit components.** If the interface offers templates, it expands them before sending.
 5. **`purpose` list**: is `grain` / `cover` / `pasture` the right closed list, and do pasture components need extra fields (e.g. grazing), or is that out of the event core? For the engines developer, agreed with the interface developer.
+   - `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, D6): **`grain` / `cover` / `pasture` stays.** No separate pasture fields: what a pasture needs comes with the management fields of D4 (question 3).
 
 ### Rules the model does not enforce
 
@@ -241,7 +254,7 @@ Neither the brief of this unit, the conventions sheet nor issue #60 asks for the
 
 ### What the calendar engine needs from this contract
 
-10. **Which fields of the rotation calendar does the definition carry?** This is part (a) of question Q8 of `contracts/ENTRYPOINTS.md`, and it is not decided here. `RotationCalendar` (`contracts/inputs/rotation_calendar.py`) needs the fields below, and the entry point of the calendar engine (EP2) takes the definition as its only argument.
+10. **Which fields of the rotation calendar does the definition carry?** This is part (a) of question Q8 of `contracts/ENTRYPOINTS.md`, and it is not decided here. For the start month of the agricultural year it is now `DECIDED` by a person (issue #77, D8; see below the table). `RotationCalendar` (`contracts/inputs/rotation_calendar.py`) needs the fields below, and the entry point of the calendar engine (EP2) takes the definition as its only argument.
 
     | Field of the rotation calendar | In this definition today |
     |---|---|
@@ -249,11 +262,16 @@ Neither the brief of this unit, the conventions sheet nor issue #60 asks for the
     | `case_id` | Carried |
     | `field_id` | Carried |
     | `rotation_id` | Carried |
-    | `ag_year_start`: the start month of the agricultural year (C5.4) | Not carried |
+    | `ag_year_start`: the start month of the agricultural year (C5.4) | Not carried. `DECIDED` (issue #77, D8): it travels in this definition. The model does not carry it until its own unit lands |
     | `start_date`: the first day the calendar is laid out for | Not carried |
     | `end_date`: the last day | Not carried |
 
     Each one that is not carried is either a new field of this contract or a further argument of EP2. For the lead developer, as owner of lane L1, and the interface developer.
+
+    - `DECIDED` for the start month (decided by the lead developer on 14 November 2026, issue #77, D8): the start month travels **in the rotation definition**, with its provisional mark. The calendar engine copies it into the calendar.
+    - Not changed yet: the model of this folder has no field for the start month. The rotation definition gains it in a later unit, for the interface developer, who is its producer.
+    - Still `OPEN`, to be supplied by people: **the provisional month of each case** (convention C5.4). For the person who declares the case.
+    - Still `OPEN`, not answered by issue #77: `start_date` and `end_date`. For the lead developer, as owner of lane L1, and the interface developer.
 11. **How long is one cycle, and how are the years inside a rotation numbered?** The conventions sheet leaves "the numbering of the years inside a rotation" to this contract. Issue #60 proposes `position`, which numbers components, not years. With `repeats: true` and exact dates, the definition does not say when the cycle starts over, nor how its dates are moved onto the years the calendar is laid out for (question 6 of `contracts/inputs/README.md`). This also depends on question 2. For the engines developer and the interface developer.
 12. **Is a `component_id` of the rotation calendar the `component_id` of this definition?** The calendar rejects two components with one `component_id`, and a rotation that repeats places each component of the definition more than once. Question 4 of `contracts/inputs/README.md` asks the same from the other side. For the engines developer and the lead developer.
 13. **Where do the calendar rules live, and what is the identifier of each?** Blueprint section 5 gives this contract "which calendar rules are checked", and `RuleViolation.rule` of the calendar is "the identifier of a rule of the rotation definition". Issue #60 says the definition declares intent and the calendar engine checks feasibility; its example carries no rule, so the model carries none. For the engines developer and the interface developer.
