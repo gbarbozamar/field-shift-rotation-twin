@@ -26,22 +26,22 @@ function isFiniteNumber(value: unknown): value is number {
 
 function parseGeometry(value: unknown, fieldId: string): PolygonGeometry {
   if (typeof value !== 'object' || value === null) {
-    throw new Error(`Field ${fieldId}: geometry must be an object`)
+    throw new Error(`invalid-geometry[${fieldId}]:not-an-object`)
   }
   const geometry = value as { type?: unknown; coordinates?: unknown }
   if (geometry.type !== 'Polygon') {
-    throw new Error(`Field ${fieldId}: geometry.type must be "Polygon"`)
+    throw new Error(`invalid-geometry[${fieldId}]:type-not-polygon`)
   }
   if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length === 0) {
-    throw new Error(`Field ${fieldId}: geometry.coordinates must be a non-empty array of rings`)
+    throw new Error(`invalid-geometry[${fieldId}]:coordinates-not-rings`)
   }
   for (const ring of geometry.coordinates) {
     if (!Array.isArray(ring) || ring.length < 3) {
-      throw new Error(`Field ${fieldId}: each ring needs at least three positions`)
+      throw new Error(`invalid-geometry[${fieldId}]:ring-too-short`)
     }
     for (const position of ring) {
       if (!Array.isArray(position) || !isFiniteNumber(position[0]) || !isFiniteNumber(position[1])) {
-        throw new Error(`Field ${fieldId}: each position needs a finite longitude and latitude`)
+        throw new Error(`invalid-geometry[${fieldId}]:position-not-finite`)
       }
     }
   }
@@ -50,14 +50,14 @@ function parseGeometry(value: unknown, fieldId: string): PolygonGeometry {
 
 function parseField(value: unknown): ExampleField {
   if (typeof value !== 'object' || value === null) {
-    throw new Error('Each entry of fields must be an object')
+    throw new Error('invalid-case:field-not-an-object')
   }
   const field = value as Record<string, unknown>
   if (typeof field.field_id !== 'string' || field.field_id.length === 0) {
-    throw new Error('Each field needs a non-empty field_id')
+    throw new Error('invalid-case:field-id-empty')
   }
   if (typeof field.name !== 'string' || field.name.length === 0) {
-    throw new Error(`Field ${field.field_id}: name must be a non-empty string`)
+    throw new Error(`invalid-field[${field.field_id}]:name-empty`)
   }
   return {
     field_id: field.field_id,
@@ -73,20 +73,20 @@ function parseField(value: unknown): ExampleField {
  */
 export function parseExampleCase(value: unknown): ExampleCase {
   if (typeof value !== 'object' || value === null) {
-    throw new Error('The example case file must contain an object')
+    throw new Error('invalid-case:not-an-object')
   }
   const data = value as Record<string, unknown>
   if (data.example_data !== true) {
-    throw new Error('The case file must carry "example_data": true (this screen shows example data only)')
+    throw new Error('invalid-case:example-data-not-true')
   }
   if (typeof data.case_id !== 'string' || data.case_id.length === 0) {
-    throw new Error('The case file needs a non-empty case_id')
+    throw new Error('invalid-case:case-id-empty')
   }
   if (typeof data.label !== 'string' || data.label.length === 0) {
-    throw new Error('The case file needs a non-empty label')
+    throw new Error('invalid-case:label-empty')
   }
   if (!Array.isArray(data.fields)) {
-    throw new Error('The case file needs a fields array')
+    throw new Error('invalid-case:fields-not-array')
   }
   return {
     example_data: true,
