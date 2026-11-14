@@ -81,6 +81,8 @@ CHAIN_SOIL_SLOPE = INPUT_EXAMPLES / "PLACEHOLDER_chain_site_soil_slope.json"
 WORD = "PLACEHOLDER"
 IDENTITY_FIELDS = ("case_id", "field_id")
 ONE_DAY = dt.timedelta(days=1)
+# The unit strings of the point, decision D55 of issue #77.
+POINT_UNITS_D55 = {"latitude": "degree", "longitude": "degree", "elevation": "m"}
 
 
 # --- the examples -------------------------------------------------------------
@@ -331,8 +333,15 @@ def assert_water_missing_for_every_covered_year(
 
     Every item is missing, none with an identity absence, none ``NO_COVERAGE``
     in a covered year, and the part is EP3's own output for the same
-    arguments, passed on unchanged. The detail text is not asserted: it is
-    EP3's, and it changes when EP3 takes the catalogue (#165).
+    arguments, passed on unchanged.
+
+    With the point in the unit strings of D55, EP3 passes its unit guard, so
+    a covered year is ``MISSING_INPUT`` for what the daily chain lacks, not for
+    a unit (Q11): every site parameter of EP3 has no record (D56: neither test
+    catalogue holds one), the crop of each day is not known (the calendar's
+    dates lie outside the record and the repetition of the rotation over the
+    years is not decided, Q5), and the definition of the indicator is
+    incomplete (C1.4, D61). The texts are EP3's own constants.
     """
     result = outcome.result
     assert result is not None
@@ -344,7 +353,14 @@ def assert_water_missing_for_every_covered_year(
         assert item.value is None
         assert_not_an_identity_absence(item.missing)
         if item.ag_year in covered():
-            assert item.missing.reason != "NO_COVERAGE"
+            detail = item.missing.detail
+            assert item.missing.reason == "MISSING_INPUT"
+            assert "unit string the water engine does not accept" not in detail
+            for pid in ep3.SITE_PARAMETERS:
+                assert f"'{pid}'" in detail, pid
+            assert "no record in parameters (D56)" in detail
+            assert ep3.CROP_UNKNOWN in detail
+            assert ep3.DEFINITION_INCOMPLETE in detail
     function = ep3.compute_water_deficit_exposure
     extra = {"parameters": parameters} if takes_parameters(function) else {}
     assert water == function(
@@ -402,10 +418,15 @@ def test_CH03_example_values_are_plainly_placeholder():
     for series in example.daily_series:
         assert len({day.value for day in series.days}) == 1, series.quantity
         assert series.source is not None and series.source.startswith(WORD)
-    for name in ("latitude", "longitude", "elevation"):
+    # The unit strings of the point are those of D55 (issue #77), the ones
+    # EP3 accepts; the numbers stay illustrative and the source says so.
+    assert POINT_UNITS_D55["latitude"] == ep3.POINT_UNITS.latitude_decimal_degrees
+    assert POINT_UNITS_D55["elevation"] == ep3.POINT_UNITS.elevation
+    for name, unit in POINT_UNITS_D55.items():
         value = getattr(example.point, name)
-        assert value.unit == "PLACEHOLDER_unit"
+        assert value.unit == unit
         assert value.source.startswith(WORD)
+        assert "not a real place" in value.source
     soil = soil_slope()
     for value in (soil.slope_length, soil.slope_steepness):
         assert value.value is not None
