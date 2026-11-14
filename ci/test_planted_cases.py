@@ -8,13 +8,14 @@ folder; nothing planted is stored in the repository.
 
 Checks without a planted case yet, both OPEN:
 
-- frontend build: needs ``web/``;
+- frontend build;
 - contract validation: runs ``uv run pytest contracts/``; the invalid variants
   that each contract folder rejects are its planted cases, owned by lane L0.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import shutil
@@ -25,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from ci import licences, names_scan
+from ci import frontend_licences, licences, names_scan
 
 ROOT = Path(__file__).parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
@@ -225,3 +226,94 @@ def test_allowed_list_is_read_without_comments():
     allowed = licences.read_allowed()
     assert allowed
     assert not any(entry.startswith("#") for entry in allowed)
+
+
+# --- check 6: frontend dependency licences --------------------------------
+
+PLACEHOLDER_LICENCE = "PLACEHOLDER-licence-not-on-the-list"
+
+
+def write_lockfile(folder: Path, packages: dict[str, dict]) -> Path:
+    lockfile = folder / "package-lock.json"
+    lock = {"name": "placeholder", "lockfileVersion": 3, "packages": packages}
+    lockfile.write_text(json.dumps(lock), encoding="utf-8")
+    return lockfile
+
+
+def frontend_check(lockfile: Path, capsys) -> tuple[int, str]:
+    code = frontend_licences.main(lockfile)
+    return code, capsys.readouterr().out
+
+
+ROOT_ENTRY = {"": {"name": "placeholder", "version": "0.0.0"}}
+ALLOWED_PACKAGE = {"version": "0.0.0", "license": "MIT"}
+
+
+def test_frontend_licence_check_fails_on_a_planted_licence(tmp_path, capsys):
+    lockfile = write_lockfile(
+        tmp_path,
+        {
+            **ROOT_ENTRY,
+            "node_modules/allowed-package": ALLOWED_PACKAGE,
+            "node_modules/planted-package": {
+                "version": "0.0.0",
+                "license": PLACEHOLDER_LICENCE,
+            },
+        },
+    )
+    code, out = frontend_check(lockfile, capsys)
+    assert code == 1
+    assert "node_modules/planted-package 0.0.0" in out
+    assert "allowed-package" not in out
+
+
+def test_frontend_licence_check_fails_without_a_licence(tmp_path, capsys):
+    lockfile = write_lockfile(
+        tmp_path,
+        {**ROOT_ENTRY, "node_modules/planted-package": {"version": "0.0.0"}},
+    )
+    code, out = frontend_check(lockfile, capsys)
+    assert code == 1
+    assert "node_modules/planted-package 0.0.0: no licence recorded" in out
+
+
+def test_frontend_licence_check_accepts_an_or_with_one_allowed_side(tmp_path, capsys):
+    lockfile = write_lockfile(
+        tmp_path,
+        {
+            "node_modules/planted-package": {
+                "version": "0.0.0",
+                "license": f"(MIT OR {PLACEHOLDER_LICENCE})",
+            }
+        },
+    )
+    code, out = frontend_check(lockfile, capsys)
+    assert code == 0
+    assert "1 packages checked" in out
+
+
+def test_frontend_licence_check_ignores_the_root_entry(tmp_path, capsys):
+    lockfile = write_lockfile(
+        tmp_path,
+        {
+            "": {"name": "placeholder", "license": PLACEHOLDER_LICENCE},
+            "node_modules/allowed-package": ALLOWED_PACKAGE,
+        },
+    )
+    code, out = frontend_check(lockfile, capsys)
+    assert code == 0
+    assert "1 packages checked" in out
+
+
+def test_frontend_licence_check_without_a_lockfile_is_skipped(tmp_path, capsys):
+    code, out = frontend_check(tmp_path / "package-lock.json", capsys)
+    assert code == 0
+    assert "::notice::Frontend licence check skipped" in out
+
+
+def test_frontend_licence_check_passes_on_the_repository_lockfile(capsys):
+    lockfile = ROOT / "web" / "package-lock.json"
+    if not lockfile.is_file():
+        pytest.skip("web/package-lock.json does not exist")
+    code, out = frontend_check(lockfile, capsys)
+    assert code == 0, out
