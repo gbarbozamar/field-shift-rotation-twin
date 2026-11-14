@@ -68,7 +68,11 @@ Status: DECIDED (lead developer, 14 November 2026; acceptance by a science revie
 Still to be supplied by a person:
 
 - `OPEN`: the definition of the critical period per crop. Question for the science reviewers: **which period of each crop is its critical period?**
+- `OPEN`: the state of the water balance that the ratio and the descriptive measures use. Question for the science reviewers: **which quantities of the daily water balance are "water transpired" and "water demanded", and which state of the balance do the descriptive measures use?**
+- `OPEN`: days without a crop in the ground. Question for the science reviewers: **do days without a crop in the ground count?**
 - The source of the measure: CITATION NEEDED.
+
+While the definition is incomplete (critical period, state of the balance), no engine reports `water_deficit_exposure` as anything but missing, with its reason.
 
 ### C1.5 Trend of soil carbon: identifier, unit, time basis and direction
 
@@ -97,7 +101,7 @@ Status: DECIDED (lead developer, 14 November 2026; acceptance by a science revie
 
 Still to be supplied by a person:
 
-- `OPEN`: the soil depth and the horizon. They are values; they live in the parameter catalogue and in the carbon forcing contract, not in this sheet. Questions for the science reviewers: **to which soil depth does the stock refer, and over which horizon is the trend computed?**
+- `OPEN`: the soil depth and the horizon. They are values; they live in the parameter catalogue and in the carbon forcing contract, not in this sheet. Questions for the science reviewers: **to which soil depth does the stock refer, and over which horizon is the trend computed?** Both carbon models must refer to the same soil depth.
 - The source of each computation: CITATION NEEDED.
 
 ## 2. How an uncertainty range travels with a value
