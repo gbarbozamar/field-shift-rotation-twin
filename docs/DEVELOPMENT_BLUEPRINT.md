@@ -136,7 +136,7 @@ Folders are created by the first unit that needs them.
 | Geometry | shapely, pyproj |
 | Storage | Files (JSON cache and results). No database |
 | Frontend | React, Vite, TypeScript, Tailwind, shadcn/ui, TanStack Query |
-| Map and drawing | react-leaflet, terra-draw |
+| Map and drawing | leaflet, terra-draw |
 | Charts | Recharts |
 | Explanation text | Deterministic templates. No language model in the product |
 | Tests | pytest, against published or reference values |
