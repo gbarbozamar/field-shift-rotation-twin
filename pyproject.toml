@@ -6,13 +6,13 @@ license = "Apache-2.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi",
+    "httpx",
     "pydantic",
     "uvicorn",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx",
     "pip-licenses>=5.5.5",
     "pytest",
     "ruff",
