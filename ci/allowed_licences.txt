@@ -1,0 +1,16 @@
+# Licences a Python dependency may carry. PROPOSED (blueprint section 3.7):
+# the platform developer approves this list.
+# One licence per line, written exactly as the package metadata reports it.
+# Every entry is OSI-approved (blueprint section 1, rule 3).
+Apache-2.0
+Apache Software License
+BSD-2-Clause
+BSD-3-Clause
+BSD License
+ISC
+ISC License (ISCL)
+MIT
+MIT License
+MPL-2.0
+Mozilla Public License 2.0 (MPL 2.0)
+PSF-2.0

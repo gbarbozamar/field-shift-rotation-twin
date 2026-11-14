@@ -19,6 +19,8 @@ uv run pytest api/test_cors.py::test_preflight_from_allowed_origin   # one test
 uv run ruff check api/ && uv run ruff format --check api/            # lint (scope to your lane's folders)
 uv run uvicorn api.main:app --reload     # backend on http://localhost:8000
 docker compose watch                     # backend in a container; edits to api/ reload it
+uv run pip-licenses --with-system --format=json | uv run python -m ci.licences   # licence check
+FORBIDDEN_NAMES="$(cat <list>)" uv run python -m ci.names_scan                   # names scan
 ```
 
 Tests live next to the code they check (`params/test_layout.py`, `validation/test_layout.py`, `api/test_*.py`); `params/` and `validation/` use the standard library only. Docs written before uv existed say `python -m pytest <folder>/`, which still works.
@@ -28,7 +30,9 @@ Tests live next to the code they check (`params/test_layout.py`, `validation/tes
 ## Platform decisions (L2a)
 
 - Stack: FastAPI served by uvicorn; Pydantic models are the schema format; httpx, numpy, shapely, pyproj; pytest and ruff. Frontend: Node 22 LTS, npm (`package-lock.json` committed, `npm ci` in CI), Vitest; the rest of the frontend stack is in blueprint §4.
-- CI: GitHub Actions running the six checks (tests, frontend build, contract validation, secret scan with gitleaks, names scan, dependency licences with pip-licenses and license-checker). A check whose folder does not exist yet is skipped with a notice. The forbidden-names list lives in a GitHub Actions secret, never in the repository.
+- CI: `.github/workflows/ci.yml` runs the six checks as separate jobs: `tests` (all pytest, plus ruff on `api/`, `adapters/`, `ci/`), `frontend-build`, `contract-validation`, `secret-scan` (gitleaks over the whole history), `names-scan` and `dependency-licences`. `frontend-build` is skipped with a notice until `web/package.json` exists; `contract-validation` until `contracts/` exists and its command is agreed.
+- `ci/` holds the check scripts and `ci/test_planted_cases.py`, which shows each check failing on a case planted at run time in a temporary folder (the secret-scan cases need docker). Nothing planted is committed. `ci/allowed_licences.txt` is the licence allowlist, with licences written exactly as package metadata reports them; a new dependency with another licence fails CI until the platform developer adds it.
+- The forbidden-names list lives in the GitHub Actions secret `FORBIDDEN_NAMES` (one name per line), never in the repository. The scan reports file and line, never the name; without the secret it is skipped with a notice.
 - API: `api/main.py` builds the app with `create_app(cors_origins)`. `GET /health` → `{"status": "ok"}` is the liveness route.
 - CORS: allowed origins come from the `CORS_ORIGINS` environment variable (comma-separated). Unset or empty means no cross-origin access. Compose sets `http://localhost:5173` (Vite dev server); the production origin is set in the host's settings at deploy.
 - Deploy: a static frontend and one backend container, both public without login. The frontend is proposed for GitHub Pages through the platform pipeline: base path `/field-shift-rotation-twin/`, hash routing, built with `npm ci && npm run build` in `web/` into `web/dist/`. The backend host is not chosen yet. Deploys are performed by a person, never a session.
