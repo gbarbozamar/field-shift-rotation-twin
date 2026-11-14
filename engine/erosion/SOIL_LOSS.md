@@ -259,12 +259,12 @@ A *computable* run, in the cases below, has every input that EP1 needs: a precip
 
 ## Changes outside this folder that this unit needs
 
-Nothing outside `engine/erosion/` is changed here.
+`validation/test_chain_examples.py`, case CH06, and its row in `validation/README.md` are updated in this unit, at the orchestrator's request (lane L0). CH06 used to expect `R` and `C` read as whole-factor records. It now asserts two things with a complete PLACEHOLDER catalogue (its site records, with numbers of a usable size for the daily index and the coefficients of `c_factor/`, and crop records):
 
-`validation/test_chain_examples.py` (lane L0, not in the files of this unit) needs new expectations; the brief says not to edit it:
+- through the runner, on the calendar EP2 builds from the rotation definition example (2027 and 2028, after the record of 2001 and 2002), each covered year is missing with only factor `c` named, for the days outside the calendar (D47, OPEN 2), so `R`, `K`, `LS` and `P` are computed;
+- EP1 on the same calendar laid on the record gives a number equal to `equation.py` of `R` and `C` computed again in the test from the PROPOSED forms of `r_factor/` and `c_factor/`.
 
-- `test_CH06_complete_placeholder_catalogue_gives_the_product_of_equation_py` fails. It expects the soil loss of the chain to be `equation.annual_soil_loss` with `R` and `C` read as whole-factor records (`ep1.R_ID`, `ep1.C_ID`). With this unit, `R` is the level times the fractions and ratios of `r_factor/`, and `C` comes from `c_factor/`. In the chain as it is, the year stays missing for three reasons: its catalogue gives every site record `PLACEHOLDER_BASE + position`, so the threshold of the daily index lies above every day of the example climate (no erosive day) and the coefficients of `c_factor/` carry a PLACEHOLDER unit; it holds no crop record; and the calendar that EP2 builds from the rotation definition example lies in 2027 and 2028, outside the climate record of 2001 and 2002, so the crop of every day is not known (D47, OPEN 2). Until the rotation is repeated over the record, CH06 can only check that every covered year is missing with `factor 'r'` and `factor 'c'` named, and that `K`, `LS` and `P` are not; or it builds its own calendar inside the record and the crop records, as `chain-example-climate-gives-r-and-c-through-r-factor-and-c-factor` does here.
-- CH05 still holds: `PARAMETER_IDS` is now every identifier read with the empty scope, and each is named in an empty-catalogue run. CH07 still holds: `C_ID` is kept as the name of the record that is no longer read.
+CH05 and CH07 are unchanged and pass: `PARAMETER_IDS` is every identifier read with the empty scope, and `C_ID` stays as the name of the record that is no longer read. Nothing else outside `engine/erosion/` is changed.
 
 ## OPEN
 
