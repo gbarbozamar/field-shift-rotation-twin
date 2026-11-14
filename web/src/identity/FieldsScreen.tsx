@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { exampleCase } from './exampleCase'
-import { formatHectares, polygonAreaHectares } from './geometry'
 import { FIELDS_SCREEN_TEXT as T } from './literals'
 
 /**
@@ -59,10 +58,6 @@ export default function FieldsScreen() {
                 <span className="mt-1 block text-sm text-slate-500">
                   {T.fieldIdLabel}: {field.field_id}
                 </span>
-                <span className="mt-1 block text-sm text-slate-600">
-                  {formatHectares(polygonAreaHectares(field.geometry))} {T.areaUnit} ·{' '}
-                  {T.areaProvenanceLabel}
-                </span>
               </button>
             </li>
           )
@@ -73,7 +68,6 @@ export default function FieldsScreen() {
         <p className="mt-6 text-sm text-slate-500">{T.emptyList}</p>
       )}
 
-      <p className="mt-6 text-xs text-slate-500">{T.areaFootnote}</p>
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${T.selectedLabel}: ${selectedField.name}` : ''}

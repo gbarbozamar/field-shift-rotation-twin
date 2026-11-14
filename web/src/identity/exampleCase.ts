@@ -1,5 +1,9 @@
 import rawCase from '../data/example_case.json'
-import type { PolygonGeometry } from './geometry'
+/** GeoJSON polygon, WGS84 longitude/latitude, exterior ring closed. */
+export interface PolygonGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
 
 /** A field of the example case (illustrative placeholder, no real field). */
 export interface ExampleField {
