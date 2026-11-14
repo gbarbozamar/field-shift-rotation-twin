@@ -278,6 +278,7 @@ NO_SUCH_TIME_BASIS = "Input should be 'ag_year' or 'rotation'"
 NEITHER = "neither a number nor a 'missing' part"
 NUMBER_AND_REASON = "a number together with a 'missing' part"
 THREE_COMPUTATIONS = "must carry each of the three computations once"
+NO_SUCH_MODEL = "Input should be 'amg' or 'rothc'"
 
 
 @dataclass(frozen=True)
@@ -1001,7 +1002,7 @@ REJECTED = [
         "carbon value with a blank model",
         carbon_values,
         put_at(0, carbon_model=""),
-        BLANK,
+        NO_SUCH_MODEL,
         (ROTATION,),
     ),
     Case(
@@ -1027,6 +1028,20 @@ REJECTED = [
         drop("computation"),
         "names its carbon model and its computation",
         (TABLE,),
+    ),
+    Case(
+        "K4",
+        "carbon model not in the list (D1)",
+        carbon_number,
+        put(carbon_model="PLACEHOLDER_carbon_model"),
+        NO_SUCH_MODEL,
+    ),
+    Case(
+        "K4",
+        "carbon model written in upper case",
+        carbon_number,
+        put(carbon_model="AMG"),
+        NO_SUCH_MODEL,
     ),
     Case(
         "K2",
@@ -1116,7 +1131,7 @@ REJECTED = [
         "T4",
         "soil loss that names a carbon model",
         soil_loss_number,
-        put(carbon_model="PLACEHOLDER_carbon_model_one"),
+        put(carbon_model="amg"),
         "belong to 'soil_carbon_trend' only",
         (TABLE,),
     ),
@@ -1238,6 +1253,7 @@ VOCABULARY = {
     *get_args(models.ProvenanceLabel),
     *get_args(models.ReasonCode),
     *get_args(models.TrendComputation),
+    *get_args(models.CarbonModel),
     *get_args(models.TimeBasis),
     *(unit for units in models.UNITS_OF.values() for unit in units),
 }
@@ -1413,7 +1429,7 @@ CARRYING_VALUES = [
     ("water_deficit_exposure", "value", _fixed(0.5)),
     ("water_deficit_exposure", "time_basis", _fixed("rotation")),
     ("water_deficit_exposure", "ag_year", _fixed(2001)),
-    ("soil_carbon_trend", "carbon_model", _fixed("PLACEHOLDER_carbon_model_one")),
+    ("soil_carbon_trend", "carbon_model", _fixed("amg")),
     ("soil_carbon_trend", "computation", _fixed("end_minus_start")),
     ("soil_carbon_trend", "unit", _fixed(models.UNIT_SOIL_CARBON_TREND)),
 ]
