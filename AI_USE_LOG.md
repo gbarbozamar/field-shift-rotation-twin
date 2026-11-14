@@ -20,6 +20,8 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-14 | L2a | `l2/backend-skeleton` (#38): `api/`, `pyproject.toml`, `uv.lock`, `Dockerfile`, `compose.yaml`, `CLAUDE.md`, `ATTRIBUTIONS.md` | Claude Code (Anthropic) | A builder session wrote the FastAPI skeleton with the liveness route, CORS from a setting, the container and the compose watch setup, their tests and the attribution rows, and the `CLAUDE.md` guidance file; the platform developer chose the dependencies, the liveness route and the CORS origins | Merged by the platform developer as a merge commit instead of a squash, without a separate verifier run or a review recorded on the pull request |
 | 2026-11-14 | L0 | RothC fallback (#42): `docs/DEVELOPMENT_BLUEPRINT.md` | Claude Code (Anthropic) | An AI session wrote the rule that `engine/rothc/` moves to L2a if L3 together with L2b is too much for one developer, as the lead developer dictated | Merged by an AI session on the instruction of the lead developer, without a review recorded on the pull request |
 
+| 2026-11-14 | L3 | `l3/frontend-skeleton` (#36): `web/` | Codex (OpenAI) | Built the frontend shell using the stack recorded in #36, pinned dependencies, added hash navigation and a deployment acceptance check; explicitly shows that rotation calculations are unavailable | Requested by the repository owner to repair the public 404; automated acceptance passed; no independent human review recorded |
+
 Rules:
 
 - No generated images, video or voice in the submission.
