@@ -1,0 +1,19 @@
+{
+  "base_url": "https://power.invalid/PLACEHOLDER/daily/point",
+  "community": "PLACEHOLDER_community",
+  "parameters": [
+    {
+      "source_parameter": "PLACEHOLDER_PARAMETER_A",
+      "quantity": "placeholder_quantity_a",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED"
+    }
+  ],
+  "optional_arguments": {},
+  "fill_value": -1000000000.0,
+  "fill_reason": "NO_COVERAGE",
+  "range_missing_reason": "NOT_AVAILABLE",
+  "attribution": "PLACEHOLDER_attribution",
+  "source_id": "placeholder_source",
+  "timeout_seconds": 1.0
+}

@@ -1,106 +1,41 @@
-"""Backend application.
+"""Backend application: the app a server runs (``api.main:app``).
 
 Run locally with ``uv run uvicorn api.main:app --reload`` from the
 repository root, or in a container with ``docker compose watch``
 (edits reload the server; http://localhost:8000/health).
 
-Settings (environment variables):
+The app is assembled from environment variables by ``api/config.py``
+(see api/README.md, "Configuration"). An empty or blank value counts as unset.
+A piece that is not configured is a typed absence; a piece that is configured
+wrongly raises ``ConfigError`` naming the variable, and the server does not
+start. No variable has a default.
 
 - ``CORS_ORIGINS``: comma-separated origins allowed to call the API from a
   browser, e.g. ``http://localhost:5173,https://gbarbozamar.github.io``.
-  Empty or unset: no cross-origin access.
+  Unset: no cross-origin access.
+- ``POWER_SETTINGS_FILE``: path of the JSON settings file of the NASA POWER
+  adapter (``PowerSettings.from_mapping``). Unset: the climate source is the
+  stand-in (``unavailable`` / ``NOT_AVAILABLE``).
+- ``CLIMATE_CACHE_DIR``: folder of the climate response cache. Required when
+  ``POWER_SETTINGS_FILE`` is set; ignored otherwise.
+- ``CLIMATE_START_DATE``, ``CLIMATE_END_DATE``: the climate record period,
+  ``YYYY-MM-DD``, inclusive; both or neither. Unset: the climate source is not
+  called.
+- ``SOIL_SLOPE_EXAMPLE_FILE``: path of the accepted soil-and-slope contract
+  example, served as ``example``. Unset: the soil-and-slope source is the
+  stand-in.
+
+``create_app`` (in ``api/app.py``) stays the way tests inject fakes; it and
+``parse_origins`` are re-exported here.
 """
 
 from __future__ import annotations
 
 import os
-from typing import Literal
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from api.app import Health, create_app, parse_origins
+from api.config import build_app, load_config
 
-from adapters.ports import ClimateSource
-from api.engines import (
-    DEFAULT_CARBON_MODELS,
-    EntryPointEngines,
-    discover_engine_functions,
-)
-from api.errors import install_error_handlers
-from api.ports import RotationEngines, RotationValidator, RunSettings, SoilSlopeSource
-from api.rotation_validator import RotationDefinitionValidator
-from api.rotations import make_router
-from api.standins import ClimateUnavailable, SoilSlopeNotLoaded
+__all__ = ["Health", "app", "create_app", "parse_origins"]
 
-
-class Health(BaseModel):
-    """Response of the liveness route."""
-
-    status: Literal["ok"]
-
-
-def parse_origins(value: str | None) -> list[str]:
-    """Split a comma-separated origin list; blanks and trailing slashes dropped."""
-    if not value:
-        return []
-    return [part.strip().rstrip("/") for part in value.split(",") if part.strip()]
-
-
-def create_app(
-    cors_origins: list[str],
-    *,
-    climate: ClimateSource | None = None,
-    soil_slope: SoilSlopeSource | None = None,
-    engines: RotationEngines | None = None,
-    rotation_validator: RotationValidator | None = None,
-    settings: RunSettings | None = None,
-) -> FastAPI:
-    """Build the application. ``None`` for an implementation means its default.
-
-    The default engines are ``EntryPointEngines`` on the engine functions found
-    at their paths of contracts/ENTRYPOINTS.md, with the carbon model
-    identifiers ``DEFAULT_CARBON_MODELS``. The default rotation validator loads the item into
-    ``RotationDefinition``. The two sources default to the stand-ins of
-    ``api/standins.py``.
-    ``settings=None`` means no climate record period is configured (OPEN for
-    the science reviewers).
-    """
-    app = FastAPI(title="Field Shift Rotation Twin")
-    install_error_handlers(app)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
-        allow_credentials=False,
-    )
-
-    @app.get("/health", response_model=Health)
-    def health() -> Health:
-        """Liveness: the process is up and answering. Checks nothing else."""
-        return Health(status="ok")
-
-    app.include_router(
-        make_router(
-            climate=climate if climate is not None else ClimateUnavailable(),
-            soil_slope=soil_slope if soil_slope is not None else SoilSlopeNotLoaded(),
-            engines=(
-                engines
-                if engines is not None
-                else EntryPointEngines(
-                    discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS
-                )
-            ),
-            rotation_validator=(
-                rotation_validator
-                if rotation_validator is not None
-                else RotationDefinitionValidator()
-            ),
-            settings=settings if settings is not None else RunSettings(),
-        )
-    )
-
-    return app
-
-
-app = create_app(parse_origins(os.environ.get("CORS_ORIGINS")))
+app = build_app(load_config(os.environ))
