@@ -10,7 +10,7 @@ Purpose, from blueprint section 5: **decision screens are built before the calcu
 
 Source: the example, design choices and OPEN items the interface developer wrote in issue #96, as producer (L2b) and as consumer (L3). Landed by a lane L0 builder under decision D40 of issue #77, following #68.
 
-**The example is PLACEHOLDER data.** It is read off the results table example (`contracts/results/examples/PLACEHOLDER_results_table.json`): the same case, field, rotations and scenario; its rows not evaluated are the missing rows of that table, and its differences are second minus first of that table's pairs. The limit (`7.0`) is the producer's illustrative number. The `measure_first` item is the producer's, as written. It describes no real place, field or producer, and says `"example_data": true`.
+**The example is PLACEHOLDER data.** Its identifiers chain with the other examples of the repository: case `example-case`, field `example-field-1` and rotation `example-rotation-1`, as in the rotation definition example and the web example case. A decision compares at least two rotations, and no second rotation identifier exists in another example, so the second rotation is `example-rotation-2` (OPEN item 8). Its values are read off the results table example (`contracts/results/examples/PLACEHOLDER_results_table.json`), whose own identifiers are `PLACEHOLDER_case`, `PLACEHOLDER_field`, `PLACEHOLDER_rotation_a` and `PLACEHOLDER_rotation_b`; the test matches the two sets of identifiers in one table (`IDS_IN_THE_RESULTS_TABLE_EXAMPLE`). The scenario is that example's `PLACEHOLDER_scenario_one`, since no other example names a scenario. The rows not evaluated are the missing rows of that table, and the differences are second minus first of that table's pairs. The limit (`7.0`) is the producer's illustrative number. The `measure_first` item is the producer's, as written. It describes no real place, field or producer, and says `"example_data": true`.
 
 Acceptance test, from the repository root:
 
@@ -110,7 +110,7 @@ For the interface developer, to accept or to contest. There are six differences 
 
 ### 1. Rotations by `rotation_id`, and the key of a count is `rotation_id`
 
-D40 point 1. The example uses the identifiers of the results table example (`PLACEHOLDER_rotation_a`, `PLACEHOLDER_rotation_b`) in place of `current` and `alternative-1`, and a count names its rotation in `rotation_id` (the key in `contracts/results/`) in place of `rotation`. The case and field identifiers are those of the same example (`PLACEHOLDER_case`, `PLACEHOLDER_field`) in place of `example-case` and `example-field-1`, so the example can be checked against it. The old key is the rejected case `count-with-producer-key-rotation`.
+D40 point 1. The example uses the rotation identifiers `example-rotation-1` (that of the rotation definition example) and `example-rotation-2` in place of `current` and `alternative-1`, and a count names its rotation in `rotation_id` (the key in `contracts/results/`) in place of `rotation`. The case and field identifiers are the producer's (`example-case`, `example-field-1`), which are also those of the rotation definition example and the web example case. The old key is the rejected case `count-with-producer-key-rotation`.
 
 ### 2. Scenarios
 
@@ -232,7 +232,7 @@ Every case below is a change to the example. The rejected ones must be rejected 
 | `swapped-pair` | The same cell with the pair swapped, and the sign of the difference flipped |
 | `example-data-false` | `example_data` is false |
 
-The model does not check what it cannot see: that `rotations` are the identifiers of the results table, that counts and differences equal what the decision functions compute, that a priority list is given only when the state is not resolved (D4), or that the state agrees with `indicators_not_resolved`. Those are duties of the producer, tested in `decision/`. For the example alone, `test_examples.py` checks that its identifiers, its rows not evaluated and its differences agree with the results table example.
+The model does not check what it cannot see: that `rotations` are the identifiers of the results table, that counts and differences equal what the decision functions compute, that a priority list is given only when the state is not resolved (D4), or that the state agrees with `indicators_not_resolved`. Those are duties of the producer, tested in `decision/`. For the example alone, `test_examples.py` checks that its identifiers (through the matching table), its rows not evaluated and its differences agree with the results table example.
 
 ## OPEN
 
@@ -245,6 +245,7 @@ Each item is a question a person has to answer. Until then the model keeps the s
 5. **The state and the scenarios.** PROPOSED here: one state per document. Whether the state is given per scenario, or per pair of rotations when there are more than two (`PairState` of `decision/functions.py` is per pair), goes with the tipping point (D3) and the thin matrix of Block 2. For the interface developer as producer and consumer, and the lead developer.
 6. **Which reason a row carries when it holds a value and its indicator has no declared limit.** D60 says it is "not evaluated", with its reason; no code of C3.2 is decided for that case (`NOT_DECLARED` is a candidate). The example does not need it: every water row is missing on its own. For the lead developer.
 7. **Counts of indicators that are not annual.** A count of `soil_carbon_trend` counts rows (one per carbon model and computation), not agricultural years, under the names `years_evaluated` and `years_within_limits` of issue #96. Whether those names stay, and how the two carbon models are counted when they disagree (D7), is for the interface developer and the science reviewers.
+8. **The identifier of a second example rotation.** The examples chain on `example-case`, `example-field-1` and `example-rotation-1`; a decision needs two rotations, and `example-rotation-2` is introduced here without a rotation definition example of its own. The results table example still uses `PLACEHOLDER_…` identifiers. Whether those examples move to the chained identifiers, and which one defines the second rotation, is for the lead developer as owner of `contracts/`.
 
 ## Notes for the producer
 
