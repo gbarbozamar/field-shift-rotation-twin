@@ -5,11 +5,24 @@ See ``README.md`` in this folder.
 """
 
 from .common import DateValue, Missing
-from .rotation_definition import RotationComponent, RotationDefinition
+from .rotation_definition import (
+    AgYearStart,
+    Grazing,
+    Management,
+    MissingManagementField,
+    RotationComponent,
+    RotationDefinition,
+    Termination,
+)
 
 __all__ = [
+    "AgYearStart",
     "DateValue",
+    "Grazing",
+    "Management",
     "Missing",
+    "MissingManagementField",
     "RotationComponent",
     "RotationDefinition",
+    "Termination",
 ]
