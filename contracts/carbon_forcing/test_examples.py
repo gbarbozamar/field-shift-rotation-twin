@@ -120,6 +120,12 @@ INVALID: list[tuple[str, Mutation, str]] = [
         put(["horizon", "start", "month"], "1"),
         "horizon.start.month: Input should be a valid integer",
     ),
+    ("contract-left-out", drop(["contract"]), "contract: Field required"),
+    (
+        "contract-of-another-document",
+        put(["contract"], "site_data_climate"),
+        "contract: Input should be 'carbon_forcing'",
+    ),
     ("example-data-left-out", drop(["example_data"]), "example_data: Field required"),
     ("horizon-left-out", drop(["horizon"]), "horizon: Field required"),
     ("soil-depth-left-out", drop(["soil_depth"]), "soil_depth: Field required"),

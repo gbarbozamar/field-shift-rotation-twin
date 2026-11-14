@@ -1,4 +1,5 @@
 {
+  "contract": "carbon_forcing",
   "example_data": true,
   "case_id": "PLACEHOLDER-case",
   "field_id": "PLACEHOLDER-field",
