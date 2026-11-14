@@ -1292,3 +1292,229 @@ def test_the_example_with_its_own_identifiers_no_longer_answers_another_field(
     assert body["result"] is not None
     assert body["sources"][1]["state"] == "example"
     assert "PLACEHOLDER_FILE" not in json.dumps(body)
+
+
+# --- 14. the parameter catalogue as `parameters` (Q3, D46, D56 of #77) ---------
+#
+# PROPOSED transition rule: EP1 and EP3 get ``parameters=`` only when their
+# signature names it. The catalogue here is given directly at the level of the
+# runner: the PLACEHOLDER example record of params/examples/, which
+# ``check_catalogue`` would refuse as a placeholder; the runner passes what it
+# is given and checks nothing (api/config.py checks at start-up).
+
+PARAMS_EXAMPLE = Path(__file__).parent.parent / "params" / "examples"
+
+
+def catalogue() -> dict[str, dict]:
+    name = "PLACEHOLDER_with_value.json"
+    record = json.loads((PARAMS_EXAMPLE / name).read_text(encoding="utf-8"))
+    return {name: record}
+
+
+class TakesParameters(Fake):
+    """A fake EP1 or EP3 on the new signature: ``parameters`` required, no default."""
+
+    def __call__(self, *, calendar, climate, soil_slope, parameters):  # type: ignore[override]
+        return super().__call__(
+            calendar=calendar,
+            climate=climate,
+            soil_slope=soil_slope,
+            parameters=parameters,
+        )
+
+
+class OldSignature(Fake):
+    """A fake EP1 or EP3 on today's signature: no ``parameters``."""
+
+    def __call__(self, *, calendar, climate, soil_slope):  # type: ignore[override]
+        return super().__call__(
+            calendar=calendar, climate=climate, soil_slope=soil_slope
+        )
+
+
+def engine_fakes(soil_takes: bool, water_takes: bool) -> tuple[Fake, Fake, Fake]:
+    calendar_fn, soil_fn, water_fn = fakes()
+    soil_class = TakesParameters if soil_takes else OldSignature
+    water_class = TakesParameters if water_takes else OldSignature
+    return calendar_fn, soil_class(soil_fn.answer), water_class(water_fn.answer)
+
+
+@pytest.mark.parametrize(
+    "soil_takes, water_takes",
+    [(True, True), (False, False), (True, False), (False, True)],
+)
+def test_each_engine_gets_what_its_signature_asks(soil_takes, water_takes):
+    loaded = catalogue()
+    calendar_fn, soil_fn, water_fn = engine_fakes(soil_takes, water_takes)
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn),
+        carbon_models=CARBON_MODELS,
+        parameters=loaded,
+    )
+    result = engines.run(ROTATION, climate_result(), soil_result())
+    assert result.result is not None
+    for fake, takes in ((soil_fn, soil_takes), (water_fn, water_takes)):
+        ((args, kwargs),) = fake.calls
+        assert args == ()
+        expected = {"calendar", "climate", "soil_slope"}
+        if takes:
+            expected.add("parameters")
+            assert kwargs["parameters"] is loaded  # the same object, not a copy
+        assert set(kwargs) == expected
+    # EP2 is never given the catalogue.
+    assert calendar_fn.calls == [((RotationDefinition.model_validate(ROTATION),), {})]
+
+
+def test_the_catalogue_passes_unchanged_and_is_the_same_object_every_call():
+    loaded = catalogue()
+    before = json.loads(json.dumps(loaded))
+    calendar_fn, soil_fn, water_fn = engine_fakes(True, True)
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn),
+        carbon_models=CARBON_MODELS,
+        parameters=loaded,
+    )
+    assert engines.parameters is loaded
+    for _ in range(2):
+        engines.run(ROTATION, climate_result(), soil_result())
+    passed = [
+        kwargs["parameters"] for fake in (soil_fn, water_fn) for _, kwargs in fake.calls
+    ]
+    assert len(passed) == 4
+    assert all(item is loaded for item in passed)
+    assert loaded == before
+
+
+def test_engines_that_require_parameters_answer_200_through_the_route():
+    loaded = catalogue()
+    calendar_fn, soil_fn, water_fn = engine_fakes(True, True)
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn),
+        carbon_models=CARBON_MODELS,
+        parameters=loaded,
+    )
+    response = client(engines).post(ROUTE, json=BODY)
+    assert response.status_code == 200, response.text
+    assert response.json()["result"] is not None
+    for fake in (soil_fn, water_fn):
+        ((_, kwargs),) = fake.calls
+        assert kwargs["parameters"] is loaded
+
+
+def test_without_a_catalogue_the_runner_passes_the_empty_one():
+    calendar_fn, soil_fn, water_fn = engine_fakes(True, True)
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn), carbon_models=CARBON_MODELS
+    )
+    engines.run(ROTATION, climate_result(), soil_result())
+    for fake in (soil_fn, water_fn):
+        ((_, kwargs),) = fake.calls
+        assert kwargs["parameters"] == {}
+        assert kwargs["parameters"] is engines.parameters
+
+
+def test_the_empty_catalogue_given_is_passed_as_given():
+    empty: dict[str, dict] = {}
+    calendar_fn, soil_fn, water_fn = engine_fakes(True, True)
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn),
+        carbon_models=CARBON_MODELS,
+        parameters=empty,
+    )
+    engines.run(ROTATION, climate_result(), soil_result())
+    ((_, kwargs),) = soil_fn.calls
+    assert kwargs["parameters"] is empty
+
+
+@pytest.mark.parametrize("bad", [[], "PLACEHOLDER", ({},)])
+def test_the_catalogue_must_be_a_dict(bad):
+    with pytest.raises(TypeError):
+        EntryPointEngines(EngineFunctions(), parameters=bad)
+
+
+def test_signatures_are_read_once_when_the_runner_is_built(monkeypatch):
+    calendar_fn, soil_fn, water_fn = engine_fakes(True, False)
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn),
+        carbon_models=CARBON_MODELS,
+        parameters=catalogue(),
+    )
+
+    def no_more_reading(*_args, **_kwargs):
+        raise AssertionError("a signature is read per request")
+
+    monkeypatch.setattr(runner.inspect, "signature", no_more_reading)
+    for _ in range(2):
+        engines.run(ROTATION, climate_result(), soil_result())
+    assert [set(kwargs) for _, kwargs in soil_fn.calls] == [
+        {"calendar", "climate", "soil_slope", "parameters"}
+    ] * 2
+
+
+def test_takes_parameters_only_for_a_parameter_a_keyword_can_fill():
+    def keyword_only(*, calendar, climate, soil_slope, parameters): ...
+
+    def positional_or_keyword(calendar, climate, soil_slope, parameters): ...
+
+    def with_default(*, calendar, climate, soil_slope, parameters=None): ...
+
+    def positional_only(calendar, climate, soil_slope, parameters, /): ...
+
+    def any_keyword(**kwargs): ...
+
+    def today(*, calendar, climate, soil_slope): ...
+
+    assert runner.takes_parameters(keyword_only)
+    assert runner.takes_parameters(positional_or_keyword)
+    assert runner.takes_parameters(with_default)
+    assert not runner.takes_parameters(positional_only)
+    assert not runner.takes_parameters(any_keyword)
+    assert not runner.takes_parameters(today)
+
+
+def test_create_app_gives_its_catalogue_to_the_default_engines(monkeypatch):
+    loaded = catalogue()
+    calendar_fn, soil_fn, water_fn = engine_fakes(True, True)
+    monkeypatch.setattr(
+        "api.app.discover_engine_functions",
+        lambda: functions(calendar_fn, soil_fn, water_fn),
+    )
+    app_client = TestClient(
+        create_app(
+            [ORIGIN],
+            climate=FakeClimate(),
+            soil_slope=ExampleSoilSlopeSource(SOIL_SLOPE_FILE),
+            settings=PERIOD,
+            parameters=loaded,
+        )
+    )
+    response = app_client.post(ROUTE, json=BODY)
+    assert response.status_code == 200, response.text
+    for fake in (soil_fn, water_fn):
+        ((_, kwargs),) = fake.calls
+        assert kwargs["parameters"] is loaded
+
+
+def test_create_app_refuses_a_catalogue_beside_engines_passed_in():
+    engines = EntryPointEngines(EngineFunctions(), carbon_models=CARBON_MODELS)
+    with pytest.raises(TypeError):
+        create_app([ORIGIN], engines=engines, parameters={})
+
+
+def test_the_default_app_with_the_engines_of_the_repository_answers_200():
+    """The engines on this branch, each called as its signature asks, give no ``TypeError``.
+
+    EP1 and EP3 may or may not take ``parameters`` yet; the empty catalogue is
+    today's state of params/records/.
+    """
+    app_client = TestClient(
+        create_app(
+            [ORIGIN],
+            climate=FakeClimate(),
+            soil_slope=ExampleSoilSlopeSource(SOIL_SLOPE_FILE),
+            settings=PERIOD,
+            parameters={},
+        )
+    )
+    response = app_client.post(ROUTE, json=BODY)
+    assert response.status_code == 200, response.text

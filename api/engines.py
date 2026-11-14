@@ -9,7 +9,10 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    also when the calendar is infeasible: the engine writes the missing values
    and their reason (G4), but only when the climate and soil-and-slope data carry the calendar's
    ``case_id`` and ``field_id``; otherwise neither is called and the result
-   is absent, ``MISSING_INPUT`` (PROPOSED);
+   is absent, ``MISSING_INPUT`` (PROPOSED). Each of the two also gets the
+   parameter catalogue as ``parameters=`` (Q3, D46, D56 of issue #77) when its
+   signature has a parameter of that name (PROPOSED transition rule, see
+   ``takes_parameters``); EP2 never does;
 3. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend`` written here as missing,
    because no carbon engine is built (decision Q15 c). A part whose engine is
@@ -39,6 +42,7 @@ not-built form of a part (D12), all of issue #77.
 from __future__ import annotations
 
 import importlib
+import inspect
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, get_args
@@ -163,6 +167,26 @@ def discover_engine_functions() -> EngineFunctions:
     """Import each engine function by its exact module path and name."""
     return EngineFunctions(
         **{point.function: _import_function(point) for point in DISCOVERED}
+    )
+
+
+# The name of the argument that carries the parameter catalogue (Q3, D46, D56).
+PARAMETERS_ARGUMENT = "parameters"
+
+
+def takes_parameters(function: Callable[..., Any]) -> bool:
+    """Whether ``function`` has a parameter named ``parameters`` that a keyword can fill.
+
+    PROPOSED transition rule: EP1 and EP3 gain the argument one by one, so the
+    runner passes it only to a function whose signature names it. OPEN: once
+    both engines on ``main`` take it, the check can go and the argument is
+    always passed (platform developer). A signature that cannot be read
+    raises, as ``inspect.signature`` does.
+    """
+    parameter = inspect.signature(function).parameters.get(PARAMETERS_ARGUMENT)
+    return parameter is not None and parameter.kind in (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY,
     )
 
 
@@ -329,6 +353,13 @@ class EntryPointEngines:
     - ``carbon_models``: the identifiers of the carbon models. The argument has
       no default beyond the empty tuple, and with it no ``ResultsPerRotation``
       can be written; the app uses ``DEFAULT_CARBON_MODELS``.
+    - ``parameters``: the parameter catalogue, as ``params.catalogue.load_folder``
+      returned it and after ``params.catalogue.check_catalogue`` reported no
+      problem (the app loads and checks it at start-up, ``api/config.py``).
+      Passed by keyword, the same object on every call and never copied,
+      edited or filtered, to EP1 and EP3 when their signature takes it.
+      ``None`` (the default) is the empty catalogue ``{}``, today's state of
+      ``params/records/``; it reads no file (PROPOSED).
     """
 
     def __init__(
@@ -337,6 +368,7 @@ class EntryPointEngines:
         *,
         load_rotation: Callable[[Mapping[str, Any]], Any] = load_rotation_definition,
         carbon_models: Sequence[str] = (),
+        parameters: dict[str, dict] | None = None,
     ) -> None:
         if not isinstance(functions, EngineFunctions):
             raise TypeError("EntryPointEngines needs EngineFunctions")
@@ -349,9 +381,31 @@ class EntryPointEngines:
             raise ValueError("carbon_models holds non-empty identifiers")
         if len(set(models)) != len(models):
             raise ValueError("carbon_models names one model twice")
+        if parameters is None:
+            parameters = {}
+        if not isinstance(parameters, dict):
+            raise TypeError("parameters is the catalogue as loaded: a dict")
         self._functions = functions
+        self._parameters = parameters
+        # Read once, here, never per request (PROPOSED transition rule).
+        self._extra: dict[str, dict[str, Any]] = {
+            name: (
+                {PARAMETERS_ARGUMENT: parameters}
+                if function is not None and takes_parameters(function)
+                else {}
+            )
+            for name, function in (
+                ("soil_loss", functions.compute_soil_loss),
+                ("water", functions.compute_water_deficit_exposure),
+            )
+        }
         self._load_rotation = load_rotation
         self._carbon_models = models
+
+    @property
+    def parameters(self) -> dict[str, dict]:
+        """The parameter catalogue this runner passes, the object it was given."""
+        return self._parameters
 
     def run(
         self,
@@ -449,7 +503,7 @@ class EntryPointEngines:
         if soil_loss_function is None:
             erosion_module = _not_built(EROSION)
         else:
-            soil_loss = soil_loss_function(**arguments)
+            soil_loss = soil_loss_function(**arguments, **self._extra["soil_loss"])
             if isinstance(soil_loss, SoilLossResults):
                 erosion_module = module_status_of(
                     EROSION.module_id, count_values(soil_loss_values(soil_loss))
@@ -471,7 +525,7 @@ class EntryPointEngines:
         if water_function is None:
             water_module = _not_built(WATER)
         else:
-            water = water_function(**arguments)
+            water = water_function(**arguments, **self._extra["water"])
             if not isinstance(water, list) or not all(
                 isinstance(item, WaterDeficitExposure) for item in water
             ):
