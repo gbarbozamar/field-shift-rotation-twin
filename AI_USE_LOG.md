@@ -12,6 +12,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-14 | Bootstrap | `README.md`, `docs/DEVELOPMENT_BLUEPRINT.md`, `docs/GETTING_STARTED.md` | Claude Code (Anthropic) | Named the owner of each lane, as the lead developer asked | Pending team review |
 | 2026-11-14 | L0 | `l0/validation-layout` (#9): `validation/` | Claude Code (Anthropic) | A builder session wrote the validation store layout, the record check and its tests as a proposal; a separate verifier ran and probed it; the builder fixed the defects found | Merged by the lead developer; the proposed format and cases still wait for approval |
 | 2026-11-14 | L0 | `l0/params-layout` (#14): `params/` | Claude Code (Anthropic) | A builder session wrote the parameter catalogue layout, the record check and its tests as a proposal; a separate verifier ran and probed it | Merged by the lead developer; the verifier's remarks and the proposed format still wait for a decision |
+| 2026-11-14 | L0 | Acceptance limit per sub-lane (#23): `docs/DEVELOPMENT_BLUEPRINT.md`, `docs/GETTING_STARTED.md` | Claude Code (Anthropic) | An AI session wrote the rule that the limit of units waiting for acceptance counts per lane, with L2a and L2b separately, as the lead developer dictated | Merged by the lead developer |
 
 Rules:
 
