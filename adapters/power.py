@@ -6,7 +6,8 @@ provenance of each, the fill value and the reason codes, the attribution, the
 source identifier and the timeout. See README.md for who decides each one.
 
 The facts about the service used here come from the scout report (issue 15):
-the query arguments, ``time-standard=UTC`` to request UTC, ``format=JSON`` and
+the query arguments, ``time-standard=utc`` to request UTC (written as in the documented
+request of docs/evidence/nasa-power-2026-11-14/), ``format=JSON`` and
 the JSON response layout. The time standard is not a setting: series from this
 adapter are UTC (contracts/CONVENTIONS.md C6.2).
 
@@ -304,7 +305,7 @@ def build_query(request: ClimateRequest, settings: PowerSettings) -> dict[str, s
         "start": request.start_date.strftime("%Y%m%d"),
         "end": request.end_date.strftime("%Y%m%d"),
         "format": "JSON",
-        "time-standard": "UTC",
+        "time-standard": "utc",
     }
     query.update(settings.optional_arguments)
     return query
