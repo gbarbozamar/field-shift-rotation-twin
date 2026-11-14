@@ -161,7 +161,7 @@ def _drop_water_limit(data: dict[str, Any]) -> None:
 
 
 def _three_rotations_one_uncounted(data: dict[str, Any]) -> None:
-    data["rotations"].append("PLACEHOLDER_rotation_c")
+    data["rotations"].append("example-rotation-3")
 
 
 def _tied_ranks(data: dict[str, Any]) -> None:
@@ -196,7 +196,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("contract-of-another-document", put(["contract"], "results_table"), "contract"),
     ("example-data-left-out", drop(["example_data"]), "example_data"),
     ("case-id-blank", put(["case_id"], " "), "case_id"),
-    ("one-rotation", put(["rotations"], ["PLACEHOLDER_rotation_a"]), "rotations"),
+    ("one-rotation", put(["rotations"], ["example-rotation-1"]), "rotations"),
     ("rotation-listed-twice", _repeat(["rotations"], 0), "more than once"),
     ("scenarios-left-out", drop(["scenarios"]), "scenarios"),
     ("no-scenario", put(["scenarios"], []), "scenarios"),
@@ -242,7 +242,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("count-names-scenario-not-listed", _rename_scenario_list, "not in 'scenarios'"),
     (
         "count-with-producer-key-rotation",
-        put(SOIL_LOSS_COUNT + ["rotation"], "PLACEHOLDER_rotation_a"),
+        put(SOIL_LOSS_COUNT + ["rotation"], "example-rotation-1"),
         "rotation",
     ),
     ("count-without-scenario", drop(SOIL_LOSS_COUNT + ["scenario_id"]), "scenario_id"),
@@ -301,7 +301,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
         "difference-pair-of-one-rotation",
         put(
             SOIL_LOSS_DIFFERENCE + ["pair"],
-            ["PLACEHOLDER_rotation_a", "PLACEHOLDER_rotation_a"],
+            ["example-rotation-1", "example-rotation-1"],
         ),
         "twice",
     ),
@@ -310,9 +310,9 @@ INVALID: list[tuple[str, Mutation, str]] = [
         put(
             SOIL_LOSS_DIFFERENCE + ["pair"],
             [
-                "PLACEHOLDER_rotation_a",
-                "PLACEHOLDER_rotation_b",
-                "PLACEHOLDER_rotation_a",
+                "example-rotation-1",
+                "example-rotation-2",
+                "example-rotation-1",
             ],
         ),
         "pair",
@@ -546,6 +546,21 @@ def test_each_listed_difference_is_needed(number: int) -> None:
 # --- the example is read off the results table example ------------------------------
 
 
+# The example uses the identifiers that chain the examples of the repository
+# (the rotation definition example and the web example case); the results
+# table example uses its own. This is the one place they are matched.
+IDS_IN_THE_RESULTS_TABLE_EXAMPLE = {
+    "example-case": "PLACEHOLDER_case",
+    "example-field-1": "PLACEHOLDER_field",
+    "example-rotation-1": "PLACEHOLDER_rotation_a",
+    "example-rotation-2": "PLACEHOLDER_rotation_b",
+}
+
+
+def _table_id(identifier: str) -> str:
+    return IDS_IN_THE_RESULTS_TABLE_EXAMPLE[identifier]
+
+
 def _table() -> ResultsTable:
     return ResultsTable.model_validate_json(
         RESULTS_TABLE_EXAMPLE.read_text(encoding="utf-8")
@@ -557,8 +572,13 @@ def test_example_names_the_rotations_and_scenarios_of_the_results_table_example(
 ):
     document = DecisionOutput.model_validate(load())
     table = _table()
-    assert (document.case_id, document.field_id) == (table.case_id, table.field_id)
-    assert set(document.rotations) == {row.rotation_id for row in table.rows}
+    assert (_table_id(document.case_id), _table_id(document.field_id)) == (
+        table.case_id,
+        table.field_id,
+    )
+    assert {_table_id(rotation_id) for rotation_id in document.rotations} == {
+        row.rotation_id for row in table.rows
+    }
     assert set(document.scenarios) == {row.scenario_id for row in table.rows}
 
 
@@ -576,7 +596,7 @@ def test_example_rows_not_evaluated_are_the_missing_rows_of_the_table() -> None:
                 row.missing.detail,
             )
             for row in table.rows
-            if row.rotation_id == count.rotation_id
+            if row.rotation_id == _table_id(count.rotation_id)
             and row.scenario_id == count.scenario_id
             and row.indicator == count.indicator
             and row.value is None
@@ -599,7 +619,9 @@ def test_example_differences_are_second_minus_first_of_the_table() -> None:
     document = DecisionOutput.model_validate(load())
     rows = {(row.rotation_id, row.cell()): row for row in _table().rows}
     for item in document.paired_differences:
-        first, second = (rows[(rotation_id, item.cell())] for rotation_id in item.pair)
+        first, second = (
+            rows[(_table_id(rotation_id), item.cell())] for rotation_id in item.pair
+        )
         if first.value is None or second.value is None:
             assert item.difference.value is None
             assert item.difference.missing.reason == "MISSING_INPUT"
