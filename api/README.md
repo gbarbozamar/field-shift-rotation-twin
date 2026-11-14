@@ -30,8 +30,9 @@ Request body (`api/rotations.py`, unknown fields are errors):
 - `site` is `SiteReference`, **PROPOSED**: non-empty `case_id` and `field_id`,
   `latitude` in −90..90, `longitude` in −180..180. It is the only place that
   knows the shape of `site`.
-- `rotation` must be a JSON object. Its contents are checked only by the
-  `RotationValidator`.
+- `rotation` must be a JSON object. Its contents are checked by the
+  `RotationValidator`; the default one (`api/rotation_validator.py`) loads it
+  into `contracts.rotation_definition.RotationDefinition`.
 - No options, no custom headers, no query parameters.
 
 What the route does, in order: validate the body; ask the `RotationValidator`;
@@ -60,12 +61,25 @@ A valid request always answers `200`, also when nothing could be computed:
   time zone is treated as a defect.
 - `modules` comes from the engines unchanged. `reason` is required unless
   `state` is `available`.
+- `calendar` and `result` are the contract models `RotationCalendar` and
+  `ResultsPerRotation`, serialised with `model_dump(mode="json")`, **never**
+  with `exclude_none=True` (such a document does not load back, issue 18). A
+  test loads the `result` of a response back into `ResultsPerRotation`.
+- Example data is marked next to the result, not inside it (decision Q16):
+  a source that is the accepted contract example has `sources[].state ==
+  "example"`.
 - `result_missing` is non-null exactly when `result` is null (**PROPOSED**:
   the key is always present, `null` when there is a result).
-- `outcome` (`derive_outcome`): `no_result` without a result; `complete` when
-  every module is `available` and no source is `unavailable`; `partial`
-  otherwise. When the "Results per rotation" contract model lands, "an
-  indicator is missing" joins the rule for `partial`.
+- `outcome` (`derive_outcome`, **PROPOSED**), from what `EnginesResult`
+  carries (`values_present`, `values_missing`), without reading the result:
+  - `no_result`: no result, **or** no value in it is present (an infeasible
+    calendar ends here, as decided in issue 18);
+  - `complete`: no value missing, every module `available`, no source
+    `unavailable`;
+  - `partial`: otherwise.
+
+  While no carbon engine is built, `soil_carbon_trend` is always missing, so
+  `complete` is **not reachable yet**.
 - An interface answer that breaks these rules (a module without a reason, an
   unavailable source without `missing_reason`, a result together with a
   reason for its absence) is a defect and answers `500`.
@@ -91,6 +105,12 @@ One shape for every non-2xx response on every route:
 
 - `message` is developer text; the interface shows its own strings keyed by
   `code`. The message templates are **PROPOSED**.
+- The default `RotationValidator` gives one detail per validation error of
+  `RotationDefinition`: `path` dotted and relative to the rotation (empty for
+  an error of the whole object, which the route reports at `rotation`),
+  `code` the error type, `message` the error text. Input, context and URL are
+  never copied. A rotation that does not load answers `422`
+  `ROTATION_INVALID` and no source or engine is called.
 - `details[].path` is the dotted location without the leading `body`;
   `code` is the validation type; `message` its text. The submitted input is
   never echoed (`input`, `ctx` and `url` are dropped); for malformed JSON no
@@ -106,43 +126,159 @@ One shape for every non-2xx response on every route:
 - Unexpected exceptions are caught inside the route, logged with `logging`,
   and answered `500` without exception text, so the CORS headers are kept.
 
-## Interfaces and their stand-ins
+## Interfaces and their implementations
 
 The route depends only on these interfaces. `create_app(cors_origins, *,
 climate=None, soil_slope=None, engines=None, rotation_validator=None,
-settings=None)` receives the implementations; `None` means the stand-in.
+settings=None)` receives the implementations; `None` means the default.
 
-| Interface | Defined in | Stand-in (`api/standins.py`) | Stand-in behaviour | Replaced by |
+| Interface | Defined in | Default | Default behaviour | Still to come |
 |---|---|---|---|---|
-| `ClimateSource` | `adapters/ports.py` | `ClimateUnavailable` | `data=None`, `unavailable`, `NOT_AVAILABLE` | The NASA POWER adapter (unit `l2/power-adapter`) |
-| `SoilSlopeSource` | `api/ports.py` | `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | A loader of the accepted soil-and-slope example (`state="example"`), then the Block 2 adapters |
-| `RotationEngines` | `api/ports.py` | `EnginesNotBuilt` | No calendar, no result (`NOT_AVAILABLE`), every module `not_available` | An implementation calling the engine entry points of `contracts/ENTRYPOINTS.md` |
-| `RotationValidator` | `api/ports.py` | `AcceptAnyRotation` | Accepts any JSON object | Validation against the "Rotation definition" contract model |
+| `ClimateSource` | `adapters/ports.py` | Stand-in `ClimateUnavailable` | `data=None`, `unavailable`, `NOT_AVAILABLE` | The NASA POWER adapter (`adapters/power.py`) is built; wiring it needs its settings (OPEN in `adapters/README.md`) |
+| `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is built, not wired: which file is the accepted example is a person's decision. Then the Block 2 adapters |
+| `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; today none is, so every module is `not_available` and there is no result | Nothing in `api/`: each engine is picked up when its lane lands it |
+| `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
 
-Payload aliases in `api/ports.py`, one line each to change when the contract
-models are merged: `RotationPayload`, `CalendarPayload`, `ResultsPayload`
-(becomes `ResultsPerRotation`), `SoilSlopePayload` (becomes `SiteSoilSlope`),
-and `ReasonCode` (becomes the C3.2 type of the contracts package).
+The engine stand-in `EnginesNotBuilt` and the validator stand-in
+`AcceptAnyRotation` are **removed**: no test needs them. The runner reports an
+engine that is not built itself, and tests that need another validator pass
+their own fake.
+
+Payload types in `api/ports.py`, one line each: `CalendarPayload` is
+`RotationCalendar`, `ResultsPayload` is `ResultsPerRotation`, `ReasonCode` is
+the C3.2 list of `contracts/results/models.py`; `SoilSlopePayload` is
+`SiteSoilSlope` (in `adapters/ports.py`). `RotationPayload` stays a mapping:
+the request carries a JSON object, the validator checks it and the runner
+loads it into `RotationDefinition` for EP2. `CLIMATE_CONTRACT` and
+`SOIL_SLOPE_CONTRACT` are read from the `contract` field of the two site-data
+models, so they cannot differ from them.
 
 `RunSettings(start_date, end_date)` carries what is not a client choice. It
 has no default dates. Without a period the route does not call the climate
-source and reports it `unavailable` / `NOT_AVAILABLE`.
+source and reports it `unavailable` / `NOT_AVAILABLE`, under the source's own
+`source_id` and `contract` (the route invents no identifier).
+
+### Import path of the contract models
+
+Contract models are imported only as `contracts.inputs`, `contracts.results`
+and `contracts.rotation_definition`, never by the short names, and nothing is
+imported from a `contracts/*/test_examples.py` module. `contracts/__init__.py`
+is landed by lane L0 (issue #71), not by this unit. `api/test_packaging.py`
+checks that no contract folder is loaded under a second name; it is
+**skipped while `contracts/__init__.py` does not exist** and starts running by
+itself once it does (checked by hand: with the file present the whole suite
+passes, that test included).
+
+## The engine runner (`api/engines.py`)
+
+`EntryPointEngines(functions, *, load_rotation=RotationDefinition.model_validate,
+carbon_models=())` implements `RotationEngines`.
+
+- `EngineFunctions(build_rotation_calendar, compute_soil_loss,
+  compute_water_deficit_exposure)`: each an injected callable, `None` when the
+  engine is not built.
+- `discover_engine_functions()` imports each one by the module path and name
+  of `contracts/ENTRYPOINTS.md`: `engine.calendar.build_rotation_calendar`
+  (EP2), `engine.erosion.compute_soil_loss` (EP1),
+  `engine.water.compute_water_deficit_exposure` (EP3). A module (or a package
+  above it) or a function that does not exist gives `None`. Any other import
+  error, including a module that imports something absent, propagates; a
+  name that exists and is not callable is a `TypeError`. Today all three are
+  `None`.
+- `load_rotation` turns the request item into the argument of EP2 (decision
+  Q9); by default `RotationDefinition.model_validate`, so EP2 receives a model
+  instance, unchanged.
+- `carbon_models`: the identifiers of the carbon models. The argument has no
+  default beyond the empty tuple. The app built by `create_app` passes
+  `DEFAULT_CARBON_MODELS = ("amg", "rothc")`, the identifiers decided by the
+  lead developer (issue #18, 17:29 UTC; decision D1 of #77; question 7 of
+  `contracts/results/README.md`), defined once in `api/engines.py`. With all
+  three engine functions present, the default app therefore assembles a
+  `ResultsPerRotation` whose `soil_carbon_trend` holds six missing rows.
+
+Call order (accepted in issue 18):
+
+1. EP2 first: `build_rotation_calendar(load_rotation(rotation))`.
+2. EP1 and EP3 with the keyword arguments `calendar`, `climate`, `soil_slope`
+   (G3), also when the calendar is infeasible (G4).
+3. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
+   calendar; `soil_loss` from EP1 and `water_deficit_exposure` from EP3,
+   unchanged; `soil_carbon_trend` written by the runner.
+
+The runner computes nothing scientific, converts no unit, fills no gap and
+never builds a number. It catches nothing an engine raises (G5, Q7): the route
+answers `500` `INTERNAL_ERROR` with the CORS headers and no exception text. An
+engine that returns something other than the type its signature names
+(`RotationCalendar`; `SoilLossResults` or the results `Missing`; a `list` of
+`WaterDeficitExposure`) is a defect: `TypeError`, so also `500`.
+
+### What the runner writes when something is absent (PROPOSED, every row)
+
+A typed absence, never a stand-in value, never an invented identifier.
+Whenever `result` is `None`, the calendar that was built is still returned.
+The rows are checked in this order; the first that applies decides
+`result_missing`.
+
+| Situation | `result` | `result_missing` | Modules |
+|---|---|---|---|
+| EP2 not built | `None` | `NOT_AVAILABLE`, detail names `engine.calendar.build_rotation_calendar` | `calendar` `not_available` / `NOT_AVAILABLE`; `erosion`, `water` `not_available` / `MISSING_INPUT` naming the calendar (see the precedence rule below) |
+| Climate or soil-and-slope data is `None` | `None` | `MISSING_INPUT`, detail names the input(s) (`climate`, `soil_slope`). EP1 and EP3 are **not** called: their arguments are model instances (G3) | `calendar` as it ran; `erosion`, `water` `not_available` / `MISSING_INPUT` |
+| EP1 or EP3 not built (the other is still called) | `None` | `NOT_AVAILABLE`, detail names the engine(s) | that module `not_available` / `NOT_AVAILABLE`; the other from its output |
+| EP1 returns a bare `Missing` (Q4) | `None` | its reason and detail, copied | `erosion` `not_available` with that reason and detail |
+| No carbon model identifier configured (an explicit `carbon_models=()`; not the app's default) | `None` | `NOT_AVAILABLE`, detail says the carbon model identifiers are not configured | `residues`, `amg`, `rothc` `not_available` / `NOT_AVAILABLE` |
+| Carbon model identifiers configured (the app's default `amg`, `rothc`; no carbon engine is built, always true today) | `ResultsPerRotation` | `null` | For each identifier, the three computations of C1.6 as missing `SoilCarbonTrend` items, reason `NOT_AVAILABLE`, with the identifier, direction and unit of `contracts/results/models.py` (C3.1). `residues`, `amg`, `rothc` `not_available` / `NOT_AVAILABLE` |
+
+**Precedence rule (PROPOSED):** a module whose function is not built is
+`not_available` / `NOT_AVAILABLE` whatever else is absent; `MISSING_INPUT` is
+written only for a module that is built and was not called because an input
+is missing. So in the default app (nothing built) every module is
+`NOT_AVAILABLE`.
+
+### Module states (PROPOSED)
+
+Identifiers `calendar`, `erosion`, `water`, `residues`, `amg`, `rothc`, one per
+entry of `contracts/ENTRYPOINTS.md`, always all six, in that order.
+
+- Function absent: `not_available` / `NOT_AVAILABLE`.
+- Function ran, no value of its output missing: `available`.
+- Function ran, some values missing: `degraded`, reason of the first missing
+  value (annual soil loss before monthly), detail `"<n> of <m> values are
+  missing"`.
+- Function ran, every value missing: `not_available` with that reason.
+- `calendar`: `available` when `feasibility.feasible`; otherwise `degraded` /
+  `NOT_COMPUTABLE`, detail giving the number of rule violations.
+
+`count_values(values) -> ValueCount(present, missing, first_missing)` is the
+one pure counting function over `IndicatorValue` items, with
+`soil_loss_values` and `result_values` listing the values of a
+`SoilLossResults` and of a `ResultsPerRotation`. `EnginesResult` carries
+`values_present` and `values_missing` of the result; both are zero without a
+result and not both zero with one (checked at construction).
 
 ## PROPOSED
 
 - The shape of `site` (`SiteReference`).
 - The error codes, their message templates, and the classification rule.
 - The shapes of `api/ports.py`: `ModuleStatus`, `ModuleState`
-  (`available | degraded | not_available`), `Missing`, `EnginesResult`,
-  `SoilSlopeResult`, `ErrorDetail`, `RunSettings`.
-- Contract identifiers `site_data_climate` and `site_data_soil_slope`.
-- Source identifiers `climate_not_connected`, `soil_slope_not_loaded`, and
-  `climate` for the entry reported when the climate source is not called.
-- The module identifiers listed by the default app: `calendar`, `erosion`,
-  `water`, `residues`, `amg`, `rothc` (one per engine folder). Replaced by
-  the list of `contracts/ENTRYPOINTS.md`.
+  (`available | degraded | not_available`), `Missing`, `EnginesResult` (with
+  `values_present` and `values_missing`), `ErrorDetail`, `RunSettings`.
+- Source identifiers of the stand-ins `climate_not_connected` and
+  `soil_slope_not_loaded`.
 - `result_missing` always present as a key, `null` when there is a result.
-- The test cases of `api/test_rotations.py` and `api/test_errors.py`.
+- The engine runner: `EngineFunctions`, `discover_engine_functions` (what
+  counts as "not built" and what propagates), `EntryPointEngines`, the
+  `TypeError` for a wrong return type.
+- Every row of the table "What the runner writes when something is absent",
+  their order, and the precedence rule.
+- The module identifiers and the module-state rules, the counting function,
+  and the detail texts of the runner.
+- The outcome rule.
+- `RotationDefinitionValidator`: one detail per validation error, path
+  relative to the rotation, code and message as above.
+- The detail of the missing carbon rows ("no carbon engine is built yet").
+- The test cases of `api/test_rotations.py`, `api/test_errors.py`,
+  `api/test_engines.py`, `api/test_rotation_validator.py`,
+  `api/test_packaging.py`.
 
 ## OPEN
 
@@ -153,5 +289,37 @@ source and reports it `unavailable` / `NOT_AVAILABLE`.
   and so replaces `SiteReference`?
 - **How is the point (latitude, longitude) chosen for a field?** (already
   OPEN in `adapters/ports.py`).
-- **Which engine modules exist and with which identifiers?** (to be fixed in
-  `contracts/ENTRYPOINTS.md`).
+- **The results contract cannot express two answers the runner needs**
+  (lead developer, as owner of `contracts/results/`; platform developer for
+  the response). Where the model makes the answer impossible the runner
+  returns no result with a typed absence instead:
+  1. `ResultsPerRotation` has no missing form for a whole `soil_loss`, so
+     "the erosion engine is not built" (and a bare `Missing` from EP1, Q4)
+     cannot be written inside a result.
+  2. A missing `water_deficit_exposure` item needs its `time_basis` (and an
+     `ag_year` for the `ag_year` basis), which is the water engine's choice
+     (C1.3), so "the water engine is not built" cannot be written inside a
+     result without inventing it.
+
+  A third case of the plan, "carbon not built" without model identifiers, is
+  settled by the decision on the identifiers (`amg`, `rothc`); it remains
+  only for an explicit `carbon_models=()`.
+
+  Should `ResultsPerRotation` gain a missing form for each, or is a response
+  without a result the intended answer?
+- **What the calendar engine gets beyond the rotation definition** (Q8 of
+  `contracts/ENTRYPOINTS.md`; lead developer and interface developer).
+  `RotationDefinition` carries no start month of the agricultural year and no
+  first or last date of the calendar, which `RotationCalendar` needs. The
+  runner passes the model on unchanged and adds nothing. Decided (issue #18):
+  a rotation without the start month will be invalid (`422`, no engine
+  called) once lane L0's model requires it; `RotationDefinitionValidator`
+  then enforces it with no change here. Until then the runner keeps the
+  defensive handling of a bare `Missing` from EP1 (Q4). The first and last
+  dates of the calendar remain open.
+- **Do the identifiers of the site data have to match the calendar's?** The
+  runner passes the climate and soil-and-slope instances as they come. A
+  source whose `case_id` or `field_id` differs (for example the accepted
+  example, which carries its own) makes the engines raise `ValueError` (G5),
+  which the route answers `500`. Should the runner or the route check the
+  identifiers first and answer with a typed absence? (platform developer).

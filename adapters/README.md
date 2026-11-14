@@ -2,7 +2,21 @@
 
 Sub-lane L2a. One module per data source. Network calls happen only here, and never during tests.
 
-Today there is one adapter: NASA POWER, daily values of one point (`power.py`). It implements `ClimateSource` of `ports.py`, the seam with `api/`. `ports.py` is not edited by this unit.
+Two sources today:
+
+- NASA POWER, daily values of one point (`power.py`). It implements `ClimateSource` of `ports.py`, the seam with `api/`.
+- The accepted soil-and-slope contract example (`example_soil_slope.py`). It implements `SoilSlopeSource` of `ports.py`.
+
+## The seam (`ports.py`)
+
+Unit `l2/engine-runner` owned both sides of the seam and made exactly these changes (**PROPOSED**), updating every implementation, stand-in, fake and test:
+
+1. **A source describes itself without a call.** `ClimateSource` and `SoilSlopeSource` have two read-only attributes, `source_id` and `contract`: the values the source writes as `SourceInfo.id` and `SourceInfo.contract`. The route uses them for the `sources` entry when it does not call the climate source (no period configured).
+2. **`retrieved_at` carries its time zone.** `SourceInfo` rejects a `retrieved_at` that is not a datetime with a time zone (`ValueError`).
+3. **`missing_reason` is enforced.** It is typed as the C3.2 `ReasonCode` of `contracts.inputs.common`; `SourceInfo` requires it when `state == "unavailable"`, forbids it with any other state, and rejects a code outside C3.2.
+4. **`SoilSlopeSource` and `SoilSlopeResult` live here**, next to the climate ones. `api/ports.py` re-exports them.
+
+The payload aliases are the contract models: `ClimatePayload` is `contracts.inputs.SiteClimate`, `SoilSlopePayload` is `contracts.inputs.SiteSoilSlope`. Contract models are imported only as `contracts.inputs` (and `contracts.results`), never by a short name.
 
 **Status.** The mechanics are built and tested: the request, the file cache of the first response, the failure handling and the mapping into the contract "Site data: climate". Every decision that belongs to a person is a setting with **no default**, listed under [OPEN](#open). Nothing here has been run against the real service. A person makes the first real request.
 
@@ -13,6 +27,8 @@ Given a `ClimateRequest` (case, field, one point, a period), `PowerClimateSource
 1. builds the query from the request and the settings only;
 2. if the first response to this query is stored, maps it and returns `state="cached"` without contacting the source;
 3. otherwise asks the service; on a usable response, stores it, maps it and returns `state="fresh"`;
+
+`data` is a `SiteClimate` **instance**: the mapper's document is loaded into the model. A document that does not load is an unusable response: `unavailable`, `SOURCE_UNAVAILABLE`, a `detail` that does not echo the body, and nothing stored. A stored entry that no longer loads is treated like one that cannot be mapped (below).
 4. on any failure, returns `data=None`, `state="unavailable"`, `missing_reason="SOURCE_UNAVAILABLE"` and a `detail` in plain English. Nothing is stored, so the next call tries again.
 
 It never raises because of the source. It raises only for a programming error: invalid settings, an impossible request (end before start, a coordinate out of range), or a clock that returns a time without a time zone.
@@ -121,7 +137,8 @@ Two further cases, not failures of the source:
 `to_site_climate(raw, request, settings) -> dict` is a pure function. It returns a JSON-ready document in the shape of `SiteClimate` (proposed in `contracts/inputs/`, not merged yet):
 
 - `contract: "site_data_climate"`, `example_data: false`, `case_id`, `field_id` from the request, `monthly_series: []` (aggregation belongs to the engines).
-- One daily series per `ParameterSpec`, in the configured order, with `quantity`, `unit`, `provenance`, `source` (= `source_id`), `range_missing: {reason: range_missing_reason}`, `time_zone: "UTC"`, `start_date`, `end_date`, `days`.
+- One daily series per `ParameterSpec`, in the configured order, with `quantity`, `unit`, `provenance`, `source` (= `source_id`), `range_missing: {reason: range_missing_reason, detail}`, `time_zone: "UTC"`, `start_date`, `end_date`, `days`.
+- Every `missing` and `range_missing` part the mapper writes carries a non-empty English `detail`. Without it, a legal setting such as `MISSING_INPUT` (for which C3.2 asks a detail) gave a document that does not load. A test maps a response with every code of C3.2 as `fill_reason` and as `range_missing_reason` and loads each document into `SiteClimate`: all sixteen load, so no code is refused at construction of `PowerSettings`.
 - Every day from `start_date` to `end_date` appears once, in order. A day whose value equals `fill_value`, or that the response does not contain, is `{"date", "value": null, "missing": {"reason": fill_reason, "detail"}}`; the two cases have different `detail` texts. Zero is a real value and is never produced for a missing day.
 - A series whose days are all missing carries no `provenance`, no `source` and no `range_missing` (C2.2, C4.1).
 - Days in the response outside the requested period are not reported.
@@ -129,7 +146,16 @@ Two further cases, not failures of the source:
 
 ### Drop-in check
 
-`test_power_mapping.py::test_drop_in_against_the_contract_model` loads the mapper's output into `SiteClimate` through JSON. It uses `pytest.importorskip("contracts.inputs")`: it is **skipped today** and starts running, unchanged, the day `contracts/inputs/` is merged. It was run once by hand against the files of the unmerged branch, outside this worktree, and passed.
+`test_power_mapping.py::test_drop_in_against_the_contract_model` loads the mapper's output into `SiteClimate` through JSON. It is an ordinary test now that `contracts/inputs/` is on `main`.
+
+## The soil-and-slope example (`example_soil_slope.py`)
+
+`ExampleSoilSlopeSource(path, *, source_id="soil_slope_example")` implements `SoilSlopeSource`:
+
+- `path` is required and has **no default**. Which file is "the accepted example" is a person's decision, so the source is not wired into the default app. Tests use `contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json`.
+- Each call reads the file and loads it into `SiteSoilSlope`, returned unchanged with `state="example"` and no `retrieved_at`. The route shows it as `sources[].state == "example"` next to the result (decision Q16).
+- A file that is absent or cannot be read, that does not load into the model, or whose `example_data` is false gives `data=None`, `unavailable`, `NOT_AVAILABLE` and a `detail`. It never raises for the file.
+- `contract` is read from the `contract` field of `SiteSoilSlope`.
 
 ## Tests
 
@@ -141,7 +167,17 @@ No network: `httpx.MockTransport` for the service, `tmp_path` for the cache, a f
 
 ## PROPOSED
 
-Designed by the builder session; a person accepts or corrects them in the pull request.
+Designed by the builder sessions; a person accepts or corrects them in the pull request.
+
+Unit `l2/engine-runner`:
+
+- The four seam changes listed under "The seam".
+- A mapped document that does not load into `SiteClimate` is unusable (`SOURCE_UNAVAILABLE`, nothing stored).
+- The `detail` texts the mapper writes in `range_missing` ("the source gives no uncertainty range for this series").
+- `ExampleSoilSlopeSource`: the source identifier `soil_slope_example`, the reason `NOT_AVAILABLE` and the `detail` texts of its three failures, reading the file on each call.
+- The test cases in `test_ports.py` and `test_example_soil_slope.py`, and the new cases in `test_power.py` and `test_power_mapping.py`.
+
+Unit `l2/power-adapter`:
 
 1. The structure: `PowerSettings` with no defaults, `ParameterSpec`, `PowerSettings.from_mapping`, the injected `ResponseCache`, `httpx.Client` and clock.
 2. The cache layout above: key, one JSON file per key with `body`, `query`, `retrieved_at`; first response wins; atomic write; corrupt entry treated as absent; only usable responses stored.
@@ -182,3 +218,5 @@ Each item is a question a person answers. Until then the setting has no value an
 16. **What are `attribution`, `source_id` and `timeout_seconds`?** The `ATTRIBUTIONS.md` data row for NASA POWER is written by a person when the data is first used for real. For the platform developer.
 17. **What does the adapter do on status 429 (too many requests)?** Today it is one failure like any other; the next call tries again. No retry and no back-off. For the platform developer.
 18. **Should the place the source answered for (grid cell, elevation in the response) travel with the data?** The contract has no field for it (contracts/inputs OPEN 21). For the platform developer and the lead developer.
+19. **Which file is the accepted soil-and-slope example?** (`ExampleSoilSlopeSource(path)`.) The placeholder example's numbers mean nothing, and the engines may reject its units. For the lead developer and the platform developer.
+20. **Is the example served for any field?** It carries its own `case_id` and `field_id` and is returned unchanged whatever field is asked. An engine that receives site data of another field raises `ValueError` (G5), and the route answers `500`. Should the source refuse a request for another field, or the route check the identifiers first? For the platform developer.

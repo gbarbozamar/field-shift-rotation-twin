@@ -24,6 +24,7 @@ from adapters._fakes import (
 from adapters.cache import FileCache
 from adapters.ports import ClimateSource
 from adapters.power import ParameterSpec, PowerClimateSource, PowerSettings
+from contracts.inputs import SiteClimate
 
 FIRST = dt.datetime(1900, 2, 1, 6, 0, tzinfo=dt.UTC)
 LATER = dt.datetime(1900, 3, 1, 6, 0, tzinfo=dt.UTC)
@@ -257,7 +258,7 @@ def test_same_inputs_give_the_same_query_whatever_the_configured_order(tmp_path)
     result = other.get_climate(REQUEST)
     assert other_service.requests == []  # same query, same key: a cache hit
     assert result.source.state == "cached"
-    assert [s["quantity"] for s in result.data["daily_series"]] == [
+    assert [s.quantity for s in result.data.daily_series] == [
         "placeholder_quantity_b",
         "placeholder_quantity_a",
     ]
@@ -285,8 +286,8 @@ def test_optional_arguments_cannot_identify_a_user_or_override_the_query(name):
 def test_source_info(tmp_path, handler):
     source, service, _ = build(tmp_path, handler)
     info = source.get_climate(REQUEST).source
-    assert info.id == "placeholder_source"
-    assert info.contract == "site_data_climate"
+    assert info.id == "placeholder_source" == source.source_id
+    assert info.contract == "site_data_climate" == source.contract
     assert info.time_zone == "UTC"
     assert info.attribution == "PLACEHOLDER_attribution"
     assert dict(info.request) == dict(service.requests[0].url.params.multi_items())
@@ -457,3 +458,41 @@ def test_a_cache_that_cannot_write_still_returns_the_data(tmp_path):
     assert result.source.state == "fresh"
     assert result.data is not None
     assert "not be stored" in result.source.detail
+
+
+# Seam fixes of unit l2/engine-runner
+
+
+def test_data_is_a_site_climate_instance(tmp_path):
+    source, _, _ = build(tmp_path, answer_with(DOCUMENT))
+    fresh = source.get_climate(REQUEST)
+    cached = source.get_climate(REQUEST)
+    assert isinstance(fresh.data, SiteClimate)
+    assert isinstance(cached.data, SiteClimate)
+    assert cached.source.state == "cached"
+
+
+def test_source_says_who_it_is_without_a_call(tmp_path):
+    source, service, _ = build(tmp_path, answer_with(DOCUMENT))
+    assert source.source_id == "placeholder_source"
+    assert source.contract == "site_data_climate"
+    assert service.requests == []
+
+
+def test_a_document_that_does_not_load_is_unavailable_and_not_stored(
+    tmp_path, monkeypatch
+):
+    import adapters.power
+
+    def not_loadable(raw, request, settings):
+        return {"contract": "site_data_climate", "PLACEHOLDER_KEY": "PLACEHOLDER"}
+
+    monkeypatch.setattr(adapters.power, "to_site_climate", not_loadable)
+    source, _, folder = build(tmp_path, answer_with(DOCUMENT))
+    result = source.get_climate(REQUEST)
+    assert result.data is None
+    assert result.source.state == "unavailable"
+    assert result.source.missing_reason == "SOURCE_UNAVAILABLE"
+    assert "SiteClimate" in result.source.detail
+    assert "PLACEHOLDER_KEY" not in result.source.detail
+    assert stored_files(folder) == []
