@@ -38,6 +38,7 @@ All PROPOSED.
 
 | Field | Type | Rule |
 |---|---|---|
+| `contract` | `"carbon_forcing"` | Required. Names the document, as the `contract` field of the input contracts does |
 | `example_data` | true or false | Required |
 | `case_id`, `field_id`, `rotation_id` | text | Required, not empty. As in `contracts/results/`, so a carbon balance can be matched to its rotation. The field identity contract (decision D19 of issue #77) will replace `field_id` when it exists |
 | `horizon` | `ForcingHorizon` | Required. `start` and `end`, each a `YearMonth` (`year`, `month` 1 to 12, C5.1), inclusive. The end is not before the start. Its value is OPEN (C1.6) |
@@ -55,7 +56,6 @@ Each monthly series repeats `start` and `end`, which must equal the horizon. Tha
 - **The starting soil carbon.** It belongs to `ModelState` ("same starting soil carbon across models", blueprint section 5). Whether it is an argument of the carbon engines, part of what they return, or both is Q14 (a) of `contracts/ENTRYPOINTS.md`.
 - **Any annual aggregate.** Whether the annual reference of AMG (blueprint section 8) takes its own annual forcing or aggregates the monthly one is Q14 (d). Until it is answered, the forcing holds monthly series only.
 - **Any parameter of one model.** Model parameters come from the parameter catalogue of `params/`, passed to the engines by the runner (decision D46 of issue #77), not in the forcing.
-- **A `contract` discriminator** such as the `contract` field of the input contracts. Not in the field list of this unit; proposed under OPEN.
 
 ## PROPOSED cases
 
@@ -72,6 +72,8 @@ Every case below is a change to the example. The invalid ones must be rejected f
 | `number-written-as-text` | A monthly value written as text |
 | `soil-depth-number-written-as-text` | The soil depth written as text |
 | `month-written-as-text` | A month of the horizon written as text |
+| `contract-left-out` | No `contract` |
+| `contract-of-another-document` | `contract` names another document |
 | `example-data-left-out` | No `example_data` |
 | `horizon-left-out` | No `horizon` |
 | `soil-depth-left-out` | No `soil_depth` |
@@ -110,4 +112,3 @@ Each item is a question a person has to answer. Until then the model keeps the g
 4. **Q14 of `contracts/ENTRYPOINTS.md`, as far as it touches this contract.** (a) Does the starting soil carbon (`ModelState`) travel beside the forcing or in it? (b) Do the carbon engines take `ResidueLedger` as an argument, or does `carbon_inputs` hold what comes from it, and which identifiers can `origin` take? (c) Nothing in this contract depends on who computes `soil_carbon_trend`. (d) Does the annual variant of AMG need an annual forcing, or does it aggregate the monthly one? For the lead developer, the interface developer and the platform developer.
 5. **Which soil properties do both models share, with which identifier and unit?** For the science reviewers.
 6. **The producer function.** Where in `adapters/` or `api/` the forcing is built from `SiteClimate`, `SiteSoilSlope` and the residue ledger, and when it is called. For the platform developer, in a later unit.
-7. **Does the document carry a `contract` discriminator** (`"contract": "carbon_forcing"`), as the input contracts do? For the platform developer.

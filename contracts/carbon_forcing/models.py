@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
+from typing import Literal
 
 from pydantic import model_validator
 
@@ -100,6 +101,7 @@ def _covers_horizon(series: MonthlySeries, horizon: ForcingHorizon, what: str) -
 class CarbonForcing(ContractModel):
     """What both carbon models receive for one rotation of one field."""
 
+    contract: Literal["carbon_forcing"]
     example_data: bool
     case_id: NonEmptyStr
     field_id: NonEmptyStr  # replaced by the field identity contract (D19 of #77)
