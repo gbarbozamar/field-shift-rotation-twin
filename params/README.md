@@ -1,12 +1,12 @@
 # Parameter catalogue
 
-Where crop and rotation parameters are stored, each with its unit, its uncertainty range, its citation and the two persons who transcribed and checked it.
+Where crop and rotation parameters are stored, each with its unit, its uncertainty range, its citation, who transcribed it and the person who checked it.
 
 **This folder holds no parameter yet.** It holds the layout, the record format and the check that rejects a malformed record.
 
 > **Status: PROPOSED.** The record format, the scope keys and the test cases below were written by a builder session (blueprint section 3.7). They take effect only when a person approves the pull request. Items marked `OPEN` need an answer from a person.
 
-Values, ranges and citations are science class (blueprint sections 3.5 and 3.6): a person writes them, a second person checks them against the source, and a science reviewer accepts them. A session never writes one.
+Values, ranges and citations are science class (blueprint sections 3.5 and 3.6), and a science reviewer accepts them. Who transcribes them is decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622), stated in full in section 3.5 of the blueprint: An AI session may transcribe a value, a unit, a range, an expected result or a citation from a published source, and one person checks it against that source. The transcription is valid only if it carries the full reference, the locator (page, table, equation or example number, or URL with anchor), the verbatim text it comes from, and the date it was read. The person who checks opens the source at the locator, checks every number, and signs the check. A value written by an AI session from memory, without a source opened and quoted, is still a defect.
 
 ## Layout
 
@@ -72,8 +72,8 @@ Provisional environment: Python 3.12 and pytest; standard library otherwise.
 | `citation.reference` | yes | The full reference of the source, as text |
 | `citation.locator` | yes | Where the value is in the source (table, page, equation), so the checker can find it |
 | `citation.url` | no | Link or identifier of the source |
-| `transcribed_by` | yes | The person who copied the value from the source |
-| `checked_by` | yes | The person who checked it against the source. Not the transcriber: case and spacing are ignored in the comparison |
+| `transcribed_by` | yes | Who transcribed the value from the source (D34). What identifies an AI session here is `OPEN` (question 3) |
+| `checked_by` | yes | The person who checked it against the source (D34). Not the transcriber: case and spacing are ignored in the comparison |
 | `note` | no | Free text |
 
 Any other field is rejected, so a misspelt field name cannot pass unnoticed.
@@ -110,8 +110,8 @@ A citation that says `CITATION NEEDED` is rejected: it marks an absence, it is n
 
 ## How to add a parameter
 
-1. A person copies the value, its unit, its range and its citation from the source into a new file under `records/`, and signs `transcribed_by`.
-2. A second person opens the source at `citation.locator`, checks every number and signs `checked_by`.
+1. The value, its unit, its range and its citation are transcribed from the source into a new file under `records/`, and `transcribed_by` is filled. Decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622) lets an AI session do it, with the full reference, the locator, the verbatim text and the date read (blueprint section 3.5). `citation.reference` and `citation.locator` hold the first two; the record has no field yet for the verbatim text or the date read (question 13).
+2. One person opens the source at `citation.locator`, checks every number and signs `checked_by`.
 3. `python -m pytest params/` passes.
 4. The pull request is labelled `science` and a science reviewer accepts it.
 
@@ -184,8 +184,8 @@ One code per defect of issue 21. Each case failed on the code before the fix.
 Questions for a person. None is answered by this unit.
 
 1. **Unify with the conventions sheet** (pull request 8, not in `main`). This unit did not read it. Once accepted, align: how a unit is spelt and how "no unit" is written; how an uncertainty range travels and whether `range.basis` becomes a fixed list of kinds; how a missing value and its reason travel (free text here; a fixed list of reasons there?); whether a record carries a provenance label.
-2. **Unify with the validation store** (pull request 9, not in `main`). This unit did not read it. Both record a citation and two persons. Once accepted, align the field names and the shape of the citation, and keep one shared check of "citation present" and "two different persons" instead of two.
-3. **How a person is identified.** `transcribed_by` and `checked_by` hold any non-empty text. The repository is public and CI scans for personal names: which identifier is written here?
+2. **Unify with the validation store** (pull request 9, not in `main`). This unit did not read it. Both record a citation, who transcribed and who checked. Once accepted, align the field names and the shape of the citation, and keep one shared check of "citation present" and "two different persons" instead of two.
+3. **How a person, or an AI session, is identified.** `transcribed_by` and `checked_by` hold any non-empty text. The repository is public and CI scans for personal names: which identifier is written here, and what does `transcribed_by` hold when an AI session transcribed the value (D34)?
 4. **Scope vocabularies.** Who lists the words allowed under `crop`, `stage`, `management`, `soil` and `region`, and where does the list live? Are these five keys the right ones, and is one missing (for example the model a value belongs to)?
 5. **General against specific scope.** When one record has the empty scope and another names a crop, which one does an engine read? This unit only rejects exact duplicates.
 6. **Citation on a missing value.** Proposed: optional when the range is missing too, because there may be no source to cite. Confirm, or require it always.
@@ -195,3 +195,4 @@ Questions for a person. None is answered by this unit.
 10. **File names.** The naming convention is not enforced. Enforce it?
 11. **Files that a system or an editor leaves in `records/`.** They are reported like any other file that is not a record (F3b), so the acceptance test fails on a machine that has one. Keep it that way, or name the files that may be skipped?
 12. **Testing the readers.** The readers refuse a placeholder and every fixture must carry the word, so the tests read an in-memory copy without it (see "PROPOSED cases"). Accept this, or decide another way to test the accepting path.
+13. **Where do the verbatim text and the date read of D34 live?** D34 ([issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622)) makes a transcription valid only with the full reference, the locator, the verbatim text and the date it was read. The record format has `citation.reference` and `citation.locator` (and `citation.url`, `note`), and no field for the verbatim text or the date. Adding one changes `catalogue.py`, which is not part of this documentation unit. For the lead developer.
