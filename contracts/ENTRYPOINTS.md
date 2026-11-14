@@ -31,7 +31,7 @@ Every type in a signature is one of the rows below. Nothing else is used.
 | `dict[str, dict]` (only as `parameters`) | The parameter catalogue as loaded (Q3, D46, D56): the first value that `params.catalogue.load_folder` returns for the folder `params/records/`, that is every record of the catalogue, each a dictionary in the record format of `params/README.md`, keyed by the path of its file relative to `params/records/`. PROPOSED |
 | `"Rotation definition"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
 | `"ResidueLedger"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
-| `"CarbonForcing"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
+| `"CarbonForcing"` | PROPOSED model: file `contracts/carbon_forcing/models.py`, class `CarbonForcing` (#155, accepted into `contracts/` by D62 of #77). Its values (quantities, units, depth, horizon, aggregation) are `OPEN` in `contracts/carbon_forcing/README.md` |
 | `"CarbonBalance"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
 
 A name in double quotes is the blueprint name of a contract, not a class: its model, its file and its example are a separate unit. The models of `contracts/inputs/` and `contracts/results/` are themselves proposals; a signature follows them as they are in `main` and changes when they change.
@@ -254,7 +254,7 @@ Status: OPEN
 | Lane | L1 Engines (lead developer) |
 | Module path | `engine.amg` (file `engine/amg/__init__.py`) |
 | Function name | `run_amg` |
-| Argument `forcing` | `"CarbonForcing"`: contract of blueprint section 5, producer Platform (L2a). It does not exist yet: `OPEN` |
+| Argument `forcing` | `"CarbonForcing"`: contract of blueprint section 5, producer Platform (L2a); PROPOSED model `contracts/carbon_forcing/models.py`, class `CarbonForcing` (#155, D62). The same object for EP5 and EP6 |
 | Return type | `"CarbonBalance"`: contract of blueprint section 5, producers Engines and Platform (L2b). It does not exist yet: `OPEN` |
 
 ```text
@@ -274,7 +274,7 @@ Status: OPEN
 | Lane | L2b Platform: decision and carbon (interface developer) |
 | Module path | `engine.rothc` (file `engine/rothc/__init__.py`) |
 | Function name | `run_rothc` |
-| Argument `forcing` | `"CarbonForcing"`: contract of blueprint section 5, producer Platform (L2a). It does not exist yet: `OPEN` |
+| Argument `forcing` | `"CarbonForcing"`: contract of blueprint section 5, producer Platform (L2a); PROPOSED model `contracts/carbon_forcing/models.py`, class `CarbonForcing` (#155, D62). The same object for EP5 and EP6 |
 | Return type | `"CarbonBalance"`: contract of blueprint section 5, producers Engines and Platform (L2b). It does not exist yet: `OPEN` |
 
 ```text
@@ -366,7 +366,7 @@ Each item is a question a person can answer. The role that answers it is named a
 
 **Q13. What is the residue ledger computed from, and what is its contract?** EP4 is `OPEN` until the `ResidueLedger` contract exists and a person says which inputs the ledger needs: what the user declares, the calendar, site data, the result of another engine, parameters. The contract has to let every value be missing with its reason. For the lead developer, as owner of lane L1; the science reviewers for what the ledger is computed from.
 
-**Q14. What do the two carbon entry points receive and return?** EP5 and EP6 are `OPEN` until the `CarbonForcing`, `ModelState` and `CarbonBalance` contracts exist. Four parts. (a) `ModelState`: is it an argument (the starting state, the same for both models), part of what is returned, or both? (b) The residue ledger: does a carbon engine take `ResidueLedger` as an argument, or does `CarbonForcing` already hold what comes from it? (c) The indicator: who computes the three values of `soil_carbon_trend` per model (C1.6): each carbon engine, which then returns `list[SoilCarbonTrend]` (`contracts/results/models.py`) next to the balance, or one function shared by both models, and in which folder does it live? (d) The two variants of AMG in blueprint section 8: does the one function return both, and how is each labelled? For the lead developer (EP5), the interface developer (EP6) and the platform developer, as producer of `CarbonForcing`.
+**Q14. What do the two carbon entry points receive and return?** EP5 and EP6 are `OPEN` until the `ModelState` and `CarbonBalance` contracts exist; `CarbonForcing` is PROPOSED in `contracts/carbon_forcing/` (#155, D62). Four parts. (a) `ModelState`: is it an argument (the starting state, the same for both models), part of what is returned, or both? (b) The residue ledger: does a carbon engine take `ResidueLedger` as an argument, or does `CarbonForcing` already hold what comes from it? `CarbonForcing` has `carbon_inputs` and `annual_carbon_inputs`, each series with an `origin` whose vocabulary is `OPEN` (`contracts/carbon_forcing/README.md`, OPEN 4). (c) The indicator: who computes the three values of `soil_carbon_trend` per model (C1.6): each carbon engine, which then returns `list[SoilCarbonTrend]` (`contracts/results/models.py`) next to the balance, or one function shared by both models, and in which folder does it live? (d) The two variants of AMG in blueprint section 8: does the one function return both, and how is each labelled? `CarbonForcing` now carries both monthly series and annual series (`annual_climate`, `annual_carbon_inputs`), at the lead developer's request on #155; which one each variant reads stays part of this question (`contracts/carbon_forcing/README.md`, OPEN 4). For the lead developer (EP5), the interface developer (EP6) and the platform developer, as producer of `CarbonForcing`.
 
 **Q15. Who builds what no entry point returns?** Three parts. (a) `ResultsPerRotation` is put together from the results of EP1 and EP3 and the carbon values: by the route, or by a function that is not one of the six engines? (b) `ResultsTable`: which code builds it from several calls, and in which folder? (c) While an engine is not built, who writes its values as missing with reason `NOT_AVAILABLE` (C3.2)? For `soil_carbon_trend` that also needs the identifiers of the carbon models, which are question 7 of `contracts/results/README.md`. For the platform developer and the lead developer.
 
