@@ -1,13 +1,15 @@
 import { exampleCase } from './exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from './selection'
 import FieldsMap from '../map/FieldsMap'
+import SiteSheet from '../site/SiteSheet'
 import { strings } from '../strings'
 
 /**
  * Multi-field identity screen on example data: the example-data banner on
- * every render, the map of the fields and the field list below it. The list
- * and the map share the selected-field state through the selection module,
- * so a click on either selects the field on both.
+ * every render, the map of the fields and the field list below it, and the
+ * site sheet of the selected field after the list. The list, the map and the
+ * sheet share the selected-field state through the selection module, so a
+ * click on either selects the field on all three.
  */
 export default function FieldsScreen() {
   const selectedFieldId = useSelectedFieldId()
@@ -80,6 +82,7 @@ export default function FieldsScreen() {
         <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
       )}
 
+      <SiteSheet />
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${strings['identity.selected']}: ${selectedField.name}` : ''}
