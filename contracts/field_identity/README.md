@@ -59,7 +59,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types: a n
 
 ### `PolygonGeometry`: a GeoJSON Polygon in WGS 84
 
-What the map draws. The interface computes the area from it and shows it as `DERIVED`; the area is never stored here (issue #103).
+What the map draws. Issue #103 says the interface computes the area from it and shows it as `DERIVED`, and that the area is never stored here. On this pull request the producer reports that the interface no longer shows an area (D57 of issue #77: the area stays on screen only with a sourced Earth radius). Either way, no area travels in this contract.
 
 **What is checked**, and nothing else:
 
@@ -77,7 +77,7 @@ The `missing` part of C3.1, from `contracts/inputs/common.py`: `reason` (one of 
 
 ### What carries no provenance label
 
-Identifiers, the `example_data` flag, `label`, `name` and the geometry describe the record. They carry no provenance label, source or assumption mark: issue #103 says so, after the line drawn in `contracts/inputs/README.md`. The area that the interface derives from the geometry is labelled `DERIVED` where it is shown. Whether the geometry, which the user draws or uploads, should carry a label is OPEN, question 7.
+Identifiers, the `example_data` flag, `label`, `name` and the geometry describe the record. They carry no provenance label, source or assumption mark: issue #103 says so, after the line drawn in `contracts/inputs/README.md`. An area derived from the geometry, if the interface shows one again (D57), is labelled `DERIVED` where it is shown. Whether the geometry, which the user draws or uploads, should carry a label is OPEN, question 7.
 
 ## PROPOSED cases
 
