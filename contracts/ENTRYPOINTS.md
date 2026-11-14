@@ -9,6 +9,7 @@ The one public function of each engine: where it lives, its name, its arguments 
   - `PROPOSED`: the session proposes the module path, the function name, the arguments and the return type. A person accepts or corrects them in the pull request.
   - `OPEN`: the session cannot responsibly propose the signature. The entry gives a candidate, so that the question is concrete, and names the questions a person has to answer.
 - A `PROPOSED` entry can still depend on a question. Questions are listed once, under [OPEN](#open), as `Q1` to `Q16`, each with the role that answers it.
+- Three questions were answered by the lead developer on 14 November 2026 (issue #77): Q4, Q8 as far as the start month of the agricultural year goes, and Q10 as far as latitude and elevation go. Each keeps its number and its text, and carries the answer under it, marked `DECIDED`. They are a person's decisions, transcribed by a builder session. Issue #77 says of them: where they are science class, a science reviewer still has to accept them. No model and no route changed with these answers: each change is its own later unit, and until it lands the models behave as this file describes them.
 - General rules that hold for every entry are `G1` to `G7`. They are all `PROPOSED`.
 - No engine exists yet and the folder `engine/` does not exist. This file contains no code. A signature is written as text, in the notation of Python type hints.
 - This file contains no method, equation, unit, parameter value, threshold or citation. The repository names no soil-loss method and this file names none.
@@ -135,8 +136,10 @@ When it cannot compute:
 
 - G4 applies to every annual and monthly value. Every agricultural year and each of its twelve months is present; a value that is not computed is missing with its reason.
 - When the agricultural years themselves cannot be laid out, because the start month in `calendar.ag_year_start` is missing, the function returns one `Missing` with reason `MISSING_INPUT` and a `detail` that names the start month. `SoilLossResults` cannot say this: it needs at least one agricultural year with its number and twelve dated months. This is Q4.
+  - **This point no longer applies once the decision on Q4 is in force.** `DECIDED` by the lead developer on 14 November 2026 (issue #77, D7): the start month is a required part of the request; a request without it is an invalid request, and the route answers it as such and calls no engine. The case "no start month" no longer reaches an engine. The text above is kept to show what was proposed.
+  - Not changed yet: `RotationCalendar` still accepts a start month that is missing with its reason, and the signature of this entry is left as it was written. Issue #77 does not say whether the return type changes.
 
-Depends on: Q3 (parameters), Q4, Q5 (which agricultural years), Q11 (unit), Q12 (residue ledger).
+Depends on: Q3 (parameters), Q4 (answered: see the question), Q5 (which agricultural years), Q11 (unit), Q12 (residue ledger).
 
 ### EP2 `engine/calendar/`
 
@@ -161,9 +164,12 @@ When it cannot compute:
 - A rotation that breaks a calendar rule gives a calendar with `feasibility.feasible` false and at least one `RuleViolation`. The function does not raise. An engine that receives that calendar answers by G4.
 - A date that cannot be placed is a `DateValue` with `date` null and its `missing` part: reason `NOT_DECLARED` when the user did not give what the date needs, otherwise the code of G4 that applies. No date is invented.
 - A start month of the agricultural year that was not declared is an `AgYearStart` with `month` null and its `missing` part.
+  - **This point no longer applies once the decision on Q4 is in force.** `DECIDED` by the lead developer on 14 November 2026 (issue #77, D7): a request without the start month is an invalid request, and the route answers it as such and calls no engine. The text above is kept to show what was proposed.
+  - `DECIDED` on the same day (issue #77, D8): the start month travels in the rotation definition, with its provisional mark, and the calendar engine copies it into the calendar.
+  - Not changed yet: the rotation definition does not carry the start month, and `RotationCalendar` still accepts a start month that is missing with its reason.
 - `RotationCalendar` has no missing state for `case_id`, `field_id`, `rotation_id`, `start_date` and `end_date`. The function can return a valid calendar only if its arguments give all five. With the single argument above, the rotation definition has to carry them: Q8.
 
-Depends on: Q8. Whether a calendar with a missing date can be feasible is question 8 of `contracts/inputs/README.md`.
+Depends on: Q8 (answered for the start month: see the question). Whether a calendar with a missing date can be feasible is question 8 of `contracts/inputs/README.md`.
 
 ### EP3 `engine/water/`
 
@@ -206,7 +212,7 @@ When it cannot compute:
 - The list is never empty and an agricultural year is never left out.
 - The time basis of the items is `OPEN` in C1.3. The signature is the same for either answer.
 
-Depends on: Q2, Q3 (parameters), Q5 (which agricultural years), Q10 (inputs and outputs of the water engine), Q11 (unit).
+Depends on: Q2, Q3 (parameters), Q5 (which agricultural years), Q10 (inputs and outputs of the water engine; answered for latitude and elevation: they arrive in `climate`, and this signature does not change), Q11 (unit).
 
 ### EP4 `engine/residues/`
 
@@ -279,7 +285,7 @@ The route itself is not defined here. This section only says which entry point g
 | Part of `ResultsPerRotation` | Comes from |
 |---|---|
 | `case_id`, `field_id`, `rotation_id` | The `RotationCalendar` returned by EP2 carries the same three |
-| `soil_loss` | EP1, unchanged when it returns a `SoilLossResults`. For the other case see Q4 |
+| `soil_loss` | EP1, unchanged when it returns a `SoilLossResults`. For the other case see Q4, now answered: that case no longer reaches an engine |
 | `water_deficit_exposure` | EP3, unchanged |
 | `soil_carbon_trend` | No entry point, as the candidates of EP5 and EP6 stand: Q14, Q15 |
 
@@ -298,6 +304,10 @@ Each item is a question a person can answer. The role that answers it is named a
 
 **Q4. What does EP1 return when the agricultural years cannot be laid out?** `RotationCalendar` accepts a start month that is missing with its reason. `SoilLossResults` needs at least one agricultural year with its number, and twelve dated months for each, so it has no valid form for that case. EP1 proposes to return a `Missing` in its place. The field `soil_loss` of `ResultsPerRotation` cannot hold a `Missing`, so the route has no valid `ResultsPerRotation` for that request. The options are: `SoilLossResults` gains a wholly missing form (a change of the model, a new L0 unit); or a request without a start month is not a valid request; or the response of the route is not a bare `ResultsPerRotation`. For the lead developer; the platform developer for the response.
 
+- `DECIDED` (decided by the lead developer on 14 November 2026, issue #77, D7): **the start month is a required part of the request.** It follows convention C5.4: a person declares it per case, marked provisional. A request without it is an invalid request: the route answers it as such and calls no engine. The case "no start month" no longer reaches an engine.
+- What this makes out of date in this file: the point of EP1 on a missing start month, the point of EP2 on a start month that was not declared, and "the other case" of `soil_loss` in [From the entry points to one response](#from-the-entry-points-to-one-response). Each is marked where it stands.
+- Not changed yet: `RotationCalendar` still accepts a start month that is missing with its reason, the rotation definition does not carry the start month (Q8), and the signature of EP1 is left as it was written. Issue #77 does not say whether the return type of EP1 changes.
+
 **Q5. Which agricultural years does a result list?** The years covered by the calendar (`start_date` to `end_date`), the years of the climate record, or only those in both? EP1 and EP3 must list the same years for one rotation, and no model checks that. This follows from question 6 of `contracts/inputs/README.md`. For the lead developer.
 
 **Q6. How does a scenario reach an engine, and who gives a value its range?** `scenario_id` is in the rows of `ResultsTable` and not in `ResultsPerRotation`, and no signature here has a scenario argument. Proposed: one call is one scenario; the caller builds one set of arguments per scenario and writes `scenario_id` when it builds the table rows. This holds only if a scenario changes nothing but the arguments of the entry points; a scenario that changes a parameter falls under Q3. Also: with one call per scenario, an engine has nothing to compute a range from, so every number it returns carries `range_missing` and its reason. Is that intended, and which reason code does it use? What a scenario holds is question 9 of `contracts/results/README.md`. For the lead developer; the science reviewers for what a scenario and a range are.
@@ -306,9 +316,18 @@ Each item is a question a person can answer. The role that answers it is named a
 
 **Q8. What does the calendar engine receive besides the rotation definition?** Two parts. (a) `RotationCalendar` needs `case_id`, `field_id`, `rotation_id`, the start month of the agricultural year (C5.4) and the first and last date of the calendar. Does the "Rotation definition" contract carry all of them? If not, each one that it does not carry is a further argument of EP2, and the route has to be told where it comes from in a request `{ "site", "rotation" }`. (b) Does any calendar rule need site data, for example the climate record? If so EP2 gains the argument `climate: SiteClimate`. For the lead developer, as owner of lane L1, and the interface developer, as producer of the rotation definition.
 
+- `DECIDED` for the start month of part (a) (decided by the lead developer on 14 November 2026, issue #77, D8): the start month travels **in the rotation definition**, with its provisional mark. The calendar engine copies it into the calendar.
+- Not changed yet: the rotation definition does not carry the start month. It gains it in a later unit, for the interface developer, who is its producer.
+- Still `OPEN`, to be supplied by people: **the provisional month of each case** (convention C5.4). For the person who declares the case.
+- Still `OPEN`, not answered by issue #77: the rest of part (a), and part (b). For the same roles as before.
+
 **Q9. Is the argument of EP2 the request item itself?** Issue #18 says `rotation` in the request body is one item of the "Rotation definition" contract, unchanged. EP2 assumes the route passes that item as it is, loaded into its model. For the platform developer and the interface developer.
 
 **Q10. Do the inputs and the output of EP3 cover what the water engine needs and gives?** Two parts. (a) Inputs: do `SiteClimate` and `SiteSoilSlope` carry everything the methods of the water engine need? Neither carries anything about the place of the field (question 21 of `contracts/inputs/README.md`). If something is missing, it is a field of a contract or a further argument. For the science reviewers, who decide the method and its inputs, and the platform developer, who produces the site data. (b) Outputs: EP3 returns the indicator only. The reference evapotranspiration, the daily balance and the three descriptive measures of C1.4 have no contract, so the route cannot pass them on. Does the interface need any of them? If so, a contract is needed first and the return type of EP3 changes. For the lead developer and the interface developer.
+
+- `DECIDED` for latitude and elevation, in part (a) (decided by the lead developer on 14 November 2026, issue #77, D9): they reach the water engine **in the "Site data: climate" contract**: the point the series is valid for (latitude, longitude, elevation), with its provenance label and source. The signature of the water entry point does not change.
+- Not changed yet: `SiteClimate` carries nothing about the place of the field. The climate contract gains the point in a later unit, which has to land together with the adapter that fills it, so it is agreed with the platform developer first.
+- Still `OPEN`, not answered by issue #77: whether the two models carry everything else the methods of the water engine need (the rest of part (a)), and part (b). For the same roles as before.
 
 **Q11. Which reason code does an engine use for an input in a unit it does not accept?** C1.1 says a consumer checks the unit it receives. G5 proposes that the engine does not raise. `NOT_COMPUTABLE` and `CONTROL_FAILED` are the two codes of C3.2 that could apply. For the lead developer.
 

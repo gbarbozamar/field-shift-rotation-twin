@@ -6,12 +6,13 @@ Which method each engine implements, and where it is published. This file names 
 
 - Every item has one status: `PROPOSED`, `DECIDED` or `OPEN`, with the meaning of blueprint section 3.7 and of `contracts/CONVENTIONS.md`.
 - The items below were transcribed by an AI session from the planning notes of the lead developer, who approved them on 14 November 2026: they are `DECIDED`. They are science class: a science reviewer still has to accept them. A point marked `OPEN` inside a decided item is not decided.
+- Two points that were `OPEN` here, the source of `K` in M1.3 and the units of `R` and `K` in M1.7, were decided by the lead developer on 14 November 2026 and recorded in issue #77 (decisions D10 and D11). An AI session transcribed them into this file. Like the other items of this file, a science reviewer still has to accept them.
 - A citation here says where a method is published. The column "Read" says how far the planning notes got with the source: `read` (the abstract or the text was read), `fragments` (only fragments of the abstract), or `located` (the reference was found, nothing of it was read). A builder session never takes a number from memory of these sources: it reads it from the parameter catalogue, and returns a missing value with its reason when the catalogue does not have it.
 - If an engine needs a method that is not in this file, that is an `OPEN` point for the lead developer, not something a session chooses.
 
 ## M1 Soil loss: `engine/erosion/`
 
-Status of the whole section: `DECIDED`, except the points marked `OPEN` in M1.3, M1.5 and M1.7. Acceptance by a science reviewer is pending.
+Status of the whole section: `DECIDED`, except the points marked `OPEN`: in M1.3 the source of the soil-loss tolerance, in M1.5 the sub-factors and the source of each input, and in M1.7 the confirmation of the units against the sources. Acceptance by a science reviewer is pending.
 
 ### M1.1 The method
 
@@ -47,14 +48,19 @@ Two parts, from two sources:
 
 ### M1.3 Factor K and soil-loss tolerance
 
-`OPEN`: which source the event repository may use.
+The question was: which source the event repository may use.
+
+- `DECIDED` for the source of `K` (decided by the lead developer on 14 November 2026, issue #77, D10; acceptance by a science reviewer pending): **the open dataset of source S9**.
+- `OPEN` for the soil-loss tolerance: which source the event repository may use. As far as the planning notes record, the dataset of S9 carries `K` and not the tolerance (issue #77).
+
+What the planning notes say, unchanged:
 
 - The planning notes name two: the official values by soil group of the national soil map, and the open dataset of S9.
 - The licence of the official tables for an open repository is not established. S9 is published as open data.
 - The soil identity is confirmed by the user: one soil group can hold several soils, and `K`, the tolerance and the available water change together with it.
 - `K` is not computed from a global soil grid with a nomograph as the main value.
 
-For the lead developer and the science reviewers: which source, and under which licence.
+For the lead developer and the science reviewers: which source for the soil-loss tolerance, and under which licence. Issue #77 names the source of `K` and names no licence for it.
 
 ### M1.4 Factor LS
 
@@ -77,7 +83,15 @@ The soil-loss ratio of a period comes from the sub-factor equations of RUSLE (ca
 
 ### M1.7 Units
 
-The engine works in the International System and converts at the edge. The unit string of the result is fixed by convention C1.2. The unit strings of `R` and `K` are `OPEN` until a person writes them in the parameter catalogue with their source.
+The engine works in the International System and converts at the edge. The unit string of the result is fixed by convention C1.2.
+
+`DECIDED` for the unit strings of `R` and `K` (decided by the lead developer on 14 November 2026, issue #77, D11; acceptance by a science reviewer pending). Before this decision they were `OPEN` here, "until a person writes them in the parameter catalogue with their source". The decision fixes the two strings; it puts nothing in the parameter catalogue.
+
+- International System: `R` in `MJ mm ha-1 h-1 yr-1`, `K` in `t ha h ha-1 MJ-1 mm-1`.
+- With `LS`, `C` and `P` without unit, the result is in `t ha-1 yr-1` (convention C1.2).
+- Conversion happens at the edge.
+
+`OPEN`, for a science reviewer: **are the published values of `R` and `K` in these units?** A science reviewer confirms it against the sources before any value is transcribed.
 
 ## Sources
 
