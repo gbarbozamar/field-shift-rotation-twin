@@ -1,0 +1,20 @@
+{
+  "id": "PLACEHOLDER_parameter",
+  "scope": {
+    "crop": "PLACEHOLDER_crop"
+  },
+  "value": 2.0,
+  "unit": "PLACEHOLDER_unit",
+  "range": {
+    "low": 1.0,
+    "high": 3.0,
+    "basis": "PLACEHOLDER: what the range represents, as the source states it"
+  },
+  "citation": {
+    "reference": "PLACEHOLDER reference. This is not a publication.",
+    "locator": "PLACEHOLDER locator: the table, page or equation holding the value"
+  },
+  "transcribed_by": "PLACEHOLDER_person_one",
+  "checked_by": "PLACEHOLDER_person_two",
+  "note": "PLACEHOLDER example of the record format. The numbers mean nothing."
+}
