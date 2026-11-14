@@ -403,6 +403,7 @@ def test_settings_from_configuration():
                 parameters=[
                     dataclasses.asdict(spec) for spec in make_settings().parameters
                 ],
+                point=dataclasses.asdict(make_settings().point),
             )
         )
     )
