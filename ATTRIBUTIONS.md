@@ -38,6 +38,9 @@ Add a row **when the item is first used**, not at the end.
 | @types/react-dom | 19.3.0 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
 | @types/node | 24.19.2 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
 | Vitest | 5.1.0 | https://vitest.dev | MIT | l3 | 2026-11-14 |
+| OpenStreetMap standard tiles | (no version) | https://www.openstreetmap.org/copyright | ODbL (attribution required; OSMF tile usage policy) | l3 | 2026-11-14 |
+| leaflet | 1.9.4 | https://leafletjs.com | BSD-2-Clause | l3 | 2026-11-14 |
+| @types/leaflet | 1.9.22 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
 ## Tables and publications
 
 | Citation | URL or DOI | What is taken from it | Checked by a second person |
