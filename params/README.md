@@ -2,7 +2,7 @@
 
 Where crop and rotation parameters are stored, each with its unit, its uncertainty range, its citation, who transcribed it and the person who checked it.
 
-**This folder holds no parameter yet.** It holds the layout, the record format and the check that rejects a malformed record.
+It holds the layout, the record format, the check that rejects a malformed record, and in `records/` the first parameters: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), checked by the lead developer under D34 and D66.
 
 > **Status: PROPOSED.** The record format, the scope keys and the test cases below were written by a builder session (blueprint section 3.7). They take effect only when a person approves the pull request. Items marked `OPEN` need an answer from a person.
 
@@ -12,7 +12,7 @@ Values, ranges and citations are science class (blueprint sections 3.5 and 3.6),
 
 | Path | Content |
 |---|---|
-| `records/` | The catalogue: one JSON file per parameter record. Empty today |
+| `records/` | The catalogue: one JSON file per parameter record. Today: the records of the demonstration point La Estanzuela |
 | `examples/` | Two placeholder records that show the format. Never read as parameters |
 | `catalogue.py` | The record checks. Standard library only |
 | `test_layout.py` | The acceptance test. It also checks the whole folder: every file under `records/`, and that no record file lies anywhere else |
@@ -133,7 +133,7 @@ The reading functions refuse a placeholder (F5b). To reach their accepting path,
 | A6 | The same `id` with a different scope, or with the empty scope, is a different record |
 | A7 | The optional fields `note` and `citation.url` are accepted |
 | A8 | The files in `examples/` are well-formed, are all placeholders, and are rejected as a catalogue |
-| A9 | The whole `params/` folder of this repository passes the layout check (widened by F3a and F5c). Today it holds no record |
+| A9 | The whole `params/` folder of this repository passes the layout check (widened by F3a and F5c), records included |
 
 ### Rejected
 

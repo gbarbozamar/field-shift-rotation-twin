@@ -1,0 +1,16 @@
+{
+  "id": "rusle_r_factor",
+  "scope": {},
+  "value": 4248,
+  "unit": "MJ mm ha-1 h-1 yr-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Pérez Bidegain, M., Piaggio, J.M., Baethgen, W., García Préchac, F. (2017). Actualización del factor erosividad de la lluvia en Uruguay. Agrociencia Uruguay 21(2):91-99. https://doi.org/10.31285/agro.21.2.11 (CC BY 4.0).",
+    "locator": "Cuadro 2, row «Colonia», column «1980-2009», p. 94 (PDF p. 4). Unit: from the text, p. 92",
+    "url": "https://agrocienciauruguay.uy/index.php/agrociencia/article/download/161/143#page=4"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Colonia» … «4248» (last column, «1980-2009»). Column 1980-2009 (30-year series; the source recommends the 30-year estimates, p. 98). The other 11 columns (20-year moving windows) are in FUENTES_INVESTIGADAS.md §6.1. Unit kept as printed; the string accepted by D11 is `MJ mm ha-1 h-1 yr-1`. Scope set to {} because EP1 looks R up with the empty scope (SOIL_LOSS.md); the locality is Colonia by D83. A second locality in the catalogue would need a scope key EP1 reads. Unit string set to «MJ mm ha-1 h-1 yr-1» (the string of D11 that EP1 accepts; M1.7 asks the lead developer to confirm the published unit); the source prints «MJ.mm.ha-1.h-1.año-1». Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-14 against a crop of the source page (D34, D66). Value selected for the demonstration point La Estanzuela (D83 for R, D100 for K); scope {} is PROPOSED until EP1 reads a site scope."
+}

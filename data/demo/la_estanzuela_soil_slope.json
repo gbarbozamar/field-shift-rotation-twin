@@ -1,0 +1,41 @@
+{
+  "contract": "site_data_soil_slope",
+  "example_data": true,
+  "case_id": "la-estanzuela-demo",
+  "field_id": "wischmeier-plots-1984",
+  "slope_length": {
+    "value": 22.1,
+    "unit": "m",
+    "provenance": "DECLARED",
+    "source": "Declared by the lead developer under D100 of issue #77 (2026-11-14). Taken from Grahmann, K., Rubio, V., Perez-Bidegain, M., Quincke, J.A. (2022). Soil Use Legacy as Driving Factor for Soil Erosion under Conservation Agriculture. Frontiers in Environmental Science 10:822967, https://doi.org/10.3389/fenvs.2022.822967 (CC BY), section 'Long-Term Wischmeier Plots', p. 3: \"six Wischmeier runoff plots were built with a size of 22.1 m length and 3.5 m width along an agricultural field's slope side\". Read on 2026-11-14.",
+    "range_missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "The source gives a single plot length, with no uncertainty range."
+    }
+  },
+  "slope_steepness": {
+    "value": 4.5,
+    "unit": "percent",
+    "provenance": "DECLARED",
+    "source": "Declared by the lead developer under D100 of issue #77 (2026-11-14) as the midpoint of the range printed in Grahmann, K., Rubio, V., Perez-Bidegain, M., Quincke, J.A. (2022), Frontiers in Environmental Science 10:822967, https://doi.org/10.3389/fenvs.2022.822967 (CC BY), section 'Long-Term Wischmeier Plots', p. 3: \"the resulting slope ranged between 4.3 and 4.7%\" (measured in 2020 as the height difference between the top and bottom end of each plot). Read on 2026-11-14.",
+    "range": {
+      "low": 4.3,
+      "high": 4.7,
+      "kind": "published range of the six plots (Grahmann et al. 2022, p. 3)"
+    }
+  },
+  "soil_properties": [
+    {
+      "quantity": "rusle_k_factor",
+      "value": 0.03,
+      "unit": "t ha h ha-1 MJ-1 mm-1",
+      "provenance": "DECLARED",
+      "source": "Soil class \"T Brunosol\" declared by the lead developer under D100 of issue #77 (2026-11-14); K is the class mean by D70. Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. Ciencia e Investigacion Agraria 44(1):100-112, https://doi.org/10.7764/rcia.v44i1.1622 (CC BY 4.0), Table 1, row \"T Brunosol\", column \"K_Puentes\", row mu, p. 104 (PDF p. 5): mu 0.0300, sigma 0.0110, n 26. Unit: text of p. 105, \"All K-values were expressed in compatible SI units, i.e., in (t ha h)(ha MJ mm)-1\"; the label \"mg kg-1\" printed under that column header is noted, not corrected (D70). The unit string here is the one accepted by D11 for the same unit. S9 does not say whether \"T Brunosol\" includes the vertic brunosols; the plots' soil is printed as \"Vertic Argiudoll\" (Grahmann et al. 2022, p. 3). Read on 2026-11-14.",
+      "range": {
+        "low": 0.019,
+        "high": 0.041,
+        "kind": "class mean plus or minus one class standard deviation, derived from S9 Table 1 (D70)"
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "rusle_p_factor",
+  "scope": {},
+  "value": 1,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "No uncertainty range: P = 1 follows from the definition of P for plots run up and down the slope with no support practice; it is not an estimate.",
+  "citation": {
+    "reference": "Renard, K.G., Foster, G.R., Weesies, G.A., McCool, D.K., Yoder, D.C. (coord.) (1997). Predicting Soil Erosion by Water: A Guide to Conservation Planning With the Revised Universal Soil Loss Equation (RUSLE). U.S. Department of Agriculture, Agriculture Handbook No. 703.",
+    "locator": "Chapter 1, Eq. [1-2] and the definition of P, p. 15 (PDF p. 37). Scanned copy: read the page image",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/AH_703%20-%20Predicting%20Soil%20Erosion%20by%20Water%20-%20A%20Guide%20to%20Conservation%20Planning%20With%20the%20RUSLE%20(RUSLE).pdf#page=37"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-14 (question P13; DP06), choosing 'P = 1 derived from the definition'. Verbatim text: «P = support practice factor—the ratio of soil loss with a support practice like contouring, stripcropping, or terracing to soil loss with straight-row farming up and down the slope.» The source does not print P = 1 for this case: 1 follows from that definition for the Wischmeier plots of La Estanzuela, built «along an agricultural field's slope side» with no support practice stated (Grahmann et al. 2022, Frontiers in Environmental Science 10:822967, p. 3). Method decision: docs/METHODS.md M1.6 («P is one by default under no-till»). Scope {} because EP1 looks P up with the empty scope."
+}

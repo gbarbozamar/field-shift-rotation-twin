@@ -1,0 +1,16 @@
+{
+  "id": "rusle_c_factor",
+  "scope": {},
+  "value": 0.036,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives a single value with no uncertainty range.",
+  "citation": {
+    "reference": "García Préchac, F., Durán, A. (1998). Propuesta de estimación del impacto de la erosión sobre la productividad del suelo en Uruguay. Agrociencia (Uruguay) II(1):26-36.",
+    "locator": "p. 29 (PDF p. 4), 'Sistema 3.7'. Same value: Clérici, C., García Préchac, F. (2001). Aplicaciones del modelo USLE/RUSLE para estimar pérdidas de suelo por erosión en Uruguay y la región sur de la cuenca del Río de la Plata. Agrociencia (Uruguay) V(1):92-103, Cuadro 6, row 6, p. 99 (PDF p. 8)",
+    "url": "https://beta.acuedi.org/book/4731/pdf#page=4"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-14 as the single declared C of docs/METHODS.md M1.2, chosen among cited options (0.036, 0.05, 0.02) shown in crops of the source pages. Verbatim text: «Sistema 3.7: Similar a los tres anteriores, pero sin laboreo de ningún tipo el que se sustituye por la siembra directa. Le corresponde un valor C de 0,036 (determinado experimentalmente Sawchik y Quintana, cit. por García Préchac, 1992).» Cuadro 6 of the 2001 paper: «6) agricultura cultivos continuos siembra directa | 0,036*», «*/ Determinados experimentalmente». Limits: the measurement predates 1992, the source does not say which plots it comes from, and it does not cover the present rotation with cover crops. Both papers were read in copies on a third-party site (acuedi.org); no official open copy was found. Scope {} because EP1 looks C up with the empty scope."
+}
