@@ -1,4 +1,5 @@
-# The six checks of docs/DEVELOPMENT_BLUEPRINT.md section 6.
+# The six checks of docs/DEVELOPMENT_BLUEPRINT.md section 6, plus a seventh
+# job that builds and starts the container image.
 # Owned by sub-lane L2a. A check whose folder does not exist yet is skipped
 # with a notice, and switched on when the folder lands.
 
@@ -40,20 +41,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Is there a frontend?
-        id: web
-        run: |
-          if [ -f web/package.json ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Frontend build skipped: web/package.json does not exist yet"
-          fi
       - uses: actions/setup-node@v4
-        if: steps.web.outputs.present == 'true'
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - name: Build
-        if: steps.web.outputs.present == 'true'
         working-directory: web
         run: |
           npm ci
@@ -102,7 +95,8 @@ jobs:
           FORBIDDEN_NAMES: ${{ secrets.FORBIDDEN_NAMES }}
         run: python -m ci.names_scan
 
-  # Check 6. Python dependencies; the frontend ones are added with web/.
+  # Check 6. Python dependencies, then the frontend ones (read from
+  # web/package-lock.json).
   dependency-licences:
     runs-on: ubuntu-latest
     steps:
@@ -116,3 +110,32 @@ jobs:
         run: |
           set -o pipefail
           uv run pip-licenses --with-system --format=json | uv run python -m ci.licences
+      - name: Check the frontend licences
+        run: uv run python -m ci.frontend_licences
+
+  # Not one of the six checks: catches a broken Dockerfile on the pull
+  # request instead of at deploy. Builds the image, starts it with no
+  # configuration and waits for GET /health to answer 200. Nothing is pushed.
+  image-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the image
+        run: docker build --tag field-shift-ci:throwaway .
+      - name: Start the image and wait for /health
+        run: |
+          docker run --detach --name field-shift-ci --publish 8000:8000 field-shift-ci:throwaway
+          for attempt in $(seq 1 30); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:8000/health || true)
+            if [ "$status" = "200" ]; then
+              echo "GET /health answered 200 after $attempt attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::GET /health did not answer 200 within 60 seconds"
+          docker logs field-shift-ci
+          exit 1
+      - name: Stop the container
+        if: always()
+        run: docker rm --force field-shift-ci || true
