@@ -27,6 +27,7 @@ from types import MappingProxyType
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from adapters.cache import ResponseCache, StoredResponse, cache_key
 from adapters.ports import ClimateRequest, ClimateResult, SourceInfo, SourceState
@@ -36,6 +37,7 @@ from adapters.power_mapping import (
     UnusableResponse,
     to_site_climate,
 )
+from contracts.inputs import SiteClimate
 
 # contracts/CONVENTIONS.md C4.1, copied so the adapter does not depend on an
 # unmerged contract module.
@@ -302,6 +304,30 @@ class PowerClimateSource:
         self._client = client
         self._now = now
 
+    @property
+    def source_id(self) -> str:
+        """The ``SourceInfo.id`` this source writes: the ``source_id`` setting."""
+        return self._settings.source_id
+
+    @property
+    def contract(self) -> str:
+        """The ``SourceInfo.contract`` this source writes."""
+        return CONTRACT
+
+    def _load(self, raw: Any, request: ClimateRequest) -> SiteClimate:
+        """Map a parsed response and load it into the contract model.
+
+        Raises ``UnusableResponse`` when the response cannot be mapped or the
+        mapped document does not load. The text never echoes the response.
+        """
+        document = to_site_climate(raw, request, self._settings)
+        try:
+            return SiteClimate.model_validate(document)
+        except ValidationError:
+            raise UnusableResponse(
+                "the mapped document does not load into the contract model SiteClimate"
+            ) from None
+
     def _info(
         self,
         query: Mapping[str, str],
@@ -348,7 +374,7 @@ class PowerClimateSource:
         stored = self._cache.get(key)
         if stored is not None:
             try:
-                data = to_site_climate(_parse_json(stored.body), request, settings)
+                data = self._load(_parse_json(stored.body), request)
             except ValueError:
                 return self._unavailable(
                     query,
@@ -384,7 +410,7 @@ class PowerClimateSource:
         except ValueError:
             return self._unavailable(query, "the response body is not JSON")
         try:
-            data = to_site_climate(raw, request, settings)
+            data = self._load(raw, request)
         except UnusableResponse as error:
             if _is_error_payload(raw):
                 return self._unavailable(
@@ -410,7 +436,7 @@ class PowerClimateSource:
         if kept is not entry:
             # Another writer stored a first response meanwhile: that one wins.
             try:
-                kept_data = to_site_climate(_parse_json(kept.body), request, settings)
+                kept_data = self._load(_parse_json(kept.body), request)
             except ValueError:
                 kept_data = None
             if kept_data is not None:

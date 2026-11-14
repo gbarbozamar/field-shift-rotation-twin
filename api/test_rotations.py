@@ -10,31 +10,49 @@ obvious placeholder, every date is in year 1900 and every identifier is
 from __future__ import annotations
 
 import datetime as dt
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from adapters.ports import ClimateRequest, ClimateResult, ClimateSource, SourceInfo
-from api.main import app as default_app
 from api.main import create_app
 from api.ports import (
     EnginesResult,
     ErrorDetail,
     Missing,
     ModuleStatus,
-    RotationEngines,
-    RotationValidator,
     RunSettings,
     SoilSlopeResult,
     SoilSlopeSource,
 )
 from api.rotations import derive_outcome
 from api.standins import (
-    AcceptAnyRotation,
     ClimateUnavailable,
-    EnginesNotBuilt,
     SoilSlopeNotLoaded,
+)
+from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
+from contracts.results.models import ResultsPerRotation
+
+CONTRACTS = Path(__file__).parent.parent / "contracts"
+
+
+def load_example(model, folder: str, name: str):
+    text = (CONTRACTS / folder / "examples" / name).read_text(encoding="utf-8")
+    return model.model_validate(json.loads(text))
+
+
+CLIMATE_EXAMPLE = load_example(SiteClimate, "inputs", "PLACEHOLDER_site_climate.json")
+SOIL_SLOPE_EXAMPLE = load_example(
+    SiteSoilSlope, "inputs", "PLACEHOLDER_site_soil_slope.json"
+)
+CALENDAR_EXAMPLE = load_example(
+    RotationCalendar, "inputs", "PLACEHOLDER_rotation_calendar.json"
+)
+RESULT_EXAMPLE = load_example(
+    ResultsPerRotation, "results", "PLACEHOLDER_results_per_rotation.json"
 )
 
 ROUTE = "/api/rotations/run"
@@ -48,7 +66,16 @@ SITE = {
     "latitude": 1.0,
     "longitude": 2.0,
 }
-ROTATION = {"PLACEHOLDER_KEY": "PLACEHOLDER_VALUE"}
+# A valid rotation: the PLACEHOLDER example of the rotation definition.
+ROTATION = json.loads(
+    (
+        Path(__file__).parent.parent
+        / "contracts"
+        / "rotation_definition"
+        / "examples"
+        / "PLACEHOLDER_rotation_definition.json"
+    ).read_text(encoding="utf-8")
+)
 BODY = {"site": SITE, "rotation": ROTATION}
 
 
@@ -57,6 +84,9 @@ BODY = {"site": SITE, "rotation": ROTATION}
 
 class FakeClimate:
     """Counts calls and answers fresh, cached or unavailable."""
+
+    source_id = "PLACEHOLDER_CLIMATE"
+    contract = "site_data_climate"
 
     def __init__(self, state: str = "fresh") -> None:
         self.state = state
@@ -75,7 +105,7 @@ class FakeClimate:
                 ),
             )
         return ClimateResult(
-            data={"PLACEHOLDER_KEY": "PLACEHOLDER_VALUE"},
+            data=CLIMATE_EXAMPLE,
             source=SourceInfo(
                 id="PLACEHOLDER_CLIMATE",
                 contract="site_data_climate",
@@ -89,13 +119,16 @@ class FakeClimate:
 
 
 class FakeSoilSlope:
+    source_id = "PLACEHOLDER_SOIL"
+    contract = "site_data_soil_slope"
+
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
 
     def get_soil_slope(self, case_id: str, field_id: str) -> SoilSlopeResult:
         self.calls.append((case_id, field_id))
         return SoilSlopeResult(
-            data={"PLACEHOLDER_KEY": "PLACEHOLDER_VALUE"},
+            data=SOIL_SLOPE_EXAMPLE,
             source=SourceInfo(
                 id="PLACEHOLDER_SOIL", contract="site_data_soil_slope", state="example"
             ),
@@ -111,11 +144,14 @@ AVAILABLE = (
         detail="PLACEHOLDER_DETAIL",
     ),
 )
+# The route reads only the counts, never the result: a fake may declare them.
 WITH_RESULT = EnginesResult(
-    calendar={"PLACEHOLDER_CALENDAR": [1, 2]},
-    result={"PLACEHOLDER_RESULT": {"PLACEHOLDER_NESTED": 3.5}},
+    calendar=CALENDAR_EXAMPLE,
+    result=RESULT_EXAMPLE,
     result_missing=None,
     modules=AVAILABLE,
+    values_present=1,
+    values_missing=1,
 )
 
 
@@ -189,8 +225,14 @@ def test_valid_request_with_answering_fakes():
     ]
     assert body["result_missing"] is None
     # Copied unchanged: nothing added, renamed or converted.
-    assert body["result"] == WITH_RESULT.result
-    assert body["calendar"] == WITH_RESULT.calendar
+    assert body["result"] == RESULT_EXAMPLE.model_dump(mode="json")
+    assert body["calendar"] == CALENDAR_EXAMPLE.model_dump(mode="json")
+    assert ResultsPerRotation.model_validate_json(json.dumps(body["result"])) == (
+        RESULT_EXAMPLE
+    )
+    assert RotationCalendar.model_validate_json(json.dumps(body["calendar"])) == (
+        CALENDAR_EXAMPLE
+    )
     assert soil.calls == [("PLACEHOLDER_CASE", "PLACEHOLDER_FIELD")]
     rotation, climate_result, soil_result = engines.calls[0]
     assert rotation == ROTATION
@@ -202,7 +244,8 @@ def test_complete_when_all_available_and_no_source_unavailable():
     engines = FakeEngines(
         EnginesResult(
             calendar=None,
-            result={"PLACEHOLDER_RESULT": "PLACEHOLDER_VALUE"},
+            result=RESULT_EXAMPLE,
+            values_present=1,
             result_missing=None,
             modules=(ModuleStatus(id="PLACEHOLDER_MODULE", state="available"),),
         )
@@ -213,8 +256,9 @@ def test_complete_when_all_available_and_no_source_unavailable():
     assert response.json()["outcome"] == "complete"
 
 
-def test_default_app_answers_with_typed_absences_only():
-    response = TestClient(default_app).post(ROUTE, json=BODY)
+def test_default_app_answers_with_typed_absences_only(engines_hidden):
+    # Built here, not at import: the engines are looked for when the app is built.
+    response = TestClient(create_app([])).post(ROUTE, json=BODY)
     assert response.status_code == 200
     body = response.json()
     assert body["outcome"] == "no_result"
@@ -263,7 +307,8 @@ def test_unavailable_climate_is_still_200_and_not_complete():
         engines=FakeEngines(
             EnginesResult(
                 calendar=None,
-                result={"PLACEHOLDER_RESULT": "PLACEHOLDER_VALUE"},
+                result=RESULT_EXAMPLE,
+                values_present=1,
                 result_missing=None,
                 modules=(ModuleStatus(id="PLACEHOLDER_MODULE", state="available"),),
             )
@@ -283,6 +328,9 @@ def test_no_period_configured_does_not_call_the_climate_source():
     assert response.status_code == 200
     assert climate.requests == []
     entry = response.json()["sources"][0]
+    # The source describes itself; the route invents no identifier.
+    assert entry["id"] == climate.source_id
+    assert entry["contract"] == climate.contract
     assert entry["state"] == "unavailable"
     assert entry["missing_reason"] == "NOT_AVAILABLE"
     assert entry["detail"]
@@ -330,7 +378,8 @@ def test_engine_exception_is_500_with_cors_and_no_exception_text(caplog):
         # A result and a reason for its absence at once.
         EnginesResult(
             calendar=None,
-            result={"PLACEHOLDER_RESULT": "PLACEHOLDER_VALUE"},
+            result=RESULT_EXAMPLE,
+            values_present=1,
             result_missing=Missing(reason="NOT_AVAILABLE"),
         ),
     ],
@@ -342,6 +391,7 @@ def test_engine_answer_breaking_the_envelope_rules_is_a_defect(answer):
 
 
 def test_unavailable_source_without_reason_is_a_defect():
+    # SourceInfo itself now refuses it, inside the call: still a defect.
     class NoReason:
         def get_soil_slope(self, case_id, field_id):
             return SoilSlopeResult(
@@ -393,20 +443,25 @@ def test_preflight_for_the_run_route():
 
 
 @pytest.mark.parametrize(
-    ("result_present", "modules", "sources", "expected"),
+    ("result_present", "present", "missing", "modules", "sources", "expected"),
     [
-        (False, ["available"], ["fresh"], "no_result"),
-        (False, [], [], "no_result"),
-        (True, ["available"], ["fresh", "cached"], "complete"),
-        (True, ["available"], ["example"], "complete"),
-        (True, [], [], "complete"),
-        (True, ["available", "degraded"], ["fresh"], "partial"),
-        (True, ["not_available"], ["fresh"], "partial"),
-        (True, ["available"], ["fresh", "unavailable"], "partial"),
+        (False, 0, 0, ["available"], ["fresh"], "no_result"),
+        (False, 0, 0, [], [], "no_result"),
+        # A result in which no value is present: an infeasible calendar.
+        (True, 0, 3, ["available"], ["fresh"], "no_result"),
+        (True, 2, 0, ["available"], ["fresh", "cached"], "complete"),
+        (True, 2, 0, ["available"], ["example"], "complete"),
+        (True, 2, 0, [], [], "complete"),
+        (True, 2, 1, ["available"], ["fresh"], "partial"),
+        (True, 2, 0, ["available", "degraded"], ["fresh"], "partial"),
+        (True, 2, 0, ["not_available"], ["fresh"], "partial"),
+        (True, 2, 0, ["available"], ["fresh", "unavailable"], "partial"),
     ],
 )
-def test_derive_outcome(result_present, modules, sources, expected):
-    assert derive_outcome(result_present, modules, sources) == expected
+def test_derive_outcome(result_present, present, missing, modules, sources, expected):
+    assert (
+        derive_outcome(result_present, present, missing, modules, sources) == expected
+    )
 
 
 # --- stand-ins ----------------------------------------------------------------
@@ -436,28 +491,6 @@ def test_soil_slope_standin():
     assert result.data is None
     assert result.source.state == "unavailable"
     assert result.source.missing_reason == "NOT_AVAILABLE"
-
-
-def test_engines_standin():
-    engines: RotationEngines = EnginesNotBuilt(["PLACEHOLDER_A", "PLACEHOLDER_B"])
-    result = engines.run(
-        ROTATION,
-        ClimateUnavailable().get_climate(PLACEHOLDER_REQUEST),
-        SoilSlopeNotLoaded().get_soil_slope("PLACEHOLDER_CASE", "PLACEHOLDER_FIELD"),
-    )
-    assert result.result is None
-    assert result.calendar is None
-    assert result.result_missing is not None
-    assert result.result_missing.reason == "NOT_AVAILABLE"
-    assert [m.id for m in result.modules] == ["PLACEHOLDER_A", "PLACEHOLDER_B"]
-    assert all(m.state == "not_available" for m in result.modules)
-    assert all(m.reason == "NOT_AVAILABLE" for m in result.modules)
-
-
-def test_rotation_validator_standin():
-    validator: RotationValidator = AcceptAnyRotation()
-    assert validator.validate(ROTATION) == []
-    assert validator.validate({}) == []
 
 
 def test_run_settings_reject_a_reversed_period():

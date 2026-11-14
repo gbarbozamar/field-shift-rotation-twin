@@ -1,7 +1,7 @@
 """Route ``POST /api/rotations/run``: one rotation, end to end.
 
-The route depends only on interfaces (``adapters.ports.ClimateSource`` and the
-protocols of ``api/ports.py``). It never imports a concrete adapter or engine,
+The route depends only on interfaces (``adapters.ports.ClimateSource``,
+``adapters.ports.SoilSlopeSource`` and the protocols of ``api/ports.py``). It never imports a concrete adapter or engine,
 never knows whether data came from a cache, and never builds a number: it
 copies what the interfaces return into one envelope.
 
@@ -24,7 +24,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_valid
 from adapters.ports import ClimateRequest, ClimateResult, ClimateSource, SourceInfo
 from api.errors import ErrorCode, error_response, join_path
 from api.ports import (
-    CLIMATE_CONTRACT,
     EnginesResult,
     ErrorDetail,
     ModuleState,
@@ -37,10 +36,6 @@ from api.ports import (
 
 logger = logging.getLogger(__name__)
 
-# PROPOSED: identifier of the climate entry in ``sources`` when the route does
-# not call the climate source because no record period is configured. The
-# ``ClimateSource`` interface offers no way to ask a source for its id.
-CLIMATE_NOT_CALLED_ID = "climate"
 PERIOD_NOT_CONFIGURED = "the climate record period is not configured"
 
 NonEmpty = Annotated[str, Field(min_length=1)]
@@ -147,23 +142,25 @@ class RunRotationResponse(BaseModel):
 
 def derive_outcome(
     result_present: bool,
+    values_present: int,
+    values_missing: int,
     module_states: Sequence[ModuleState],
     source_states: Sequence[str],
 ) -> Outcome:
-    """Outcome of a run.
+    """Outcome of a run. PROPOSED.
 
-    - ``no_result`` when there is no result;
-    - ``complete`` when every module is ``available`` and no source is
-      ``unavailable``;
+    - ``no_result`` when there is no result, or no value in it is present
+      (an infeasible calendar ends here, issue 18);
+    - ``complete`` when no value is missing, every module is ``available`` and
+      no source is ``unavailable``;
     - ``partial`` otherwise.
-
-    Once the "Results per rotation" contract model lands, "an indicator is
-    missing" joins the rule for ``partial``.
     """
-    if not result_present:
+    if not result_present or values_present == 0:
         return "no_result"
-    if all(s == "available" for s in module_states) and all(
-        s != "unavailable" for s in source_states
+    if (
+        values_missing == 0
+        and all(s == "available" for s in module_states)
+        and all(s != "unavailable" for s in source_states)
     ):
         return "complete"
     return "partial"
@@ -194,11 +191,22 @@ def build_envelope(
     return RunRotationResponse(
         outcome=derive_outcome(
             engines.result is not None,
+            engines.values_present,
+            engines.values_missing,
             [m.state for m in modules],
             [s.state for s in sources],
         ),
-        calendar=dict(engines.calendar) if engines.calendar is not None else None,
-        result=dict(engines.result) if engines.result is not None else None,
+        # Never ``exclude_none``: a document written that way does not load back.
+        calendar=(
+            engines.calendar.model_dump(mode="json")
+            if engines.calendar is not None
+            else None
+        ),
+        result=(
+            engines.result.model_dump(mode="json")
+            if engines.result is not None
+            else None
+        ),
         result_missing=(
             MissingOut(
                 reason=engines.result_missing.reason,
@@ -263,8 +271,8 @@ def _get_climate(
         return ClimateResult(
             data=None,
             source=SourceInfo(
-                id=CLIMATE_NOT_CALLED_ID,
-                contract=CLIMATE_CONTRACT,
+                id=climate.source_id,
+                contract=climate.contract,
                 state="unavailable",
                 missing_reason="NOT_AVAILABLE",
                 detail=PERIOD_NOT_CONFIGURED,

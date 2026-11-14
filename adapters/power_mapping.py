@@ -28,6 +28,7 @@ _SOURCE_DATE = re.compile(r"\d{8}")
 # English detail of a missing day. Text for developers, not a claim.
 DETAIL_FILL_VALUE = "the source gave its fill value for this day"
 DETAIL_NOT_IN_RESPONSE = "the response holds no value for this day"
+DETAIL_NO_RANGE = "the source gives no uncertainty range for this series"
 
 
 class UnusableResponse(ValueError):
@@ -96,6 +97,10 @@ def to_site_climate(
 ) -> dict[str, Any]:
     """Map a parsed response to a JSON-ready document in the shape of ``SiteClimate``.
 
+    Every ``missing`` and ``range_missing`` part written carries a non-empty
+    English ``detail``, so that every reason code of C3.2 loads (C3.2 asks a
+    detail for ``MISSING_INPUT``).
+
     Raises ``UnusableResponse`` when the response lacks the expected layout or
     holds a date that cannot be parsed. Every day from ``start_date`` to
     ``end_date`` appears once, in order; a fill value or an absent day becomes
@@ -132,7 +137,10 @@ def to_site_climate(
             # C2.2, C4.1: only a series with at least one number carries these.
             series["provenance"] = spec.provenance
             series["source"] = settings.source_id
-            series["range_missing"] = {"reason": settings.range_missing_reason}
+            series["range_missing"] = {
+                "reason": settings.range_missing_reason,
+                "detail": DETAIL_NO_RANGE,
+            }
         series.update(
             {
                 "time_zone": TIME_ZONE,
