@@ -1,0 +1,285 @@
+{
+  "case_id": "PLACEHOLDER_case",
+  "field_id": "PLACEHOLDER_field",
+  "rotation_id": "PLACEHOLDER_rotation_a",
+  "soil_loss": {
+    "annual": [
+      {
+        "ag_year": 2001,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 12.0,
+        "unit": "t ha-1 yr-1",
+        "range": {"low": 6.0, "high": 18.0, "kind": "PLACEHOLDER_range_kind"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "ag_year": 2002,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "missing": {
+          "reason": "NO_COVERAGE",
+          "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"
+        }
+      }
+    ],
+    "monthly": [
+      {
+        "year": 2001, "month": 7, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2001, "month": 8, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2001, "month": 9, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2001, "month": 10, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2001, "month": 11, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2001, "month": 12, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 1, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 2, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 3, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 4, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 5, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 6, "ag_year": 2001,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 7, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 8, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 9, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 10, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 11, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2002, "month": 12, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": 1.0, "unit": "t ha-1 month-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for a monthly value"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "year": 2003, "month": 1, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": null, "unit": "t ha-1 month-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this month"}
+      },
+      {
+        "year": 2003, "month": 2, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": null, "unit": "t ha-1 month-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this month"}
+      },
+      {
+        "year": 2003, "month": 3, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": null, "unit": "t ha-1 month-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this month"}
+      },
+      {
+        "year": 2003, "month": 4, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": null, "unit": "t ha-1 month-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this month"}
+      },
+      {
+        "year": 2003, "month": 5, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": null, "unit": "t ha-1 month-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this month"}
+      },
+      {
+        "year": 2003, "month": 6, "ag_year": 2002,
+        "indicator": "soil_loss", "direction": "lower_is_better",
+        "value": null, "unit": "t ha-1 month-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this month"}
+      }
+    ]
+  },
+  "water_deficit_exposure": [
+    {
+      "time_basis": "rotation",
+      "indicator": "water_deficit_exposure",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "dimensionless",
+      "missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"
+      }
+    }
+  ],
+  "soil_carbon_trend": [
+    {
+      "carbon_model": "amg",
+      "computation": "end_minus_start",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": 0.5,
+      "unit": "t C ha-1 yr-1",
+      "range": {"low": -0.5, "high": 1.5, "kind": "PLACEHOLDER_range_kind"},
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+    },
+    {
+      "carbon_model": "amg",
+      "computation": "fitted_slope",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": 0.25,
+      "unit": "t C ha-1 yr-1",
+      "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for this computation"},
+      "provenance": "SIMULATED",
+      "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+    },
+    {
+      "carbon_model": "amg",
+      "computation": "mean_over_cycles",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "missing": {"reason": "NOT_COMPUTABLE", "detail": "PLACEHOLDER detail: the example horizon holds no whole rotation cycle"}
+    },
+    {
+      "carbon_model": "rothc",
+      "computation": "end_minus_start",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    },
+    {
+      "carbon_model": "rothc",
+      "computation": "fitted_slope",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    },
+    {
+      "carbon_model": "rothc",
+      "computation": "mean_over_cycles",
+      "indicator": "soil_carbon_trend",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "t C ha-1 yr-1",
+      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    }
+  ]
+}
