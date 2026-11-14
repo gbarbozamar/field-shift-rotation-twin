@@ -23,6 +23,8 @@
  * - site.*       the site sheet of the selected field (climate monthly series,
  *                soil and slope), wording addendum Block 3
  * - ribbon.*     the rotation timeline of the selected field
+ * - clocks.*     the two clocks of a rotation of the results example (soil
+ *                clock, water clock, year columns), Block 2 addendum
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -102,6 +104,11 @@ export const strings = {
   'ribbon.mgmt_residue': 'Residue',
   'ribbon.mgmt_grazing': 'Grazing',
   'ribbon.mgmt_termination': 'Termination',
+  'clocks.title': 'Two clocks',
+  'clocks.soil': 'The soil clock',
+  'clocks.water': 'The water clock',
+  'clocks.years_hint': 'Each column is one agricultural year',
+  'clocks.example_note': 'Example data — real years arrive with the seam',
 } as const
 
 /**
