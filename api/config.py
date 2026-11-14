@@ -47,6 +47,13 @@ import params
 from adapters.cache import FileCache
 from adapters.example_soil_slope import ExampleSoilSlopeSource
 from adapters.power import PowerClimateSource, PowerSettings
+from adapters.soil_tables import (
+    SoilFileError,
+    SoilTableSource,
+    check_tables,
+    load_soil_groups,
+    load_soil_table,
+)
 from api.app import create_app, parse_origins
 from api.ports import RunSettings
 from contracts.inputs import SiteSoilSlope
@@ -60,6 +67,8 @@ CLIMATE_CACHE_DIR = "CLIMATE_CACHE_DIR"
 CLIMATE_START_DATE = "CLIMATE_START_DATE"
 CLIMATE_END_DATE = "CLIMATE_END_DATE"
 SOIL_SLOPE_EXAMPLE_FILE = "SOIL_SLOPE_EXAMPLE_FILE"
+SOIL_TABLE_FILES = "SOIL_TABLE_FILES"
+SOIL_GROUPS_FILE = "SOIL_GROUPS_FILE"
 
 VARIABLES: tuple[str, ...] = (
     CORS_ORIGINS,
@@ -68,6 +77,8 @@ VARIABLES: tuple[str, ...] = (
     CLIMATE_START_DATE,
     CLIMATE_END_DATE,
     SOIL_SLOPE_EXAMPLE_FILE,
+    SOIL_TABLE_FILES,
+    SOIL_GROUPS_FILE,
 )
 
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -92,6 +103,14 @@ class ClimateConfig:
 
 
 @dataclass(frozen=True)
+class SoilTablesConfig:
+    """The soil-table source: its tables, in order, and the soil-groups declaration."""
+
+    table_files: tuple[Path, ...]
+    groups_file: Path
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """What the environment configures. ``None``: not configured (an absence)."""
 
@@ -99,6 +118,7 @@ class AppConfig:
     climate: ClimateConfig | None = None
     run_settings: RunSettings = field(default_factory=RunSettings)
     soil_slope_example_file: Path | None = None
+    soil_tables: SoilTablesConfig | None = None
     # The parameter catalogue as loaded and checked; ``{}`` when it is empty.
     parameters: dict[str, dict] = field(default_factory=dict)
 
@@ -204,6 +224,58 @@ def _soil_slope_example(environ: Mapping[str, str]) -> Path | None:
     return path
 
 
+def _soil_tables(environ: Mapping[str, str]) -> SoilTablesConfig | None:
+    """``SOIL_TABLE_FILES`` and ``SOIL_GROUPS_FILE``: both or neither. PROPOSED.
+
+    Every file is loaded and the tables are checked together at start-up, so a
+    wrong file stops the server; the source reads them again on each call.
+    """
+    tables_value = _value(environ, SOIL_TABLE_FILES)
+    groups_value = _value(environ, SOIL_GROUPS_FILE)
+    if tables_value is None and groups_value is None:
+        return None
+    if tables_value is None or groups_value is None:
+        given, absent = (
+            (SOIL_TABLE_FILES, SOIL_GROUPS_FILE)
+            if tables_value is not None
+            else (SOIL_GROUPS_FILE, SOIL_TABLE_FILES)
+        )
+        raise ConfigError(f"{given} is set without {absent}: set both or neither")
+    if _value(environ, SOIL_SLOPE_EXAMPLE_FILE) is not None:
+        raise ConfigError(
+            f"{SOIL_SLOPE_EXAMPLE_FILE} is set together with {SOIL_TABLE_FILES} "
+            f"and {SOIL_GROUPS_FILE}: one soil-and-slope source at a time"
+        )
+    parts = [part.strip() for part in tables_value.split(",")]
+    if any(not part for part in parts):
+        raise ConfigError(f"{SOIL_TABLE_FILES} has an empty item in its list")
+    table_files = tuple(Path(part) for part in parts)
+    if len(set(table_files)) != len(table_files):
+        raise ConfigError(f"{SOIL_TABLE_FILES} names one file twice")
+    tables = []
+    for path in table_files:
+        _read_file(SOIL_TABLE_FILES, path)
+        try:
+            tables.append(load_soil_table(path))
+        except SoilFileError as error:
+            raise ConfigError(
+                f"{SOIL_TABLE_FILES}: the file '{path}' is rejected: {error}"
+            ) from None
+    try:
+        check_tables(tables)
+    except SoilFileError as error:
+        raise ConfigError(f"{SOIL_TABLE_FILES}: {error}") from None
+    groups_file = Path(groups_value)
+    _read_file(SOIL_GROUPS_FILE, groups_file)
+    try:
+        load_soil_groups(groups_file)
+    except SoilFileError as error:
+        raise ConfigError(
+            f"{SOIL_GROUPS_FILE}: the file '{groups_file}' is rejected: {error}"
+        ) from None
+    return SoilTablesConfig(table_files=table_files, groups_file=groups_file)
+
+
 def load_parameters(folder: Path) -> dict[str, dict]:
     """The parameter catalogue under ``folder``, loaded and checked.
 
@@ -238,6 +310,7 @@ def load_config(
         climate=_climate(environ),
         run_settings=_run_settings(environ),
         soil_slope_example_file=_soil_slope_example(environ),
+        soil_tables=_soil_tables(environ),
         parameters=load_parameters(parameters_folder),
     )
 
@@ -285,11 +358,15 @@ def build_app(
         climate = PowerClimateSource(
             config.climate.settings, FileCache(config.climate.cache_dir), client
         )
-    soil_slope = (
-        ExampleSoilSlopeSource(config.soil_slope_example_file)
-        if config.soil_slope_example_file is not None
-        else None
-    )
+    if config.soil_slope_example_file is not None and config.soil_tables is not None:
+        raise ConfigError("one soil-and-slope source at a time")
+    soil_slope: ExampleSoilSlopeSource | SoilTableSource | None = None
+    if config.soil_slope_example_file is not None:
+        soil_slope = ExampleSoilSlopeSource(config.soil_slope_example_file)
+    elif config.soil_tables is not None:
+        soil_slope = SoilTableSource(
+            config.soil_tables.table_files, config.soil_tables.groups_file
+        )
     app = create_app(
         list(config.cors_origins),
         climate=climate,

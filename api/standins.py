@@ -51,7 +51,8 @@ class SoilSlopeNotLoaded:
 
     Replaced first by a loader of the accepted soil-and-slope contract example
     (``adapters.example_soil_slope.ExampleSoilSlopeSource``, once a person
-    names the accepted file), then by the soil and terrain adapters of Block 2.
+    names the accepted file) or by ``adapters.soil_tables.SoilTableSource``
+    (soil by soil group, D48, D49), then by slope from an elevation model.
     """
 
     source_id = SOIL_SLOPE_STANDIN_ID

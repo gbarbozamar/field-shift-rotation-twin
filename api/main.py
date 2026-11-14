@@ -24,6 +24,11 @@ start. No variable has a default.
 - ``SOIL_SLOPE_EXAMPLE_FILE``: path of the accepted soil-and-slope contract
   example, served as ``example``. Unset: the soil-and-slope source is the
   stand-in.
+- ``SOIL_TABLE_FILES`` (comma-separated paths of soil tables) and
+  ``SOIL_GROUPS_FILE`` (the soil group of each field): both or neither, and
+  never with ``SOIL_SLOPE_EXAMPLE_FILE``. Set: the soil-and-slope source is
+  ``adapters.soil_tables.SoilTableSource`` (soil by soil group, D48, D49;
+  slope not built).
 
 The parameter catalogue is not a variable: ``load_config`` loads it once from
 ``params/records/`` and checks it; a problem stops start-up, an empty
