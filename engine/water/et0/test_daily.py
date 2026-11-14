@@ -26,10 +26,14 @@ from contracts.inputs.site_climate import SiteClimate
 from contracts.results.models import Missing
 from engine.water.et0 import equations as eq
 from engine.water.et0.daily import (
+    BOUNDS,
+    RELATIVE_SHORTWAVE_BOUND,
+    WIND_SPEED_BOUND,
     DailyReferenceEvapotranspiration,
     Et0Steps,
     reference_evapotranspiration_day,
     reference_evapotranspiration_from_climate,
+    reference_evapotranspiration_from_climate_with_bounds,
 )
 from engine.water.et0.quantities import (
     ACCEPTED_UNITS,
@@ -43,7 +47,11 @@ from engine.water.et0.quantities import (
     PointUnits,
     read_input,
 )
-from engine.water.et0.test_equations import NOT_TRANSCRIBED, PLACEHOLDER_CONSTANTS
+from engine.water.et0.test_equations import (
+    NOT_TRANSCRIBED,
+    PLACEHOLDER_BOUNDS,
+    PLACEHOLDER_CONSTANTS,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 CLIMATE_EXAMPLE = (
@@ -107,9 +115,9 @@ START = dt.date(2001, 1, 30)  # PLACEHOLDER dates
 DATES = [START + dt.timedelta(days=n) for n in range(3)]
 
 
-def day(**changes):
+def day(*, bounds=PLACEHOLDER_BOUNDS, **changes):
     return reference_evapotranspiration_day(
-        **(DAY | changes), constants=PLACEHOLDER_CONSTANTS
+        **(DAY | changes), constants=PLACEHOLDER_CONSTANTS, bounds=bounds
     )
 
 
@@ -157,9 +165,23 @@ def run(record, **changes):
     arguments = {
         "point_units": POINT_UNITS,
         "constants": PLACEHOLDER_CONSTANTS,
+        "bounds": PLACEHOLDER_BOUNDS,
+        "unit_guard_reason": GUARD,
+    } | changes
+    return reference_evapotranspiration_from_climate_with_bounds(record, **arguments)
+
+
+def run_without_bounds(record, **changes):
+    arguments = {
+        "point_units": POINT_UNITS,
+        "constants": PLACEHOLDER_CONSTANTS,
         "unit_guard_reason": GUARD,
     } | changes
     return reference_evapotranspiration_from_climate(record, **arguments)
+
+
+# The two fields that say what the bounds did; never missing.
+BOUND_NOTES = {"bounds_changed", "bounds_not_applied"}
 
 
 def missing_steps(steps: Et0Steps) -> set[str]:
@@ -192,13 +214,19 @@ def test_d1_each_step_is_its_function_applied_to_the_steps_before_it():
         DAY["latitude_radians"], dr, decl, ws, c.extraterrestrial_radiation
     )
     rso = eq.clear_sky_solar_radiation(DAY["elevation"], ra, c.clear_sky_radiation)
+    ratio = eq.shortwave_ratio(DAY["solar_radiation"], rso)
+    relative = eq.relative_shortwave_radiation(
+        ratio, PLACEHOLDER_BOUNDS.relative_shortwave_bound
+    )
+    u2 = eq.wind_speed_for_penman_monteith(
+        DAY["wind_speed_2m"], PLACEHOLDER_BOUNDS.wind_speed_bound
+    )
     rns = eq.net_shortwave_radiation(DAY["solar_radiation"], c.net_shortwave)
     rnl = eq.net_longwave_radiation(
         DAY["temperature_max"],
         DAY["temperature_min"],
         ea,
-        DAY["solar_radiation"],
-        rso,
+        relative,
         c.net_longwave,
     )
     rn = eq.net_radiation(rns, rnl)
@@ -220,21 +248,28 @@ def test_d1_each_step_is_its_function_applied_to_the_steps_before_it():
         sunset_hour_angle=ws,
         extraterrestrial_radiation=ra,
         clear_sky_solar_radiation=rso,
+        shortwave_ratio=ratio,
+        relative_shortwave_radiation=relative,
         net_shortwave_radiation=rns,
         net_longwave_radiation=rnl,
         net_radiation=rn,
         soil_heat_flux=g,
+        wind_speed_2m=u2,
         reference_evapotranspiration=eq.reference_evapotranspiration(
             slope=delta,
             net_radiation=rn,
             soil_heat_flux=g,
             psychrometric_constant=gamma,
             mean_temperature=tmean,
-            wind_speed_2m=DAY["wind_speed_2m"],
+            wind_speed_2m=u2,
             mean_saturation_vapour_pressure=es,
             actual_vapour_pressure=ea,
             constants=c.penman_monteith,
         ),
+        # PLACEHOLDER day: the ratio is below its bound and the wind above its
+        # bound, so neither bound changes anything.
+        bounds_changed=(),
+        bounds_not_applied=(),
     )
     assert steps == expected
     assert missing_steps(steps) == set()
@@ -260,8 +295,10 @@ DEPENDS_ON = {
         "net_radiation",
         "reference_evapotranspiration",
     },
-    "wind_speed_2m": {"reference_evapotranspiration"},
+    "wind_speed_2m": {"wind_speed_2m", "reference_evapotranspiration"},
     "solar_radiation": {
+        "shortwave_ratio",
+        "relative_shortwave_radiation",
         "net_shortwave_radiation",
         "net_longwave_radiation",
         "net_radiation",
@@ -271,6 +308,8 @@ DEPENDS_ON = {
         "atmospheric_pressure",
         "psychrometric_constant",
         "clear_sky_solar_radiation",
+        "shortwave_ratio",
+        "relative_shortwave_radiation",
         "net_longwave_radiation",
         "net_radiation",
         "reference_evapotranspiration",
@@ -279,6 +318,8 @@ DEPENDS_ON = {
         "sunset_hour_angle",
         "extraterrestrial_radiation",
         "clear_sky_solar_radiation",
+        "shortwave_ratio",
+        "relative_shortwave_radiation",
         "net_longwave_radiation",
         "net_radiation",
         "reference_evapotranspiration",
@@ -289,6 +330,8 @@ DEPENDS_ON = {
         "sunset_hour_angle",
         "extraterrestrial_radiation",
         "clear_sky_solar_radiation",
+        "shortwave_ratio",
+        "relative_shortwave_radiation",
         "net_longwave_radiation",
         "net_radiation",
         "reference_evapotranspiration",
@@ -313,7 +356,9 @@ def test_d2_a_missing_constant_of_the_equation_makes_missing_only_the_result():
             PLACEHOLDER_CONSTANTS.penman_monteith, radiation_factor=NOT_TRANSCRIBED
         ),
     )
-    steps = reference_evapotranspiration_day(**DAY, constants=constants)
+    steps = reference_evapotranspiration_day(
+        **DAY, constants=constants, bounds=PLACEHOLDER_BOUNDS
+    )
     assert missing_steps(steps) == {"reference_evapotranspiration"}
     assert "penman_monteith.radiation_factor" in (
         steps.reference_evapotranspiration.detail
@@ -332,12 +377,16 @@ def test_d2_with_every_constant_missing_every_step_that_has_one_is_missing():
             for f in dataclasses.fields(PLACEHOLDER_CONSTANTS)
         }
     )
-    steps = reference_evapotranspiration_day(**DAY, constants=constants)
-    # Present: the actual vapour pressure, given as an input here, and the
-    # mean temperature, the one step with no constant.
-    assert missing_steps(steps) == ALL_STEPS - {
+    steps = reference_evapotranspiration_day(
+        **DAY, constants=constants, bounds=PLACEHOLDER_BOUNDS
+    )
+    # Present: the actual vapour pressure, given as an input here, the mean
+    # temperature, the one step with no constant, the wind speed, whose bound
+    # is not one of these constants, and the two notes on the bounds.
+    assert missing_steps(steps) == ALL_STEPS - BOUND_NOTES - {
         "actual_vapour_pressure",
         "mean_temperature",
+        "wind_speed_2m",
     }
 
 
@@ -349,7 +398,9 @@ def test_d2_a_non_finite_input_is_not_computed():
 
 def test_d2_constants_of_the_wrong_type_raise():
     with pytest.raises(TypeError):
-        reference_evapotranspiration_day(**DAY, constants=None)
+        reference_evapotranspiration_day(
+            **DAY, constants=None, bounds=PLACEHOLDER_BOUNDS
+        )
 
 
 # --- Q1: the unit strings are those of contracts/CLIMATE_QUANTITIES.md ---
@@ -470,6 +521,7 @@ def test_c1_every_day_is_the_composition_of_its_own_inputs():
             wind_speed_2m=VALUES[WIND_SPEED_2M],
             solar_radiation=VALUES[SOLAR_RADIATION],
             constants=PLACEHOLDER_CONSTANTS,
+            bounds=PLACEHOLDER_BOUNDS,
         )
         assert item.value is item.steps.reference_evapotranspiration
         assert isinstance(item.value, float)
@@ -654,8 +706,10 @@ def test_c9_the_arguments_are_not_changed_and_the_result_repeats():
     [
         {"point_units": None},
         {"constants": None},
+        {"bounds": None},
+        {"bounds": PLACEHOLDER_CONSTANTS},
     ],
-    ids=["point-units", "constants"],
+    ids=["point-units", "constants", "bounds-none", "bounds-of-another-class"],
 )
 def test_c10_an_argument_of_the_wrong_type_raises(changes):
     with pytest.raises(TypeError):
@@ -671,3 +725,151 @@ def test_c10_a_climate_record_that_is_not_a_site_climate_raises():
 def test_c10_a_unit_guard_reason_outside_c3_2_raises():
     with pytest.raises(ValueError):
         run(climate(*all_series()), unit_guard_reason="NOT_A_CODE")
+
+
+# --- BD2 to BD6: the bounds of D82 (PC-4) in the composition, PLACEHOLDER values ---
+
+# PLACEHOLDER bounds that both change the PLACEHOLDER day: the ratio of the
+# day is above an upper bound this small, and the wind of the day is below a
+# lower bound this large.
+TIGHT_BOUNDS = dataclasses.replace(
+    PLACEHOLDER_BOUNDS,
+    relative_shortwave_bound=dataclasses.replace(
+        PLACEHOLDER_BOUNDS.relative_shortwave_bound, upper_bound=0.001
+    ),
+    wind_speed_bound=dataclasses.replace(
+        PLACEHOLDER_BOUNDS.wind_speed_bound, lower_bound=9.0
+    ),
+)
+
+
+def test_bd2_a_bound_that_changes_its_quantity_says_so():
+    steps = day(bounds=TIGHT_BOUNDS)
+    assert steps.shortwave_ratio > 0.001
+    assert steps.relative_shortwave_radiation == 0.001
+    assert steps.wind_speed_2m == 9.0
+    assert steps.bounds_changed == (RELATIVE_SHORTWAVE_BOUND, WIND_SPEED_BOUND)
+    assert steps.bounds_not_applied == ()
+    c = PLACEHOLDER_CONSTANTS
+    assert steps.net_longwave_radiation == eq.net_longwave_radiation(
+        DAY["temperature_max"],
+        DAY["temperature_min"],
+        DAY["actual_vapour_pressure"],
+        0.001,
+        c.net_longwave,
+    )
+    assert steps.reference_evapotranspiration == eq.reference_evapotranspiration(
+        slope=steps.slope,
+        net_radiation=steps.net_radiation,
+        soil_heat_flux=steps.soil_heat_flux,
+        psychrometric_constant=steps.psychrometric_constant,
+        mean_temperature=steps.mean_temperature,
+        wind_speed_2m=9.0,
+        mean_saturation_vapour_pressure=steps.mean_saturation_vapour_pressure,
+        actual_vapour_pressure=steps.actual_vapour_pressure,
+        constants=c.penman_monteith,
+    )
+    assert steps.reference_evapotranspiration != day().reference_evapotranspiration
+
+
+def test_bd2_only_the_bound_that_changes_its_quantity_is_named():
+    steps = day(wind_speed_2m=0.5)  # below the PLACEHOLDER lower bound 2
+    assert steps.bounds_changed == (WIND_SPEED_BOUND,)
+    assert steps.wind_speed_2m == 2.0
+
+
+def test_bd3_a_bound_that_leaves_its_quantity_as_it_was_is_not_named():
+    steps = day()
+    assert steps.relative_shortwave_radiation == steps.shortwave_ratio
+    assert steps.wind_speed_2m == DAY["wind_speed_2m"]
+    assert steps.bounds_changed == ()
+    assert steps.bounds_not_applied == ()
+
+
+def test_bd4_without_bounds_nothing_is_bounded_and_the_day_says_so():
+    steps = day(bounds=None, wind_speed_2m=0.5)
+    assert steps.bounds_not_applied == BOUNDS
+    assert steps.bounds_changed == ()
+    assert steps.relative_shortwave_radiation == steps.shortwave_ratio
+    assert steps.wind_speed_2m == 0.5
+    assert isinstance(steps.reference_evapotranspiration, float)
+
+
+@pytest.mark.parametrize(
+    ("group", "field", "identifier", "dependent"),
+    [
+        (
+            "relative_shortwave_bound",
+            "upper_bound",
+            RELATIVE_SHORTWAVE_BOUND,
+            {
+                "relative_shortwave_radiation",
+                "net_longwave_radiation",
+                "net_radiation",
+                "reference_evapotranspiration",
+            },
+        ),
+        (
+            "wind_speed_bound",
+            "lower_bound",
+            WIND_SPEED_BOUND,
+            {"wind_speed_2m", "reference_evapotranspiration"},
+        ),
+    ],
+)
+def test_bd5_a_missing_bound_makes_its_quantity_missing_and_names_it(
+    group, field, identifier, dependent
+):
+    bounds = dataclasses.replace(
+        PLACEHOLDER_BOUNDS,
+        **{
+            group: dataclasses.replace(
+                getattr(PLACEHOLDER_BOUNDS, group), **{field: NOT_TRANSCRIBED}
+            )
+        },
+    )
+    steps = day(bounds=bounds)
+    assert missing_steps(steps) == dependent
+    assert steps.reference_evapotranspiration.reason == "MISSING_INPUT"
+    assert f"constant '{identifier}'" in steps.reference_evapotranspiration.detail
+    assert steps.bounds_changed == ()
+    assert steps.bounds_not_applied == ()
+
+
+def test_bd5_a_missing_quantity_is_not_named_as_changed_by_its_bound():
+    steps = day(bounds=TIGHT_BOUNDS, wind_speed_2m=NOT_TRANSCRIBED)
+    assert steps.wind_speed_2m.reason == "MISSING_INPUT"
+    assert steps.bounds_changed == (RELATIVE_SHORTWAVE_BOUND,)
+
+
+def test_bd6_every_day_of_the_record_applies_the_bounds_it_is_given():
+    result = run(climate(*all_series()), bounds=TIGHT_BOUNDS)
+    assert len(result) == len(DATES)
+    for item in result:
+        steps = item.steps
+        # The wind of every PLACEHOLDER day is below the lower bound 9.
+        assert steps.wind_speed_2m == 9.0
+        assert WIND_SPEED_BOUND in steps.bounds_changed
+        # The ratio of each day depends on its date: bounded at 0.001, and the
+        # bound named exactly when it changed the ratio of that day.
+        assert steps.relative_shortwave_radiation == min(steps.shortwave_ratio, 0.001)
+        assert (RELATIVE_SHORTWAVE_BOUND in steps.bounds_changed) == (
+            steps.shortwave_ratio > 0.001
+        )
+        assert steps.bounds_not_applied == ()
+
+
+def test_bd6_the_record_without_bounds_says_on_every_day_that_none_was_applied():
+    bounded = run(climate(*all_series()))
+    unbounded = run_without_bounds(climate(*all_series()))
+    assert [item.date for item in unbounded] == DATES
+    for with_bounds, without in zip(bounded, unbounded, strict=True):
+        assert without.steps.bounds_not_applied == BOUNDS
+        assert without.steps.bounds_changed == ()
+        # The PLACEHOLDER record is inside both bounds: the same numbers.
+        assert without.value == with_bounds.value
+
+
+def test_bd6_bounds_of_the_wrong_type_raise():
+    with pytest.raises(TypeError):
+        day(bounds=PLACEHOLDER_CONSTANTS)

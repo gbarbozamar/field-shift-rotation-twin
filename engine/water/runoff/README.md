@@ -10,12 +10,15 @@ Acceptance test, from the repository root:
 python -m pytest engine/water/runoff/
 ```
 
-Identifiers such as C3.2 refer to `contracts/CONVENTIONS.md`; EP3, G1 to G7 and Q11 refer to `contracts/ENTRYPOINTS.md`; CQ1 refers to `contracts/CLIMATE_QUANTITIES.md`; H1, H7, H8, H10 and E7 refer to `docs/VALIDATION.md`; D-numbers are decisions in issue #77.
+Identifiers such as C3.2 refer to `contracts/CONVENTIONS.md`; EP3, G1 to G7 and Q11 refer to `contracts/ENTRYPOINTS.md`; CQ1 refers to `contracts/CLIMATE_QUANTITIES.md`; H1, H7, H8, H10 and E7 refer to `docs/VALIDATION.md`; S11 refers to the Sources of `docs/METHODS.md`; D-numbers are decisions in issue #77.
 
 ## What a reader must know first
 
 - **This folder holds no constant of the method.** The initial-abstraction ratio, the two constants of the potential-retention formula and their unit factor are fields of `CurveNumberConstants`, with no default. The curve number of each day is an input. The only number the code writes is zero, and a test checks it. Every number in the test file is a PLACEHOLDER, plainly not real; none comes from any source.
-- **The forms of the equations are PROPOSED.** A builder session wrote them without the method's text in front of it. A person confirms each form against its source, which is CITATION NEEDED (OPEN 1).
+- **The source of the forms is NRCS (2004), National Engineering Handbook Part 630, chapter 10** (S11 of `docs/METHODS.md`), by decision D82 of issue #77 (PC-6 of `docs/SCIENCE_DECISIONS.md`). See [Source of the forms](#source-of-the-forms).
+- **Using these forms in a continuous daily balance is a declared adaptation** (D82, PC-6). See [Declared adaptation: continuous use](#declared-adaptation-continuous-use).
+- **The forms of the equations are PROPOSED.** A builder session wrote them without the method's text in front of it. The AI pre-check found them to match S11; a person still confirms each form at its locator (D34, OPEN 1).
+- **The table of curve numbers is not chosen.** D82 chooses the source of the forms, not the curve number of a soil, crop or cover (OPEN 3).
 - **No state is carried from one day to the next.** Each day is computed from its own precipitation, its own curve number and the constants. So a missing day does not stop the days after it. This holds because this unit has no antecedent-moisture adjustment (OPEN 4); if one is added and it reads earlier days, this changes.
 - The only contract model used is `Missing`, imported as `contracts.results.models.Missing` (the class the balance uses). No new missing shape is defined.
 
@@ -63,9 +66,25 @@ The precipitation must arrive in the unit string of CQ1, `mm day-1` (`PRECIPITAT
 
 `RunoffDayResult` with `date`, `runoff`, `potential_retention` and `initial_abstraction`. Each is a number or a `Missing` with its reason, whose `detail` starts with the date of the day. `runoff` is a depth of water over the day in the depth unit of the precipitation, never below zero and never above the precipitation of the day, so it fits the `runoff` field of `engine.water.balance.DayInput` as it is (a test builds that `DayInput` and runs the balance on it, without changing `balance/`). A missing `runoff` given to the balance makes that balance day missing, naming `runoff`, by the balance's own rule R9.
 
+## Source of the forms
+
+Decision D82 of issue #77, PC-6 of `docs/SCIENCE_DECISIONS.md` (finding 8 of the AI pre-check, F42 to F44, question P18): the source of the forms F1 to F3 is
+
+> S11 of `docs/METHODS.md`: USDA Natural Resources Conservation Service (2004). *National Engineering Handbook*, Part 630 Hydrology, Chapter 10: Estimation of Direct Runoff from Storm Rainfall (210-VI-NEH, July 2004).
+
+The AI pre-check of 14 November 2026 read it (pp. 10-3 and 10-4, as S11 records) and found the forms built here to match it algebraically. That is not a person's check: a person opens S11 at its locator and confirms each form and which constant goes where (D34, OPEN 1). The row of S11 in `ATTRIBUTIONS.md` is not written by this unit (OPEN 1).
+
+## Declared adaptation: continuous use
+
+S11 estimates direct runoff from storm rainfall. This folder applies its forms to every day of a continuous daily balance: one runoff per day from that day's precipitation and curve number, fed to `engine/water/balance/` as its daily loss, with no state carried between days. The 2025 edition of Part 630 (Subpart H, section 630.113G, August 2025, as S11 records it) places using the method as a loss in continuous simulation outside its intended use. D82 (PC-6) admits that use and **declares it an adaptation**:
+
+- No result of this folder is presented as a runoff S11 validates for daily continuous use.
+- Whether the daily runoff of the balance agrees with observations is for the tests that name runoff (E7, H10; OPEN 8), not for S11.
+- Nothing in the code changes with this declaration: the forms, the rules and the cases below are the same.
+
 ## PROPOSED forms and rules
 
-Each form is PROPOSED and its source is CITATION NEEDED. The rules are choices of this session that a person accepts or corrects.
+Each form is PROPOSED; its source is S11 (D82, PC-6), and a person still checks each form at its locator (D34). The rules are choices of this session that a person accepts or corrects.
 
 | Rule | Statement |
 |---|---|
@@ -85,14 +104,14 @@ Each form is PROPOSED and its source is CITATION NEEDED. The rules are choices o
 
 ## Constants a person has to transcribe
 
-One row per field of `CurveNumberConstants`. The identifier is the field name, used by the code and in the `detail` of a missing result. The value column stays empty: a person fills it, with the full reference, the locator, the verbatim text and the date read, and one person checks it (D34). Until then the caller passes each constant as `Missing`, and every quantity that needs it is missing, naming it. The source has not been read by this session, so every source is OPEN.
+One row per field of `CurveNumberConstants`. The identifier is the field name, used by the code and in the `detail` of a missing result. The value column stays empty: a person fills it, with the full reference, the locator, the verbatim text and the date read, and one person checks it (D34). Until then the caller passes each constant as `Missing`, and every quantity that needs it is missing, naming it. The source is S11, chapter 10 (D82, PC-6); this session did not read it, so the locator of each constant is for the person who transcribes it.
 
 | Identifier | What it is | Unit | Equation and source | Value |
 |---|---|---|---|---|
-| `initial_abstraction_ratio` | Ratio of the initial abstraction to the potential retention | None by the form of F2 (a ratio of two depths); a person confirms | F2; source OPEN (CITATION NEEDED) | |
-| `retention_numerator` | Number divided by the curve number in the retention formula | OPEN (read with the value in the source) | F1; source OPEN (CITATION NEEDED) | |
-| `retention_offset` | Number subtracted from that quotient | OPEN (read with the value in the source) | F1; source OPEN (CITATION NEEDED) | |
-| `retention_unit_factor` | Factor that turns the retention of the formula into the depth unit of the precipitation (`mm`, from CQ1) | OPEN: depth unit of the precipitation per depth unit in which the source writes F1 | F1; source OPEN (CITATION NEEDED) | |
+| `initial_abstraction_ratio` | Ratio of the initial abstraction to the potential retention | None by the form of F2 (a ratio of two depths); a person confirms | F2; S11, chapter 10 (D82); locator OPEN | |
+| `retention_numerator` | Number divided by the curve number in the retention formula | OPEN (read with the value in the source) | F1; S11, chapter 10 (D82); locator OPEN | |
+| `retention_offset` | Number subtracted from that quotient | OPEN (read with the value in the source) | F1; S11, chapter 10 (D82); locator OPEN | |
+| `retention_unit_factor` | Factor that turns the retention of the formula into the depth unit of the precipitation (`mm`, from CQ1) | OPEN: depth unit of the precipitation per depth unit in which the source writes F1 | F1; S11, chapter 10 (D82); locator OPEN | |
 
 ## PROPOSED cases
 
@@ -185,9 +204,9 @@ The identifier of a case is the name of its test function in `test_curve_number.
 
 Each question names the role that answers it.
 
-1. **Source and forms.** Which publication is the source of the Curve Number method for this project, and do F1 to F3 match it (which constant goes where, whether the runoff equation is written with `P − Ia + S` or another equivalent denominator)? CITATION NEEDED, with its row in `ATTRIBUTIONS.md`. *Science reviewers; lead developer for the citation.*
+1. **Forms against their source.** The source is decided: S11, chapter 10 (D82, PC-6). Still open: a person's check that F1 to F3 match it (which constant goes where, whether the runoff equation is written with `P − Ia + S` or another equivalent denominator), at its locator, under D34; and the row of S11 in `ATTRIBUTIONS.md`. *Science reviewers; lead developer for the attribution.*
 2. **Admissible range of the curve number.** R1 reads it from F1 alone (greater than zero, retention not below zero). Does the method state a narrower range, and is a value outside it rejected or flagged? *Science reviewers.*
-3. **Which curve number applies on each day**: by hydrologic soil group, crop or cover, treatment and condition, and on fallow days and residue cover; where the table comes from; how the soil group is read from the site data (D49). Out of scope of this unit. *Science reviewers; lead developer; platform developer for the parameter catalogue (D46, D56, #144).*
+3. **Which curve number applies on each day**: by hydrologic soil group, crop or cover, treatment and condition, and on fallow days and residue cover; where the table comes from; how the soil group is read from the site data (D49). D82 (PC-6) chooses the source of the forms and leaves the table of curve numbers not chosen. Out of scope of this unit. *Science reviewers; lead developer; platform developer for the parameter catalogue (D46, D56, #144).*
 4. **Antecedent moisture.** Whether the curve number is adjusted by antecedent moisture or by the soil water of the balance, and with which form. Not built; if it reads earlier days or the balance's storage, the "no state" statement above and R7 change, and the order with the balance's day has to be decided. *Science reviewers; lead developer.*
 5. **The value and unit of each constant** of the table above, transcribed under D34 and checked by one person; in particular the unit factor, which depends on the unit in which the source writes F1. *A person or a session under D34 (transcription); science reviewers (check).*
 6. **Reason code of the unit guard** (Q11). The caller supplies it. *Lead developer.*

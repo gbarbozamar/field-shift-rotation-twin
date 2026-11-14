@@ -10,9 +10,12 @@ pressure are derived (D30).
 
 ``reference_evapotranspiration_day`` takes the actual vapour pressure as an
 input, so that a worked example given another form of humidity can enter it
-(the [H2] test). ``reference_evapotranspiration_from_climate`` reads the
-daily series of ``SiteClimate`` and computes the actual vapour pressure from
-dew point.
+(the [H2] test). ``reference_evapotranspiration_from_climate_with_bounds``
+reads the daily series of ``SiteClimate``, computes the actual vapour
+pressure from dew point and applies the two bounds of decision D82 of issue
+#77 (PC-4). ``reference_evapotranspiration_from_climate`` is the same without
+those bounds: it is the function EP3 calls today, and every day it returns
+says that the bounds were not applied (README, OPEN list).
 
 Pure functions: no file, no network, no clock. Arguments are not changed.
 """
@@ -28,7 +31,7 @@ from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.results.models import Missing, ReasonCode
 
 from . import equations as eq
-from .constants import Et0Constants
+from .constants import Et0Bounds, Et0Constants
 from .equations import Quantity
 from .quantities import (
     ACCEPTED_UNITS,
@@ -45,9 +48,23 @@ from .quantities import (
 )
 
 
+# The identifiers of the two bounds of D82 (PC-4), as the README table writes them.
+RELATIVE_SHORTWAVE_BOUND = "relative_shortwave_bound.upper_bound"
+WIND_SPEED_BOUND = "wind_speed_bound.lower_bound"
+BOUNDS = (RELATIVE_SHORTWAVE_BOUND, WIND_SPEED_BOUND)
+
+
 @dataclass(frozen=True)
 class Et0Steps:
-    """Every intermediate quantity of one day, and the result; each a number or missing."""
+    """Every intermediate quantity of one day, and the result; each a number or missing.
+
+    The last two fields say what the bounds of D82 did on this day, by the
+    identifiers of the README table: ``bounds_changed`` names each bound that
+    changed the quantity it bounds (the ratio of Eq. 39, the wind speed of
+    Eq. 6), and ``bounds_not_applied`` names each bound the caller did not
+    supply. A bound that left its quantity as it was, or whose quantity is
+    missing, is in neither.
+    """
 
     atmospheric_pressure: Quantity
     psychrometric_constant: Quantity
@@ -61,11 +78,16 @@ class Et0Steps:
     sunset_hour_angle: Quantity
     extraterrestrial_radiation: Quantity
     clear_sky_solar_radiation: Quantity
+    shortwave_ratio: Quantity
+    relative_shortwave_radiation: Quantity
     net_shortwave_radiation: Quantity
     net_longwave_radiation: Quantity
     net_radiation: Quantity
     soil_heat_flux: Quantity
+    wind_speed_2m: Quantity
     reference_evapotranspiration: Quantity
+    bounds_changed: tuple[str, ...]
+    bounds_not_applied: tuple[str, ...]
 
 
 def _check_constants(constants: object) -> None:
@@ -73,6 +95,25 @@ def _check_constants(constants: object) -> None:
         raise TypeError(
             f"argument 'constants' must be an Et0Constants, not {type(constants).__name__}"
         )
+
+
+def _check_bounds(bounds: object, *, may_be_none: bool) -> None:
+    if bounds is None and may_be_none:
+        return
+    if not isinstance(bounds, Et0Bounds):
+        expected = "an Et0Bounds or None" if may_be_none else "an Et0Bounds"
+        raise TypeError(
+            f"argument 'bounds' must be {expected}, not {type(bounds).__name__}"
+        )
+
+
+def _changed(before: Quantity, after: Quantity) -> bool:
+    """True when a bound gave a number other than the number it was given."""
+    return (
+        not isinstance(before, Missing)
+        and not isinstance(after, Missing)
+        and after != before
+    )
 
 
 def reference_evapotranspiration_day(
@@ -86,12 +127,21 @@ def reference_evapotranspiration_day(
     wind_speed_2m: Quantity,
     solar_radiation: Quantity,
     constants: Et0Constants,
+    bounds: Et0Bounds | None,
 ) -> Et0Steps:
     """All the steps of one day. Each step is missing, with its reason, when it cannot be computed.
 
     A missing input makes missing only the steps that depend on it.
+
+    ``bounds`` holds the two bounds of decision D82 (PC-4). The ratio of
+    Eq. 39 and the wind speed of Eq. 6 pass through their bound, and
+    ``bounds_changed`` names each bound that changed its quantity. ``None``
+    means the caller supplies no bound: the ratio and the wind speed enter
+    the equations as they are, and ``bounds_not_applied`` names both bounds.
+    A bound that is missing makes its quantity missing (rule G4).
     """
     _check_constants(constants)
+    _check_bounds(bounds, may_be_none=True)
     c = constants
     pressure = eq.atmospheric_pressure(elevation, c.atmospheric_pressure)
     gamma = eq.psychrometric_constant(pressure, c.psychrometric)
@@ -111,9 +161,30 @@ def reference_evapotranspiration_day(
         latitude_radians, dr, declination, ws, c.extraterrestrial_radiation
     )
     rso = eq.clear_sky_solar_radiation(elevation, ra, c.clear_sky_radiation)
+    ratio = eq.shortwave_ratio(solar_radiation, rso)
+    u2_given = eq.pass_through("wind_speed_2m", wind_speed_2m)
+    if bounds is None:
+        relative = ratio
+        u2 = u2_given
+        changed: tuple[str, ...] = ()
+        not_applied = BOUNDS
+    else:
+        relative = eq.relative_shortwave_radiation(
+            ratio, bounds.relative_shortwave_bound
+        )
+        u2 = eq.wind_speed_for_penman_monteith(u2_given, bounds.wind_speed_bound)
+        changed = tuple(
+            identifier
+            for identifier, before, after in (
+                (RELATIVE_SHORTWAVE_BOUND, ratio, relative),
+                (WIND_SPEED_BOUND, u2_given, u2),
+            )
+            if _changed(before, after)
+        )
+        not_applied = ()
     rns = eq.net_shortwave_radiation(solar_radiation, c.net_shortwave)
     rnl = eq.net_longwave_radiation(
-        temperature_max, temperature_min, ea, solar_radiation, rso, c.net_longwave
+        temperature_max, temperature_min, ea, relative, c.net_longwave
     )
     rn = eq.net_radiation(rns, rnl)
     g = eq.soil_heat_flux_daily(c.soil_heat_flux)
@@ -123,7 +194,7 @@ def reference_evapotranspiration_day(
         soil_heat_flux=g,
         psychrometric_constant=gamma,
         mean_temperature=tmean,
-        wind_speed_2m=wind_speed_2m,
+        wind_speed_2m=u2,
         mean_saturation_vapour_pressure=es,
         actual_vapour_pressure=ea,
         constants=c.penman_monteith,
@@ -141,11 +212,16 @@ def reference_evapotranspiration_day(
         sunset_hour_angle=ws,
         extraterrestrial_radiation=ra,
         clear_sky_solar_radiation=rso,
+        shortwave_ratio=ratio,
+        relative_shortwave_radiation=relative,
         net_shortwave_radiation=rns,
         net_longwave_radiation=rnl,
         net_radiation=rn,
         soil_heat_flux=g,
+        wind_speed_2m=u2,
         reference_evapotranspiration=et0,
+        bounds_changed=changed,
+        bounds_not_applied=not_applied,
     )
 
 
@@ -203,6 +279,53 @@ def reference_evapotranspiration_from_climate(
     *,
     point_units: PointUnits,
     constants: Et0Constants,
+    unit_guard_reason: ReasonCode,
+) -> list[DailyReferenceEvapotranspiration]:
+    """Every day of the climate record, without the bounds of D82; each day says so.
+
+    The same as ``reference_evapotranspiration_from_climate_with_bounds``
+    with no bound supplied: the ratio of Eq. 39 and the wind speed of Eq. 6
+    enter the equations as they are, and ``bounds_not_applied`` of every day
+    names both bounds. It is the function EP3 calls today; passing the
+    bounds from EP3 is OPEN (README).
+    """
+    return _from_climate(
+        climate,
+        point_units=point_units,
+        constants=constants,
+        bounds=None,
+        unit_guard_reason=unit_guard_reason,
+    )
+
+
+def reference_evapotranspiration_from_climate_with_bounds(
+    climate: SiteClimate,
+    *,
+    point_units: PointUnits,
+    constants: Et0Constants,
+    bounds: Et0Bounds,
+    unit_guard_reason: ReasonCode,
+) -> list[DailyReferenceEvapotranspiration]:
+    """Every day of the climate record, with the bounds of D82 (PC-4).
+
+    The rules for each day are those of ``_from_climate`` below.
+    """
+    _check_bounds(bounds, may_be_none=False)
+    return _from_climate(
+        climate,
+        point_units=point_units,
+        constants=constants,
+        bounds=bounds,
+        unit_guard_reason=unit_guard_reason,
+    )
+
+
+def _from_climate(
+    climate: SiteClimate,
+    *,
+    point_units: PointUnits,
+    constants: Et0Constants,
+    bounds: Et0Bounds | None,
     unit_guard_reason: ReasonCode,
 ) -> list[DailyReferenceEvapotranspiration]:
     """The steps of every day of the climate record, in date order.
@@ -307,6 +430,7 @@ def reference_evapotranspiration_from_climate(
             wind_speed_2m=inputs[WIND_SPEED_2M],
             solar_radiation=inputs[SOLAR_RADIATION],
             constants=constants,
+            bounds=bounds,
         )
         if not one_time_zone:
             steps = replace(steps, reference_evapotranspiration=mixed_time_zones)

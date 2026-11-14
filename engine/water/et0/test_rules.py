@@ -17,7 +17,7 @@ import pytest
 
 from engine.water.et0 import constants as constants_module
 from engine.water.et0 import daily, equations, quantities
-from engine.water.et0.constants import Et0Constants
+from engine.water.et0.constants import Et0Bounds, Et0Constants
 
 HERE = Path(__file__).resolve().parent
 MODULES = sorted(p for p in HERE.glob("*.py") if not p.name.startswith("test_"))
@@ -37,9 +37,11 @@ def _section(title: str) -> str:
 
 def _constant_identifiers() -> set[str]:
     # The module uses postponed annotations: a field type is the class name.
+    # The bounds of D82 (Et0Bounds) are transcribed in the same table.
     return {
         f"{group.name}.{item.name}"
-        for group in dataclasses.fields(Et0Constants)
+        for holder in (Et0Constants, Et0Bounds)
+        for group in dataclasses.fields(holder)
         for item in dataclasses.fields(getattr(constants_module, group.type))
     }
 
@@ -68,7 +70,13 @@ def test_r2_no_constant_has_a_default():
         for value in vars(constants_module).values()
         if dataclasses.is_dataclass(value) and isinstance(value, type)
     ]
-    assert len(classes) == len(dataclasses.fields(Et0Constants)) + 1
+    # One class per group of each holder, and the two holders themselves.
+    assert (
+        len(classes)
+        == len(dataclasses.fields(Et0Constants))
+        + len(dataclasses.fields(Et0Bounds))
+        + 2
+    )
     for cls in classes:
         for item in dataclasses.fields(cls):
             assert item.default is dataclasses.MISSING, f"{cls.__name__}.{item.name}"
