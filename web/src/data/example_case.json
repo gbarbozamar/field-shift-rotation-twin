@@ -1,0 +1,13 @@
+{
+  "example_data": true,
+  "case_id": "example-case",
+  "label": "Example case",
+  "fields": [
+    { "field_id": "example-field-1", "name": "North field",
+      "geometry": { "type": "Polygon", "coordinates": [[[-57.0100, -33.0100], [-57.0030, -33.0100], [-57.0030, -33.0160], [-57.0100, -33.0160], [-57.0100, -33.0100]]] } },
+    { "field_id": "example-field-2", "name": "Long field by the creek",
+      "geometry": { "type": "Polygon", "coordinates": [[[-56.9980, -33.0110], [-56.9900, -33.0110], [-56.9900, -33.0130], [-56.9980, -33.0130], [-56.9980, -33.0110]]] } },
+    { "field_id": "example-field-3", "name": "Small triangle field",
+      "geometry": { "type": "Polygon", "coordinates": [[[-57.0060, -33.0190], [-57.0020, -33.0190], [-57.0040, -33.0230], [-57.0060, -33.0190]]] } }
+  ]
+}
