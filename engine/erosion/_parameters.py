@@ -1,6 +1,7 @@
 """Look up one parameter of the catalogue by its id and scope. PROPOSED.
 
-Private to the erosion engine (unit l0/erosion-ep1-parameters, issue #154).
+Private to the erosion engine (unit l0/erosion-ep1-parameters, issue #154;
+``ParameterReader`` added by unit l0/erosion-ep1-c-r, issue #173).
 The catalogue reaches the entry point as the argument ``parameters``, the
 dictionary that ``params.catalogue.load_folder`` returns (contracts/ENTRYPOINTS.md,
 Q3, D46, D56). A record is found by its ``id`` and its ``scope`` through
@@ -26,7 +27,7 @@ from contracts.results.models import Missing
 from params.catalogue import Missing as CatalogueMissing
 from params.catalogue import identity, read_value
 
-__all__ = ["Parameter", "read_parameter", "scope_text"]
+__all__ = ["Parameter", "ParameterReader", "read_parameter", "scope_text"]
 
 
 @dataclass(frozen=True)
@@ -138,3 +139,33 @@ def read_parameter(
             record["unit"],
         )
     return Parameter(value, record["unit"])
+
+
+class ParameterReader:
+    """``read_parameter`` on one catalogue, each id and scope looked up once.
+
+    It remembers every id and scope it was asked for, in the order first
+    asked, so that the source of a computed value can name each record read.
+    PROPOSED (unit l0/erosion-ep1-c-r). It changes nothing in ``parameters``.
+    """
+
+    def __init__(self, parameters: dict[str, dict]) -> None:
+        self._parameters = parameters
+        self._read: dict[tuple[str, str], Parameter] = {}
+
+    def read(self, parameter_id: str, scope: dict[str, str]) -> Parameter:
+        """The value of one parameter, as ``read_parameter`` returns it."""
+        key = (parameter_id, scope_text(scope))
+        if key not in self._read:
+            self._read[key] = read_parameter(self._parameters, parameter_id, scope)
+        return self._read[key]
+
+    def records_read(self) -> list[tuple[str, str]]:
+        """Every id and scope (as ``scope_text`` writes it) asked for, in order."""
+        return list(self._read)
+
+    def fork(self) -> ParameterReader:
+        """A reader of the same catalogue that starts with what this one read."""
+        other = ParameterReader(self._parameters)
+        other._read = dict(self._read)
+        return other

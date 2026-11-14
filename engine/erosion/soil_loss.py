@@ -1,23 +1,35 @@
 """Entry point EP1 of contracts/ENTRYPOINTS.md: ``compute_soil_loss``.
 
-Unit l0/erosion-ep1-parameters (issue #154), on the mechanical form of #125.
-The function lays out the agricultural years of the climate record (decision
-D47 of issue #77) and their months. It takes the parameter catalogue as the
-keyword argument ``parameters`` (Q3, D46, D56) and computes the factors of
-RUSLE that the code already built can compute:
+Unit l0/erosion-ep1-c-r (issue #173), on the mechanical form of #125 and the
+argument ``parameters`` of #154. The function lays out the agricultural years
+of the climate record (decision D47 of issue #77) and their months. It takes
+the parameter catalogue as the keyword argument ``parameters`` (Q3, D46, D56)
+and computes the factors of RUSLE (docs/METHODS.md M1.1):
 
+- ``R`` of each agricultural year through ``engine/erosion/r_factor/``
+  (M1.2): the daily erosivity index of the ``precipitation`` series, its
+  monthly fractions and yearly ratios, and the mean annual level read from
+  ``parameters``; ``R`` of the year is the sum of its twelve values of ``R``
+  by month;
+- ``C`` of each agricultural year through ``engine/erosion/c_factor/``
+  (M1.5, D45): the soil-loss ratio of each day from the crop of the day in
+  the calendar (canopy sub-factor) and the residue of the last harvest
+  before it (surface residue cover, with decay by residue type), averaged
+  over each month, then ``rotation_c`` weighted by the monthly erosivity
+  fractions of ``r_factor/``;
 - ``LS`` through ``engine/erosion/ls.py``, from the slope of ``soil_slope``
   and coefficients read from ``parameters``;
-- ``R``, ``K``, ``C`` and ``P`` from one record each of ``parameters``.
+- ``K`` and ``P`` from one record each of ``parameters``.
 
 The annual soil loss of an agricultural year is ``equation.annual_soil_loss``
 of the five factors, a number only where every factor is present. Every
-monthly value is missing: the monthly erosivity fraction of M1.2 is not built.
-See SOIL_LOSS.md in this folder.
+monthly value is missing: how a monthly value is formed is not decided. See
+SOIL_LOSS.md in this folder.
 
 Status: PROPOSED (blueprint section 3.7): the parameter identifiers and their
-scope, the order of the checks, the reason of each value, the reading of a
-slope unit and the format of every ``detail``.
+scope, the crop and the residue of a day, the soil-loss ratio of a month, the
+reading of a unit string, the order of the checks, the reason of each value
+and the format of every ``detail``.
 
 Pure function (G1): no file, no network, no clock, no environment variable,
 and the arguments are not changed. ``load_folder`` is never called. The only
@@ -28,11 +40,12 @@ from __future__ import annotations
 
 import datetime as dt
 import math
-from dataclasses import dataclass
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import get_args
 
 from contracts.inputs.common import Value
-from contracts.inputs.rotation_calendar import RotationCalendar
+from contracts.inputs.rotation_calendar import CalendarComponent, RotationCalendar
 from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.inputs.site_soil_slope import SiteSoilSlope
 from contracts.results.models import (
@@ -45,8 +58,8 @@ from contracts.results.models import (
     MonthlySoilLoss,
     SoilLossResults,
 )
-from engine.erosion import ls
-from engine.erosion._parameters import Parameter, read_parameter, scope_text
+from engine.erosion import c_factor, ls, r_factor
+from engine.erosion._parameters import Parameter, ParameterReader, scope_text
 from engine.erosion.equation import AcceptedUnits, Factor, annual_soil_loss
 
 __all__ = ["compute_soil_loss"]
@@ -60,15 +73,56 @@ PRECIPITATION = "precipitation"
 
 # --- parameters: PROPOSED identifiers and scope (SOIL_LOSS.md) ---------------
 
-# The scope of every record EP1 reads: the empty scope, "no restriction
-# stated" (params/README.md). PROPOSED; the scope words are OPEN.
+# The scope of every record that holds for the field and the method: the
+# empty scope, "no restriction stated" (params/README.md). PROPOSED; the
+# scope words are OPEN.
 SCOPE: dict[str, str] = {}
 
-# R, K, C and P: one record each.
+# The scope of a record that holds on a day with no crop, as engine/water/
+# reads it (EXPOSURE.md). PROPOSED.
+NO_CROP_SCOPE: dict[str, str] = {"management": "no_crop"}
+
+# The scope key of a record that holds for one crop of the calendar.
+CROP_KEY = "crop"
+
+# R (docs/METHODS.md M1.2), with the identifiers of engine/erosion/r_factor/
+# README.md: the mean annual level, and the exponent and threshold of the
+# daily erosivity index.
 R_ID = "rusle_r_factor"
+R_EXPONENT_ID = "rusle_r_daily_index_exponent"
+R_THRESHOLD_ID = "rusle_r_daily_index_threshold"
+R_IDS: tuple[str, ...] = (R_ID, R_EXPONENT_ID, R_THRESHOLD_ID)
+
+# K and P: one record each.
 K_ID = "rusle_k_factor"
-C_ID = "rusle_c_factor"
 P_ID = "rusle_p_factor"
+
+# The whole-factor record of C of unit #154. No longer read: C is computed
+# through c_factor/ (PROPOSED; OPEN 12 of SOIL_LOSS.md).
+C_ID = "rusle_c_factor"
+
+# The coefficients of c_factor/ that hold for the field and the method, with
+# the identifiers of engine/erosion/c_factor/README.md.
+FALL_HEIGHT_COEFFICIENT_ID = "rusle2_canopy_fall_height_coefficient"
+SURFACE_COVER_COEFFICIENT_ID = "rusle2_surface_cover_coefficient"
+MASS_COVER_COEFFICIENT_ID = "rusle2_residue_mass_cover_coefficient"
+C_SITE_IDS: tuple[str, ...] = (
+    FALL_HEIGHT_COEFFICIENT_ID,
+    SURFACE_COVER_COEFFICIENT_ID,
+    MASS_COVER_COEFFICIENT_ID,
+)
+
+# The inputs of c_factor/ read by crop. The canopy of a day: scope of its crop,
+# or NO_CROP_SCOPE. The residue of a day: scope of the crop of the last
+# harvest before it; the decay coefficient keeps the identifier of
+# c_factor/README.md, its residue type named by that crop (PROPOSED).
+CANOPY_COVER_ID = "rusle2_canopy_cover"
+FALL_HEIGHT_ID = "rusle2_canopy_fall_height"
+RESIDUE_MASS_ID = "rusle2_residue_mass_at_harvest"
+DECAY_COEFFICIENT_ID = "rusle2_residue_decay_coefficient"
+CANOPY_IDS: tuple[str, ...] = (CANOPY_COVER_ID, FALL_HEIGHT_ID)
+RESIDUE_IDS: tuple[str, ...] = (RESIDUE_MASS_ID, DECAY_COEFFICIENT_ID)
+CROP_PARAMETER_IDS: tuple[str, ...] = (*CANOPY_IDS, *RESIDUE_IDS)
 
 # The coefficients of ls.py, by its argument name, with the identifiers that
 # engine/erosion/LS.md proposes.
@@ -92,7 +146,10 @@ LS_IDS: tuple[str, ...] = (
     LAMBDA_UNIT_ID,
     *L_COEFFICIENTS.values(),
 )
-PARAMETER_IDS: tuple[str, ...] = (R_ID, K_ID, *LS_IDS, C_ID, P_ID)
+
+# Every identifier read with the empty scope. The identifiers read by crop
+# are CROP_PARAMETER_IDS.
+PARAMETER_IDS: tuple[str, ...] = (*R_IDS, K_ID, *LS_IDS, *C_SITE_IDS, P_ID)
 
 # --- units ------------------------------------------------------------------
 
@@ -101,7 +158,7 @@ PARAMETER_IDS: tuple[str, ...] = (R_ID, K_ID, *LS_IDS, C_ID, P_ID)
 # unit (M1.7), written "dimensionless" (contracts/CONVENTIONS.md C1.1).
 DIMENSIONLESS = "dimensionless"
 ACCEPTED_UNITS = AcceptedUnits(
-    r="MJ mm ha-1 h-1 yr-1",
+    r=r_factor.R_UNIT,
     k="t ha h ha-1 MJ-1 mm-1",
     ls=DIMENSIONLESS,
     c=DIMENSIONLESS,
@@ -112,11 +169,25 @@ ACCEPTED_UNITS = AcceptedUnits(
 # (Q11 of contracts/ENTRYPOINTS.md is not decided).
 UNIT_NOT_ACCEPTED = ls.REASON_UNIT_NOT_ACCEPTED
 
+# The unit of the time since a harvest: days of the daily series, the unit
+# string of CQ1 in contracts/CLIMATE_QUANTITIES.md ("mm day-1"). PROPOSED.
+DAY = "day"
+
+# How the inverse of a unit string is written on a coefficient record:
+# "<unit>-1" for a unit of one word, "(<unit>)-1" for any unit. PROPOSED.
+INVERSE_SUFFIX = "-1"
+OPEN_BRACKET = "("
+CLOSE_BRACKET = ")"
+
 # Month arithmetic (C5.1, C5.3): twelve months to a year, months and days
 # counted from one.
 _MONTHS_IN_A_YEAR = 12
 _FIRST = 1
 _ONE_DAY = dt.timedelta(days=_FIRST)
+
+# C of one agricultural year is rotation_c over its twelve months, divided by
+# this number of years (M1.5). PROPOSED.
+_ONE_AGRICULTURAL_YEAR = 1
 
 # --- detail texts: PROPOSED, English for developers -------------------------
 
@@ -133,23 +204,53 @@ INFEASIBLE = (
     "the rotation calendar is infeasible (feasibility.feasible is false), so no "
     "value that depends on it is computed (G4, first row)"
 )
-MONTHLY_NOT_BUILT = (
-    "a monthly value needs the fraction of the annual erosivity that falls in the "
-    "month, from the daily erosivity index of docs/METHODS.md M1.2, which is not "
-    "built (blueprint section 8, Block 1)"
-)
-R_NOT_BUILT = (
-    "the daily erosivity index of docs/METHODS.md M1.2, which gives the monthly "
-    "fraction of R and its variation between years, is not built (blueprint "
-    "section 8, Block 1)"
-)
-C_NOT_BUILT = (
-    "the method that would compute C, the sub-factor equations of docs/METHODS.md "
-    "M1.5 (decision D45 of issue #77), is not built"
+MONTHLY_NOT_FORMED = (
+    "a monthly value of soil loss is not formed: docs/METHODS.md M1.1 and M1.5 "
+    "give the annual product, and how R by month (M1.2, engine/erosion/r_factor/) "
+    "and the soil-loss ratio of the month make a monthly value is not decided "
+    "(OPEN 20 of engine/erosion/SOIL_LOSS.md)"
 )
 RANGE_NOT_BUILT = (
     "how an uncertainty range passes through the product of docs/METHODS.md M1.1 "
     "is not built (C2.3; OPEN 5 of engine/erosion/EQUATION.md)"
+)
+INDEX_PART = (
+    "the daily erosivity index of docs/METHODS.md M1.2 (engine/erosion/r_factor/), "
+    "whose monthly fractions and yearly ratios R and C need"
+)
+LEVEL_PART = (
+    "the mean annual level of R of docs/METHODS.md M1.2 (engine/erosion/r_factor/)"
+)
+CANOPY_PART = (
+    "the canopy sub-factor of docs/METHODS.md M1.5 (decision D45 of issue #77; "
+    "engine/erosion/c_factor/)"
+)
+SURFACE_PART = (
+    "the surface-cover sub-factor of docs/METHODS.md M1.5 (decision D45 of issue "
+    "#77; engine/erosion/c_factor/)"
+)
+RESIDUE_PART = (
+    "the surface residue cover, with residue decay by residue type, of "
+    "docs/METHODS.md M1.5 (decision D45 of issue #77; engine/erosion/c_factor/)"
+)
+OUTSIDE_CALENDAR = (
+    "the day lies outside the dates of the rotation calendar, and how the rotation "
+    "is repeated over the years of the climate record (decision D47 of issue #77) "
+    "is not laid out (OPEN 2 of engine/erosion/SOIL_LOSS.md)"
+)
+NO_HARVEST_BEFORE = (
+    "no component of the rotation calendar ends before the day, so the residue on "
+    "the surface is not known: the residue left before the calendar begins needs "
+    "the rotation repeated over the years (decision D47 of issue #77) or the "
+    "residue ledger (Q12 of contracts/ENTRYPOINTS.md)"
+)
+TOLERANCE_NOT_SUPPLIED = Missing(
+    reason="NOT_AVAILABLE",
+    detail=(
+        "EP1 supplies no tolerance for the sum of the erosivity fractions (OPEN 9 "
+        "of engine/erosion/c_factor/README.md); it only drives fractions_add_up, "
+        "which EP1 does not read"
+    ),
 )
 
 
@@ -231,39 +332,101 @@ def _months_of(ag_year: int, start_month: int) -> list[tuple[int, int]]:
     return [_month_at(first + k) for k in range(_MONTHS_IN_A_YEAR)]
 
 
+def _days_of(year: int, month: int) -> Iterator[dt.date]:
+    day = _first_day(year, month)
+    last = _last_day(year, month)
+    while day <= last:
+        yield day
+        day += _ONE_DAY
+
+
 def _covers(series: DailySeries, first: dt.date, last: dt.date) -> bool:
     return series.start_date <= first and last <= series.end_date
 
 
-# --- the factors --------------------------------------------------------------
+def _month_label(year: int, month: int) -> str:
+    return _first_day(year, month).strftime("%Y-%m")
+
+
+# --- unit strings (PROPOSED) --------------------------------------------------
+
+
+def _per_unit(unit: str) -> str | None:
+    """The unit whose inverse the unit string is, or ``None``. PROPOSED.
+
+    ``"<u>-1"`` gives ``<u>`` when ``<u>`` is one word (no space, no
+    bracket); ``"(<u>)-1"`` gives ``<u>`` for any ``<u>`` that is not empty.
+    Any other string is not read.
+    """
+    if not unit.endswith(INVERSE_SUFFIX):
+        return None
+    base = unit.removesuffix(INVERSE_SUFFIX)
+    if base.startswith(OPEN_BRACKET) and base.endswith(CLOSE_BRACKET):
+        inner = base.removeprefix(OPEN_BRACKET).removesuffix(CLOSE_BRACKET)
+        return inner if inner.strip() else None
+    if not base or any(mark in base for mark in (" ", OPEN_BRACKET, CLOSE_BRACKET)):
+        return None
+    return base
+
+
+def _inverse_not_read(what: str, unit: str) -> str:
+    return (
+        f"the unit '{unit}' of {what} is not read as the inverse of a unit: it is "
+        f"written '<unit>{INVERSE_SUFFIX}' for a unit of one word or "
+        f"'{OPEN_BRACKET}<unit>{CLOSE_BRACKET}{INVERSE_SUFFIX}' (OPEN 21 of "
+        "engine/erosion/SOIL_LOSS.md)"
+    )
+
+
+def _not_dimensionless(what: str, unit: str) -> str:
+    return (
+        f"the unit '{unit}' of {what} is not '{DIMENSIONLESS}': c_factor/ reads it as "
+        "a fraction from zero to one (OPEN 3 of engine/erosion/c_factor/README.md)"
+    )
+
+
+# --- the factors read from one record ----------------------------------------
 
 
 @dataclass(frozen=True)
-class _Factors:
-    """The five factors of M1.1 as ``equation.py`` takes them."""
+class _Problem:
+    """Why a value is not computed: a reason code and a text for ``detail``."""
 
-    r: Factor
-    k: Factor
-    ls: Factor
-    c: Factor
-    p: Factor
+    reason: str
+    text: str
 
 
-def _factor(parameter: Parameter, accepted: str, extra: str | None = None) -> Factor:
+def _factor(parameter: Parameter, accepted: str) -> Factor:
     """A factor read from one record.
 
     A missing factor keeps the unit it would have, the accepted one (C3.1).
-    ``extra`` is added to the detail of a missing factor.
     """
     if isinstance(parameter.value, Missing):
-        missing = parameter.value
-        if extra is not None:
-            missing = Missing(
-                reason=missing.reason, detail=f"{missing.detail}; {extra}"
-            )
-        return Factor(value=missing, unit=accepted)
+        return Factor(value=parameter.value, unit=accepted)
     assert parameter.unit is not None  # a record was read
     return Factor(value=parameter.value, unit=parameter.unit)
+
+
+def _combined(problems: list[_Problem], prefix: str) -> Missing:
+    """One ``Missing`` for several problems, each named once, in order.
+
+    ``MISSING_INPUT`` when any problem is an input that is missing (C3.3);
+    otherwise the reason of the first problem.
+    """
+    texts = list(dict.fromkeys(problem.text for problem in problems))
+    reasons = [problem.reason for problem in problems]
+    reason = "MISSING_INPUT" if "MISSING_INPUT" in reasons else next(iter(reasons))
+    return Missing(reason=reason, detail=f"{prefix}: {'; '.join(texts)}")
+
+
+def _missing_record(parameter: Parameter, part: str) -> _Problem | None:
+    if isinstance(parameter.value, Missing):
+        assert parameter.value.detail is not None
+        return _Problem("MISSING_INPUT", f"{parameter.value.detail}; needed by {part}")
+    return None
+
+
+# --- LS -------------------------------------------------------------------------
 
 
 def _slope_unit(unit: str) -> ls.SlopeUnit | None:
@@ -288,7 +451,7 @@ def _input_missing(name: str, value: Value) -> str:
     return why
 
 
-def _ls_factor(soil_slope: SiteSoilSlope, parameters: dict[str, dict]) -> Factor:
+def _ls_factor(soil_slope: SiteSoilSlope, reader: ParameterReader) -> Factor:
     """``LS = L * S`` through ls.py, or why it is missing.
 
     Every input and every coefficient is looked at first. Any that is missing
@@ -298,7 +461,7 @@ def _ls_factor(soil_slope: SiteSoilSlope, parameters: dict[str, dict]) -> Factor
     """
     slope = soil_slope.slope_steepness
     length = soil_slope.slope_length
-    read = {pid: read_parameter(parameters, pid, SCOPE) for pid in LS_IDS}
+    read = {pid: reader.read(pid, SCOPE) for pid in LS_IDS}
 
     absent = [
         _input_missing(name, value)
@@ -364,41 +527,572 @@ def _ls_factor(soil_slope: SiteSoilSlope, parameters: dict[str, dict]) -> Factor
     return Factor(value=product, unit=ACCEPTED_UNITS.ls)
 
 
-def _factors(soil_slope: SiteSoilSlope, parameters: dict[str, dict]) -> _Factors:
-    def record(pid: str) -> Parameter:
-        return read_parameter(parameters, pid, SCOPE)
+# --- R: through r_factor/ (M1.2) -------------------------------------------------
 
-    return _Factors(
-        r=_factor(record(R_ID), ACCEPTED_UNITS.r, extra=R_NOT_BUILT),
-        k=_factor(record(K_ID), ACCEPTED_UNITS.k),
-        ls=_ls_factor(soil_slope, parameters),
-        c=_factor(record(C_ID), ACCEPTED_UNITS.c, extra=C_NOT_BUILT),
-        p=_factor(record(P_ID), ACCEPTED_UNITS.p),
+YearMonth = tuple[int, int]
+ByYear = dict[int, dict[YearMonth, float | Missing]]
+
+
+@dataclass(frozen=True)
+class _Erosivity:
+    """What r_factor/ gives for the record: monthly fractions and R by month.
+
+    Each is the table of ``r_factor.r_factor_parts`` or one ``Missing`` that
+    names what is missing.
+    """
+
+    fractions: ByYear | Missing
+    r_by_month: ByYear | Missing
+
+
+def _erosivity(
+    series: DailySeries, start_month: int, reader: ParameterReader
+) -> _Erosivity:
+    """The steps of M1.2 through ``r_factor.r_factor_parts``.
+
+    A record of the exponent or the threshold that cannot be read makes the
+    fractions and R missing; a record of the level that cannot be read makes R
+    missing and leaves the fractions. Each names the records by id and scope
+    and the part of M1.2 that needs them.
+    """
+    level = reader.read(R_ID, SCOPE)
+    exponent = reader.read(R_EXPONENT_ID, SCOPE)
+    threshold = reader.read(R_THRESHOLD_ID, SCOPE)
+    index_problems = [
+        problem
+        for problem in (
+            _missing_record(exponent, INDEX_PART),
+            _missing_record(threshold, INDEX_PART),
+        )
+        if problem is not None
+    ]
+    level_problem = _missing_record(level, LEVEL_PART)
+    r_problems = index_problems + ([level_problem] if level_problem else [])
+    r_missing = _combined(r_problems, "R by month") if r_problems else None
+    if index_problems:
+        assert r_missing is not None
+        return _Erosivity(
+            fractions=_combined(index_problems, "the monthly erosivity fractions"),
+            r_by_month=r_missing,
+        )
+    assert threshold.unit is not None
+    parts = r_factor.r_factor_parts(
+        series=series,
+        exponent=exponent.value,
+        threshold=threshold.value,
+        threshold_unit=threshold.unit,
+        start_month=start_month,
+        mean_annual_r=level.value,
+        mean_annual_r_unit=level.unit if level.unit is not None else r_factor.R_UNIT,
+    )
+    return _Erosivity(
+        fractions=parts.monthly_fractions,
+        r_by_month=r_missing if r_missing is not None else parts.r_by_year_and_month,
     )
 
 
-def _annual_product(factors: _Factors) -> float | Missing:
+def _year_table(
+    table: ByYear | Missing, ag_year: int, what: str
+) -> dict[YearMonth, float] | Missing:
+    """The twelve numbers of one agricultural year of a table of r_factor/.
+
+    Missing months are named once per reason and detail, with their labels.
+    """
+    if isinstance(table, Missing):
+        return table
+    months = table.get(ag_year)
+    if months is None:
+        return Missing(
+            reason="NOT_COMPUTABLE",
+            detail=(
+                f"engine/erosion/r_factor/ gives no {what} for agricultural year "
+                f"{ag_year}"
+            ),
+        )
+    groups: dict[tuple[str, str | None], list[str]] = {}
+    for (year, month), value in months.items():
+        if isinstance(value, Missing):
+            key = (value.reason, value.detail)
+            groups.setdefault(key, []).append(_month_label(year, month))
+    if groups:
+        reasons = list(dict.fromkeys(reason for reason, _ in groups))
+        reason = next(iter(reasons)) if len(reasons) == _FIRST else "MISSING_INPUT"
+        texts = [
+            f"{', '.join(labels)} ({code}: {detail})"
+            for (code, detail), labels in groups.items()
+        ]
+        return Missing(
+            reason=reason,
+            detail=(
+                f"{what} of engine/erosion/r_factor/ is missing for agricultural year "
+                f"{ag_year} in the month(s) {'; '.join(texts)}"
+            ),
+        )
+    return {key: value for key, value in months.items() if isinstance(value, float)}
+
+
+def _r_of_year(erosivity: _Erosivity, ag_year: int) -> Factor:
+    """R of one agricultural year: the sum of its twelve values of R by month."""
+    months = _year_table(erosivity.r_by_month, ag_year, "R by month")
+    if isinstance(months, Missing):
+        return Factor(value=months, unit=ACCEPTED_UNITS.r)
+    total = sum(months.values())
+    if not math.isfinite(total):
+        return Factor(
+            value=Missing(
+                reason="NOT_COMPUTABLE",
+                detail=f"R of agricultural year {ag_year} is not a finite number",
+            ),
+            unit=ACCEPTED_UNITS.r,
+        )
+    return Factor(value=total, unit=ACCEPTED_UNITS.r)
+
+
+# --- C: through c_factor/ (M1.5, D45) --------------------------------------------
+
+
+def _crop_scope(calendar: RotationCalendar, day: dt.date) -> dict[str, str] | _Problem:
+    """The scope of the canopy records of a day. PROPOSED, as engine/water/.
+
+    The crop of the one dated component that covers the day; ``NO_CROP_SCOPE``
+    when no component can cover it; a problem when the day lies outside the
+    calendar, when two components cover it, or when a component with a
+    missing date could cover it.
+    """
+    if not calendar.start_date <= day <= calendar.end_date:
+        return _Problem("MISSING_INPUT", OUTSIDE_CALENDAR)
+    covering = [
+        component
+        for component in calendar.components
+        if component.start.date is not None
+        and component.end.date is not None
+        and component.start.date <= day <= component.end.date
+    ]
+    if len(covering) > _FIRST:
+        names = ", ".join(repr(c.component_id) for c in covering)
+        return _Problem(
+            "NOT_COMPUTABLE",
+            f"the components {names} of the rotation calendar cover the same day",
+        )
+    if covering:
+        (component,) = covering
+        return {CROP_KEY: component.crop_id}
+    undated = [
+        component.component_id
+        for component in calendar.components
+        if (component.start.date is None or component.end.date is None)
+        and (component.start.date is None or component.start.date <= day)
+        and (component.end.date is None or day <= component.end.date)
+    ]
+    if undated:
+        names = ", ".join(repr(name) for name in undated)
+        return _Problem(
+            "MISSING_INPUT",
+            f"the component(s) {names} of the rotation calendar have a missing date, "
+            "so whether they cover the day is not known",
+        )
+    return dict(NO_CROP_SCOPE)
+
+
+def _last_harvest(
+    calendar: RotationCalendar, day: dt.date
+) -> CalendarComponent | _Problem:
+    """The component whose end date is the last one before the day. PROPOSED.
+
+    Its residue is the residue on the surface on the day. A problem when the
+    day lies outside the calendar, when a component without an end date
+    could have ended before the day, when no component ends before it, or
+    when two components end on that last date.
+    """
+    if not calendar.start_date <= day <= calendar.end_date:
+        return _Problem("MISSING_INPUT", OUTSIDE_CALENDAR)
+    unknown = [
+        component.component_id
+        for component in calendar.components
+        if component.end.date is None
+        and (component.start.date is None or component.start.date < day)
+    ]
+    if unknown:
+        names = ", ".join(repr(name) for name in unknown)
+        return _Problem(
+            "MISSING_INPUT",
+            f"the component(s) {names} of the rotation calendar have no end date, so "
+            "the last harvest before the day is not known",
+        )
+    ended = [
+        component
+        for component in calendar.components
+        if component.end.date is not None and component.end.date < day
+    ]
+    if not ended:
+        return _Problem("MISSING_INPUT", NO_HARVEST_BEFORE)
+    last = max(component.end.date for component in ended if component.end.date)
+    at_last = [component for component in ended if component.end.date == last]
+    if len(at_last) > _FIRST:
+        names = ", ".join(repr(c.component_id) for c in at_last)
+        return _Problem(
+            "NOT_COMPUTABLE",
+            f"the components {names} of the rotation calendar end on the same day, "
+            "so the residue of the last harvest is not one crop's",
+        )
+    (component,) = at_last
+    return component
+
+
+@dataclass
+class _DayGroups:
+    """Problems of the days of a year, each text once, with its days counted."""
+
+    days: dict[tuple[str, str], list[dt.date]] = field(default_factory=dict)
+
+    def add(self, problem: _Problem, day: dt.date) -> None:
+        self.days.setdefault((problem.reason, problem.text), []).append(day)
+
+    def problems(self) -> list[_Problem]:
+        return [
+            _Problem(
+                reason,
+                f"{text} ({len(days)} day(s) of the year, the first on "
+                f"{min(days).isoformat()})",
+            )
+            for (reason, text), days in self.days.items()
+        ]
+
+
+@dataclass(frozen=True)
+class _DayInputs:
+    """What the soil-loss ratio of one day is computed from."""
+
+    crop_scope: dict[str, str]
+    harvest: CalendarComponent
+
+
+def _scope_of_crop(crop_id: str) -> dict[str, str]:
+    return {CROP_KEY: crop_id}
+
+
+def _c_inputs(
+    calendar: RotationCalendar,
+    ag_year: int,
+    start_month: int,
+    reader: ParameterReader,
+) -> tuple[dict[dt.date, _DayInputs], list[_Problem]]:
+    """The inputs of every day of an agricultural year, and every problem.
+
+    A problem is a day whose crop or residue is not known, or a record of
+    c_factor/ that cannot be read (named by id and scope, with the part of
+    M1.5 that needs it), or a unit string that is not read.
+    """
+    problems: list[_Problem] = []
+    groups = _DayGroups()
+    inputs: dict[dt.date, _DayInputs] = {}
+    parts = {
+        FALL_HEIGHT_COEFFICIENT_ID: CANOPY_PART,
+        SURFACE_COVER_COEFFICIENT_ID: SURFACE_PART,
+        MASS_COVER_COEFFICIENT_ID: RESIDUE_PART,
+    }
+    for pid in C_SITE_IDS:
+        problem = _missing_record(reader.read(pid, SCOPE), parts[pid])
+        if problem is not None:
+            problems.append(problem)
+    for year, month in _months_of(ag_year, start_month):
+        for day in _days_of(year, month):
+            crop_scope = _crop_scope(calendar, day)
+            harvest = _last_harvest(calendar, day)
+            if isinstance(crop_scope, _Problem):
+                groups.add(crop_scope, day)
+            else:
+                for pid in CANOPY_IDS:
+                    problem = _missing_record(reader.read(pid, crop_scope), CANOPY_PART)
+                    if problem is not None:
+                        problems.append(problem)
+            if isinstance(harvest, _Problem):
+                groups.add(harvest, day)
+            else:
+                for pid in RESIDUE_IDS:
+                    problem = _missing_record(
+                        reader.read(pid, _scope_of_crop(harvest.crop_id)), RESIDUE_PART
+                    )
+                    if problem is not None:
+                        problems.append(problem)
+            if not isinstance(crop_scope, _Problem) and not isinstance(
+                harvest, _Problem
+            ):
+                inputs[day] = _DayInputs(crop_scope=crop_scope, harvest=harvest)
+    problems += groups.problems()
+    if problems:
+        return inputs, problems
+    return inputs, _unit_problems(inputs, reader)
+
+
+def _unit_problems(
+    inputs: dict[dt.date, _DayInputs], reader: ParameterReader
+) -> list[_Problem]:
+    """Unit strings of the records of c_factor/ that are not read. PROPOSED."""
+    texts: list[str] = []
+    surface = reader.read(SURFACE_COVER_COEFFICIENT_ID, SCOPE)
+    assert surface.unit is not None
+    if surface.unit != DIMENSIONLESS:
+        texts.append(
+            _not_dimensionless(
+                f"parameter '{SURFACE_COVER_COEFFICIENT_ID}'", surface.unit
+            )
+        )
+    for pid in (FALL_HEIGHT_COEFFICIENT_ID, MASS_COVER_COEFFICIENT_ID):
+        unit = reader.read(pid, SCOPE).unit
+        assert unit is not None
+        if _per_unit(unit) is None:
+            texts.append(_inverse_not_read(f"parameter '{pid}' with scope {{}}", unit))
+    crop_scopes = {
+        scope_text(item.crop_scope): item.crop_scope for item in inputs.values()
+    }
+    for text, scope in crop_scopes.items():
+        unit = reader.read(CANOPY_COVER_ID, scope).unit
+        assert unit is not None
+        if unit != DIMENSIONLESS:
+            texts.append(
+                _not_dimensionless(
+                    f"parameter '{CANOPY_COVER_ID}' with scope {text}", unit
+                )
+            )
+    crops = dict.fromkeys(item.harvest.crop_id for item in inputs.values())
+    for crop_id in crops:
+        scope = _scope_of_crop(crop_id)
+        unit = reader.read(DECAY_COEFFICIENT_ID, scope).unit
+        assert unit is not None
+        if _per_unit(unit) is None:
+            texts.append(
+                _inverse_not_read(
+                    f"parameter '{DECAY_COEFFICIENT_ID}' with scope {scope_text(scope)}",
+                    unit,
+                )
+            )
+    return [_Problem(UNIT_NOT_ACCEPTED, text) for text in dict.fromkeys(texts)]
+
+
+def _number(parameter: Parameter) -> float:
+    assert isinstance(parameter.value, float)
+    return parameter.value
+
+
+def _unit(parameter: Parameter) -> str:
+    assert parameter.unit is not None
+    return parameter.unit
+
+
+def _inverse_of(parameter: Parameter) -> str:
+    """The unit whose inverse is the unit of a record checked by ``_unit_problems``."""
+    per_unit = _per_unit(_unit(parameter))
+    assert per_unit is not None
+    return per_unit
+
+
+@dataclass(frozen=True)
+class _DayRatio:
+    """The soil-loss ratio of one day and its two sub-factors."""
+
+    ratio: float
+    canopy: float
+    surface_cover: float
+
+
+def _day_ratio(
+    day: dt.date, inputs: _DayInputs, reader: ParameterReader
+) -> _DayRatio | _Problem:
+    """The soil-loss ratio of one day, through c_factor/, or the first refusal."""
+    crop_text = scope_text(inputs.crop_scope)
+    fall_coefficient = reader.read(FALL_HEIGHT_COEFFICIENT_ID, SCOPE)
+    fall_height = reader.read(FALL_HEIGHT_ID, inputs.crop_scope)
+    canopy = c_factor.canopy_subfactor(
+        canopy_cover=_number(reader.read(CANOPY_COVER_ID, inputs.crop_scope)),
+        fall_height=_number(fall_height),
+        fall_height_unit=_unit(fall_height),
+        fall_height_coefficient=_number(fall_coefficient),
+        fall_height_coefficient_per_unit=_inverse_of(fall_coefficient),
+    )
+    if isinstance(canopy, Missing):
+        return _Problem(
+            canopy.reason,
+            f"on {day.isoformat()}, canopy_subfactor of engine/erosion/c_factor/ with "
+            f"the records of scope {crop_text}: {canopy.detail}",
+        )
+
+    harvest = inputs.harvest
+    residue_scope = _scope_of_crop(harvest.crop_id)
+    residue_text = scope_text(residue_scope)
+    mass = reader.read(RESIDUE_MASS_ID, residue_scope)
+    decay = reader.read(DECAY_COEFFICIENT_ID, residue_scope)
+    assert harvest.end.date is not None
+    after_decay = c_factor.residue_mass_after_decay(
+        residue_mass=_number(mass),
+        residue_type=harvest.crop_id,
+        decay_coefficients={harvest.crop_id: _number(decay)},
+        decay_coefficient_per_unit=_inverse_of(decay),
+        elapsed_time=(day - harvest.end.date).days,
+        elapsed_time_unit=DAY,
+    )
+    steps: list[tuple[str, float | Missing]] = [
+        (
+            f"residue_mass_after_decay with the records of scope {residue_text}",
+            after_decay,
+        )
+    ]
+    if not isinstance(after_decay, Missing):
+        mass_coefficient = reader.read(MASS_COVER_COEFFICIENT_ID, SCOPE)
+        cover = c_factor.residue_cover_from_mass(
+            residue_mass=after_decay,
+            residue_mass_unit=_unit(mass),
+            mass_cover_coefficient=_number(mass_coefficient),
+            mass_cover_coefficient_per_unit=_inverse_of(mass_coefficient),
+        )
+        steps.append(
+            (f"residue_cover_from_mass with the records of scope {residue_text}", cover)
+        )
+        if not isinstance(cover, Missing):
+            steps.append(
+                (
+                    "surface_cover_subfactor",
+                    c_factor.surface_cover_subfactor(
+                        surface_residue_cover=cover,
+                        surface_cover_coefficient=_number(
+                            reader.read(SURFACE_COVER_COEFFICIENT_ID, SCOPE)
+                        ),
+                    ),
+                )
+            )
+    name, surface_cover = steps[-1]
+    if isinstance(surface_cover, Missing):
+        return _Problem(
+            surface_cover.reason,
+            f"on {day.isoformat()}, {name} of engine/erosion/c_factor/: "
+            f"{surface_cover.detail}",
+        )
+    ratio = c_factor.soil_loss_ratio(canopy=canopy, surface_cover=surface_cover)
+    if isinstance(ratio.value, Missing):
+        return _Problem(
+            ratio.value.reason,
+            f"on {day.isoformat()}, soil_loss_ratio of engine/erosion/c_factor/: "
+            f"{ratio.value.detail}",
+        )
+    return _DayRatio(ratio=ratio.value, canopy=canopy, surface_cover=surface_cover)
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
+def _c_of_year(
+    calendar: RotationCalendar,
+    ag_year: int,
+    start_month: int,
+    erosivity: _Erosivity,
+    reader: ParameterReader,
+) -> Factor:
+    """C of one agricultural year through c_factor/ (M1.5), or why it is missing.
+
+    Every problem is gathered first: the monthly erosivity fractions of
+    r_factor/, the crop and the residue of each day, the records of
+    c_factor/ and their unit strings. Any problem makes C missing and names
+    each. Otherwise the soil-loss ratio of each day, its mean over each month
+    (PROPOSED), and ``c_factor.rotation_c`` over the twelve months with the
+    fractions of the year and one year (PROPOSED).
+    """
+    prefix = f"C of agricultural year {ag_year} is not computed"
+    fractions = _year_table(
+        erosivity.fractions, ag_year, "the monthly erosivity fraction"
+    )
+    problems: list[_Problem] = []
+    if isinstance(fractions, Missing):
+        problems.append(
+            _Problem(
+                "MISSING_INPUT",
+                f"the monthly erosivity fractions of M1.2 are missing "
+                f"({fractions.reason}: {fractions.detail})",
+            )
+        )
+    inputs, more = _c_inputs(calendar, ag_year, start_month, reader)
+    problems += more
+    if problems:
+        return Factor(value=_combined(problems, prefix), unit=ACCEPTED_UNITS.c)
+    assert not isinstance(fractions, Missing)
+
+    months: list[c_factor.MonthOfRotation] = []
+    for year, month in _months_of(ag_year, start_month):
+        days: list[_DayRatio] = []
+        for day in _days_of(year, month):
+            outcome = _day_ratio(day, inputs[day], reader)
+            if isinstance(outcome, _Problem):
+                return Factor(
+                    value=Missing(
+                        reason=outcome.reason, detail=f"{prefix}: {outcome.text}"
+                    ),
+                    unit=ACCEPTED_UNITS.c,
+                )
+            days.append(outcome)
+        months.append(
+            c_factor.MonthOfRotation(
+                label=_month_label(year, month),
+                erosivity_fraction=fractions[(year, month)],
+                soil_loss_ratio=c_factor.SoilLossRatio(
+                    value=_mean([item.ratio for item in days]),
+                    canopy=_mean([item.canopy for item in days]),
+                    surface_cover=_mean([item.surface_cover for item in days]),
+                    set_to_one=c_factor.SET_TO_ONE,
+                    limit=c_factor.DECLARED_LIMIT,
+                ),
+            )
+        )
+    rotation = c_factor.rotation_c(
+        months=months,
+        number_of_years=_ONE_AGRICULTURAL_YEAR,
+        fraction_sum_tolerance=TOLERANCE_NOT_SUPPLIED,
+    )
+    if isinstance(rotation.value, Missing):
+        return Factor(
+            value=Missing(
+                reason=rotation.value.reason,
+                detail=(
+                    f"{prefix}: rotation_c of engine/erosion/c_factor/: "
+                    f"{rotation.value.detail}"
+                ),
+            ),
+            unit=ACCEPTED_UNITS.c,
+        )
+    return Factor(value=rotation.value, unit=ACCEPTED_UNITS.c)
+
+
+# --- the annual product -----------------------------------------------------------
+
+
+def _annual_product(
+    r: Factor, k: Factor, ls_: Factor, c: Factor, p: Factor
+) -> float | Missing:
     return annual_soil_loss(
-        r=factors.r,
-        k=factors.k,
-        ls=factors.ls,
-        c=factors.c,
-        p=factors.p,
+        r=r,
+        k=k,
+        ls=ls_,
+        c=c,
+        p=p,
         accepted_units=ACCEPTED_UNITS,
         unit_guard_reason=UNIT_NOT_ACCEPTED,
     )
 
 
-def _source() -> str:
+def _source(reader: ParameterReader) -> str:
     """The source of a computed annual value. PROPOSED (question 11 of
     contracts/results/README.md is OPEN)."""
-    scope = scope_text(SCOPE)
+    records = ", ".join(
+        f"'{pid}' with scope {scope}" for pid, scope in reader.records_read()
+    )
     return (
         "derived by engine.erosion.compute_soil_loss with the product of "
-        "docs/METHODS.md M1.1: R, K, C and P from the parameter records "
-        f"'{R_ID}', '{K_ID}', '{C_ID}' and '{P_ID}' with scope {scope}; LS from "
-        "engine/erosion/ls.py with the slope of the soil-and-slope data and the "
-        f"parameter records {', '.join(repr(pid) for pid in LS_IDS)} with scope {scope}"
+        "docs/METHODS.md M1.1: R of the agricultural year as the sum of R by month "
+        "of engine/erosion/r_factor/ (M1.2) from the daily series "
+        f"'{PRECIPITATION}'; C through engine/erosion/c_factor/ (M1.5, decision D45 "
+        "of issue #77) from the rotation calendar, weighted by the monthly erosivity "
+        "fractions of r_factor/; LS from engine/erosion/ls.py with the slope of the "
+        "soil-and-slope data; K and P from their records; parameter records read: "
+        f"{records}"
     )
 
 
@@ -415,7 +1109,7 @@ def _not_covered(what: str) -> Missing:
     )
 
 
-def _annual(ag_year: int, outcome: float | Missing) -> AnnualSoilLoss:
+def _annual(ag_year: int, outcome: float | Missing, source: str) -> AnnualSoilLoss:
     common = {
         "indicator": INDICATOR,
         "direction": DIRECTION_OF[INDICATOR],
@@ -427,7 +1121,7 @@ def _annual(ag_year: int, outcome: float | Missing) -> AnnualSoilLoss:
     return AnnualSoilLoss(
         value=outcome,
         provenance=PROVENANCE_OF_SOIL_LOSS,
-        source=_source(),
+        source=source,
         range_missing=Missing(reason="NOT_AVAILABLE", detail=RANGE_NOT_BUILT),
         **common,
     )
@@ -444,6 +1138,28 @@ def _monthly(ag_year: int, year: int, month: int, missing: Missing) -> MonthlySo
         month=month,
         ag_year=ag_year,
     )
+
+
+@dataclass(frozen=True)
+class _Field:
+    """The factors that do not change from year to year, and the record reader."""
+
+    reader: ParameterReader
+    erosivity: _Erosivity
+    k: Factor
+    ls: Factor
+    p: Factor
+
+
+def _year_value(
+    field_: _Field, calendar: RotationCalendar, ag_year: int, start_month: int
+) -> tuple[float | Missing, str]:
+    """The annual product of one covered agricultural year, and its source."""
+    reader = field_.reader.fork()
+    r = _r_of_year(field_.erosivity, ag_year)
+    c = _c_of_year(calendar, ag_year, start_month, field_.erosivity, reader)
+    product = _annual_product(r, field_.k, field_.ls, c, field_.p)
+    return product, _source(reader)
 
 
 # --- the entry point ----------------------------------------------------------
@@ -468,11 +1184,11 @@ def compute_soil_loss(
 
     - an infeasible calendar: every value ``NOT_COMPUTABLE``;
     - a year or month the series does not cover: ``NO_COVERAGE`` (C5.5);
-    - every other month: ``NOT_AVAILABLE``, the monthly fraction of M1.2 is
-      not built;
-    - every other year: ``equation.annual_soil_loss`` of the five factors, a
-      number (``DERIVED``, with its source and the reason it has no range)
-      only when all five are present, otherwise its ``Missing``.
+    - every other month: ``NOT_AVAILABLE``, a monthly value is not formed;
+    - every other year: ``equation.annual_soil_loss`` of the five factors, ``R``
+      and ``C`` of that year, a number (``DERIVED``, with its source and the
+      reason it has no range) only when all five are present, otherwise its
+      ``Missing``.
 
     Raises ``TypeError`` for an argument that is not of its type and
     ``ValueError`` when the arguments name different fields (G5).
@@ -492,21 +1208,17 @@ def compute_soil_loss(
         return Missing(reason="MISSING_INPUT", detail=PRECIPITATION_MISSING)
 
     infeasible: Missing | None = None
+    field_: _Field | None = None
     if not calendar.feasibility.feasible:
         infeasible = Missing(reason="NOT_COMPUTABLE", detail=INFEASIBLE)
-        product: float | Missing = infeasible
     else:
-        product = _annual_product(_factors(soil_slope, parameters))
-    monthly_not_built = Missing(reason="NOT_AVAILABLE", detail=MONTHLY_NOT_BUILT)
-
-    def outcome_of(
-        first: dt.date, last: dt.date, what: str, otherwise: float | Missing
-    ) -> float | Missing:
-        if infeasible is not None:
-            return infeasible
-        if not _covers(series, first, last):
-            return _not_covered(what)
-        return otherwise
+        reader = ParameterReader(parameters)
+        erosivity = _erosivity(series, start_month, reader)
+        k = _factor(reader.read(K_ID, SCOPE), ACCEPTED_UNITS.k)
+        ls_ = _ls_factor(soil_slope, reader)
+        p = _factor(reader.read(P_ID, SCOPE), ACCEPTED_UNITS.p)
+        field_ = _Field(reader=reader, erosivity=erosivity, k=k, ls=ls_, p=p)
+    monthly_not_formed = Missing(reason="NOT_AVAILABLE", detail=MONTHLY_NOT_FORMED)
 
     annual: list[AnnualSoilLoss] = []
     monthly: list[MonthlySoilLoss] = []
@@ -515,25 +1227,24 @@ def compute_soil_loss(
     for ag_year in range(first_ag_year, last_ag_year + _FIRST):
         first_index = _index_of(ag_year, start_month)
         last_index = first_index + _MONTHS_IN_A_YEAR - _FIRST
-        annual.append(
-            _annual(
-                ag_year,
-                outcome_of(
-                    _first_day(*_month_at(first_index)),
-                    _last_day(*_month_at(last_index)),
-                    f"agricultural year {ag_year}",
-                    product,
-                ),
-            )
-        )
+        first = _first_day(*_month_at(first_index))
+        last = _last_day(*_month_at(last_index))
+        source = ""
+        if infeasible is not None:
+            outcome: float | Missing = infeasible
+        elif not _covers(series, first, last):
+            outcome = _not_covered(f"agricultural year {ag_year}")
+        else:
+            assert field_ is not None
+            outcome, source = _year_value(field_, calendar, ag_year, start_month)
+        annual.append(_annual(ag_year, outcome, source))
         for year, month in _months_of(ag_year, start_month):
-            missing = outcome_of(
-                _first_day(year, month),
-                _last_day(year, month),
-                f"the month {_first_day(year, month).strftime('%Y-%m')}",
-                monthly_not_built,
-            )
-            assert isinstance(missing, Missing)
+            if infeasible is not None:
+                missing = infeasible
+            elif not _covers(series, _first_day(year, month), _last_day(year, month)):
+                missing = _not_covered(f"the month {_month_label(year, month)}")
+            else:
+                missing = monthly_not_formed
             monthly.append(_monthly(ag_year, year, month, missing))
 
     return SoilLossResults(annual=annual, monthly=monthly)
