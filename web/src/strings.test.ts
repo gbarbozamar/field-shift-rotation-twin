@@ -85,6 +85,9 @@ const WORDING_SHEET: Record<string, string> = {
   'map.layer.attribution': '© OpenStreetMap contributors',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
+  'entry.title': 'Case',
+  'entry.open_field': 'Open field',
+  'entry.fields_count': '{n} fields',
 }
 
 /** Source of the shell page as it was before the strings unit. */

@@ -17,6 +17,7 @@
  *                plus api.code.shown for the raw code
  * - home.*       the shell page (heading, intro, placeholder, diagnostics)
  * - common.*     shared loading and error wording
+ * - entry.*      the entry screen (case title, fields count, open action)
  * - identity.*   the fields screen (title, banner, list wording)
  * - map.*        the map screen (title, select hint, base-layer attribution)
  *
@@ -63,6 +64,9 @@ export const strings = {
   'home.backend': 'Backend: {api}',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
+  'entry.title': 'Case',
+  'entry.open_field': 'Open field',
+  'entry.fields_count': '{n} fields',
   'identity.title': 'Fields',
   'identity.case_label': 'Case',
   'identity.banner_title': 'Example data',
