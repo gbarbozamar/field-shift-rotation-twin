@@ -1,0 +1,20 @@
+{
+  "format_version": 1,
+  "kind": "expected_value",
+  "id": "PLACEHOLDER-expected-number",
+  "test_code": "E999",
+  "quantity": "PLACEHOLDER quantity",
+  "value": {
+    "number": 123456789.0,
+    "unit": "PLACEHOLDER unit"
+  },
+  "tolerance": {
+    "absolute": 987654321.0
+  },
+  "citation": {
+    "reference": "PLACEHOLDER citation, not a real source",
+    "locator": "PLACEHOLDER locator"
+  },
+  "transcribed_by": "PLACEHOLDER person A",
+  "checked_by": "PLACEHOLDER person B"
+}

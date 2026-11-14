@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "kind": "protocol_run",
+  "id": "PLACEHOLDER-run",
+  "protocol": "PLACEHOLDER protocol version",
+  "code_version": "PLACEHOLDER commit",
+  "run_at": "1900-01-01T00:00:00Z",
+  "run_by": "PLACEHOLDER person A",
+  "test_codes": [
+    "E999",
+    "H999",
+    "D999"
+  ]
+}
