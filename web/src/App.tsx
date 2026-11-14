@@ -2,9 +2,13 @@ import { useHashRoute } from './lib/useHashRoute'
 import { API_URL } from './lib/api'
 import { formatString } from './lib/format'
 import { strings } from './strings'
+import FieldsScreen from './identity/FieldsScreen'
 
 export default function App() {
   const route = useHashRoute()
+  // The identity screen is the first real screen: it is the default view and
+  // also reachable at "/fields". Other routes keep the placeholder page.
+  const showFieldsScreen = route === '/' || route === '/fields'
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -13,13 +17,19 @@ export default function App() {
         <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
       </header>
       <main className="px-6 py-8">
-        <p>{strings['home.shell']}</p>
-        <p className="mt-2 text-sm text-slate-500">
-          {formatString(strings['home.route'], { route })}
-        </p>
-        <p className="text-sm text-slate-500">
-          {formatString(strings['home.backend'], { api: API_URL })}
-        </p>
+        {showFieldsScreen ? (
+          <FieldsScreen />
+        ) : (
+          <>
+            <p>{strings['home.shell']}</p>
+            <p className="mt-2 text-sm text-slate-500">
+              {formatString(strings['home.route'], { route })}
+            </p>
+            <p className="text-sm text-slate-500">
+              {formatString(strings['home.backend'], { api: API_URL })}
+            </p>
+          </>
+        )}
       </main>
     </div>
   )
