@@ -18,7 +18,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from adapters.ports import ClimateRequest, ClimateResult, ClimateSource, SourceInfo
-from api.main import app as default_app
 from api.main import create_app
 from api.ports import (
     EnginesResult,
@@ -257,8 +256,9 @@ def test_complete_when_all_available_and_no_source_unavailable():
     assert response.json()["outcome"] == "complete"
 
 
-def test_default_app_answers_with_typed_absences_only():
-    response = TestClient(default_app).post(ROUTE, json=BODY)
+def test_default_app_answers_with_typed_absences_only(engines_hidden):
+    # Built here, not at import: the engines are looked for when the app is built.
+    response = TestClient(create_app([])).post(ROUTE, json=BODY)
     assert response.status_code == 200
     body = response.json()
     assert body["outcome"] == "no_result"

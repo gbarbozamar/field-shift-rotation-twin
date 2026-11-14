@@ -279,19 +279,6 @@ def numbers_in(value: Any) -> list[Any]:
 # --- 1. discovery -------------------------------------------------------------
 
 
-@pytest.fixture
-def no_engine_modules():
-    def clear() -> None:
-        for name in [
-            n for n in sys.modules if n == "engine" or n.startswith("engine.")
-        ]:
-            del sys.modules[name]
-
-    clear()
-    yield
-    clear()
-
-
 def write_package(root: Path, files: dict[str, str]) -> None:
     for relative, text in files.items():
         path = root / relative
@@ -299,7 +286,7 @@ def write_package(root: Path, files: dict[str, str]) -> None:
         path.write_text(textwrap.dedent(text), encoding="utf-8")
 
 
-def test_without_an_engine_package_nothing_is_built(no_engine_modules):
+def test_without_an_engine_package_nothing_is_built(engines_hidden):
     assert discover_engine_functions() == EngineFunctions()
 
 
@@ -780,7 +767,7 @@ def test_route_end_to_end():
 # --- 10. the default app ------------------------------------------------------
 
 
-def test_default_engines_are_the_runner_and_say_nothing_is_built(no_engine_modules):
+def test_default_engines_are_the_runner_and_say_nothing_is_built(engines_hidden):
     app_client = TestClient(create_app([ORIGIN]))
     response = app_client.post(ROUTE, json=BODY)
     assert response.status_code == 200
