@@ -9,7 +9,7 @@ The one public function of each engine: where it lives, its name, its arguments 
   - `PROPOSED`: the session proposes the module path, the function name, the arguments and the return type. A person accepts or corrects them in the pull request.
   - `OPEN`: the session cannot responsibly propose the signature. The entry gives a candidate, so that the question is concrete, and names the questions a person has to answer.
 - A `PROPOSED` entry can still depend on a question. Questions are listed once, under [OPEN](#open), as `Q1` to `Q16`, each with the role that answers it.
-- Three questions were answered by the lead developer on 14 November 2026 (issue #77): Q4, Q8 as far as the start month of the agricultural year goes, and Q10 as far as latitude and elevation go. Each keeps its number and its text, and carries the answer under it, marked `DECIDED`. They are a person's decisions, transcribed by a builder session. Issue #77 says of them: where they are science class, a science reviewer still has to accept them. No model and no route changed with these answers: each change is its own later unit, and until it lands the models behave as this file describes them. Q5 was answered the same day (issue #77, D47) and is recorded the same way.
+- Three questions were answered by the lead developer on 14 November 2026 (issue #77): Q4, Q8 as far as the start month of the agricultural year goes, and Q10 as far as latitude and elevation go. Each keeps its number and its text, and carries the answer under it, marked `DECIDED`. They are a person's decisions, transcribed by a builder session. Issue #77 says of them: where they are science class, a science reviewer still has to accept them. No model and no route changed with these answers: each change is its own later unit, and until it lands the models behave as this file describes them. Q5 was answered the same day (issue #77, D47) and is recorded the same way. So is Q3 (D46, with the platform developer's conditions of D56). Its answer changes the signatures of EP1 and EP3 in this file before any engine or the runner changes.
 - General rules that hold for every entry are `G1` to `G7`. They are all `PROPOSED`.
 - No engine exists yet and the folder `engine/` does not exist. This file contains no code. A signature is written as text, in the notation of Python type hints.
 - This file contains no method, equation, unit, parameter value, threshold or citation. The repository names no soil-loss method and this file names none.
@@ -28,6 +28,7 @@ Every type in a signature is one of the rows below. Nothing else is used.
 | `WaterDeficitExposure` | Existing model: file `contracts/results/models.py`, class `WaterDeficitExposure` |
 | `Missing` | Existing model: file `contracts/results/models.py`, class `Missing`. Not the class of the same name in `contracts/inputs/common.py` |
 | `list[...]`, `A \| B` | Built-in: a list, and "one of the two types" |
+| `dict[str, dict]` (only as `parameters`) | The parameter catalogue as loaded (Q3, D46, D56): the first value that `params.catalogue.load_folder` returns for the folder `params/records/`, that is every record of the catalogue, each a dictionary in the record format of `params/README.md`, keyed by the path of its file relative to `params/records/`. PROPOSED |
 | `"Rotation definition"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
 | `"ResidueLedger"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
 | `"CarbonForcing"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
@@ -43,7 +44,7 @@ Status of G1 to G7: PROPOSED
 
 An entry point receives data and returns data. It makes no network call, reads and writes no file, reads no environment variable and no clock, and does not change its arguments. The same arguments give the same result. Adapters fetch; the route passes what they return.
 
-One case where the session cannot show that this holds is Q3: the values of the parameter catalogue.
+The values of the parameter catalogue reach an entry point as the argument `parameters`, loaded by the runner (Q3, D46). An entry point may call the pure functions of `params.catalogue` that read a record it was given (`read_value`, `read_range`, `identity`). It never calls `load_folder` or anything else that reads a file. PROPOSED.
 
 ### G2 One call is one rotation of one field
 
@@ -51,7 +52,7 @@ One call computes one rotation of one field from one set of inputs. Comparing ro
 
 ### G3 Arguments and return value are model instances
 
-- Every argument is an instance of the model the signature names, already validated. An entry point does not receive a dictionary or JSON text.
+- Every argument is an instance of the model the signature names, already validated. An entry point does not receive a dictionary or JSON text. The one exception is `parameters` (Q3, D56). It is the catalogue as `params.catalogue.load_folder` returns it, which is a dictionary, and the runner passes it only after `params.catalogue.check_catalogue` has reported no problem for it. What the runner does when the check reports a problem is the platform developer's (Q3).
 - The route passes arguments by name.
 - The return value is an instance of the type the signature names and is valid for its model.
 
@@ -69,6 +70,8 @@ A function that cannot compute a value returns that value as missing, with its r
 | Two daily series that must be combined have different time zones | The result is missing, reason `NOT_COMPUTABLE` | C6.3 |
 | The inputs are present and the method does not cover the case | The result is missing, reason `NOT_COMPUTABLE` | C3.2 |
 | An input is in a unit that the engine does not accept | The result is missing. The reason code is not decided: Q11 | C1.1 |
+| A parameter that the computation needs has no record in `parameters` | The result is missing, reason `MISSING_INPUT`; `detail` names the parameter by its `id` and the `scope` looked for (D56). PROPOSED | C3.3 |
+| The record of a parameter has `"value": null` (or `"range": null`) with its reason | A result that needs that value (or that range) is missing, reason `MISSING_INPUT`; `detail` names the parameter and repeats the reason of the record. PROPOSED | C3.3 |
 
 A missing value keeps its indicator identifier, its direction and its unit (C3.1).
 
@@ -118,6 +121,7 @@ Status: PROPOSED
 | Argument `calendar` | `RotationCalendar` (`contracts/inputs/rotation_calendar.py`). The value returned by EP2 |
 | Argument `climate` | `SiteClimate` (`contracts/inputs/site_climate.py`). From the adapters |
 | Argument `soil_slope` | `SiteSoilSlope` (`contracts/inputs/site_soil_slope.py`). From the adapters, or the accepted example while blueprint section 7 allows it |
+| Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner, passed by keyword like the other arguments (Q3, D46, D56). PROPOSED |
 | Return type | `SoilLossResults`, or `Missing` (both in `contracts/results/models.py`) |
 
 ```text
@@ -125,6 +129,7 @@ compute_soil_loss(
     calendar: RotationCalendar,
     climate: SiteClimate,
     soil_slope: SiteSoilSlope,
+    parameters: dict[str, dict],
 ) -> SoilLossResults | Missing
 ```
 
@@ -139,7 +144,7 @@ When it cannot compute:
   - **This point no longer applies once the decision on Q4 is in force.** `DECIDED` by the lead developer on 14 November 2026 (issue #77, D7): the start month is a required part of the request; a request without it is an invalid request, and the route answers it as such and calls no engine. The case "no start month" no longer reaches an engine. The text above is kept to show what was proposed.
   - Not changed yet: `RotationCalendar` still accepts a start month that is missing with its reason, and the signature of this entry is left as it was written. Issue #77 does not say whether the return type changes.
 
-Depends on: Q3 (parameters), Q4 (answered: see the question), Q5 (which agricultural years; answered: see the question), Q11 (unit), Q12 (residue ledger).
+Depends on: Q3 (parameters; answered: see the question), Q4 (answered: see the question), Q5 (which agricultural years; answered: see the question), Q11 (unit), Q12 (residue ledger).
 
 ### EP2 `engine/calendar/`
 
@@ -183,6 +188,7 @@ Status: PROPOSED
 | Argument `calendar` | `RotationCalendar` (`contracts/inputs/rotation_calendar.py`). The value returned by EP2 |
 | Argument `climate` | `SiteClimate` (`contracts/inputs/site_climate.py`). From the adapters |
 | Argument `soil_slope` | `SiteSoilSlope` (`contracts/inputs/site_soil_slope.py`). From the adapters, or the accepted example while blueprint section 7 allows it |
+| Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner, passed by keyword like the other arguments (Q3, D46, D56). PROPOSED |
 | Return type | `list[WaterDeficitExposure]` (`contracts/results/models.py`) |
 
 ```text
@@ -190,6 +196,7 @@ compute_water_deficit_exposure(
     calendar: RotationCalendar,
     climate: SiteClimate,
     soil_slope: SiteSoilSlope,
+    parameters: dict[str, dict],
 ) -> list[WaterDeficitExposure]
 ```
 
@@ -212,7 +219,7 @@ When it cannot compute:
 - The list is never empty and an agricultural year is never left out.
 - The time basis of the items is `OPEN` in C1.3. The signature is the same for either answer.
 
-Depends on: Q2, Q3 (parameters), Q5 (which agricultural years; answered: see the question), Q10 (inputs and outputs of the water engine; answered for latitude and elevation: they arrive in `climate`, and this signature does not change), Q11 (unit).
+Depends on: Q2, Q3 (parameters; answered: see the question), Q5 (which agricultural years; answered: see the question), Q10 (inputs and outputs of the water engine; answered for latitude and elevation: they arrive in `climate`, and this signature does not change), Q11 (unit).
 
 ### EP4 `engine/residues/`
 
@@ -301,6 +308,25 @@ Each item is a question a person can answer. The role that answers it is named a
 **Q2. Does the route see one function for `engine/water/`, or two?** EP3 proposes one, with its reasons. If it is two, the function of `engine/water/et0/` needs a return type, and no contract of blueprint section 5 carries the reference evapotranspiration. For the lead developer.
 
 **Q3. How do the values of the parameter catalogue reach an engine?** G1 says an engine reads no file, and no contract of blueprint section 5 carries parameters, so no signature here has an argument for them. Either the engines import the catalogue as code, and a person says that this is allowed under G1; or every entry point that needs parameters gains an argument, and its type has to be defined as a new contract. The session lists this case as decision 2 of issue #58 asks, without breaking the rule. For the lead developer, who owns the structure of `params/`, and the platform developer.
+
+- `DECIDED` (decided by the lead developer on 14 November 2026, [issue #77, D46](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882268346); agreed by the platform developer in [issue #18](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/18#issuecomment-6882360229) on two conditions, both accepted as [D56](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882499943)): **the runner loads the catalogue and passes it to the entry point as an argument `parameters`**, so the engines stay pure (G1).
+- What D56 fixes, written in this file:
+  - the name is `parameters`, passed by keyword (G3);
+  - its type is the catalogue of `params/` as loaded (see the table of types);
+  - a parameter that is not in the catalogue makes the value that needs it missing with `MISSING_INPUT`, the parameter named in `detail` (G4);
+  - the argument is added to EP1 and EP3 only; EP2 keeps `build_rotation_calendar(rotation)`.
+- `PROPOSED` by the session that wrote this answer, for the platform developer's approval:
+  - the type: the dictionary that `params.catalogue.load_folder` returns, unchanged;
+  - an entry point finds a record by its `id` and its `scope` (`params.catalogue.identity`), never by the path of its file, as `params/README.md` says;
+  - an entry point reads a value with `params.catalogue.read_value` and a range with `params.catalogue.read_range`, and rewrites the `Missing` of `params/catalogue.py` as the `Missing` of `contracts/results/models.py`;
+  - the runner passes the catalogue only after `params.catalogue.check_catalogue` reports no problem for it;
+  - the two rows of G4 for a parameter.
+- Still `OPEN`:
+  - What the runner does when the catalogue has a problem (a malformed record, a duplicate, a placeholder): it could answer an error or pass no catalogue. For the platform developer.
+  - Which record an engine reads when one record has the empty scope and another names a crop. This is question 5 of `params/README.md`. For the lead developer.
+  - Whether the catalogue later becomes a model class of its own, so that G3 needs no exception. For the lead developer and the platform developer.
+  - The candidates of EP4, EP5 and EP6 do not have the argument. Whether they gain it is part of Q13 and Q14.
+- Not changed yet: no engine and no runner uses the argument. The entry points of `engine/erosion/` (#125) and `engine/water/` and the runner in `api/engines.py` still take three arguments. D56 says this file states the argument first. Each engine and the runner change in their own later units, after the platform developer approves this one.
 
 **Q4. What does EP1 return when the agricultural years cannot be laid out?** `RotationCalendar` accepts a start month that is missing with its reason. `SoilLossResults` needs at least one agricultural year with its number, and twelve dated months for each, so it has no valid form for that case. EP1 proposes to return a `Missing` in its place. The field `soil_loss` of `ResultsPerRotation` cannot hold a `Missing`, so the route has no valid `ResultsPerRotation` for that request. The options are: `SoilLossResults` gains a wholly missing form (a change of the model, a new L0 unit); or a request without a start month is not a valid request; or the response of the route is not a bare `ResultsPerRotation`. For the lead developer; the platform developer for the response.
 
