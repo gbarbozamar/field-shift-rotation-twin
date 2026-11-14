@@ -9,6 +9,15 @@ CSS, TanStack Query and hash-based client-side routing.
 - `npm run dev` — dev server at `http://localhost:5173`.
 - `npm run build` — type-check and build into `dist/`.
 - `npm run preview` — preview the production build.
+- `npm test` — run the Vitest suite (`npx vitest run` also works).
+
+## Strings
+
+Every user-visible English string lives in `src/strings.ts`; components render
+`strings[key]` and hold no text literal of their own. Placeholders in braces
+(`{source}`, `{route}`, ...) are filled by the pure helper in `src/lib/format.ts`.
+The Vitest suite checks that the file matches the wording sheet and that no
+other file under `src/` carries user-visible text.
 
 ## Configuration
 
