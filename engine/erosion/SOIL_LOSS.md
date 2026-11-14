@@ -4,17 +4,26 @@ Entry point EP1 of `contracts/ENTRYPOINTS.md`, `compute_soil_loss`, in `engine/e
 
 - Unit `l0/erosion-entrypoint` (issue #115, merged as #125): the mechanical form. It lays out the agricultural years of the climate record and their months.
 - Unit `l0/erosion-ep1-parameters` (issue #154, merged as #158): the argument `parameters` (D46, D56), and the factors the code then built could compute from it.
-- Unit `l0/erosion-ep1-c-r` (issue #173): `R` computed through `engine/erosion/r_factor/` (M1.2) and `C` through `engine/erosion/c_factor/` (M1.5, D45), every constant read from `parameters`.
+- Unit `l0/erosion-ep1-c-r` (issue #173, PR #187): `R` and `C` wired to `engine/erosion/r_factor/` and `engine/erosion/c_factor/`, every constant read from `parameters`. Revised after the review of PR #187 to follow decisions recorded on `main` after the brief: the route of the first release (D69, D84, USER-G) and the forms of PC-1.
 
-> **Status: PROPOSED** (blueprint section 3.7). The parameter identifiers and their scope, the crop and the residue of a day, the soil-loss ratio of a month, `C` by agricultural year, the reading of a unit string, the order of the checks, the reason code of each value, the format of every `detail`, the source text of a computed value and the test cases below were written by builder sessions. They take effect only when a person approves the pull request. Items under [OPEN](#open) need an answer from a person.
+> **Status: PROPOSED** (blueprint section 3.7). The parameter identifiers and their scope, the monthly value of the main route, the crop and the residue of a day, the soil-loss ratio of a month, `C` by agricultural year on the daily-index route, the reading of a unit string, the order of the checks, the reason code of each value, the format of every `detail`, the source text of a computed value and the test cases below were written by builder sessions. They take effect only when a person approves the pull request. Items under [OPEN](#open) need an answer from a person.
 
-**This unit holds no parameter value.** No coefficient, no default and no stand-in number: not in the code, not in a test, not in this file. `params/records/` stays empty, so every real run still returns every annual value missing, each with the parameters it lacks named by id and scope. A number appears only when a person has transcribed and checked every record listed under [Parameters EP1 reads](#parameters-ep1-reads) (decision D34 of issue #77). With a real calendar, whose dates lie after the climate record, `C` stays missing as well until the rotation is repeated over the years of the record (OPEN 2).
+**This unit holds no parameter value.** No coefficient, no default and no stand-in number: not in the code, not in a test, not in this file. `params/records/` stays empty, so every real run still returns every value missing, each with the parameters it lacks named by id and scope. A number appears only when a person has transcribed and checked every record listed under [Parameters EP1 reads](#parameters-ep1-reads) (decision D34 of issue #77).
 
 Acceptance test, from the repository root:
 
 ```bash
 py -3.12 -m pytest engine/erosion/ validation/
 ```
+
+## Two routes
+
+| Route | Function | Called by the runner | `R` | `C` | Monthly values |
+|---|---|---|---|---|---|
+| **Main**: the route of the first release (`docs/METHODS.md` M1.2; decisions D69 and D84 of issue #77, USER-G) | `compute_soil_loss` (EP1) | Yes | The mean annual level, the same for every agricultural year: the variation between years is deferred (USER-G, D69) | The single declared value of the whole-factor record `rusle_c_factor` (`DECLARED`), until the licence of the climatology is confirmed (M1.2, D69, D84) | `R` of the month, the level times the climatological fraction of the month (`r_factor/climatology.py`, twelve records), times `K`, `LS`, `C` and `P` |
+| **Daily index**, kept available off the main path | `compute_soil_loss_daily_index` (same signature) | No | Through the daily erosivity index of `r_factor/`: monthly fractions and yearly ratios of the `precipitation` series | Through `c_factor/` (D45, PC-1) for each agricultural year, from the crop and the last harvest of each day of the calendar | `NOT_AVAILABLE` (OPEN 20) |
+
+The daily-index route is what the brief of #173 asked for. It stays off the main path because D69, D84 and USER-G choose the climatology for the first release while S5 and S6 stay behind paywalls (OPEN 11, OPEN 12).
 
 ## Signature
 
@@ -28,24 +37,27 @@ compute_soil_loss(
 ) -> SoilLossResults | Missing
 ```
 
-As EP1 is written in `contracts/ENTRYPOINTS.md` (#144): `parameters` is the catalogue as `params.catalogue.load_folder` returns it, passed by keyword (G3, D56). It has **no default**: a call without it raises `TypeError`. It is keyword-only, so a call that passes it by position also raises `TypeError`. Unchanged by this unit.
+As EP1 is written in `contracts/ENTRYPOINTS.md` (#144): `parameters` is the catalogue as `params.catalogue.load_folder` returns it, passed by keyword (G3, D56). It has **no default**: a call without it raises `TypeError`. It is keyword-only, so a call that passes it by position also raises `TypeError`. `compute_soil_loss_daily_index` has the same signature.
 
-The function never calls `load_folder` or anything else that reads a file (G1). It calls the pure functions `params.catalogue.identity` and `params.catalogue.read_value` on the records it was given, and the pure functions of `r_factor/`, `c_factor/`, `ls.py` and `equation.py`, and does not change `parameters`.
+Neither function calls `load_folder` or anything else that reads a file (G1). They call the pure functions `params.catalogue.identity` and `params.catalogue.read_value` on the records they were given, and the pure functions of `r_factor/`, `c_factor/`, `ls.py` and `equation.py`, and do not change `parameters`.
 
 ## Decisions this unit applies
 
-Decisions of the lead developer, recorded in issue #77. They are cited, not reopened.
+Decisions recorded in issue #77 and `docs/SCIENCE_DECISIONS.md`. They are cited, not reopened.
 
 | Decision | What this unit does with it |
 |---|---|
 | D46, D56 (Q3) | The argument `parameters`, by keyword. A parameter without a record makes the value that needs it missing with `MISSING_INPUT`, the parameter named by id and scope in `detail` |
 | D47, agricultural years (Q5) | Every agricultural year of the climate record, cut by the start month of the case. The record is the daily series with quantity `precipitation`: every agricultural year (C5.3) that has at least one day between that series' `start_date` and `end_date` is laid out, identified by the calendar year in which it begins |
-| D47, rotation repeated over the years | **Not implemented.** `C` reads the crop and the last harvest of each day from the calendar's dates; a day outside them makes `C` of its year missing, naming D47 (OPEN 2) |
-| D23, source of daily precipitation | The quantity identifier `precipitation`, the only climate series the soil-loss method reads (`docs/METHODS.md` M1.2) |
+| D47, rotation repeated over the years | **Not implemented.** The main route reads no date of the calendar. The daily-index route reads the crop and the last harvest of each day from the calendar's dates; a day outside them makes `C` of its year missing, naming D47 (OPEN 2) |
+| D69, D84, USER-G (D76) | The main route: `R` of every year is the mean annual level; a month's `R` is the level times the climatological fraction of the month, from the twelve monthly values at the point; `C` is a single declared value until the licence of the climatology is confirmed (`docs/METHODS.md` M1.2) |
+| PC-1 | On the daily-index route: the canopy sub-factor takes the effective canopy cover of S1 Eq. 6.5 (`effective_canopy_cover`), and the ground-cover sub-factor is `surface_cover_subfactor_percent` with `b` per percent of cover (`rusle2_surface_cover_b_per_percent`) |
+| PC-7 | The control regression of `r_factor/` stays out of both routes |
+| D23, source of daily precipitation | The quantity identifier `precipitation`, the series by which the years are laid out and the daily-index route computes |
 | D11, unit strings of `R` and `K` (M1.7) | The accepted unit strings of the unit guard of `equation.py`: `R` in `MJ mm ha-1 h-1 yr-1` (`r_factor.R_UNIT`), `K` in `t ha h ha-1 MJ-1 mm-1`. `LS`, `C` and `P` have no unit (M1.7), written `dimensionless` (C1.1) |
-| D45, sub-factors of `C` | Applied through `c_factor/`: canopy cover, and surface residue cover with residue decay by residue type. The other sub-factors stand at one, as `c_factor/` records in every soil-loss ratio |
+| D45, sub-factors of `C` | Applied through `c_factor/` on the daily-index route: canopy cover, and surface residue cover with residue decay by residue type |
 | D7, start month required (Q4) | Decided, not implemented on `main`: EP1 keeps its single `Missing` for a missing start month (OPEN 7) |
-| D12 and D31, meaning of `NOT_AVAILABLE` | Used only for a part that is not built: a monthly value of soil loss, the propagation of a range through the product, and the tolerance of the sum of the erosivity fractions that EP1 does not supply |
+| D12 and D31, meaning of `NOT_AVAILABLE` | Used only for a part that is not built: a monthly value on the daily-index route, the propagation of a range through the product, and the tolerance of the sum of the erosivity fractions that EP1 does not supply |
 | D10, D48, source of `K` | Not applied: `K` comes from the soil data through the platform adapters later. Until then `K` is read from the catalogue (OPEN 13) |
 
 ## Parameters EP1 reads
@@ -58,100 +70,136 @@ The scope column says how a record is looked up:
 - `crop or no crop`: `{"crop": "<crop_id>"}`, the `crop_id` of the calendar component that covers the day; on a day no component covers, `{"management": "no_crop"}` (as `engine/water/EXPOSURE.md` reads it).
 - `crop of the last harvest`: `{"crop": "<crop_id>"}`, the `crop_id` of the component whose end date is the last one before the day.
 
-| Argument | Identifier | Scope | Factor | What the record holds | Unit of the record |
-|---|---|---|---|---|---|
-| `mean_annual_r` | `rusle_r_factor` | site | `R` | The mean annual level of `R` at the field (M1.2) | Must be `MJ mm ha-1 h-1 yr-1` (D11), or `r_factor/` refuses it |
-| `exponent` | `rusle_r_daily_index_exponent` | site | `R`, `C` | The exponent of the daily erosivity index (M1.2) | Not checked: an exponent |
-| `threshold` | `rusle_r_daily_index_threshold` | site | `R`, `C` | The daily precipitation at or below which a day adds nothing to the index | Must be `mm day-1`, or `r_factor/` refuses it |
-| `K` | `rusle_k_factor` | site | `K` | `K` of the soil of the field (M1.3) | Must be the accepted string of D11, or the unit guard stops the product |
-| `a1` | `rusle_s_below_break_sine_coefficient` | site | `LS` | See `LS.md` | Not checked (OPEN 4 of `LS.md`) |
-| `a2` | `rusle_s_below_break_constant` | site | `LS` | See `LS.md` | Not checked |
-| `a3` | `rusle_s_at_or_above_break_sine_coefficient` | site | `LS` | See `LS.md` | Not checked |
-| `a4` | `rusle_s_at_or_above_break_constant_subtracted` | site | `LS` | See `LS.md` | Not checked |
-| `s_break` | `rusle_s_break_slope` | site | `LS` | The break slope | Must be read as a `SlopeUnit` (below) |
-| `lambda_unit` | `rusle_l_unit_length` | site | `LS` | The unit length | Must be the unit string of `slope_length`; `ls.py` checks it |
-| `b1` | `rusle_l_beta_sine_divisor` | site | `LS` | See `LS.md` | Not checked |
-| `b2` | `rusle_l_beta_denominator_sine_coefficient` | site | `LS` | See `LS.md` | Not checked |
-| `b3` | `rusle_l_beta_denominator_sine_exponent` | site | `LS` | See `LS.md` | Not checked |
-| `b4` | `rusle_l_beta_denominator_constant` | site | `LS` | See `LS.md` | Not checked |
-| `fall_height_coefficient` | `rusle2_canopy_fall_height_coefficient` | site | `C` | Multiplies the fall height in the canopy sub-factor | The inverse of the unit of the fall height (below) |
-| `surface_cover_coefficient` | `rusle2_surface_cover_coefficient` | site | `C` | Multiplies the surface residue cover in the surface-cover sub-factor | Must be `dimensionless` |
-| `mass_cover_coefficient` | `rusle2_residue_mass_cover_coefficient` | site | `C` | Multiplies the residue mass in the mass-cover relation | The inverse of the unit of the residue mass (below) |
-| `canopy_cover` | `rusle2_canopy_cover` | crop or no crop | `C` | The fraction of the soil under the canopy, zero to one | Must be `dimensionless` |
-| `fall_height` | `rusle2_canopy_fall_height` | crop or no crop | `C` | The fall height of drops from the canopy | Any; it must be the unit whose inverse the coefficient carries |
-| `residue_mass` | `rusle2_residue_mass_at_harvest` | crop of the last harvest | `C` | The residue mass a crop leaves on the surface at the end date of its component | Any; it must be the unit whose inverse the mass-cover coefficient carries |
-| `decay_coefficients` | `rusle2_residue_decay_coefficient` | crop of the last harvest | `C` | The decay coefficient of the residue type of that crop | The inverse of `day` (below) |
-| `P` | `rusle_p_factor` | site | `P` | `P` of the field (M1.6) | Must be `dimensionless` |
+The route column: `main` (`compute_soil_loss`; `main, months` for the monthly values only), `daily` (`compute_soil_loss_daily_index`).
 
-Changes to this table made by this unit (#173):
+| Argument | Identifier | Scope | Route | Factor | What the record holds | Unit of the record |
+|---|---|---|---|---|---|---|
+| `mean_annual_r` | `rusle_r_factor` | site | main, daily | `R` | The mean annual level of `R` at the field (M1.2; D68, D83) | Must be `MJ mm ha-1 h-1 yr-1` (D11) |
+| `january` | `rusle_r_monthly_erosivity_january` | site | main, months | `R` by month | The monthly erosivity of the climatology at the point for January (D69, D84) | One unit string shared by the twelve records (OPEN 11) |
+| `february` | `rusle_r_monthly_erosivity_february` | site | main, months | `R` by month | The same, for February | As January |
+| `march` | `rusle_r_monthly_erosivity_march` | site | main, months | `R` by month | The same, for March | As January |
+| `april` | `rusle_r_monthly_erosivity_april` | site | main, months | `R` by month | The same, for April | As January |
+| `may` | `rusle_r_monthly_erosivity_may` | site | main, months | `R` by month | The same, for May | As January |
+| `june` | `rusle_r_monthly_erosivity_june` | site | main, months | `R` by month | The same, for June | As January |
+| `july` | `rusle_r_monthly_erosivity_july` | site | main, months | `R` by month | The same, for July | As January |
+| `august` | `rusle_r_monthly_erosivity_august` | site | main, months | `R` by month | The same, for August | As January |
+| `september` | `rusle_r_monthly_erosivity_september` | site | main, months | `R` by month | The same, for September | As January |
+| `october` | `rusle_r_monthly_erosivity_october` | site | main, months | `R` by month | The same, for October | As January |
+| `november` | `rusle_r_monthly_erosivity_november` | site | main, months | `R` by month | The same, for November | As January |
+| `december` | `rusle_r_monthly_erosivity_december` | site | main, months | `R` by month | The same, for December | As January |
+| `C` | `rusle_c_factor` | site | main | `C` | The single declared `C` of the first release (M1.2, D69, D84, USER-G) | Must be `dimensionless` |
+| `exponent` | `rusle_r_daily_index_exponent` | site | daily | `R`, `C` | The exponent of the daily erosivity index (M1.2) | Not checked: an exponent |
+| `threshold` | `rusle_r_daily_index_threshold` | site | daily | `R`, `C` | The daily precipitation at or below which a day adds nothing to the index | Must be `mm day-1`, or `r_factor/` refuses it |
+| `K` | `rusle_k_factor` | site | main, daily | `K` | `K` of the soil of the field (M1.3) | Must be the accepted string of D11 |
+| `a1` | `rusle_s_below_break_sine_coefficient` | site | main, daily | `LS` | See `LS.md` | Not checked (OPEN 4 of `LS.md`) |
+| `a2` | `rusle_s_below_break_constant` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `a3` | `rusle_s_at_or_above_break_sine_coefficient` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `a4` | `rusle_s_at_or_above_break_constant_subtracted` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `s_break` | `rusle_s_break_slope` | site | main, daily | `LS` | The break slope | Must be read as a `SlopeUnit` (below) |
+| `lambda_unit` | `rusle_l_unit_length` | site | main, daily | `LS` | The unit length | Must be the unit string of `slope_length`; `ls.py` checks it |
+| `b1` | `rusle_l_beta_sine_divisor` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `b2` | `rusle_l_beta_denominator_sine_coefficient` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `b3` | `rusle_l_beta_denominator_sine_exponent` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `b4` | `rusle_l_beta_denominator_constant` | site | main, daily | `LS` | See `LS.md` | Not checked |
+| `fall_height_coefficient` | `rusle2_canopy_fall_height_coefficient` | site | daily | `C` | Multiplies the fall height in the canopy sub-factor | The inverse of the unit of the fall height (below) |
+| `surface_cover_coefficient_per_percent` | `rusle2_surface_cover_b_per_percent` | site | daily | `C` | `b` of S1 Eq. 6.6, per percent of cover, the roughness term at one (PC-1) | Must be `percent-1` |
+| `mass_cover_coefficient` | `rusle2_residue_mass_cover_coefficient` | site | daily | `C` | Multiplies the residue mass in the mass-cover relation | The inverse of the unit of the residue mass (below) |
+| `canopy_cover` | `rusle2_canopy_cover` | crop or no crop | daily | `C` | The fraction of the soil under the canopy, zero to one, before Eq. 6.5 | Must be `dimensionless` |
+| `fall_height` | `rusle2_canopy_fall_height` | crop or no crop | daily | `C` | The fall height of drops from the canopy | Any; it must be the unit whose inverse the coefficient carries |
+| `residue_mass` | `rusle2_residue_mass_at_harvest` | crop of the last harvest | daily | `C` | The residue mass a crop leaves on the surface at the end date of its component | Any; it must be the unit whose inverse the mass-cover coefficient carries |
+| `decay_coefficients` | `rusle2_residue_decay_coefficient` | crop of the last harvest | daily | `C` | The decay coefficient of the residue type of that crop (PC-2: constant) | The inverse of `day` (below) |
+| `P` | `rusle_p_factor` | site | main, daily | `P` | `P` of the field (M1.6) | Must be `dimensionless` |
 
-- `rusle_r_factor` now holds the **mean annual level** of `R` that `r_factor/` multiplies by the monthly fractions and the yearly ratios. It was read as the whole factor before; its unit is unchanged.
-- Added for `R`: `rusle_r_daily_index_exponent`, `rusle_r_daily_index_threshold` (the identifiers of `r_factor/README.md`).
-- Added for `C`, site: `rusle2_canopy_fall_height_coefficient`, `rusle2_surface_cover_coefficient`, `rusle2_residue_mass_cover_coefficient` (the identifiers of `c_factor/README.md`).
-- Added for `C`, by crop: `rusle2_canopy_cover`, `rusle2_canopy_fall_height`, `rusle2_residue_mass_at_harvest` (new identifiers, PROPOSED) and `rusle2_residue_decay_coefficient` (the identifier of `c_factor/README.md`, its residue type named by the scope key `crop`, OPEN 23).
-- **No longer read:** `rusle_c_factor`, the whole-factor record of `C`. A catalogue that holds it gives the same result as one without it. It does not stay as an override (PROPOSED, OPEN 12).
-- Not read: the two constants of the control regression of `r_factor/` (`rusle_r_monthly_control_coefficient`, `rusle_r_monthly_control_exponent`); EP1 does not run the control (OPEN 26).
+Changes to this table made by this unit (#173, revised after the review of #187):
+
+- `rusle_r_factor` holds the **mean annual level** of `R`: the `R` of every year on the main route, and the level `r_factor/` multiplies on both routes.
+- Added for the monthly values of the main route: the twelve `rusle_r_monthly_erosivity_<month>` (OPEN 11).
+- `rusle_c_factor` is read again, on the main route only, as the single declared `C` (M1.2, D69, D84, USER-G). The daily-index route does not read it (OPEN 12).
+- Added for the daily-index route: `rusle_r_daily_index_exponent`, `rusle_r_daily_index_threshold` (the identifiers of `r_factor/README.md`); `rusle2_canopy_fall_height_coefficient`, `rusle2_surface_cover_b_per_percent` (PC-1), `rusle2_residue_mass_cover_coefficient` (the identifiers of `c_factor/README.md`); by crop, `rusle2_canopy_cover`, `rusle2_canopy_fall_height`, `rusle2_residue_mass_at_harvest` (new identifiers, PROPOSED) and `rusle2_residue_decay_coefficient` (the identifier of `c_factor/README.md`, its residue type named by the scope key `crop`, OPEN 23).
+- Not read: `rusle2_surface_cover_coefficient`, the per-fraction coefficient that PC-1 replaced; the two constants of the control regression of `r_factor/` (PC-7, OPEN 26).
 
 ### Reading a unit string (PROPOSED)
 
 - **A slope.** `ls.py` needs the unit of `slope_steepness` and of `s_break` as a `SlopeUnit`. A unit string is read as the `SlopeUnit` whose value is that exact string (`percent`, `ratio`, `angle_degrees`, `angle_radians`); any other string is not read, and `LS` is missing with `ls.REASON_UNIT_NOT_ACCEPTED`. OPEN 4.
-- **The inverse of a unit.** `c_factor/` takes, next to each coefficient, the unit whose inverse is the coefficient's unit, and compares it with the unit of the input the coefficient multiplies. A record carries one unit string, so EP1 reads that unit from it: `<u>-1` gives `<u>` when `<u>` is one word (no space, no bracket), for example `day-1` gives `day`; `(<u>)-1` gives `<u>` for any `<u>` that is not blank. Any other string is not read, and `C` is missing with `ls.REASON_UNIT_NOT_ACCEPTED`. OPEN 21.
-- **A fraction.** `c_factor/` reads the canopy cover and the residue cover as fractions from zero to one. The canopy-cover record and the surface-cover coefficient must carry `dimensionless`; any other string is not read. OPEN 21.
+- **The inverse of a unit** (daily-index route). `c_factor/` takes, next to each coefficient, the unit whose inverse is the coefficient's unit, and compares it with the unit of the input the coefficient multiplies. A record carries one unit string, so EP1 reads that unit from it: `<u>-1` gives `<u>` when `<u>` is one word (no space, no bracket), for example `day-1` gives `day`; `(<u>)-1` gives `<u>` for any `<u>` that is not blank. Any other string is not read, and `C` is missing with `ls.REASON_UNIT_NOT_ACCEPTED`. `b` of S1 Eq. 6.6 must read as the inverse of `percent` (PC-1). OPEN 21.
+- **A fraction.** `c_factor/` reads the canopy cover and the residue cover as fractions from zero to one; the canopy-cover record must carry `dimensionless`. OPEN 21.
 - **Time since a harvest** is counted in days of the daily series, unit string `day` (the unit string of `mm day-1`, CQ1). OPEN 21.
+- **The twelve monthly records** must carry one unit string between them; otherwise their fractions are not defined and every month is missing with `ls.REASON_UNIT_NOT_ACCEPTED`. Which string is OPEN 11.
 
-## What the function does, in order
+## What the functions do, in order
 
 1. **Types (G5).** `calendar`, `climate` or `soil_slope` that is not an instance of its model, or `parameters` that is not a `dict` whose keys are `str` and whose items are `dict`, raises `TypeError` naming the argument.
 2. **One field (G5).** When `climate` or `soil_slope` names another `case_id` or `field_id` than `calendar`, `ValueError`, naming the identifier fields that differ, never their values.
 3. **Start month (EP1, Q4).** When `calendar.ag_year_start.month` is missing: one `Missing`, reason `MISSING_INPUT`, `detail` names the start month.
 4. **Precipitation series (G4, third row; D47).** When `climate.daily_series` has no item with quantity `precipitation`: one `Missing`, reason `MISSING_INPUT`, `detail` names `precipitation`.
 5. **Years and months (C5.3, D47).** From the agricultural year that holds the series' `start_date` to the one that holds its `end_date`, each with its twelve calendar months starting at `calendar.ag_year_start.month` in calendar year `ag_year`.
-6. **When the calendar is feasible**, once for the call: the steps of M1.2 through `r_factor/` (below), `K`, `LS` and `P`. Then, for each agricultural year the series covers, `R` and `C` of that year.
+6. **When the calendar is feasible**, once for the call: the factors of the route (below).
 7. **Reason or number of each value**, the first row that applies:
 
 | Situation | Annual value | Monthly value | Convention |
 |---|---|---|---|
 | The calendar is infeasible | `NOT_COMPUTABLE` | `NOT_COMPUTABLE` | G4, first row |
 | The series does not cover the year (or the month) from its first day to its last | `NO_COVERAGE` | `NO_COVERAGE` (PROPOSED: C5.5 speaks of yearly values) | C5.5, OPEN 5 |
-| Every other value | `equation.annual_soil_loss` of `R` and `C` of the year and of `K`, `LS`, `P`: a number only when all five are present, otherwise its `Missing` | `NOT_AVAILABLE`: a monthly value of soil loss is not formed (OPEN 20) | G4; D12, D31 |
+| Every other value | The route's annual value, or its `Missing` | The route's monthly value, or its `Missing` | G4 |
 
-Every value keeps `indicator`, `direction` and `unit` (C3.1), taken from `contracts/results/models.py`.
+Every value keeps `indicator`, `direction` and `unit` (C3.1), taken from `contracts/results/models.py`. A number carries `provenance` `DERIVED` (C4.6), a `source`, no `range` and `range_missing` with reason `NOT_AVAILABLE`: how a range passes through the product is not built (C2.3, OPEN 5 of `EQUATION.md`).
 
-## The factors
+## The main route (`compute_soil_loss`)
 
-Each factor is an `equation.Factor`: a number with the unit string it arrives in, or the `Missing` of `contracts/results/models.py` with the unit string it would have (the accepted one).
+### The annual value
+
+`equation.annual_soil_loss(r=..., k=..., ls=..., c=..., p=..., accepted_units=ACCEPTED_UNITS, unit_guard_reason=ls.REASON_UNIT_NOT_ACCEPTED)` of:
+
+- `R`: the record `rusle_r_factor`, the mean annual level, for every agricultural year (USER-G, D69: the variation between years is deferred);
+- `K`, `P`: one record each;
+- `LS`: through `ls.py` (below);
+- `C`: the record `rusle_c_factor`, the single declared value (`DECLARED`; `docs/METHODS.md` M1.2, D69, D84). When it cannot be read, its detail adds why it is a declared value.
+
+As `EQUATION.md` describes it: `MISSING_INPUT` naming every missing factor (`factor '<name>' is missing (reason <CODE>: <detail>)`); then the unit guard (a factor in another unit string than the accepted one); then `NOT_COMPUTABLE` for a product that is not finite. The value is the same for every covered year. Its `source` names the level of `R`, the declared `C` (with the word `DECLARED` and USER-G), `LS` from `ls.py`, `K` and `P`, and every record read with its scope.
+
+### The monthly values (PROPOSED)
+
+1. The twelve records `rusle_r_monthly_erosivity_<month>` are read. Any that cannot be read makes every month missing (`MISSING_INPUT`), naming each by id and scope with `needed by the climatological monthly fraction of R of docs/METHODS.md M1.2 (decisions D69 and D84 of issue #77, USER-G; ...); no value of the climatology is committed until its licence is confirmed (D69)`. Records in more than one unit string make every month missing with `ls.REASON_UNIT_NOT_ACCEPTED`.
+2. `r_factor.climatological_monthly_fractions` of the twelve numbers, then `r_factor.climatological_r_by_year_and_month(mean_annual_r=<level>, mean_annual_r_unit=<its unit>, fractions, ag_years=<every year of the record>, start_month)`: `R` of the month is the level times the fraction of its calendar month. Their refusals are theirs (a month below zero, twelve that add up to zero, a level in another unit).
+3. A covered month is `R` of the month times `K`, `LS`, `C` and `P`, unit `t ha-1 month-1`; the twelve months of a year add up to the annual value (C1.2). It is missing when the annual product is (its detail repeated as `its factors are those of the annual product: ...`) or when `R` of the month is, naming both; the reason is `MISSING_INPUT` when either is a missing input.
+
+`docs/METHODS.md` M1.2 says the monthly values "stay `NOT_AVAILABLE`" until the licence is confirmed; D56 makes a value whose parameter has no record `MISSING_INPUT`, naming it. EP1 follows D56 and names D69 and D84 in the detail (OPEN 11).
+
+## The daily-index route (`compute_soil_loss_daily_index`), off the main path
 
 ### `R` through `r_factor/` (M1.2)
 
-1. The records of the level, the exponent and the threshold are read. When the exponent or the threshold cannot be read, the monthly erosivity fractions are missing (`MISSING_INPUT`, `the monthly erosivity fractions: ...`), and so is `R` (`R by month: ...`); each names the record by id and scope and adds `needed by the daily erosivity index of docs/METHODS.md M1.2 (engine/erosion/r_factor/), whose monthly fractions and yearly ratios R and C need`. A level that cannot be read makes `R` missing the same way (`needed by the mean annual level of R ...`) and leaves the fractions.
-2. Otherwise `r_factor.r_factor_parts(series=<the precipitation series>, exponent, threshold, threshold_unit=<unit of the threshold record>, start_month, mean_annual_r, mean_annual_r_unit=<unit of the level record>)`. Every refusal is `r_factor/`'s: a series or a threshold not in `mm day-1`, a level not in `MJ mm ha-1 h-1 yr-1`, a missing day (that day, its month and its agricultural year missing, never zero rain), a year without an erosive day (its fractions `NOT_COMPUTABLE`), and so on (`r_factor/README.md`).
-3. `R` of a covered agricultural year is the **sum of its twelve values of `R` by month** (`r_by_year_and_month`), unit `MJ mm ha-1 h-1 yr-1`. When a month is missing, `R` of the year is missing: the months are named, grouped by reason and detail; the reason is that of the months when they share one, otherwise `MISSING_INPUT`. A sum that is not finite is `NOT_COMPUTABLE`.
+1. The records of the level, the exponent and the threshold are read. When the exponent or the threshold cannot be read, the monthly erosivity fractions are missing (`MISSING_INPUT`, `the monthly erosivity fractions: ...`), and so is `R` (`R by month: ...`); each names the record by id and scope and adds `needed by the daily erosivity index of docs/METHODS.md M1.2 (engine/erosion/r_factor/), whose monthly fractions and yearly ratios R and C need`. A level that cannot be read makes `R` missing the same way and leaves the fractions.
+2. Otherwise `r_factor.r_factor_parts(...)`. Every refusal is `r_factor/`'s: a series or a threshold not in `mm day-1`, a level not in `MJ mm ha-1 h-1 yr-1`, a missing day (that day, its month and its agricultural year missing, never zero rain), a year without an erosive day (its fractions `NOT_COMPUTABLE`).
+3. `R` of a covered agricultural year is the sum of its twelve values of `R` by month. Every month that is not a number is named, never dropped: a month missing in the table of `r_factor/` once per reason and detail; a month the table does not hold, or holds as something other than a number, as `NOT_COMPUTABLE`. The reason is the one the named months share, otherwise `MISSING_INPUT`. The same holds for the monthly fractions `C` reads.
 
-`R` therefore changes from year to year by the yearly ratio of `r_factor/`, whose mean is taken over the years of the record whose annual sum is a number (`r_factor/` OPEN 6).
-
-### `C` through `c_factor/` (M1.5, D45)
+### `C` through `c_factor/` (M1.5, D45, PC-1)
 
 `C` is computed for each covered agricultural year on its own, over its twelve months, with one year (PROPOSED, OPEN 25).
 
 1. **Crop of a day** (PROPOSED, as `engine/water/`): the `crop_id` of the one component of the calendar whose dates cover the day; `{"management": "no_crop"}` when no component can cover it. Not known (`MISSING_INPUT`) for a day outside the dates of the calendar (naming D47, OPEN 2) and when a component with a missing date could cover the day; `NOT_COMPUTABLE` when two dated components cover it. The periods of a component are not read (OPEN 22).
-2. **Residue of a day** (PROPOSED, OPEN 23): the residue left by the **last harvest before the day**, the component whose end date is the last one before the day. Not known (`MISSING_INPUT`) for a day outside the calendar, when a component without an end date could have ended before the day, and when no component ends before the day (the residue left before the calendar begins needs D47 or the residue ledger, Q12); `NOT_COMPUTABLE` when two components end on that last date. Older residue is not added.
-3. **Every problem is gathered first**: the monthly erosivity fractions of the year (missing in step 1 of `R`, or for a month of the year), the crop and the residue of every day of the year (each text once, with the number of days and the first day), and every record of the table that cannot be read (named by id and scope, with `needed by <the part of M1.5 that needs it>`). Any problem makes `C` missing: `C of agricultural year <Y> is not computed: <problem>; <problem>; ...`, reason `MISSING_INPUT` (C3.3), or the reason of the first problem when none is an input that is missing. Then the unit strings (above): any that is not read makes `C` missing with `ls.REASON_UNIT_NOT_ACCEPTED`, naming each.
-4. **The soil-loss ratio of each day**, through `c_factor/`:
-   - `canopy_subfactor(canopy_cover, fall_height, fall_height_unit, fall_height_coefficient, fall_height_coefficient_per_unit)` with the records of the crop of the day;
-   - `residue_mass_after_decay(residue_mass, residue_type=<crop of the last harvest>, decay_coefficients={<that crop>: <its record>}, decay_coefficient_per_unit, elapsed_time=<days since the end date of that component>, elapsed_time_unit="day")`;
-   - `residue_cover_from_mass(...)` of that mass, then `surface_cover_subfactor(...)` of that cover;
+2. **Residue of a day** (PROPOSED, OPEN 23): the residue left by the last harvest before the day. Not known (`MISSING_INPUT`) for a day outside the calendar, when a component without an end date could have ended before the day, and when no component ends before the day; `NOT_COMPUTABLE` when two components end on that last date. Older residue is not added.
+3. **Every problem is gathered first**: the monthly erosivity fractions of the year, the crop and the residue of every day (each text once, with the number of days and the first day), and every record that cannot be read (by id and scope, with `needed by <the part of M1.5 that needs it>`). Any problem makes `C` missing: `C of agricultural year <Y> is not computed: ...`, reason `MISSING_INPUT` (C3.3), or the reason of the first problem when none is an input that is missing. Then the unit strings: any that is not read makes `C` missing with `ls.REASON_UNIT_NOT_ACCEPTED`, naming each.
+4. **The soil-loss ratio of each day**, through `c_factor/`, under PC-1:
+   - `residue_mass_after_decay(...)` of the mass of the last harvest, its residue type that crop, `elapsed_time` the days since its end date in `day`;
+   - `residue_cover_from_mass(...)` of that mass;
+   - `surface_cover_subfactor_percent(surface_residue_cover=<that cover>, surface_cover_coefficient_per_percent=<b>)` (S1 Eq. 6.6, roughness term at one);
+   - `effective_canopy_cover(canopy_cover=<record of the crop of the day>, ground_cover=<that cover>)` (S1 Eq. 6.5);
+   - `canopy_subfactor(canopy_cover=<the effective cover>, fall_height, ...)`;
    - `soil_loss_ratio(canopy=..., surface_cover=...)`.
 
-   The first refusal of a day (a cover outside zero to one, units that differ, a form without a finite result) makes `C` missing with the reason `c_factor/` gives: `C of agricultural year <Y> is not computed: on <date>, <function> of engine/erosion/c_factor/ ...: <its detail>`.
-5. **The soil-loss ratio of a month** is the mean of the ratios of its days (PROPOSED, OPEN 24). It is passed to `rotation_c` as a `c_factor.SoilLossRatio` whose `canopy` and `surface_cover` are the means of the two sub-factors over the days, with `SET_TO_ONE` and `DECLARED_LIMIT`.
-6. **`rotation_c`** over the twelve months of the year, each with its erosivity fraction from `r_factor/` (month labelled `YYYY-MM`), `number_of_years=1`, and `fraction_sum_tolerance` missing with `NOT_AVAILABLE` (EP1 supplies none, OPEN 27; it only drives `fractions_add_up`, which EP1 does not read). A `Missing` it returns is `C`'s, with its reason; otherwise `C` is its value, `dimensionless`.
+   The first refusal of a day makes `C` missing with the reason `c_factor/` gives: `C of agricultural year <Y> is not computed: on <date>, <function> of engine/erosion/c_factor/ ...: <its detail>`.
+5. **The soil-loss ratio of a month** is the mean of the ratios of its days (PROPOSED, OPEN 24), passed to `rotation_c` as a `c_factor.SoilLossRatio` whose `canopy` and `surface_cover` are the means of the two sub-factors over the days.
+6. **`rotation_c`** over the twelve months of the year, each with its erosivity fraction, `number_of_years=1`, and `fraction_sum_tolerance` missing with `NOT_AVAILABLE` (OPEN 27).
 
-### `K`, `P` and `LS`
+The annual value is `equation.annual_soil_loss` of `R` and `C` of the year, `K`, `LS` and `P`, as on the main route. Every covered month is `NOT_AVAILABLE` (OPEN 20). The `source` says the value comes from the daily-index route, off the main path.
+
+## Factors read the same way on both routes
 
 | Factor | How it is obtained | When it is missing |
 |---|---|---|
-| `K`, `P` | The value of one record, read with `read_value`; its unit is the record's `unit` | See [a parameter that cannot be read](#a-parameter-that-cannot-be-read) |
-| `LS` | `ls.slope_length_factor(...) * ls.slope_steepness_factor(...)`, from `soil_slope.slope_steepness`, `soil_slope.slope_length` and the ten records of `LS.md`; unit `dimensionless` | First, `MISSING_INPUT` naming every slope input that is missing in `SiteSoilSlope` (with its own reason and detail) and every coefficient that cannot be read. Then `ls.REASON_UNIT_NOT_ACCEPTED` for a slope unit that is not read as a `SlopeUnit`. Then the `Missing` that `ls.py` returns (units of the length that differ, a form without a finite real result). Then `NOT_COMPUTABLE` if `L * S` is not finite |
+| `K`, `P` (and `R`, `C` on the main route) | The value of one record, read with `read_value`; its unit is the record's `unit` | See [a parameter that cannot be read](#a-parameter-that-cannot-be-read) |
+| `LS` | `ls.slope_length_factor(...) * ls.slope_steepness_factor(...)`, from `soil_slope.slope_steepness`, `soil_slope.slope_length` and the ten records of `LS.md`; unit `dimensionless` | First, `MISSING_INPUT` naming every slope input that is missing in `SiteSoilSlope` (with its own reason and detail) and every coefficient that cannot be read. Then `ls.REASON_UNIT_NOT_ACCEPTED` for a slope unit that is not read as a `SlopeUnit`. Then the `Missing` that `ls.py` returns. Then `NOT_COMPUTABLE` if `L * S` is not finite |
 
 ### A parameter that cannot be read
 
@@ -167,133 +215,124 @@ Always reason `MISSING_INPUT` (G4, the two rows for a parameter). The detail nam
 
 A record with another scope, wider or narrower, is not read (question 5 of `params/README.md`, OPEN 3). Each id and scope is looked up once per call.
 
-### The annual product
-
-`equation.annual_soil_loss(r=..., k=..., ls=..., c=..., p=..., accepted_units=ACCEPTED_UNITS, unit_guard_reason=ls.REASON_UNIT_NOT_ACCEPTED)`, as `EQUATION.md` describes it: `MISSING_INPUT` naming every missing factor (`factor '<name>' is missing (reason <CODE>: <detail>)`); then the unit guard; then `NOT_COMPUTABLE` for a product that is not finite. The factor names are those of `equation.FACTOR_NAMES`: `r`, `k`, `ls`, `c`, `p`.
-
-A number is returned as an `AnnualSoilLoss` with:
-
-- `provenance` `DERIVED` (C4.6);
-- `source`: `derived by engine.erosion.compute_soil_loss with the product of docs/METHODS.md M1.1: R of the agricultural year as the sum of R by month of engine/erosion/r_factor/ ... ; parameter records read: '<id>' with scope <scope>, ...`, naming the method of each factor and every record read for that year with its scope (PROPOSED; question 11 of `contracts/results/README.md`, OPEN 14);
-- no `range`, and `range_missing` with reason `NOT_AVAILABLE`: how a range passes through the product is not built (C2.3, OPEN 5 of `EQUATION.md`).
-
 ## Numbers in the modules
 
-`soil_loss.py` holds two integers, `12` and `1`, and no other number. `_parameters.py` holds one, the `1` of "more than one record". A test reads both modules and fails on any other number, and on any format specification in an f-string of `soil_loss.py`.
+`soil_loss.py` holds two integers, `12` and `1`, and no other number. `_parameters.py` holds one, the `1` of "more than one record". A test reads both modules and fails on any other number, and on any format specification in an f-string of `soil_loss.py`. The month of a monthly erosivity record is a word in its identifier (`january` to `december`), not a number.
 
 | Integer | Where | Why |
 |---|---|---|
 | `12` | `soil_loss.py`, `_MONTHS_IN_A_YEAR` | Twelve calendar months to a year and to an agricultural year (C5.1, C5.3) |
-| `1` | `soil_loss.py`, `_FIRST` | Months and days are counted from one (C5.1); "more than one" component on a day or on the last harvest date; one reason shared by every missing month |
+| `1` | `soil_loss.py`, `_FIRST` | Months and days are counted from one (C5.1); "more than one" component, unit string or reason |
 | `1` | `soil_loss.py`, `_ONE_AGRICULTURAL_YEAR` | `C` of one agricultural year is `rotation_c` over one year (OPEN 25) |
 | `1` | `_parameters.py` | More than one record with one id and scope |
 
 The test file builds its PLACEHOLDER numbers as `PLACEHOLDER_BASE` plus the position in the list of identifiers, a base plainly unreal, far above any value a factor or a coefficient of RUSLE takes. The records whose forms need a number of a certain size to give any result (the exponent and the threshold of the daily index, the coefficients of `c_factor/`, and the crop records: a canopy cover is a fraction) carry repeated digits (`1.11`, `0.555`), as `engine/water/test_exposure.py` does. The daily precipitation of a computable series repeats `RAIN`, repeated digits and zero, plainly not weather. None is a value of the method. Every record carries the word PLACEHOLDER in its citation, persons and reasons, and is passed as an in-memory copy in which the word is replaced by `UNMARKED_TEST_ONLY`, as `params/test_layout.py` does (question 12 of `params/README.md`); that copy passes `check_catalogue`.
 
-The expected soil loss of a computable run is computed again in the test, day by day, from the PROPOSED forms of `r_factor/README.md` and `c_factor/README.md` and the calendar the test built, without calling the module.
+The expected values are computed again in the test from the forms, without calling the module: on the main route from the records; on the daily-index route day by day, from the PROPOSED forms of `r_factor/README.md` and `c_factor/README.md` under PC-1 and the calendar the test built.
 
 ## PROPOSED cases
 
 The identifier is the name of the test function in `test_soil_loss.py` without `test_`, with hyphens. A test checks that this list and the test functions agree.
 
-A *computable* run, in the cases below, has every input that EP1 needs: a precipitation series in `mm day-1` with every day present, a calendar of the same field with the two PLACEHOLDER crops in every agricultural year and one harvest before the record begins, soil data with a slope in `percent`, and a complete PLACEHOLDER catalogue.
+A *computable* run, in the cases below, has every input that either route needs: a precipitation series in `mm day-1` with every day present, a calendar of the same field with the two PLACEHOLDER crops in every agricultural year and one harvest before the record begins, soil data with a slope in `percent`, and a complete PLACEHOLDER catalogue holding the records of both routes.
 
 ### Cases of #125, kept
 
 | Case | What it checks |
 |---|---|
 | `examples-with-several-agricultural-years-load-into-soil-loss-results` | From the examples, with a `precipitation` series spanning several agricultural years: one `AnnualSoilLoss` per agricultural year of D47 and twelve consecutive `MonthlySoilLoss` per year; indicator, direction and unit from the constants of `contracts/results/models.py`; the round trip through `model_dump(mode="json")` loads back equal |
-| `start-month-missing-returns-one-missing-input` | A missing start month: one `Missing`, reason `MISSING_INPUT`, detail names the start month |
-| `infeasible-calendar-makes-every-value-not-computable` | An infeasible calendar: every value `NOT_COMPUTABLE`, with an empty catalogue and with a computable run, also for years the series does not cover |
-| `year-or-month-not-covered-by-precipitation-is-no-coverage` | Years and months the series does not cover are `NO_COVERAGE`; a covered year is `MISSING_INPUT` (empty catalogue); a covered month is `NOT_AVAILABLE`, also inside a year that is not covered whole |
-| `series-one-day-short-at-each-end-leaves-first-and-last-not-covered` | The first and last agricultural years, and the first and last months, are `NO_COVERAGE`; every year between is `MISSING_INPUT` and every month between `NOT_AVAILABLE` |
-| `calendar-dates-outside-the-record-keep-the-years-of-the-record` | A calendar moved past the record: the years are those of the record (D47). Changed by #173: since `C` reads the calendar, the moved calendar leaves `C` missing in every year, naming D47, where the same calendar on the record gives a number; the results are no longer equal |
-| `no-precipitation-series-returns-one-missing-input` | No `precipitation` series: one `Missing`, reason `MISSING_INPUT`, detail names `precipitation` |
-| `missing-slope-input-is-named-in-the-ls-factor` | In a computable run, `slope_steepness`, `slope_length` or both missing in `SiteSoilSlope`: the year is `MISSING_INPUT`, only factor `ls` is named, with each missing input and its own reason |
-| `arguments-of-another-case-or-field-raise-value-error` | `case_id` or `field_id` of `climate` or `soil_slope` differs from the calendar: `ValueError` naming the field (G5) |
-| `argument-that-is-not-its-model-raises-type-error` | `calendar`, `climate` or `soil_slope` given as a dictionary or as another model: `TypeError` naming the argument (G5) |
+| `start-month-missing-returns-one-missing-input` | A missing start month, on both routes: one `Missing`, reason `MISSING_INPUT`, detail names the start month |
+| `infeasible-calendar-makes-every-value-not-computable` | An infeasible calendar, on both routes: every value `NOT_COMPUTABLE`, with an empty catalogue and with a computable run, also for years the series does not cover |
+| `year-or-month-not-covered-by-precipitation-is-no-coverage` | Years and months the series does not cover are `NO_COVERAGE`; a covered year is `MISSING_INPUT` (empty catalogue); a covered month is `MISSING_INPUT` naming the monthly records (changed after the review of #187: it was `NOT_AVAILABLE`), also inside a year that is not covered whole |
+| `series-one-day-short-at-each-end-leaves-first-and-last-not-covered` | The first and last agricultural years, and the first and last months, are `NO_COVERAGE`; every year and every month between is `MISSING_INPUT` |
+| `calendar-dates-outside-the-record-keep-the-years-of-the-record` | A calendar moved past the record: the years are those of the record (D47), and the main route, which reads no date of the calendar, gives the same result as with the calendar on the record, with an empty and with a complete catalogue |
+| `no-precipitation-series-returns-one-missing-input` | No `precipitation` series, on both routes: one `Missing`, reason `MISSING_INPUT`, detail names `precipitation` |
+| `missing-slope-input-is-named-in-the-ls-factor` | In a computable run on both routes, `slope_steepness`, `slope_length` or both missing in `SiteSoilSlope`: the year is `MISSING_INPUT`, only factor `ls` is named, with each missing input and its own reason |
+| `arguments-of-another-case-or-field-raise-value-error` | `case_id` or `field_id` of `climate` or `soil_slope` differs from the calendar: `ValueError` naming the field (G5), on both routes |
+| `argument-that-is-not-its-model-raises-type-error` | `calendar`, `climate` or `soil_slope` given as a dictionary or as another model: `TypeError` naming the argument (G5), on both routes |
 
-### The argument `parameters` (#154), kept
+### The main route and the argument `parameters` (#154, revised after the review of #187)
 
 | Case | What it checks |
 |---|---|
 | `parameters-missing-positional-or-not-a-dict-raises-type-error` | `parameters` left out, passed by position, or not a `dict` (`None`, a list, a tuple, text, a list of pairs), or a `dict` with an item that is not a `dict` or a key that is not `str`: `TypeError` (G3, G5) |
-| `empty-catalogue-names-every-parameter-and-keeps-every-year` | `{}` in an otherwise computable run: every agricultural year of D47 is present and `MISSING_INPUT`; the detail names the five factors; every site identifier with `scope {}` and D56; in the part of `R`, the three records of `R` with M1.2, `r_factor/`, the daily index and the mean annual level; in the part of `C`, the fractions, the three site coefficients, the canopy records of each crop and of no crop, and the residue records of each crop, each with its scope, with M1.5, D45, `c_factor/`, the canopy sub-factor and the residue cover; never `rusle_c_factor`; every month is `NOT_AVAILABLE` naming M1.2 |
-| `full-catalogue-gives-the-product-of-equation-py` | A computable run over a series that does not cover its first and last years: each covered year's value equals the soil loss computed again in the test (`R` from the daily index, fractions and ratios; `C` from the daily ratio of each day of the calendar, averaged by month and weighted by the fractions; `K`, `LS` from `ls.py`, `P`); it equals `equation.annual_soil_loss` of those factors; it carries `DERIVED`, a source naming `r_factor/`, `c_factor/` and every record read with its scope, no range and `range_missing` `NOT_AVAILABLE`; years not covered stay `NO_COVERAGE`; months stay missing; the result loads back equal |
-| `ls-is-computed-through-ls-py-from-the-catalogue` | With the break slope above the slope and at the slope, and each `LS` record changed in turn: the value equals the soil loss computed again with the changed numbers |
-| `removing-any-one-record-makes-the-year-missing-and-names-it` | For each site identifier: without its record every year is `MISSING_INPUT`, and the detail names that identifier with `scope {}` and no other identifier |
-| `record-with-null-value-repeats-its-reason` | A record of the level of `R`, of `s_break`, of the fall-height coefficient or of the residue mass of a crop with `"value": null` (the catalogue still passes `check_catalogue`): `MISSING_INPUT`, the parameter named with its scope and its reason repeated (G4) |
+| `empty-catalogue-names-every-parameter-and-keeps-every-year` | `{}`: every agricultural year is present and `MISSING_INPUT` with one detail; it names the five factors and every identifier of the main route with `scope {}` and D56, `C` with `DECLARED`, D69 and USER-G, and no identifier of the monthly records or of the daily-index route; every month is `MISSING_INPUT`, naming the annual product, the twelve monthly records with D56, M1.2, D69 and D84 |
+| `full-catalogue-gives-the-product-of-equation-py` | A computable run over a series that does not cover its first and last years: each covered year's value equals `equation.annual_soil_loss` of the records, the same for every year (USER-G); `DERIVED`, a source naming every identifier, `DECLARED` and USER-G, no range and `range_missing` `NOT_AVAILABLE`; each covered month equals the level times the share of its calendar month in the twelve records times `K`, `LS`, `C` and `P`, computed again in the test, with a source naming the climatological fraction and the twelve records; the months of a covered year add up to its value (C1.2); years and months not covered stay `NO_COVERAGE`; the result loads back equal |
+| `ls-is-computed-through-ls-py-from-the-catalogue` | With the break slope above the slope and at the slope, and each `LS` record changed in turn: the value equals the product with `LS` computed by `ls.py` from the changed numbers |
+| `removing-any-one-record-makes-the-year-missing-and-names-it` | For each identifier of the annual value: without its record every year is `MISSING_INPUT`, the detail names that identifier with `scope {}` and no other; every month is missing and names it too |
+| `removing-any-one-monthly-erosivity-record-leaves-every-month-missing` | For each of the twelve monthly records: every year is still the product; every month is `MISSING_INPUT`, naming that record, the part of M1.2 that needs it, and no other monthly record |
+| `monthly-erosivity-records-in-two-units-or-below-zero-are-not-computed` | A monthly record in another unit string than the eleven others (`ls.REASON_UNIT_NOT_ACCEPTED`, naming the unit strings) and a monthly record below zero (`MISSING_INPUT`, naming the refusal of `r_factor/`): every month missing, every year still the product |
+| `record-with-null-value-repeats-its-reason` | A record of the level of `R`, of `s_break` or of `C` (main route), or of the residue mass of a crop (daily-index route), with `"value": null` (the catalogue still passes `check_catalogue`): `MISSING_INPUT`, the parameter named with its scope and its reason repeated (G4) |
 | `record-that-read-value-refuses-is-missing-input` | A record still marked PLACEHOLDER, and a record without `unit`: `MISSING_INPUT`, naming the parameter and the refusal of `read_value` |
 | `only-a-record-with-the-empty-scope-is-read` | A record of `P` with a `management` scope instead of `{}`: not read, `MISSING_INPUT` naming `P` with `scope {}` (OPEN 3) |
-| `two-records-with-one-identity-are-missing-input` | Two records of the surface-cover coefficient with one id and scope: `MISSING_INPUT`, saying there is more than one |
+| `two-records-with-one-identity-are-missing-input` | Two records of `C` with one id and scope: `MISSING_INPUT`, saying there is more than one |
 | `record-that-cannot-be-compared-is-reported-not-skipped` | A record with `id` null, `scope` null, or an `id` that starts with a digit: every parameter is `MISSING_INPUT` and its detail names that record by its key; never "has no record" (F3c of `params/README.md`) |
 | `slope-unit-that-ls-py-cannot-read-is-not-computed` | A `slope_steepness` unit, or an `s_break` record unit, that is no `SlopeUnit` value: `LS` missing with `ls.REASON_UNIT_NOT_ACCEPTED`, naming which |
-| `factor-in-another-unit-is-stopped-by-the-unit-guard` | A `K` record in another unit string than D11's: the year is missing with the unit-guard reason, naming factor `k` (changed by #173 from `R`, which `r_factor/` now checks) |
-| `no-value-is-a-number-unless-every-factor-is-present` | Over the cases with an empty catalogue, with one record left out, with a full catalogue but a slope unit that is not read, without the residue record of a crop, with a series without an erosive day: no value is a number, none is zero, every value has a `missing` part with a code of C3.2 and carries no range, source or provenance |
-| `arguments-unchanged-and-second-call-equal` | With an empty catalogue and with a computable run: the arguments, `parameters` included, equal a deep copy taken before the call, and a second call gives an equal result (G1) |
+| `factor-in-another-unit-is-stopped-by-the-unit-guard` | An `R` or a `C` record in another unit string than the accepted one: the year is missing with the unit-guard reason, naming the factor |
+| `c-is-the-declared-record-on-the-main-route-and-not-read-on-the-daily-route` | A changed `C` record changes the main route's value to the product with it; on the daily-index route a catalogue without the record, or with it changed, gives the same result, and the source does not name it (OPEN 12) |
+| `no-value-is-a-number-unless-every-factor-is-present` | Over the cases with an empty catalogue, with one record left out, with a slope unit that is not read, without `C`, and on the daily-index route without a residue record or without an erosive day: no annual value is a number, none is zero, every one has a `missing` part with a code of C3.2 and carries no range, source or provenance |
+| `arguments-unchanged-and-second-call-equal` | On both routes, with an empty catalogue and with a computable run: the arguments, `parameters` included, equal a deep copy taken before the call, and a second call gives an equal result (G1) |
 
-### `R` through `r_factor/` and `C` through `c_factor/` (#173)
+### The daily-index route, off the main path
 
 | Case | What it checks |
 |---|---|
-| `chain-example-climate-gives-r-and-c-through-r-factor-and-c-factor` | The chain example climate (`contracts/inputs/examples/PLACEHOLDER_chain_site_climate.json`), the chain soil data, a computable calendar of the same field and a complete catalogue: the one covered year equals the soil loss computed again in the test; with one year its ratio is one, each fraction is the share of the month's days in the year, and `R` equals the level |
-| `removing-any-one-crop-record-makes-c-missing-and-names-it-with-its-scope` | For each crop record (canopy cover and fall height of each crop and of no crop; residue mass and decay coefficient of each crop): without it every year is `MISSING_INPUT`, only factor `c` is named, and the detail names the record with its scope and the part of M1.5 that needs it, and no other crop identifier |
+| `daily-index-route-gives-the-product-of-r-factor-and-c-factor` | A computable run over a series that does not cover its first and last years: each covered year's value equals the soil loss computed again in the test (`R` from the daily index, fractions and ratios; `C` from the daily ratio of each day under PC-1, averaged by month and weighted by the fractions; `K`, `LS`, `P`); the source says the route is off the main path, names PC-1 and every record read with its scope; months stay missing |
+| `daily-index-route-chain-example-climate-gives-r-and-c` | The chain example climate, the chain soil data, a computable calendar of the same field and a complete catalogue: the one covered year equals the soil loss computed again; with one year its ratio is one, each fraction is the share of the month's days, and `R` equals the level |
+| `daily-index-route-empty-catalogue-names-every-record-and-method-part` | `{}`: every year `MISSING_INPUT`, naming the five factors, every site identifier of the route with D56, M1.2 and `r_factor/` for `R`, and for `C` M1.5, D45, PC-1 and every crop record of each crop and of no crop with its scope; never `rusle_c_factor` nor a monthly record |
+| `daily-index-route-removing-any-one-site-record-names-it` | For each site identifier of the route: without its record every year is `MISSING_INPUT`, naming it and no other identifier of the route |
+| `removing-any-one-crop-record-makes-c-missing-and-names-it-with-its-scope` | For each crop record: without it every year is `MISSING_INPUT`, only factor `c` is named, with the record, its scope and the part of M1.5 that needs it, and no other crop identifier |
 | `crop-without-residue-type-or-canopy-record-leaves-c-missing-and-names-it` | One crop without a decay coefficient (no residue type) and the other without a canopy cover: `C` is `MISSING_INPUT`, never zero, and names both records with their crops |
-| `year-without-an-erosive-day-leaves-r-and-c-missing-for-that-year` | A year whose every day lies at the threshold, between computable years: that year is missing, with `R` and `C` both missing and naming the year without an erosive day; every other year is a number above or below zero, not zero |
+| `year-without-an-erosive-day-leaves-r-and-c-missing-for-that-year` | A year whose every day lies at the threshold, between computable years: that year is missing, with `R` and `C` both missing and naming the year without an erosive day; every other year is a number, not zero |
 | `missing-day-in-the-series-makes-its-year-missing-and-no-other` | A day without data: its year is `MISSING_INPUT`, `R` and `C` missing, naming its month; the other years are numbers (OPEN 1) |
-| `day-outside-the-calendar-or-before-the-first-harvest-leaves-c-missing` | A calendar that begins on the first day of the record (no harvest before it), one that ends a year early (days outside the calendar, naming D47), and one whose last component has no end date: only the years with such days are missing, with `C` naming the problem and the number of days; the other years are numbers |
-| `unit-strings-of-c-records-that-are-not-read-are-not-computed` | A canopy cover that is not `dimensionless`, a decay coefficient whose unit is not read as an inverse, a surface-cover coefficient that is not `dimensionless`, and a fall-height coefficient whose unit is the inverse of another length: `C` missing with `ls.REASON_UNIT_NOT_ACCEPTED`, naming the record and its scope, or the refusal of `canopy_subfactor` |
-| `value-c-factor-refuses-is-not-computed-and-names-the-day` | A canopy cover above one: `C` is `NOT_COMPUTABLE`, naming the day, `canopy_subfactor` and its refusal |
+| `day-outside-the-calendar-or-before-the-first-harvest-leaves-c-missing` | A calendar that begins on the first day of the record (no harvest before it), one that ends a year early (days outside the calendar, naming D47), and one whose last component has no end date: only the years with such days are missing, with `C` naming the problem and the number of days |
+| `unit-strings-of-c-records-that-are-not-read-are-not-computed` | A canopy cover that is not `dimensionless`, a decay coefficient whose unit is not read as an inverse, a `b` of S1 Eq. 6.6 that is not `percent-1`, and a fall-height coefficient whose unit is the inverse of another length: `C` missing with `ls.REASON_UNIT_NOT_ACCEPTED`, naming the record and its scope, or the refusal of `canopy_subfactor` |
+| `value-c-factor-refuses-is-not-computed-and-names-the-day` | A canopy cover above one: `C` is `NOT_COMPUTABLE`, naming the day, `effective_canopy_cover` and its refusal |
 | `r-level-threshold-or-series-in-another-unit-is-refused-by-r-factor` | A level of `R`, a threshold or a series in another unit string: `R` missing (and `C`, when the fractions need it), naming the unit; no other factor is named |
-| `whole-factor-record-of-c-is-not-read` | A catalogue that also holds `rusle_c_factor` gives the same result as one without it, and the source does not name it (OPEN 12) |
 | `per-unit-reads-only-the-proposed-inverse-forms` | `day-1`, `m-1`, `(kg m-2)-1` and `(m)-1` are read; `day`, `kg m-2-1`, `-1`, `()-1`, `( )-1`, `m-2`, a trailing space and an unclosed bracket are not (OPEN 21) |
+| `month-that-is-not-a-number-is-named-not-dropped` | A table of `r_factor/` whose month is absent, `None`, text or missing: the year is missing, naming each such month, with `MISSING_INPUT` when the reasons differ and `NOT_COMPUTABLE` when only absent months remain; a whole table gives its twelve numbers (review of #187) |
 
 ### The modules
 
 | Case | What it checks |
 |---|---|
 | `modules-import-only-allowed-modules-and-hold-only-counting-integers` | `soil_loss.py` imports only the standard library, `contracts.inputs.*`, `contracts.results.models` and `engine.erosion` (`c_factor`, `ls`, `r_factor`, `equation`, `_parameters`); `_parameters.py` only the standard library, `contracts.results.models` and `params.catalogue`; neither names `load_folder`, `check_folder`, `check_layout`, `open` or `read_text` (G1); the numbers are those of the table above; no format specification in an f-string |
-| `package-exposes-compute-soil-loss-with-parameters-by-keyword-and-no-default` | `from engine.erosion import compute_soil_loss` works; its parameters are `calendar`, `climate`, `soil_slope`, `parameters`; `parameters` is keyword-only and has no default |
-| `soil-loss-md-lists-every-parameter-identifier` | The table [Parameters EP1 reads](#parameters-ep1-reads) lists exactly the identifiers the module reads, site and crop, and the section names `rusle_c_factor` as no longer read |
+| `package-exposes-compute-soil-loss-with-parameters-by-keyword-and-no-default` | `from engine.erosion import compute_soil_loss` works; it and `compute_soil_loss_daily_index` take `calendar`, `climate`, `soil_slope`, `parameters`; `parameters` is keyword-only and has no default |
+| `soil-loss-md-lists-every-parameter-identifier` | The table [Parameters EP1 reads](#parameters-ep1-reads) lists exactly the identifiers the two routes read, site and crop |
 | `proposed-cases-match-soil-loss-md` | This list and the test functions agree |
 
 ## Changes outside this folder that this unit needs
 
-`validation/test_chain_examples.py`, case CH06, and its row in `validation/README.md` are updated in this unit, at the orchestrator's request (lane L0). CH06 used to expect `R` and `C` read as whole-factor records. It now asserts two things with a complete PLACEHOLDER catalogue (its site records, with numbers of a usable size for the daily index and the coefficients of `c_factor/`, and crop records):
-
-- through the runner, on the calendar EP2 builds from the rotation definition example (2027 and 2028, after the record of 2001 and 2002), each covered year is missing with only factor `c` named, for the days outside the calendar (D47, OPEN 2), so `R`, `K`, `LS` and `P` are computed;
-- EP1 on the same calendar laid on the record gives a number equal to `equation.py` of `R` and `C` computed again in the test from the PROPOSED forms of `r_factor/` and `c_factor/`.
-
-CH05 and CH07 are unchanged and pass: `PARAMETER_IDS` is every identifier read with the empty scope, and `C_ID` stays as the name of the record that is no longer read. Nothing else outside `engine/erosion/` is changed.
+`validation/test_chain_examples.py`, case CH06, and its row in `validation/README.md` are updated in this unit, at the orchestrator's request (lane L0). With a complete PLACEHOLDER catalogue, through the runner, CH06 asserts that the annual value of the covered year and each of its months equal the main route's forms computed again in the test, and that the erosion module is `available`. CH05 and CH07 are unchanged and pass. Nothing else outside `engine/erosion/` is changed.
 
 ## OPEN
 
 Each item is a question a person has to answer, with the role that answers it. None is answered by this unit.
 
-1. **Days missing inside the `precipitation` series.** Now applied through `r_factor/`: a missing day makes its month and its agricultural year missing (`MISSING_INPUT`), and that year is left out of the mean of the yearly ratios (OPEN 1 of `r_factor/README.md`). Whether this is the wanted rule (C3.4 leaves the gap-filling method OPEN). For the science reviewers.
-2. **Repeating the rotation over the years of the record (D47).** Not implemented. `C` reads the crop and the last harvest of each day from the calendar's own dates; a day outside them makes `C` of its year missing, naming D47. With a real calendar, whose dates lie after the record (2001 to 2024, D29), every year is missing. How the rotation is laid onto the years of the record changes `_crop_scope` and `_last_harvest` in `soil_loss.py` and nothing else; `engine/water/` waits for the same answer. For the lead developer.
-3. **Scope of the site records: `{}`.** The smallest form: one record per identifier, "no restriction stated". `R`, `K` and `P` belong to a field, so the empty scope says one value for every field. The scope words are question 4 of `params/README.md`; which record is read when one has the empty scope and another names a crop is question 5. This unit reads only the exact scopes of the table. For the lead developer, who owns `params/`.
+1. **Days missing inside the `precipitation` series** (daily-index route). Applied through `r_factor/`: a missing day makes its month and its agricultural year missing (`MISSING_INPUT`), and that year is left out of the mean of the yearly ratios (OPEN 1 of `r_factor/README.md`). The main route does not read the days. For the science reviewers.
+2. **Repeating the rotation over the years of the record (D47).** Not implemented. The main route reads no date of the calendar. The daily-index route reads the crop and the last harvest of each day from the calendar's own dates; a day outside them makes `C` of its year missing, naming D47, so with a real calendar every year of that route is missing. How the rotation is laid onto the years changes `_crop_scope` and `_last_harvest` and nothing else; `engine/water/` waits for the same answer. For the lead developer.
+3. **Scope of the site records: `{}`.** The smallest form: one record per identifier, "no restriction stated". The scope words are question 4 of `params/README.md`; which record is read when one has the empty scope and another names a crop is question 5. This unit reads only the exact scopes of the table. For the lead developer, who owns `params/`.
 4. **Reading a slope unit.** A unit string is read as the `SlopeUnit` whose value is that exact string. The unit strings of a slope in the input contract are question 18 of `contracts/inputs/README.md`; the unit of the break slope is OPEN 1 and 8 of `LS.md`. The reason code of a unit not read is `ls.REASON_UNIT_NOT_ACCEPTED` (Q11). For the science reviewers (the units), the lead developer (the reading and the code).
-5. **Months not covered by the series.** C5.5 speaks of yearly values; this unit also writes `NO_COVERAGE` for a month. For the lead developer.
-6. **Precedence of the reasons.** Infeasible calendar, then coverage, then the factors; of the two single `Missing`, the start month before the series; inside `LS`, missing inputs before a unit not read before the result of `ls.py`; inside `C`, every missing input (fractions, crop and residue of each day, records) before a unit string not read before the first refusal of `c_factor/`, day by day in order; a `C` with problems of several kinds is `MISSING_INPUT` when any is a missing input. For the lead developer.
+5. **Months not covered by the series.** C5.5 speaks of yearly values; this unit also writes `NO_COVERAGE` for a month, on both routes, although the main route reads no day of the series. For the lead developer.
+6. **Precedence of the reasons.** Infeasible calendar, then coverage, then the factors; of the two single `Missing`, the start month before the series; inside `LS`, missing inputs before a unit not read before the result of `ls.py`; on the main route, a month names both the annual product and `R` of the month when both are missing; inside `C` of the daily-index route, every missing input before a unit string not read before the first refusal of `c_factor/`. For the lead developer.
 7. **With the calendar engine of today, EP1 may always return one `Missing`.** If the calendar engine writes the start month as missing until the rotation definition carries it (D7, D8), the erosion module is `not_available` through the route. Whether the return type of EP1 changes after D7 is not said by issue #77. For the lead developer and the platform developer.
 8. **The day boundaries of an agricultural year.** Years, months and the days since a harvest are cut on the dates of the series and of the calendar, in the series' time zone (C6.1, C6.2), not on the local day at the field (C6.5). For the science reviewers.
 9. **Where the identifier `precipitation` lives.** Written once in `soil_loss.py`. Whether contracts should export the quantity identifiers as constants. For the lead developer and the platform developer.
 10. **Example data (Q16).** The inputs carry `example_data`; `SoilLossResults` has no field for it. A number computed from example soil data carries no mark of it. For the lead developer and the platform developer.
-11. **The variation between years.** Now built: `R` of a year carries the yearly ratio of `r_factor/`, and `C` of a year its fractions and the calendar of that year. The ratio's mean is over the years of the record whose annual sum is a number, so `R` of one year depends on which other years the record holds (OPEN 6 of `r_factor/README.md`). For the science reviewers.
-12. **The whole-factor records of `C` and `R`.** PROPOSED: `rusle_c_factor` is no longer read, and stays no override: one number for the rotation would bypass the channel by which rotations differ (M1.1). `rusle_r_factor` is read as the mean annual level, so a whole `R` has no record. The alternative is to keep `rusle_c_factor` (and a new identifier for a whole `R`) as an override that, when present, replaces the computed factor, with its source in the value's `source`. For the lead developer and the science reviewers.
+11. **The climatological monthly fraction and the variation between years (D69, D84, USER-G).** Applied on the main route: `R` of every year is the mean annual level, and `R` of a month is the level times the fraction of its calendar month from twelve monthly records. The variation between years is deferred (USER-G); the daily-index route, which gives it through the yearly ratios, stays available off the main path. Still open: (a) the licence of the climatology (D69, `docs/METHODS.md` M1.2), and until it is confirmed no monthly value is committed and every month stays missing; (b) the twelve identifiers `rusle_r_monthly_erosivity_<month>` carry the month in the identifier because the scope keys of `params/README.md` have no month (`r_factor/README.md` offers the alternative of site data from a platform adapter); (c) their unit string; (d) M1.2 words the months as `NOT_AVAILABLE` until then, while D56 makes a value whose parameter has no record `MISSING_INPUT`: EP1 follows D56. For the lead developer (the identifiers, the reason), the platform developer (an adapter, if chosen) and the science reviewers (the unit).
+12. **`C` as a single declared value (D69, D84, USER-G).** Applied on the main route: `C` is the record `rusle_c_factor`, marked `DECLARED` in the source, as `docs/METHODS.md` M1.2 says while the licence of the climatology is open. A single `C` cannot tell rotations apart, which is the main channel of M1.1, so until `C` is computed every rotation of one field gets the same soil loss. The daily-index route computes `C` through `c_factor/` and does not read the record. When, and on which route, the computed `C` replaces the declared one is for the lead developer and the science reviewers.
 13. **`K` from the catalogue.** D48 brings `K` from the soil data through the platform adapters (D10). Until a field carries it, `K` is read from a catalogue record. When it arrives in `SiteSoilSlope` (question 16 of `contracts/inputs/README.md`), which one wins is for the lead developer and the platform developer.
-14. **The source text of a computed value.** Question 11 of `contracts/results/README.md`. The text names the method of each factor and every record read for that year with its scope, not their citations. For the lead developer.
+14. **The source text of a computed value.** Question 11 of `contracts/results/README.md`. The text names the method of each factor and every record read with its scope, not their citations. For the lead developer.
 15. **The units of the coefficient records of `LS`, and of the exponent of the daily index.** Not checked (OPEN 4 of `LS.md`). For the science reviewers.
 16. **`P` under no-till.** M1.6 says `P` is one by default under no-till. This unit writes no default: `P` is read from a record like the other factors. For the lead developer and the science reviewers.
-17. **`ls.py` has no `LS` function.** It returns `S` and `L`; the product `L * S` is written in `soil_loss.py`, with a finiteness check. Whether `ls.py` should offer it is for the lead developer (not changed here, as the brief says).
-18. **A record that `read_value` refuses, or that cannot be compared.** G4 has rows for a parameter without a record and for a record with `"value": null`. A refused record (malformed or a placeholder), two records with one identity, and a record without a well-formed `id` and `scope` are possible only in a catalogue that `check_catalogue` rejects (G3); each is answered with `MISSING_INPUT` too, naming the parameter. A record that cannot be compared is reported, not skipped (F3c of `params/README.md`): PROPOSED, it makes **every** parameter missing, because it could be a record of any of them. For the lead developer and the platform developer.
+17. **`ls.py` has no `LS` function.** It returns `S` and `L`; the product `L * S` is written in `soil_loss.py`, with a finiteness check. Whether `ls.py` should offer it is for the lead developer.
+18. **A record that `read_value` refuses, or that cannot be compared.** A refused record, two records with one identity, and a record without a well-formed `id` and `scope` are possible only in a catalogue that `check_catalogue` rejects (G3); each is answered with `MISSING_INPUT`, naming the parameter. A record that cannot be compared is reported, not skipped (F3c of `params/README.md`): PROPOSED, it makes every parameter missing. For the lead developer and the platform developer.
 19. **Who reads `detail`.** The format above is for developers. If the interface shows it, its wording belongs to the strings file of `web/` and to people. For the interface developer and the lead developer.
-20. **Monthly values of soil loss.** C1.2 allows a monthly breakdown whose months add up to the year. `R` by month and the soil-loss ratio of each month now exist, but M1.1 and M1.5 give only the annual product; how a monthly value is formed (for example `R` of the month times `K`, `LS`, the ratio of the month and `P`) is not decided, so every covered month stays `NOT_AVAILABLE`. For the lead developer and the science reviewers.
-21. **Unit strings of the records of `C`.** The inverse of a unit written `<u>-1` or `(<u>)-1`; the canopy cover and the surface-cover coefficient in `dimensionless` (fractions, not percent: OPEN 3 of `c_factor/README.md`); the time since a harvest in `day`. Which unit strings the records carry is for the science reviewers (OPEN 4 of `c_factor/README.md`); the reading, for the lead developer.
-22. **Crop of a day, and stage.** The canopy records are read by the crop of the day, or `{"management": "no_crop"}`, as `engine/water/` does. On a day with no crop the canopy cover and fall height are still read from records (no zero is written). The periods of a component (`CalendarPeriod`, "for cover management by period") are not read: M1.5 asks for canopy cover and fall height "by stage", and whether a period's `period_type` becomes the scope key `stage` is for the lead developer (the scope) and the science reviewers (the stages).
-23. **Residue on the surface.** PROPOSED: the residue of a day is that of the last harvest (the end date of a component) before it, its mass read by that crop, decayed from the end date with the decay coefficient of that crop's residue type. The residue type is named by the scope key `crop` (`params/README.md` has no key for a residue type, question 4). Older residue is not added, and the residue before the first harvest of the calendar is not known. M1.5 names "the residue cover at sowing" as the most sensitive input and asks for the result at more than one level; neither is applied (one call is one scenario). Whether the residue comes from the residue ledger instead is Q12 of `contracts/ENTRYPOINTS.md`. For the lead developer and the science reviewers.
-24. **The soil-loss ratio of a month.** PROPOSED: the mean of the daily ratios over the days of the month. The alternatives are to weight each day by its erosivity, or to take the ratio of one day of the month. For the science reviewers.
-25. **`C` by agricultural year.** PROPOSED: `rotation_c` over the twelve months of each agricultural year with one year, so `C` changes from year to year and a year whose fractions are missing leaves only that year missing. M1.5 divides by "the number of years of the rotation", which would give one `C` over all the years of the record. For the lead developer and the science reviewers.
-26. **The control regression of M1.2.** `r_factor/` offers the control and its comparison with the fractions as a report. EP1 does not run it, so its two constants are not read and no comparison reaches the result. Whether and where it is reported is for the lead developer and the science reviewers (OPEN 8 of `r_factor/README.md`).
-27. **The tolerance of the sum of the fractions.** EP1 passes it to `rotation_c` as missing (`NOT_AVAILABLE`), because no person has supplied it (OPEN 9 of `c_factor/README.md`); `C` does not need it. For the lead developer and the science reviewers.
+20. **Monthly values of soil loss.** On the main route (PROPOSED): `R` of the month times `K`, `LS`, `C` and `P`, so the months add up to the year (C1.2). With a single declared `C` this is the annual value split by the climatological fractions. On the daily-index route every covered month stays `NOT_AVAILABLE`: M1.1 and M1.5 give only the annual product, and how a monthly value is formed with a soil-loss ratio of the month is not decided. For the lead developer and the science reviewers.
+21. **Unit strings of the records of `C`** (daily-index route). `PC-1` decided the forms (the effective canopy cover of S1 Eq. 6.5; the ground-cover sub-factor of S1 Eq. 6.6 with `b` per percent of cover, the roughness term at one), and with them that `b` carries `percent-1`. Still PROPOSED here: the inverse of a unit written `<u>-1` or `(<u>)-1`; the canopy cover in `dimensionless`; the time since a harvest in `day`. Which unit strings the other records carry is for the science reviewers (OPEN 4 of `c_factor/README.md`); the reading, for the lead developer.
+22. **Crop of a day, and stage** (daily-index route). The canopy records are read by the crop of the day, or `{"management": "no_crop"}`, as `engine/water/` does. On a day with no crop the canopy cover and fall height are still read from records (no zero is written). The periods of a component are not read: whether a period's `period_type` becomes the scope key `stage` is for the lead developer (the scope) and the science reviewers (the stages).
+23. **Residue on the surface** (daily-index route). PROPOSED: the residue of a day is that of the last harvest before it, its mass read by that crop, decayed from the end date with the constant decay coefficient of that crop's residue type (PC-2). The residue type is named by the scope key `crop`. Older residue is not added, and the residue before the first harvest of the calendar is not known. The residue cover at sowing, the most sensitive input of M1.5, is not applied as such, and the result is not shown for more than one level (one call is one scenario; USER-AA withdrew the generic levels). Whether the residue comes from the residue ledger is Q12 of `contracts/ENTRYPOINTS.md`. For the lead developer and the science reviewers.
+24. **The soil-loss ratio of a month** (daily-index route). PROPOSED: the mean of the daily ratios over the days of the month, a declared partial stage of the daily route of RUSLE2 (PC-3, USER-L). The alternatives are to weight each day by its erosivity, or to integrate daily. For the science reviewers.
+25. **`C` by agricultural year** (daily-index route). PROPOSED: `rotation_c` over the twelve months of each agricultural year with one year, so `C` changes from year to year and a year whose fractions are missing leaves only that year missing. M1.5 divides by "the number of years of the rotation", which would give one `C` over all the years. For the lead developer and the science reviewers.
+26. **The control regression of M1.2.** Out of both routes (PC-7): its two constants are not read and no comparison reaches the result.
+27. **The tolerance of the sum of the fractions** (daily-index route). EP1 passes it to `rotation_c` as missing (`NOT_AVAILABLE`), because no person has supplied it (OPEN 9 of `c_factor/README.md`); `C` does not need it. For the lead developer and the science reviewers.

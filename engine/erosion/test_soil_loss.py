@@ -237,8 +237,13 @@ def run(
     climate_: SiteClimate | None = None,
     soil_: SiteSoilSlope | None = None,
     parameters: dict[str, dict] | None = None,
+    daily: bool = False,
 ) -> SoilLossResults | Missing:
-    return module.compute_soil_loss(
+    """EP1 on the main route, or with ``daily`` the daily-index route."""
+    function = (
+        module.compute_soil_loss_daily_index if daily else module.compute_soil_loss
+    )
+    return function(
         calendar=calendar_ if calendar_ is not None else calendar(),
         climate=climate_ if climate_ is not None else climate(),
         soil_slope=soil_ if soil_ is not None else soil(),
@@ -439,7 +444,7 @@ CHOSEN: dict[str, float] = {
     module.R_EXPONENT_ID: 1.11,
     module.R_THRESHOLD_ID: 2.22,
     module.FALL_HEIGHT_COEFFICIENT_ID: 0.333,
-    module.SURFACE_COVER_COEFFICIENT_ID: 0.666,
+    module.SURFACE_COVER_B_PER_PERCENT_ID: 0.00666,
     module.MASS_COVER_COEFFICIENT_ID: 0.222,
 }
 
@@ -469,27 +474,43 @@ CROP_VALUES: dict[tuple[str, str], float] = {
 }
 
 
+# Every identifier read with the empty scope, by either route.
+SITE_IDS: tuple[str, ...] = tuple(
+    dict.fromkeys(
+        (
+            *module.PARAMETER_IDS,
+            *module.MONTHLY_EROSIVITY_IDS,
+            *module.DAILY_ROUTE_PARAMETER_IDS,
+        )
+    )
+)
+MONTHLY_UNIT = "PLACEHOLDER_monthly_erosivity_unit"
+
+
 def placeholder_values() -> dict[str, float]:
     """One PLACEHOLDER number per record with the empty scope: ``CHOSEN``, or
     else ``PLACEHOLDER_BASE`` plus its position in the list of identifiers.
     Not values of the method."""
     return {
         pid: CHOSEN.get(pid, PLACEHOLDER_BASE + position)
-        for position, pid in enumerate(module.PARAMETER_IDS)
+        for position, pid in enumerate(SITE_IDS)
     }
 
 
 def unit_of(pid: str) -> str:
-    """The unit string a site record carries: the accepted one for R, K and
-    P, and for the mean annual level of R; mm day-1 for the threshold; a
+    """The unit string a site record carries: the accepted one for the level
+    of R, K, C and P; one PLACEHOLDER unit shared by the twelve monthly
+    erosivity records; mm day-1 for the threshold; percent-1 for b of S1
+    Eq. 6.6 (PC-1); a
     slope unit for the break slope; the length unit of the slope length for
     the unit length; the inverse of the height and of the mass per area for
-    the coefficients that multiply them; dimensionless for the surface-cover
-    coefficient and the exponent; a PLACEHOLDER unit for every other
-    coefficient."""
+    the coefficients that multiply them; dimensionless for the exponent; a
+    PLACEHOLDER unit for every other coefficient."""
     accepted = module.ACCEPTED_UNITS
     return {
         module.R_ID: accepted.r,
+        module.C_ID: accepted.c,
+        **dict.fromkeys(module.MONTHLY_EROSIVITY_IDS, MONTHLY_UNIT),
         module.R_EXPONENT_ID: module.DIMENSIONLESS,
         module.R_THRESHOLD_ID: MM_PER_DAY,
         module.K_ID: accepted.k,
@@ -497,7 +518,7 @@ def unit_of(pid: str) -> str:
         module.S_BREAK_ID: PERCENT.value,
         module.LAMBDA_UNIT_ID: LENGTH_UNIT,
         module.FALL_HEIGHT_COEFFICIENT_ID: f"{HEIGHT_UNIT}-1",
-        module.SURFACE_COVER_COEFFICIENT_ID: module.DIMENSIONLESS,
+        module.SURFACE_COVER_B_PER_PERCENT_ID: f"{module.PERCENT}-1",
         module.MASS_COVER_COEFFICIENT_ID: f"({MASS_UNIT})-1",
     }.get(pid, "PLACEHOLDER_unit")
 
@@ -591,14 +612,24 @@ def run_computable(
     parameters: dict[str, dict] | None = None, **arguments: Any
 ) -> SoilLossResults:
     """A run with every input computable unless an argument replaces it."""
-    arguments.setdefault("soil_", computable_soil())
-    arguments.setdefault("climate_", computable_climate())
-    arguments.setdefault("calendar_", computable_calendar())
     result = run(
-        parameters=catalogue() if parameters is None else parameters, **arguments
+        **{
+            "soil_": computable_soil(),
+            "climate_": computable_climate(),
+            "calendar_": computable_calendar(),
+            **arguments,
+            "parameters": catalogue() if parameters is None else parameters,
+        }
     )
     assert isinstance(result, SoilLossResults)
     return result
+
+
+def run_daily(
+    parameters: dict[str, dict] | None = None, **arguments: Any
+) -> SoilLossResults:
+    """``run_computable`` on the daily-index route."""
+    return run_computable(parameters, daily=True, **arguments)
 
 
 def named(pid: str, scope: dict[str, str] | None = None) -> str:
@@ -606,7 +637,7 @@ def named(pid: str, scope: dict[str, str] | None = None) -> str:
     return f"parameter '{pid}' with scope {text}"
 
 
-# --- the expected value, computed again from the PROPOSED forms -------------
+# --- the expected values, computed again from the PROPOSED forms -------------
 
 
 def expected_ls(numbers: dict[str, float], soil_: SiteSoilSlope | None = None) -> float:
@@ -631,6 +662,45 @@ def expected_ls(numbers: dict[str, float], soil_: SiteSoilSlope | None = None) -
     return length * steepness
 
 
+def expected_product(
+    numbers: dict[str, float] | None = None, soil_: SiteSoilSlope | None = None
+) -> float:
+    """The main route: equation.py of the level of R, K, LS, the declared C, P."""
+    numbers = placeholder_values() if numbers is None else numbers
+    accepted = module.ACCEPTED_UNITS
+    product = equation.annual_soil_loss(
+        r=equation.Factor(numbers[module.R_ID], accepted.r),
+        k=equation.Factor(numbers[module.K_ID], accepted.k),
+        ls=equation.Factor(expected_ls(numbers, soil_), accepted.ls),
+        c=equation.Factor(numbers[module.C_ID], accepted.c),
+        p=equation.Factor(numbers[module.P_ID], accepted.p),
+        accepted_units=accepted,
+        unit_guard_reason=module.UNIT_NOT_ACCEPTED,
+    )
+    assert isinstance(product, float)
+    return product
+
+
+def expected_month(
+    month: int,
+    numbers: dict[str, float] | None = None,
+    soil_: SiteSoilSlope | None = None,
+) -> float:
+    """The main route: the level of R times the share of the calendar month in
+    the twelve monthly erosivity records, times K, LS, C and P."""
+    numbers = placeholder_values() if numbers is None else numbers
+    monthly = [numbers[pid] for pid in module.MONTHLY_EROSIVITY_IDS]
+    fraction = monthly[month - 1] / sum(monthly)
+    return (
+        numbers[module.R_ID]
+        * fraction
+        * numbers[module.K_ID]
+        * expected_ls(numbers, soil_)
+        * numbers[module.C_ID]
+        * numbers[module.P_ID]
+    )
+
+
 def months_of(ag_year: int) -> list[tuple[int, int]]:
     first = first_day_of(ag_year)
     months = []
@@ -643,10 +713,10 @@ def months_of(ag_year: int) -> list[tuple[int, int]]:
 def expected_r_and_fractions(
     climate_: SiteClimate, numbers: dict[str, float]
 ) -> tuple[dict[int, float], dict[int, dict[tuple[int, int], float]]]:
-    """R of every covered year and its monthly fractions, by the forms of
-    r_factor/README.md: index = P ** exponent above the threshold, else 0;
-    fraction = monthly sum / annual sum; ratio = annual sum / mean annual sum;
-    R(year, month) = level * fraction * ratio."""
+    """The daily-index route: R of every covered year and its monthly
+    fractions, by the forms of r_factor/README.md: index = P ** exponent above
+    the threshold, else 0; fraction = monthly sum / annual sum; ratio = annual
+    sum / mean annual sum; R(year, month) = level * fraction * ratio."""
     (series,) = [s for s in climate_.daily_series if s.quantity == PRECIPITATION]
     exponent = numbers[module.R_EXPONENT_ID]
     threshold = numbers[module.R_THRESHOLD_ID]
@@ -674,14 +744,15 @@ def expected_r_and_fractions(
 def expected_ratio_of_day(
     day: dt.date, calendar_: RotationCalendar, numbers: dict[str, float]
 ) -> float:
-    """The soil-loss ratio of one day by the forms of c_factor/README.md."""
+    """The daily-index route: the soil-loss ratio of one day by the forms of
+    c_factor/README.md under PC-1: the residue cover from the decayed mass of
+    the last harvest; the surface-cover sub-factor exp(-b * cover in percent);
+    the canopy sub-factor of the effective canopy cover, the canopy cover
+    times one minus the residue cover (S1 Eq. 6.5)."""
     crop = next(
         (c.crop_id for c in calendar_.components if c.start.date <= day <= c.end.date),
         NO_CROP,
     )
-    cover = CROP_VALUES[(module.CANOPY_COVER_ID, crop)]
-    height = CROP_VALUES[(module.FALL_HEIGHT_ID, crop)]
-    canopy = 1 - cover * math.exp(-numbers[module.FALL_HEIGHT_COEFFICIENT_ID] * height)
     harvest = max(
         (c for c in calendar_.components if c.end.date < day),
         key=lambda c: c.end.date,
@@ -691,18 +762,26 @@ def expected_ratio_of_day(
         * (day - harvest.end.date).days
     )
     residue_cover = 1 - math.exp(-numbers[module.MASS_COVER_COEFFICIENT_ID] * mass)
-    surface = math.exp(-numbers[module.SURFACE_COVER_COEFFICIENT_ID] * residue_cover)
+    surface = math.exp(
+        -numbers[module.SURFACE_COVER_B_PER_PERCENT_ID] * residue_cover * 100
+    )
+    effective = CROP_VALUES[(module.CANOPY_COVER_ID, crop)] * (1 - residue_cover)
+    height = CROP_VALUES[(module.FALL_HEIGHT_ID, crop)]
+    canopy = 1 - effective * math.exp(
+        -numbers[module.FALL_HEIGHT_COEFFICIENT_ID] * height
+    )
     return canopy * surface
 
 
-def expected_soil_loss(
+def expected_daily_soil_loss(
     climate_: SiteClimate,
     calendar_: RotationCalendar,
     numbers: dict[str, float] | None = None,
     soil_: SiteSoilSlope | None = None,
 ) -> dict[int, float]:
-    """A = R * K * LS * C * P of every covered year, C = sum over the months of
-    fraction * mean daily soil-loss ratio, over one year (M1.5)."""
+    """The daily-index route: A = R * K * LS * C * P of every covered year,
+    C = sum over the months of fraction * mean daily soil-loss ratio, over one
+    year (M1.5)."""
     numbers = placeholder_values() if numbers is None else numbers
     r, fractions = expected_r_and_fractions(climate_, numbers)
     product = numbers[module.K_ID] * expected_ls(numbers, soil_) * numbers[module.P_ID]
@@ -759,28 +838,31 @@ def test_examples_with_several_agricultural_years_load_into_soil_loss_results():
 
 
 def test_start_month_missing_returns_one_missing_input():
-    result = run(calendar_without_start_month())
-    assert isinstance(result, Missing)
-    assert result.reason == "MISSING_INPUT"
-    assert "start month" in result.detail
+    for daily in (False, True):
+        result = run(calendar_without_start_month(), daily=daily)
+        assert isinstance(result, Missing)
+        assert result.reason == "MISSING_INPUT"
+        assert "start month" in result.detail
 
 
 def test_infeasible_calendar_makes_every_value_not_computable():
     span = partial_years()
-    cases = (
-        (infeasible_calendar(), climate(span), {}, soil()),
-        (
-            infeasible_calendar(),
-            computable_climate(span),
-            catalogue(),
-            computable_soil(),
-        ),
-    )
-    for calendar_, climate_, parameters, soil_ in cases:
-        result = run(calendar_, climate_, soil_, parameters)
-        assert isinstance(result, SoilLossResults)
-        assert {item.missing.reason for item in values(result)} == {"NOT_COMPUTABLE"}
-        assert all("infeasible" in item.missing.detail for item in values(result))
+    for daily in (False, True):
+        cases = (
+            (infeasible_calendar(), climate(span), {}, soil()),
+            (
+                infeasible_calendar(),
+                computable_climate(span),
+                catalogue(),
+                computable_soil(),
+            ),
+        )
+        for calendar_, climate_, parameters, soil_ in cases:
+            result = run(calendar_, climate_, soil_, parameters, daily=daily)
+            assert isinstance(result, SoilLossResults)
+            reasons = {item.missing.reason for item in values(result)}
+            assert reasons == {"NOT_COMPUTABLE"}
+            assert all("infeasible" in item.missing.detail for item in values(result))
 
 
 def test_year_or_month_not_covered_by_precipitation_is_no_coverage():
@@ -802,17 +884,21 @@ def test_year_or_month_not_covered_by_precipitation_is_no_coverage():
     month_reasons = set()
     for item in result.monthly:
         covered = is_covered(*month_bounds(item.year, item.month), span)
-        expected = "NOT_AVAILABLE" if covered else "NO_COVERAGE"
+        # Changed by the review of #187: a covered month is computed on the
+        # main route, so with an empty catalogue it names its records.
+        expected = "MISSING_INPUT" if covered else "NO_COVERAGE"
         assert item.missing.reason == expected, (item.year, item.month)
         month_reasons.add(expected)
-        if not covered:
+        if covered:
+            assert module.MONTHLY_EROSIVITY_PREFIX in item.missing.detail
+        else:
             assert PRECIPITATION in item.missing.detail
-    assert month_reasons == {"NOT_AVAILABLE", "NO_COVERAGE"}
+    assert month_reasons == {"MISSING_INPUT", "NO_COVERAGE"}
     # A year that is not covered whole still has months that are covered.
     first_year = result.annual[0].ag_year
     assert {
         item.missing.reason for item in result.monthly if item.ag_year == first_year
-    } == {"NOT_AVAILABLE", "NO_COVERAGE"}
+    } == {"MISSING_INPUT", "NO_COVERAGE"}
 
 
 def test_series_one_day_short_at_each_end_leaves_first_and_last_not_covered():
@@ -833,37 +919,29 @@ def test_series_one_day_short_at_each_end_leaves_first_and_last_not_covered():
     assert months[0].missing.reason == "NO_COVERAGE"
     assert months[-1].missing.reason == "NO_COVERAGE"
     for item in months[1:-1]:
-        assert item.missing.reason == "NOT_AVAILABLE", (item.year, item.month)
+        assert item.missing.reason == "MISSING_INPUT", (item.year, item.month)
 
 
 def test_calendar_dates_outside_the_record_keep_the_years_of_the_record():
-    """D47: the years are those of the record. C now reads the calendar, so a
-    calendar moved past the record leaves C missing, naming D47, where the
-    same calendar on the record gives a number."""
+    """D47: the years are those of the record. The main route reads no date of
+    the calendar, so a calendar moved past the record gives the same result,
+    with an empty and with a complete catalogue."""
     span = several_full_years()
-    on_record = run_computable()
-    assert all(item.value is not None for item in on_record.annual)
-    moved_calendar = moved_past(computable_calendar_document(), span[1])
-    for moved in (
-        run(calendar_outside_the_record(), climate(span)),
-        run_computable(calendar_=moved_calendar),
-    ):
-        assert isinstance(moved, SoilLossResults)
-        assert [item.ag_year for item in moved.annual] == expected_ag_years(*span)
-    for item in run_computable(calendar_=moved_calendar).annual:
-        assert item.value is None and item.missing.reason == "MISSING_INPUT"
-        detail = item.missing.detail
-        assert "factor 'c' is missing" in detail
-        assert module.OUTSIDE_CALENDAR in detail and "D47" in detail
-        for factor in ("r", "k", "ls", "p"):
-            assert f"factor '{factor}'" not in detail
+    moved = run(calendar_outside_the_record(), climate(span))
+    assert isinstance(moved, SoilLossResults)
+    assert [item.ag_year for item in moved.annual] == expected_ag_years(*span)
+    assert moved == run(calendar(), climate(span))
+    full = run_computable(calendar_=calendar_outside_the_record())
+    assert full == run_computable(calendar_=calendar())
+    assert all(item.value is not None for item in full.annual)
 
 
 def test_no_precipitation_series_returns_one_missing_input():
-    result = run(climate_=climate_with(None))
-    assert isinstance(result, Missing)
-    assert result.reason == "MISSING_INPUT"
-    assert PRECIPITATION in result.detail
+    for daily in (False, True):
+        result = run(climate_=climate_with(None), daily=daily)
+        assert isinstance(result, Missing)
+        assert result.reason == "MISSING_INPUT"
+        assert PRECIPITATION in result.detail
 
 
 @pytest.mark.parametrize(
@@ -872,21 +950,21 @@ def test_no_precipitation_series_returns_one_missing_input():
 )
 def test_missing_slope_input_is_named_in_the_ls_factor(names):
     soil_ = soil_with_missing(*names, document=computable_soil_document())
-    result = run_computable(soil_=soil_)
-    for item in result.annual:
-        assert item.value is None
-        assert item.missing.reason == "MISSING_INPUT"
-        detail = item.missing.detail
-        assert "factor 'ls' is missing" in detail
-        for name in names:
-            assert (
-                f"{name} is missing in the soil-and-slope data, reason NO_COVERAGE"
-                in (detail)
-            )
-        for name in {"slope_steepness", "slope_length"} - set(names):
-            assert f"{name} is missing" not in detail
-        for factor in ("r", "k", "c", "p"):
-            assert f"factor '{factor}'" not in detail
+    for result in (run_computable(soil_=soil_), run_daily(soil_=soil_)):
+        for item in result.annual:
+            assert item.value is None
+            assert item.missing.reason == "MISSING_INPUT"
+            detail = item.missing.detail
+            assert "factor 'ls' is missing" in detail
+            for name in names:
+                assert (
+                    f"{name} is missing in the soil-and-slope data, reason NO_COVERAGE"
+                    in (detail)
+                )
+            for name in {"slope_steepness", "slope_length"} - set(names):
+                assert f"{name} is missing" not in detail
+            for factor in ("r", "k", "c", "p"):
+                assert f"factor '{factor}'" not in detail
 
 
 @pytest.mark.parametrize("argument", ["climate", "soil_slope"])
@@ -901,8 +979,9 @@ def test_arguments_of_another_case_or_field_raise_value_error(argument, field):
     arguments[argument] = arguments[argument].model_copy(
         update={field: "PLACEHOLDER-other"}
     )
-    with pytest.raises(ValueError, match=field):
-        module.compute_soil_loss(**arguments)
+    for function in (module.compute_soil_loss, module.compute_soil_loss_daily_index):
+        with pytest.raises(ValueError, match=field):
+            function(**arguments)
 
 
 @pytest.mark.parametrize("argument", ["calendar", "climate", "soil_slope"])
@@ -911,11 +990,15 @@ def test_argument_that_is_not_its_model_raises_type_error(argument):
     wrong = {"calendar": soil(), "climate": calendar(), "soil_slope": climate()}
     for replacement in (arguments[argument].model_dump(mode="json"), wrong[argument]):
         changed = dict(arguments, **{argument: replacement})
-        with pytest.raises(TypeError, match=argument):
-            module.compute_soil_loss(**changed, parameters={})
+        for function in (
+            module.compute_soil_loss,
+            module.compute_soil_loss_daily_index,
+        ):
+            with pytest.raises(TypeError, match=argument):
+                function(**changed, parameters={})
 
 
-# --- the argument parameters (D46, D56) ---------------------------------------
+# --- the argument parameters (D46, D56) on the main route ---------------------
 
 
 def test_parameters_missing_positional_or_not_a_dict_raises_type_error():
@@ -934,132 +1017,77 @@ def test_parameters_missing_positional_or_not_a_dict_raises_type_error():
 
 
 def test_empty_catalogue_names_every_parameter_and_keeps_every_year():
-    """R and C are missing; the detail names every parameter by id and scope
-    and the part of the method that needs it."""
+    """The annual value names every record it needs, C as the declared value
+    (D69, D84, USER-G); every month names the twelve monthly records."""
     span = several_full_years()
     result = run_computable({})
     assert [item.ag_year for item in result.annual] == expected_ag_years(*span)
     assert {item.missing.reason for item in result.annual} == {"MISSING_INPUT"}
-    for item in result.annual:
-        detail = item.missing.detail
-        for factor in equation.FACTOR_NAMES:
-            assert f"factor '{factor}' is missing" in detail
-        for pid in module.PARAMETER_IDS:
-            assert f"{named(pid)} has no record in parameters (D56)" in detail
-        r_part = detail.split("factor 'k'", 1)[0]
-        for pid in module.R_IDS:
-            assert f"'{pid}'" in r_part
-        assert "M1.2" in r_part and "engine/erosion/r_factor/" in r_part
-        assert "daily erosivity index" in r_part and "mean annual level" in r_part
-        c_part = detail.split("factor 'c' is missing", 1)[1].split("factor 'p'", 1)[0]
-        assert f"C of agricultural year {item.ag_year} is not computed" in c_part
-        assert "M1.5" in c_part and "D45" in c_part
-        assert "engine/erosion/c_factor/" in c_part
-        assert "monthly erosivity fractions" in c_part
-        for pid in module.C_SITE_IDS:
-            assert f"{named(pid)} has no record" in c_part
-        for pid in module.CANOPY_IDS:
-            for word in CROP_SCOPES:
-                assert f"{named(pid, CROP_SCOPES[word])} has no record" in c_part
-        for pid in module.RESIDUE_IDS:
-            for crop in CROPS:
-                assert f"{named(pid, CROP_SCOPES[crop])} has no record" in c_part
-        assert "canopy sub-factor" in c_part
-        assert "surface residue cover, with residue decay by residue type" in c_part
-        assert f"'{module.C_ID}'" not in detail
-    assert {item.missing.reason for item in result.monthly} == {"NOT_AVAILABLE"}
-    assert all("M1.2" in item.missing.detail for item in result.monthly)
+    detail = result.annual[0].missing.detail
+    assert {item.missing.detail for item in result.annual} == {detail}
+    for factor in equation.FACTOR_NAMES:
+        assert f"factor '{factor}' is missing" in detail
+    for pid in module.PARAMETER_IDS:
+        assert f"{named(pid)} has no record in parameters (D56)" in detail
+    c_part = detail.split("factor 'c' is missing", 1)[1].split("factor 'p'", 1)[0]
+    assert "DECLARED" in c_part and "D69" in c_part and "USER-G" in c_part
+    for pid in (*module.MONTHLY_EROSIVITY_IDS, *module.DAILY_ROUTE_PARAMETER_IDS):
+        if pid not in module.PARAMETER_IDS:
+            assert f"'{pid}'" not in detail
+    assert {item.missing.reason for item in result.monthly} == {"MISSING_INPUT"}
+    for item in result.monthly:
+        month_detail = item.missing.detail
+        assert "its factors are those of the annual product" in month_detail
+        for pid in module.MONTHLY_EROSIVITY_IDS:
+            assert f"{named(pid)} has no record in parameters (D56)" in month_detail
+        assert "D69" in month_detail and "D84" in month_detail
+        assert "M1.2" in month_detail
 
 
 def test_full_catalogue_gives_the_product_of_equation_py():
     span = partial_years()
     climate_ = computable_climate(span)
-    calendar_ = computable_calendar(span)
-    result = run_computable(climate_=climate_, calendar_=calendar_)
-    expected = expected_soil_loss(climate_, calendar_)
-    assert len(expected) > 1
-    assert_numbers(result, expected)
-    accepted = module.ACCEPTED_UNITS
+    result = run_computable(climate_=climate_)
+    product = expected_product()
+    years = covered_ag_years(span)
+    assert len(years) > 1
     for item in result.annual:
-        if item.ag_year not in expected:
+        if item.ag_year not in years:
             assert item.value is None and item.missing.reason == "NO_COVERAGE"
             continue
+        # The same number for every covered year: the variation between
+        # years is deferred (USER-G, D69).
         assert item.missing is None
+        assert item.value == product
         assert item.provenance == PROVENANCE_OF_SOIL_LOSS
         assert item.source is not None and not item.assumption
         for pid in module.PARAMETER_IDS:
             assert f"{named(pid).removeprefix('parameter ')}" in item.source
-        for crop in CROPS:
-            for pid in module.CROP_PARAMETER_IDS:
-                assert (
-                    f"{named(pid, CROP_SCOPES[crop]).removeprefix('parameter ')}"
-                    in (item.source)
-                )
-        assert "engine/erosion/r_factor/" in item.source
-        assert "engine/erosion/c_factor/" in item.source
+        assert "DECLARED" in item.source and "USER-G" in item.source
         assert item.range is None
         assert item.range_missing.reason == "NOT_AVAILABLE"
-    # The product is equation.py's, with R and C as computed here.
-    year = next(iter(expected))
-    numbers = placeholder_values()
-    r, _ = expected_r_and_fractions(climate_, numbers)
-    c = expected[year] / (
-        r[year] * numbers[module.K_ID] * expected_ls(numbers) * numbers[module.P_ID]
-    )
-    product = equation.annual_soil_loss(
-        r=equation.Factor(r[year], accepted.r),
-        k=equation.Factor(numbers[module.K_ID], accepted.k),
-        ls=equation.Factor(expected_ls(numbers), accepted.ls),
-        c=equation.Factor(c, accepted.c),
-        p=equation.Factor(numbers[module.P_ID], accepted.p),
-        accepted_units=accepted,
-        unit_guard_reason=module.UNIT_NOT_ACCEPTED,
-    )
-    (item,) = [item for item in result.annual if item.ag_year == year]
-    assert item.value == pytest.approx(product, rel=1e-9)
     for item in result.monthly:
-        assert item.value is None
-        assert item.missing.reason in {"NOT_AVAILABLE", "NO_COVERAGE"}
+        if not is_covered(*month_bounds(item.year, item.month), span):
+            assert item.value is None and item.missing.reason == "NO_COVERAGE"
+            continue
+        assert item.missing is None
+        assert item.value == pytest.approx(expected_month(item.month), rel=1e-9)
+        assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+        assert "climatological monthly fraction" in item.source
+        for pid in module.MONTHLY_EROSIVITY_IDS:
+            assert f"'{pid}'" in item.source
+        assert item.range_missing.reason == "NOT_AVAILABLE"
+    # The months of a covered year add up to its value (C1.2).
+    for year in years:
+        total = sum(item.value for item in result.monthly if item.ag_year == year)
+        assert total == pytest.approx(product, rel=1e-9)
     dumped = result.model_dump(mode="json")
     assert SoilLossResults.model_validate_json(json.dumps(dumped)) == result
 
 
-def test_chain_example_climate_gives_r_and_c_through_r_factor_and_c_factor():
-    """The chain example climate (one agricultural year, the same number every
-    day), a complete PLACEHOLDER catalogue and a calendar of the same field:
-    soil loss is equation.py of R from r_factor/ and C from c_factor/."""
-    climate_document_ = load("chain_site_climate")
-    climate_ = SiteClimate.model_validate(climate_document_)
-    identity = {key: climate_document_[key] for key in ("case_id", "field_id")}
-    soil_ = computable_soil(load("chain_site_soil_slope"))
-    (series,) = [s for s in climate_.daily_series if s.quantity == PRECIPITATION]
-    span = (series.start_date, series.end_date)
-    calendar_ = RotationCalendar.model_validate(
-        computable_calendar_document(span, identity)
-    )
-    result = run_computable(calendar_=calendar_, climate_=climate_, soil_=soil_)
-    expected = expected_soil_loss(climate_, calendar_, soil_=soil_)
-    assert len(expected) == 1
-    assert_numbers(result, expected)
-    # One year: its ratio is one, so R is the level times the sum of its
-    # fractions; each fraction is the share of the month's days in the year.
-    numbers = placeholder_values()
-    r, fractions = expected_r_and_fractions(climate_, numbers)
-    ((year, by_month),) = fractions.items()
-    days_in_year = (span[1] - span[0]).days + 1
-    for (y, m), fraction in by_month.items():
-        first, last = month_bounds(y, m)
-        assert fraction == pytest.approx(((last - first).days + 1) / days_in_year)
-    assert r[year] == pytest.approx(numbers[module.R_ID])
-
-
 def test_ls_is_computed_through_ls_py_from_the_catalogue():
     """Every LS record, changed, gives the product of ls.py with the change, on
-    both sides of the break slope. One agricultural year keeps the test short."""
-    year = example_start().year
-    span = (first_day_of(year), last_day_of(year))
-    climate_ = computable_climate(span)
-    calendar_ = computable_calendar(span)
+    both sides of the break slope."""
     slope = computable_soil().slope_steepness.value
     for s_break in (placeholder_values()[module.S_BREAK_ID], slope):
         for pid in (None, *module.LS_IDS):
@@ -1069,10 +1097,10 @@ def test_ls_is_computed_through_ls_py_from_the_catalogue():
             marked = marked_catalogue()
             for key, number in numbers.items():
                 marked[site_key(key)]["value"] = number
-            result = run_computable(
-                unmarked(marked), climate_=climate_, calendar_=calendar_
-            )
-            assert_numbers(result, expected_soil_loss(climate_, calendar_, numbers))
+            result = run_computable(unmarked(marked))
+            assert {item.value for item in result.annual} == {
+                expected_product(numbers)
+            }, pid
 
 
 @pytest.mark.parametrize("pid", module.PARAMETER_IDS)
@@ -1082,257 +1110,72 @@ def test_removing_any_one_record_makes_the_year_missing_and_names_it(pid):
         assert item.value is None
         assert item.missing.reason == "MISSING_INPUT"
         assert f"{named(pid)} has no record in parameters (D56)" in item.missing.detail
-        for other in (*module.PARAMETER_IDS, *module.CROP_PARAMETER_IDS):
+        for other in module.PARAMETER_IDS:
             if other != pid:
                 assert f"'{other}'" not in item.missing.detail
+    for item in result.monthly:
+        assert item.value is None and item.missing.reason == "MISSING_INPUT"
+        assert f"'{pid}'" in item.missing.detail
 
 
-@pytest.mark.parametrize("pid, word", list(CROP_VALUES))
-def test_removing_any_one_crop_record_makes_c_missing_and_names_it_with_its_scope(
-    pid, word
-):
-    result = run_computable(catalogue((pid, word)))
-    part = module.CANOPY_PART if pid in module.CANOPY_IDS else module.RESIDUE_PART
-    for item in result.annual:
+@pytest.mark.parametrize("pid", module.MONTHLY_EROSIVITY_IDS)
+def test_removing_any_one_monthly_erosivity_record_leaves_every_month_missing(pid):
+    result = run_computable(catalogue(pid))
+    assert all(item.value == expected_product() for item in result.annual)
+    for item in result.monthly:
         assert item.value is None
         assert item.missing.reason == "MISSING_INPUT"
         detail = item.missing.detail
-        assert "factor 'c' is missing" in detail
-        for factor in ("r", "k", "ls", "p"):
-            assert f"factor '{factor}'" not in detail
-        assert (
-            f"{named(pid, CROP_SCOPES[word])} has no record in parameters (D56); "
-            f"needed by {part}"
-        ) in detail
-        for other in module.CROP_PARAMETER_IDS:
+        assert f"{named(pid)} has no record in parameters (D56)" in detail
+        assert module.CLIMATOLOGY_PART in detail
+        for other in module.MONTHLY_EROSIVITY_IDS:
             if other != pid:
                 assert f"'{other}'" not in detail
+        assert "annual product" not in detail
 
 
-def test_crop_without_residue_type_or_canopy_record_leaves_c_missing_and_names_it():
-    """Crop B has no decay coefficient (no residue type) and crop A no canopy
-    cover: C is missing, never zero, and names both, each with its crop."""
-    parameters = catalogue(
-        (module.DECAY_COEFFICIENT_ID, CROP_B), (module.CANOPY_COVER_ID, CROP_A)
-    )
-    for item in run_computable(parameters).annual:
-        assert item.value is None
-        assert item.missing.reason == "MISSING_INPUT"
-        detail = item.missing.detail
-        assert "factor 'c' is missing (reason MISSING_INPUT" in detail
-        assert (
-            f"{named(module.DECAY_COEFFICIENT_ID, {'crop': CROP_B})} has no record"
-            in (detail)
-        )
-        assert "residue decay by residue type" in detail
-        assert f"{named(module.CANOPY_COVER_ID, {'crop': CROP_A})} has no record" in (
-            detail
-        )
-        assert "canopy sub-factor" in detail
-
-
-def test_year_without_an_erosive_day_leaves_r_and_c_missing_for_that_year():
-    span = several_full_years()
-    years = covered_ag_years(span)
-    dry = years[1]
-    threshold = CHOSEN[module.R_THRESHOLD_ID]
-
-    def value_of(day: dt.date, position: int) -> float:
-        # Every day of the dry year at the threshold: no erosive day.
-        return threshold if ag_year_of(day) == dry else RAIN[position % len(RAIN)]
-
-    result = run_computable(climate_=computable_climate(span, value_of))
-    by_year = {item.ag_year: item for item in result.annual}
-    item = by_year[dry]
-    assert item.value is None
-    assert item.missing.reason == "MISSING_INPUT"
-    detail = item.missing.detail
-    # r_factor/ gives each month of R as MISSING_INPUT, naming the fraction
-    # that is NOT_COMPUTABLE; C names the fractions.
-    assert "factor 'r' is missing (reason MISSING_INPUT" in detail
-    assert "factor 'c' is missing (reason MISSING_INPUT" in detail
-    assert detail.count("no erosive day") >= 2
-    for factor in ("k", "ls", "p"):
-        assert f"factor '{factor}'" not in detail
-    for year in years:
-        if year != dry:
-            assert by_year[year].value is not None and by_year[year].value != 0
-
-
-def test_missing_day_in_the_series_makes_its_year_missing_and_no_other():
-    span = several_full_years()
-    years = covered_ag_years(span)
-    document = rain_series(*span)
-    hole = first_day_of(years[0]) + 40 * ONE_DAY
-    for item in document["days"]:
-        if item["date"] == hole.isoformat():
-            item.update(
-                value=None,
-                missing={"reason": "NO_COVERAGE", "detail": "PLACEHOLDER: no data"},
-            )
-    result = run_computable(climate_=climate_with(document))
-    by_year = {item.ag_year: item for item in result.annual}
-    detail = by_year[years[0]].missing.detail
-    assert by_year[years[0]].missing.reason == "MISSING_INPUT"
-    assert "factor 'r' is missing" in detail and "factor 'c' is missing" in detail
-    assert hole.strftime("%Y-%m") in detail
-    for year in years[1:]:
-        assert by_year[year].value is not None
-
-
-def test_day_outside_the_calendar_or_before_the_first_harvest_leaves_c_missing():
-    span = several_full_years()
-    years = covered_ag_years(span)
-    document = computable_calendar_document()
-    # No harvest before the record: the calendar begins on its first day.
-    no_harvest = copy.deepcopy(document)
-    no_harvest["start_date"] = span[0].isoformat()
-    no_harvest["components"] = [
-        c for c in document["components"] if c["start"]["date"] >= span[0].isoformat()
-    ]
-    # The calendar ends before the last year of the record.
-    short = copy.deepcopy(document)
-    short["end_date"] = last_day_of(years[-2]).isoformat()
-    short["components"] = [
-        c for c in document["components"] if c["end"]["date"] <= short["end_date"]
-    ]
-    # A component without an end date.
-    undated = copy.deepcopy(document)
-    last = undated["components"][-1]
-    last["end"] = {"date": None, "missing": {"reason": "NOT_DECLARED"}}
-    cases = (
-        (no_harvest, [years[0]], "no component of the rotation calendar ends before"),
-        (short, [years[-1]], module.OUTSIDE_CALENDAR),
-        (undated, [years[-1]], f"'{last['component_id']}'"),
-    )
-    for calendar_document_, missing_years, text in cases:
-        result = run_computable(
-            calendar_=RotationCalendar.model_validate(calendar_document_)
-        )
-        for item in result.annual:
-            if item.ag_year in missing_years:
-                assert item.value is None
-                assert item.missing.reason == "MISSING_INPUT"
-                assert "factor 'c' is missing" in item.missing.detail
-                assert text in item.missing.detail
-                assert "day(s) of the year, the first on" in item.missing.detail
-            else:
-                assert item.value is not None, (text, item.ag_year)
-
-
-def test_unit_strings_of_c_records_that_are_not_read_are_not_computed():
-    cases = {
-        "canopy cover not dimensionless": (
-            catalogue_with(
-                crop_key(module.CANOPY_COVER_ID, NO_CROP), unit="PLACEHOLDER_percent"
-            ),
-            f"of parameter '{module.CANOPY_COVER_ID}' with scope "
-            f"{json.dumps(module.NO_CROP_SCOPE)} is not '{module.DIMENSIONLESS}'",
-        ),
-        "decay coefficient not an inverse": (
-            catalogue_with(
-                crop_key(module.DECAY_COEFFICIENT_ID, CROP_A), unit=module.DAY
-            ),
-            f"of parameter '{module.DECAY_COEFFICIENT_ID}' with scope "
-            f"{json.dumps({'crop': CROP_A})} is not read as the inverse of a unit",
-        ),
-        "surface-cover coefficient not dimensionless": (
-            catalogue_with(
-                site_key(module.SURFACE_COVER_COEFFICIENT_ID), unit="PLACEHOLDER_unit"
-            ),
-            f"of parameter '{module.SURFACE_COVER_COEFFICIENT_ID}' is not "
-            f"'{module.DIMENSIONLESS}'",
-        ),
-        "fall height and coefficient in two units": (
-            catalogue_with(
-                site_key(module.FALL_HEIGHT_COEFFICIENT_ID),
-                unit="PLACEHOLDER_other_height_unit-1",
-            ),
-            "canopy_subfactor of engine/erosion/c_factor/",
-        ),
-    }
-    for name, (parameters, text) in cases.items():
-        assert check_catalogue(parameters) == [], name
-        for item in run_computable(parameters).annual:
-            assert item.value is None, name
-            detail = item.missing.detail
-            assert (
-                f"factor 'c' is missing (reason {module.UNIT_NOT_ACCEPTED}" in detail
-            ), name
-            assert unmarked(text) in detail, name
-
-
-def test_value_c_factor_refuses_is_not_computed_and_names_the_day():
-    parameters = catalogue_with(crop_key(module.CANOPY_COVER_ID, CROP_A), value=1.5)
-    for item in run_computable(parameters).annual:
-        assert item.value is None
-        detail = item.missing.detail
-        assert "factor 'c' is missing (reason NOT_COMPUTABLE" in detail
-        assert "canopy_subfactor of engine/erosion/c_factor/" in detail
-        assert "canopy_cover" in detail and "outside zero to one" in detail
-        assert re.search(r"on \d{4}-\d\d-\d\d, canopy_subfactor", detail)
-
-
-def test_r_level_threshold_or_series_in_another_unit_is_refused_by_r_factor():
-    document = rain_series(*several_full_years())
-    document["unit"] = unmarked("PLACEHOLDER_unit")
+def test_monthly_erosivity_records_in_two_units_or_below_zero_are_not_computed():
+    first, second, *_ = module.MONTHLY_EROSIVITY_IDS
     cases = (
         (
-            catalogue_with(site_key(module.R_ID), unit="PLACEHOLDER_unit"),
-            computable_climate(),
-            ["r"],
+            catalogue_with(site_key(second), unit="PLACEHOLDER_other_unit"),
+            module.UNIT_NOT_ACCEPTED,
+            "different unit strings",
         ),
         (
-            catalogue_with(site_key(module.R_THRESHOLD_ID), unit="PLACEHOLDER_unit"),
-            computable_climate(),
-            ["r", "c"],
+            catalogue_with(site_key(first), value=-1.0),
+            "MISSING_INPUT",
+            "below zero",
         ),
-        (catalogue(), climate_with(document), ["r", "c"]),
     )
-    for parameters, climate_, factors in cases:
-        for item in run_computable(parameters, climate_=climate_).annual:
+    for parameters, reason, text in cases:
+        result = run_computable(parameters)
+        assert all(item.value == expected_product() for item in result.annual)
+        for item in result.monthly:
             assert item.value is None
-            detail = item.missing.detail
-            assert unmarked("PLACEHOLDER_unit") in detail
-            for factor in ("r", "k", "ls", "c", "p"):
-                assert (f"factor '{factor}' is missing" in detail) == (
-                    factor in factors
-                ), (factor, detail)
-
-
-def test_whole_factor_record_of_c_is_not_read():
-    parameters = catalogue()
-    parameters["c.json"] = unmarked(
-        placeholder_record(module.C_ID, PLACEHOLDER_BASE, module.DIMENSIONLESS)
-    )
-    assert check_catalogue(parameters) == []
-    with_record = run_computable(parameters)
-    assert with_record == run_computable()
-    for item in with_record.annual:
-        assert f"'{module.C_ID}'" not in item.source
+            assert item.missing.reason == reason
+            assert text in item.missing.detail
 
 
 def test_record_with_null_value_repeats_its_reason():
-    keys = (
-        (site_key(module.R_ID), named(module.R_ID)),
-        (site_key(module.S_BREAK_ID), named(module.S_BREAK_ID)),
-        (
-            site_key(module.FALL_HEIGHT_COEFFICIENT_ID),
-            named(module.FALL_HEIGHT_COEFFICIENT_ID),
-        ),
+    cases = (
+        (site_key(module.R_ID), named(module.R_ID), False),
+        (site_key(module.S_BREAK_ID), named(module.S_BREAK_ID), False),
+        (site_key(module.C_ID), named(module.C_ID), False),
         (
             crop_key(module.RESIDUE_MASS_ID, CROP_A),
             named(module.RESIDUE_MASS_ID, {"crop": CROP_A}),
+            True,
         ),
     )
-    for key, name in keys:
+    for key, name, daily in cases:
         marked = marked_catalogue()
         record = marked[key]
         record["value"] = None
         record["value_missing_reason"] = "PLACEHOLDER: the source gives no value here"
         parameters = unmarked(marked)
         assert check_catalogue(parameters) == []
-        for item in run_computable(parameters).annual:
+        for item in run_computable(parameters, daily=daily).annual:
             assert item.value is None
             assert item.missing.reason == "MISSING_INPUT"
             detail = item.missing.detail
@@ -1373,15 +1216,11 @@ def test_only_a_record_with_the_empty_scope_is_read():
 
 def test_two_records_with_one_identity_are_missing_input():
     parameters = catalogue()
-    key = site_key(module.SURFACE_COVER_COEFFICIENT_ID)
-    parameters["copy.json"] = copy.deepcopy(parameters[key])
+    parameters["copy.json"] = copy.deepcopy(parameters[site_key(module.C_ID)])
     assert check_catalogue(parameters) != []
     for item in run_computable(parameters).annual:
         assert item.missing.reason == "MISSING_INPUT"
-        assert (
-            f"{named(module.SURFACE_COVER_COEFFICIENT_ID)} has more than one record"
-            in item.missing.detail
-        )
+        assert f"{named(module.C_ID)} has more than one record" in item.missing.detail
 
 
 def test_record_that_cannot_be_compared_is_reported_not_skipped():
@@ -1424,12 +1263,26 @@ def test_slope_unit_that_ls_py_cannot_read_is_not_computed():
 
 
 def test_factor_in_another_unit_is_stopped_by_the_unit_guard():
-    marked = marked_catalogue()
-    marked[site_key(module.K_ID)]["unit"] = "PLACEHOLDER_unit"
-    for item in run_computable(unmarked(marked)).annual:
-        assert item.value is None
-        assert item.missing.reason == module.UNIT_NOT_ACCEPTED
-        assert "factor 'k' is in the unit" in item.missing.detail
+    for pid, factor in ((module.R_ID, "r"), (module.C_ID, "c")):
+        parameters = catalogue_with(site_key(pid), unit="PLACEHOLDER_unit")
+        for item in run_computable(parameters).annual:
+            assert item.value is None
+            assert item.missing.reason == module.UNIT_NOT_ACCEPTED
+            assert f"factor '{factor}' is in the unit" in item.missing.detail
+
+
+def test_c_is_the_declared_record_on_the_main_route_and_not_read_on_the_daily_route():
+    numbers = dict(placeholder_values())
+    numbers[module.C_ID] += 1
+    changed = catalogue_with(site_key(module.C_ID), value=numbers[module.C_ID])
+    assert {item.value for item in run_computable(changed).annual} == {
+        expected_product(numbers)
+    }
+    without = catalogue(module.C_ID)
+    assert run_daily(without) == run_daily()
+    assert run_daily(changed) == run_daily()
+    for item in run_daily().annual:
+        assert f"'{module.C_ID}'" not in item.source
 
 
 def test_no_value_is_a_number_unless_every_factor_is_present():
@@ -1445,15 +1298,17 @@ def test_no_value_is_a_number_unless_every_factor_is_present():
         run(soil_=soil_with_missing("slope_steepness", "slope_length")),
         run(soil_=computable_soil(), parameters=catalogue(module.P_ID)),
         run(soil_=soil(), parameters=catalogue()),
-        run_computable(catalogue((module.RESIDUE_MASS_ID, CROP_B))),
-        run_computable(climate_=dry),
+        run_computable(catalogue(module.C_ID)),
         run_computable({}),
+        run_daily(catalogue((module.RESIDUE_MASS_ID, CROP_B))),
+        run_daily(climate_=dry),
+        run_daily({}),
     ]
     for result in cases:
         if isinstance(result, Missing):
             assert result.reason in codes
             continue
-        for item in values(result):
+        for item in result.annual:
             assert item.value is None
             assert item.value != 0
             assert item.missing is not None and item.missing.reason in codes
@@ -1477,23 +1332,352 @@ def test_arguments_unchanged_and_second_call_equal():
             "soil_slope": soil_,
             "parameters": parameters,
         }
-        before = {name: copy.deepcopy(value) for name, value in arguments.items()}
-        first = module.compute_soil_loss(**arguments)
-        assert arguments == before
-        assert module.compute_soil_loss(**arguments) == first
+        for function in (
+            module.compute_soil_loss,
+            module.compute_soil_loss_daily_index,
+        ):
+            before = {name: copy.deepcopy(value) for name, value in arguments.items()}
+            first = function(**arguments)
+            assert arguments == before
+            assert function(**arguments) == first
+
+
+# --- the daily-index route, off the main path (D69, D84, USER-G) ------------
+
+
+def test_daily_index_route_gives_the_product_of_r_factor_and_c_factor():
+    span = partial_years()
+    climate_ = computable_climate(span)
+    calendar_ = computable_calendar(span)
+    result = run_daily(climate_=climate_, calendar_=calendar_)
+    expected = expected_daily_soil_loss(climate_, calendar_)
+    assert len(expected) > 1
+    assert_numbers(result, expected)
+    for item in result.annual:
+        if item.ag_year not in expected:
+            assert item.value is None and item.missing.reason == "NO_COVERAGE"
+            continue
+        assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+        assert "daily-index route, off the main path" in item.source
+        for pid in module.DAILY_ROUTE_PARAMETER_IDS:
+            assert f"{named(pid).removeprefix('parameter ')}" in item.source
+        for crop in CROPS:
+            for pid in module.CROP_PARAMETER_IDS:
+                text = named(pid, CROP_SCOPES[crop]).removeprefix("parameter ")
+                assert text in item.source
+        assert "PC-1" in item.source
+    for item in result.monthly:
+        assert item.value is None
+        assert item.missing.reason in {"NOT_AVAILABLE", "NO_COVERAGE"}
+
+
+def test_daily_index_route_chain_example_climate_gives_r_and_c():
+    """The chain example climate (one agricultural year, the same number every
+    day), a complete PLACEHOLDER catalogue and a calendar of the same field:
+    soil loss is equation.py of R from r_factor/ and C from c_factor/."""
+    climate_document_ = load("chain_site_climate")
+    climate_ = SiteClimate.model_validate(climate_document_)
+    identity = {key: climate_document_[key] for key in ("case_id", "field_id")}
+    soil_ = computable_soil(load("chain_site_soil_slope"))
+    (series,) = [s for s in climate_.daily_series if s.quantity == PRECIPITATION]
+    span = (series.start_date, series.end_date)
+    calendar_ = RotationCalendar.model_validate(
+        computable_calendar_document(span, identity)
+    )
+    result = run_daily(calendar_=calendar_, climate_=climate_, soil_=soil_)
+    expected = expected_daily_soil_loss(climate_, calendar_, soil_=soil_)
+    assert len(expected) == 1
+    assert_numbers(result, expected)
+    numbers = placeholder_values()
+    r, fractions = expected_r_and_fractions(climate_, numbers)
+    ((year, by_month),) = fractions.items()
+    days_in_year = (span[1] - span[0]).days + 1
+    for (y, m), fraction in by_month.items():
+        first, last = month_bounds(y, m)
+        assert fraction == pytest.approx(((last - first).days + 1) / days_in_year)
+    assert r[year] == pytest.approx(numbers[module.R_ID])
+
+
+def test_daily_index_route_empty_catalogue_names_every_record_and_method_part():
+    result = run_daily({})
+    assert {item.missing.reason for item in result.annual} == {"MISSING_INPUT"}
+    for item in result.annual:
+        detail = item.missing.detail
+        for factor in equation.FACTOR_NAMES:
+            assert f"factor '{factor}' is missing" in detail
+        for pid in module.DAILY_ROUTE_PARAMETER_IDS:
+            assert f"{named(pid)} has no record in parameters (D56)" in detail
+        r_part = detail.split("factor 'k'", 1)[0]
+        assert "M1.2" in r_part and "engine/erosion/r_factor/" in r_part
+        c_part = detail.split("factor 'c' is missing", 1)[1].split("factor 'p'", 1)[0]
+        assert "M1.5" in c_part and "D45" in c_part and "PC-1" in c_part
+        for pid in module.CANOPY_IDS:
+            for word in CROP_SCOPES:
+                assert f"{named(pid, CROP_SCOPES[word])} has no record" in c_part
+        for pid in module.RESIDUE_IDS:
+            for crop in CROPS:
+                assert f"{named(pid, CROP_SCOPES[crop])} has no record" in c_part
+        assert f"'{module.C_ID}'" not in detail
+        for pid in module.MONTHLY_EROSIVITY_IDS:
+            assert f"'{pid}'" not in detail
+
+
+@pytest.mark.parametrize("pid", module.DAILY_ROUTE_PARAMETER_IDS)
+def test_daily_index_route_removing_any_one_site_record_names_it(pid):
+    for item in run_daily(catalogue(pid)).annual:
+        assert item.value is None
+        assert item.missing.reason == "MISSING_INPUT"
+        assert f"{named(pid)} has no record in parameters (D56)" in item.missing.detail
+        for other in (*module.DAILY_ROUTE_PARAMETER_IDS, *module.CROP_PARAMETER_IDS):
+            if other != pid:
+                assert f"'{other}'" not in item.missing.detail
+
+
+@pytest.mark.parametrize("pid, word", list(CROP_VALUES))
+def test_removing_any_one_crop_record_makes_c_missing_and_names_it_with_its_scope(
+    pid, word
+):
+    result = run_daily(catalogue((pid, word)))
+    part = module.CANOPY_PART if pid in module.CANOPY_IDS else module.RESIDUE_PART
+    for item in result.annual:
+        assert item.value is None
+        assert item.missing.reason == "MISSING_INPUT"
+        detail = item.missing.detail
+        assert "factor 'c' is missing" in detail
+        for factor in ("r", "k", "ls", "p"):
+            assert f"factor '{factor}'" not in detail
+        assert (
+            f"{named(pid, CROP_SCOPES[word])} has no record in parameters (D56); "
+            f"needed by {part}"
+        ) in detail
+        for other in module.CROP_PARAMETER_IDS:
+            if other != pid:
+                assert f"'{other}'" not in detail
+
+
+def test_crop_without_residue_type_or_canopy_record_leaves_c_missing_and_names_it():
+    """Crop B has no decay coefficient (no residue type) and crop A no canopy
+    cover: C is missing, never zero, and names both, each with its crop."""
+    parameters = catalogue(
+        (module.DECAY_COEFFICIENT_ID, CROP_B), (module.CANOPY_COVER_ID, CROP_A)
+    )
+    for item in run_daily(parameters).annual:
+        assert item.value is None
+        assert item.missing.reason == "MISSING_INPUT"
+        detail = item.missing.detail
+        assert "factor 'c' is missing (reason MISSING_INPUT" in detail
+        decay = named(module.DECAY_COEFFICIENT_ID, {"crop": CROP_B})
+        assert f"{decay} has no record" in detail
+        assert "residue decay by residue type" in detail
+        canopy = named(module.CANOPY_COVER_ID, {"crop": CROP_A})
+        assert f"{canopy} has no record" in detail
+        assert "canopy sub-factor" in detail
+
+
+def test_year_without_an_erosive_day_leaves_r_and_c_missing_for_that_year():
+    span = several_full_years()
+    years = covered_ag_years(span)
+    dry = years[1]
+    threshold = CHOSEN[module.R_THRESHOLD_ID]
+
+    def value_of(day: dt.date, position: int) -> float:
+        # Every day of the dry year at the threshold: no erosive day.
+        return threshold if ag_year_of(day) == dry else RAIN[position % len(RAIN)]
+
+    result = run_daily(climate_=computable_climate(span, value_of))
+    by_year = {item.ag_year: item for item in result.annual}
+    item = by_year[dry]
+    assert item.value is None
+    assert item.missing.reason == "MISSING_INPUT"
+    detail = item.missing.detail
+    # r_factor/ gives each month of R as MISSING_INPUT, naming the fraction
+    # that is NOT_COMPUTABLE; C names the fractions.
+    assert "factor 'r' is missing (reason MISSING_INPUT" in detail
+    assert "factor 'c' is missing (reason MISSING_INPUT" in detail
+    assert detail.count("no erosive day") >= 2
+    for factor in ("k", "ls", "p"):
+        assert f"factor '{factor}'" not in detail
+    for year in years:
+        if year != dry:
+            assert by_year[year].value is not None and by_year[year].value != 0
+
+
+def test_missing_day_in_the_series_makes_its_year_missing_and_no_other():
+    span = several_full_years()
+    years = covered_ag_years(span)
+    document = rain_series(*span)
+    hole = first_day_of(years[0]) + 40 * ONE_DAY
+    for item in document["days"]:
+        if item["date"] == hole.isoformat():
+            item.update(
+                value=None,
+                missing={"reason": "NO_COVERAGE", "detail": "PLACEHOLDER: no data"},
+            )
+    result = run_daily(climate_=climate_with(document))
+    by_year = {item.ag_year: item for item in result.annual}
+    detail = by_year[years[0]].missing.detail
+    assert by_year[years[0]].missing.reason == "MISSING_INPUT"
+    assert "factor 'r' is missing" in detail and "factor 'c' is missing" in detail
+    assert hole.strftime("%Y-%m") in detail
+    for year in years[1:]:
+        assert by_year[year].value is not None
+
+
+def test_day_outside_the_calendar_or_before_the_first_harvest_leaves_c_missing():
+    span = several_full_years()
+    years = covered_ag_years(span)
+    document = computable_calendar_document()
+    # No harvest before the record: the calendar begins on its first day.
+    no_harvest = copy.deepcopy(document)
+    no_harvest["start_date"] = span[0].isoformat()
+    no_harvest["components"] = [
+        c for c in document["components"] if c["start"]["date"] >= span[0].isoformat()
+    ]
+    # The calendar ends before the last year of the record.
+    short = copy.deepcopy(document)
+    short["end_date"] = last_day_of(years[-2]).isoformat()
+    short["components"] = [
+        c for c in document["components"] if c["end"]["date"] <= short["end_date"]
+    ]
+    # A component without an end date.
+    undated = copy.deepcopy(document)
+    last = undated["components"][-1]
+    last["end"] = {"date": None, "missing": {"reason": "NOT_DECLARED"}}
+    cases = (
+        (no_harvest, [years[0]], "no component of the rotation calendar ends before"),
+        (short, [years[-1]], module.OUTSIDE_CALENDAR),
+        (undated, [years[-1]], f"'{last['component_id']}'"),
+    )
+    for calendar_document_, missing_years, text in cases:
+        result = run_daily(
+            calendar_=RotationCalendar.model_validate(calendar_document_)
+        )
+        for item in result.annual:
+            if item.ag_year in missing_years:
+                assert item.value is None
+                assert item.missing.reason == "MISSING_INPUT"
+                assert "factor 'c' is missing" in item.missing.detail
+                assert text in item.missing.detail
+                assert "day(s) of the year, the first on" in item.missing.detail
+            else:
+                assert item.value is not None, (text, item.ag_year)
+
+
+def test_unit_strings_of_c_records_that_are_not_read_are_not_computed():
+    cases = {
+        "canopy cover not dimensionless": (
+            catalogue_with(
+                crop_key(module.CANOPY_COVER_ID, NO_CROP), unit="PLACEHOLDER_percent"
+            ),
+            f"of parameter '{module.CANOPY_COVER_ID}' with scope "
+            f"{json.dumps(module.NO_CROP_SCOPE)} is not '{module.DIMENSIONLESS}'",
+        ),
+        "decay coefficient not an inverse": (
+            catalogue_with(
+                crop_key(module.DECAY_COEFFICIENT_ID, CROP_A), unit=module.DAY
+            ),
+            f"of parameter '{module.DECAY_COEFFICIENT_ID}' with scope "
+            f"{json.dumps({'crop': CROP_A})} is not read as the inverse of a unit",
+        ),
+        "b of S1 Eq. 6.6 not per percent": (
+            catalogue_with(
+                site_key(module.SURFACE_COVER_B_PER_PERCENT_ID),
+                unit=module.DIMENSIONLESS,
+            ),
+            f"of parameter '{module.SURFACE_COVER_B_PER_PERCENT_ID}' is not "
+            f"'{module.PERCENT}-1'",
+        ),
+        "fall height and coefficient in two units": (
+            catalogue_with(
+                site_key(module.FALL_HEIGHT_COEFFICIENT_ID),
+                unit="PLACEHOLDER_other_height_unit-1",
+            ),
+            "canopy_subfactor of engine/erosion/c_factor/",
+        ),
+    }
+    for name, (parameters, text) in cases.items():
+        assert check_catalogue(parameters) == [], name
+        for item in run_daily(parameters).annual:
+            assert item.value is None, name
+            detail = item.missing.detail
+            assert (
+                f"factor 'c' is missing (reason {module.UNIT_NOT_ACCEPTED}" in detail
+            ), name
+            assert unmarked(text) in detail, name
+
+
+def test_value_c_factor_refuses_is_not_computed_and_names_the_day():
+    parameters = catalogue_with(crop_key(module.CANOPY_COVER_ID, CROP_A), value=1.5)
+    for item in run_daily(parameters).annual:
+        assert item.value is None
+        detail = item.missing.detail
+        assert "factor 'c' is missing (reason NOT_COMPUTABLE" in detail
+        assert "effective_canopy_cover of engine/erosion/c_factor/" in detail
+        assert "canopy_cover" in detail and "outside zero to one" in detail
+        assert re.search(r"on \d{4}-\d\d-\d\d, effective_canopy_cover", detail)
+
+
+def test_r_level_threshold_or_series_in_another_unit_is_refused_by_r_factor():
+    document = rain_series(*several_full_years())
+    document["unit"] = unmarked("PLACEHOLDER_unit")
+    cases = (
+        (
+            catalogue_with(site_key(module.R_ID), unit="PLACEHOLDER_unit"),
+            computable_climate(),
+            ["r"],
+        ),
+        (
+            catalogue_with(site_key(module.R_THRESHOLD_ID), unit="PLACEHOLDER_unit"),
+            computable_climate(),
+            ["r", "c"],
+        ),
+        (catalogue(), climate_with(document), ["r", "c"]),
+    )
+    for parameters, climate_, factors in cases:
+        for item in run_daily(parameters, climate_=climate_).annual:
+            assert item.value is None
+            detail = item.missing.detail
+            assert unmarked("PLACEHOLDER_unit") in detail
+            for factor in ("r", "k", "ls", "c", "p"):
+                assert (f"factor '{factor}' is missing" in detail) == (
+                    factor in factors
+                ), (factor, detail)
 
 
 def test_per_unit_reads_only_the_proposed_inverse_forms():
-    read = {
-        "day-1": "day",
-        "m-1": "m",
-        "(kg m-2)-1": "kg m-2",
-        "(m)-1": "m",
-    }
+    read = {"day-1": "day", "m-1": "m", "(kg m-2)-1": "kg m-2", "(m)-1": "m"}
     for unit, base in read.items():
         assert module._per_unit(unit) == base, unit
     for unit in ("day", "kg m-2-1", "-1", "()-1", "( )-1", "m-2", "m-1 ", "(m-1"):
         assert module._per_unit(unit) is None, unit
+
+
+def test_month_that_is_not_a_number_is_named_not_dropped():
+    """A table of r_factor/ whose month is absent, None or not a number: the
+    year is missing, naming each such month; nothing is dropped silently."""
+    start = start_month()
+    year = example_start().year
+    months = months_of(year)
+    cells: dict[tuple[int, int], Any] = {m: 1.5 for m in months}
+    del cells[months[0]]
+    cells[months[1]] = None
+    cells[months[2]] = "PLACEHOLDER"
+    cells[months[3]] = Missing(reason="NO_COVERAGE", detail="PLACEHOLDER: none")
+    table = module._year_table({year: cells}, year, start, "R by month", "the table")
+    assert isinstance(table, Missing)
+    assert table.reason == "MISSING_INPUT"  # two reasons among the months
+    for y, m in months[:4]:
+        assert dt.date(y, m, 1).strftime("%Y-%m") in table.detail
+    assert "holds a str for the month, not a number" in table.detail
+    del cells[months[3]]
+    cells[months[2]] = 2.5
+    only_absent = module._year_table({year: cells}, year, start, "R", "the table")
+    assert isinstance(only_absent, Missing)
+    assert only_absent.reason == "NOT_COMPUTABLE"
+    whole = module._year_table(
+        {year: {m: 1.5 for m in months}}, year, start, "R", "the table"
+    )
+    assert whole == {m: 1.5 for m in months}
 
 
 # --- the modules --------------------------------------------------------------
@@ -1572,16 +1756,17 @@ def test_package_exposes_compute_soil_loss_with_parameters_by_keyword_and_no_def
     from engine.erosion import compute_soil_loss
 
     assert compute_soil_loss is module.compute_soil_loss
-    signature = inspect.signature(compute_soil_loss)
-    assert list(signature.parameters) == [
-        "calendar",
-        "climate",
-        "soil_slope",
-        "parameters",
-    ]
-    parameter = signature.parameters["parameters"]
-    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
-    assert parameter.default is inspect.Parameter.empty
+    for function in (compute_soil_loss, module.compute_soil_loss_daily_index):
+        signature = inspect.signature(function)
+        assert list(signature.parameters) == [
+            "calendar",
+            "climate",
+            "soil_slope",
+            "parameters",
+        ]
+        parameter = signature.parameters["parameters"]
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        assert parameter.default is inspect.Parameter.empty
 
 
 def test_soil_loss_md_lists_every_parameter_identifier():
@@ -1590,8 +1775,9 @@ def test_soil_loss_md_lists_every_parameter_identifier():
     listed = re.findall(
         r"^\| `[A-Za-z0-9_]+` \| `([a-z0-9_]+)` \|", section, flags=re.MULTILINE
     )
-    assert sorted(listed) == sorted((*module.PARAMETER_IDS, *module.CROP_PARAMETER_IDS))
-    assert f"`{module.C_ID}`" in section  # named as no longer read
+    assert sorted(listed) == sorted(
+        dict.fromkeys((*SITE_IDS, *module.CROP_PARAMETER_IDS))
+    )
 
 
 def test_proposed_cases_match_soil_loss_md():

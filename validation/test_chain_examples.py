@@ -30,7 +30,6 @@ from __future__ import annotations
 import datetime as dt
 import functools
 import json
-import math
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -173,95 +172,53 @@ def unmarked(item: Any) -> Any:
 
 
 # PLACEHOLDER base of the test numbers: plainly unreal, not a value of the
-# method. Each site record gets the base plus its position in EP1's list of
-# ids, except the records in CHOSEN.
+# method. Each record gets the base plus its position in the list of the
+# identifiers EP1 reads on its main route.
 PLACEHOLDER_BASE = 98765.5
 
-# PLACEHOLDER numbers of the site records whose forms need a number of a
-# certain size to give a result: the exponent and the threshold of the daily
-# erosivity index (a threshold below the daily number of the example, so
-# every day is erosive) and the coefficients of engine/erosion/c_factor/ (zero
-# or more). Repeated digits, not values of the method.
-CHOSEN: dict[str, float] = {
-    ep1.R_EXPONENT_ID: 1.11,
-    ep1.R_THRESHOLD_ID: 2.22,
-    ep1.FALL_HEIGHT_COEFFICIENT_ID: 0.333,
-    ep1.SURFACE_COVER_COEFFICIENT_ID: 0.666,
-    ep1.MASS_COVER_COEFFICIENT_ID: 0.222,
-}
+# The identifiers of the main route of EP1: those of the annual value, then
+# the twelve monthly erosivity records of the climatology (D69, D84).
+CATALOGUE_IDS: tuple[str, ...] = (*ep1.PARAMETER_IDS, *ep1.MONTHLY_EROSIVITY_IDS)
 
-# PLACEHOLDER unit strings of the inputs of c_factor/ that the coefficients
-# multiply: not real units.
-HEIGHT_UNIT = "PLACEHOLDER_height_unit"
-MASS_UNIT = "PLACEHOLDER_mass_per_area_unit"
-MM_PER_DAY = "mm day-1"  # CQ1 of contracts/CLIMATE_QUANTITIES.md
-
-# The scope word of a day with no crop (EP1 reads NO_CROP_SCOPE on it).
-NO_CROP = "no_crop"
-
-# PLACEHOLDER numbers of the crop records of EP1, by identifier, in the order
-# of ``crop_scopes``: the first crop, the second crop, no crop. A canopy cover
-# is a fraction; every other number only has to be zero or more. Repeated
-# digits, not values of the method.
-CROP_NUMBERS: dict[str, tuple[float, ...]] = {
-    ep1.CANOPY_COVER_ID: (0.555, 0.444, 0.111),
-    ep1.FALL_HEIGHT_ID: (2.22, 1.11, 0.555),
-    ep1.RESIDUE_MASS_ID: (7.77, 3.33),
-    ep1.DECAY_COEFFICIENT_ID: (0.0333, 0.0444),
-}
+# One PLACEHOLDER unit string shared by the twelve monthly records: not a
+# real unit (which unit the climatology prints is OPEN 11 of SOIL_LOSS.md).
+MONTHLY_UNIT = "PLACEHOLDER_monthly_erosivity_unit"
 
 
 def placeholder_numbers() -> dict[str, float]:
     return {
-        pid: CHOSEN.get(pid, PLACEHOLDER_BASE + position)
-        for position, pid in enumerate(ep1.PARAMETER_IDS)
+        pid: PLACEHOLDER_BASE + position for position, pid in enumerate(CATALOGUE_IDS)
     }
 
 
 def unit_of(pid: str) -> str:
-    """The unit string of a site record of the test catalogue.
+    """The unit string of a test record.
 
-    The level of R, K and P: the unit EP1 accepts. The threshold: mm day-1,
-    the unit of the precipitation series. The exponent and the surface-cover
-    coefficient: dimensionless. The fall-height and mass-cover coefficients:
-    the inverse of the unit of what they multiply, in the forms EP1 reads.
-    The break slope: the slope unit of the soil-and-slope example. The unit
-    length: the length unit of the soil-and-slope example (ls.py compares the
-    two strings). Every other coefficient: a PLACEHOLDER unit.
+    The level of R, K, C and P: the unit EP1 accepts. The twelve monthly
+    records: one PLACEHOLDER unit. The break slope: the slope unit of the
+    soil-and-slope example. The unit length: the length unit of the
+    soil-and-slope example (ls.py compares the two strings). Every other
+    coefficient: a PLACEHOLDER unit.
     """
     accepted = ep1.ACCEPTED_UNITS
     example = soil_slope()
     return {
         ep1.R_ID: accepted.r,
-        ep1.R_EXPONENT_ID: ep1.DIMENSIONLESS,
-        ep1.R_THRESHOLD_ID: MM_PER_DAY,
         ep1.K_ID: accepted.k,
+        ep1.C_ID: accepted.c,
         ep1.P_ID: accepted.p,
+        **dict.fromkeys(ep1.MONTHLY_EROSIVITY_IDS, MONTHLY_UNIT),
         ep1.S_BREAK_ID: example.slope_steepness.unit,
         ep1.LAMBDA_UNIT_ID: example.slope_length.unit,
-        ep1.FALL_HEIGHT_COEFFICIENT_ID: f"{HEIGHT_UNIT}-1",
-        ep1.SURFACE_COVER_COEFFICIENT_ID: ep1.DIMENSIONLESS,
-        ep1.MASS_COVER_COEFFICIENT_ID: f"({MASS_UNIT})-1",
     }.get(pid, "PLACEHOLDER_unit")
 
 
-def crop_unit_of(pid: str) -> str:
-    return {
-        ep1.CANOPY_COVER_ID: ep1.DIMENSIONLESS,
-        ep1.FALL_HEIGHT_ID: HEIGHT_UNIT,
-        ep1.RESIDUE_MASS_ID: MASS_UNIT,
-        ep1.DECAY_COEFFICIENT_ID: f"{ep1.DAY}-1",
-    }[pid]
-
-
-def placeholder_record(
-    pid: str, value: float, unit: str, scope: dict[str, str] | None = None
-) -> dict[str, Any]:
+def placeholder_record(pid: str, value: float) -> dict[str, Any]:
     return {
         "id": pid,
-        "scope": dict(scope or {}),
+        "scope": {},
         "value": value,
-        "unit": unit,
+        "unit": unit_of(pid),
         "range": None,
         "range_missing_reason": "PLACEHOLDER: this test record has no range",
         "citation": {
@@ -273,93 +230,18 @@ def placeholder_record(
     }
 
 
-def chain_crops() -> list[str]:
-    """The crops of the rotation definition example as EP2 places them, in order."""
-    calendar = discover_engine_functions().build_rotation_calendar(
-        RotationDefinition.model_validate(rotation_document())
-    )
-    return list(dict.fromkeys(c.crop_id for c in calendar.components))
-
-
-def crop_scopes() -> list[dict[str, str]]:
-    """The scopes of the crop records: the first two crops of the example
-    (unmarked, as the catalogue holds them) and the scope of no crop."""
-    first, second, *_ = chain_crops()
-    return [
-        {"crop": unmarked(first)},
-        {"crop": unmarked(second)},
-        dict(ep1.NO_CROP_SCOPE),
-    ]
-
-
 def marked_catalogue() -> dict[str, dict]:
-    """Every record EP1 reads, keyed by a file path, still marked PLACEHOLDER:
-    the site records, and the crop records of the two crops and of no crop."""
-    records = {
-        f"{pid}.json": placeholder_record(pid, value, unit_of(pid))
+    """Every record the main route of EP1 reads, keyed by a file path, still
+    marked PLACEHOLDER."""
+    return {
+        f"{pid}.json": placeholder_record(pid, value)
         for pid, value in placeholder_numbers().items()
     }
-    for pid, numbers in CROP_NUMBERS.items():
-        for number, scope in zip(numbers, crop_scopes(), strict=False):
-            word = next(iter(scope.values()))
-            records[f"{pid}.{word}.json"] = placeholder_record(
-                pid, number, crop_unit_of(pid), scope
-            )
-    return records
 
 
 def complete_catalogue() -> dict[str, dict]:
     """The unmarked copy of ``marked_catalogue``."""
     return unmarked(marked_catalogue())
-
-
-def record_calendar(calendar: Any) -> Any:
-    """The calendar EP2 built, laid on the climate record.
-
-    The same field, rotation and start month, from the agricultural year
-    before the record to its last day, with the first two crops in every
-    agricultural year (the first from the third to the eighth month, the
-    second in the tenth and eleventh) and no crop between. Built here because
-    how the rotation is repeated over the years of the record is not decided
-    (D47, OPEN 2 of engine/erosion/SOIL_LOSS.md).
-    """
-    first_crop, second_crop = (scope["crop"] for scope in crop_scopes()[:2])
-    month = start_month()
-    series = precipitation()
-    start = bounds_of(ag_year_of(series.start_date, month) - 1, month)[0]
-    end = series.end_date
-
-    def month_start(ag_year: int, position: int) -> dt.date:
-        index = ag_year * 12 + month - 1 + position
-        return dt.date(index // 12, index % 12 + 1, 1)
-
-    def dated(day: dt.date) -> dict[str, Any]:
-        return {
-            "date": day.isoformat(),
-            "provenance": "DECLARED",
-            "source": "PLACEHOLDER: chain test calendar, not a real declaration",
-        }
-
-    components = []
-    for ag_year in range(ag_year_of(start, month), ag_year_of(end, month) + 1):
-        for crop, first, after in ((first_crop, 2, 8), (second_crop, 9, 11)):
-            begins = month_start(ag_year, first)
-            ends = month_start(ag_year, after) - ONE_DAY
-            if start <= begins and ends <= end:
-                components.append(
-                    {
-                        "component_id": f"PLACEHOLDER-c{len(components) + 1}",
-                        "crop_id": crop,
-                        "start": dated(begins),
-                        "end": dated(ends),
-                        "periods": [],
-                    }
-                )
-    document = calendar.model_dump(mode="json")
-    document.update(
-        start_date=start.isoformat(), end_date=end.isoformat(), components=components
-    )
-    return type(calendar).model_validate(document)
 
 
 def expected_ls(numbers: dict[str, float]) -> float:
@@ -386,110 +268,37 @@ def expected_ls(numbers: dict[str, float]) -> float:
     return length * steepness
 
 
-def months_of_ag_year(ag_year: int, month: int) -> list[tuple[int, int]]:
-    first = ag_year * 12 + month - 1
-    return [((first + k) // 12, (first + k) % 12 + 1) for k in range(12)]
-
-
-def expected_r_and_c(
-    numbers: dict[str, float], calendar: Any
-) -> dict[int, tuple[float, float]]:
-    """R and C of every covered year, computed again here, day by day, from
-    the PROPOSED forms of engine/erosion/r_factor/README.md and
-    engine/erosion/c_factor/README.md, without calling EP1 or either package.
-
-    - index(day) = P ** exponent above the threshold, else 0; the fraction of
-      a month = its sum / the sum of its year; the ratio = the sum of the
-      year / the mean sum of the covered years; R = the sum over the months
-      of level * fraction * ratio.
-    - The soil-loss ratio of a day = (1 - canopy cover * exp(-fall-height
-      coefficient * fall height)) * exp(-surface-cover coefficient * (1 -
-      exp(-mass-cover coefficient * mass))): the canopy of the crop of the day
-      (or of no crop), the mass of the last harvest before the day times
-      exp(-decay coefficient * days since its end). C = the sum over the
-      months of fraction * the mean daily ratio of the month, over one year.
-    """
-    month = start_month()
-    series = precipitation()
-    exponent = numbers[ep1.R_EXPONENT_ID]
-    threshold = numbers[ep1.R_THRESHOLD_ID]
-    by_month: dict[tuple[int, int], float] = {}
-    days: dict[tuple[int, int], list[dt.date]] = {}
-    for item in series.days:
-        key = (item.date.year, item.date.month)
-        index = item.value**exponent if item.value > threshold else 0.0
-        by_month[key] = by_month.get(key, 0.0) + index
-        days.setdefault(key, []).append(item.date)
-    crop_value = {
-        (pid, next(iter(scope.values()))): number
-        for pid, values in CROP_NUMBERS.items()
-        for number, scope in zip(values, crop_scopes(), strict=False)
-    }
-
-    def ratio_of_day(day: dt.date) -> float:
-        crop = next(
-            (
-                c.crop_id
-                for c in calendar.components
-                if c.start.date <= day <= c.end.date
-            ),
-            NO_CROP,
-        )
-        canopy = 1 - crop_value[(ep1.CANOPY_COVER_ID, crop)] * math.exp(
-            -numbers[ep1.FALL_HEIGHT_COEFFICIENT_ID]
-            * crop_value[(ep1.FALL_HEIGHT_ID, crop)]
-        )
-        harvest = max(
-            (c for c in calendar.components if c.end.date < day),
-            key=lambda c: c.end.date,
-        )
-        mass = crop_value[(ep1.RESIDUE_MASS_ID, harvest.crop_id)] * math.exp(
-            -crop_value[(ep1.DECAY_COEFFICIENT_ID, harvest.crop_id)]
-            * (day - harvest.end.date).days
-        )
-        cover = 1 - math.exp(-numbers[ep1.MASS_COVER_COEFFICIENT_ID] * mass)
-        return canopy * math.exp(-numbers[ep1.SURFACE_COVER_COEFFICIENT_ID] * cover)
-
-    years = covered()
-    annual = {
-        year: sum(by_month[m] for m in months_of_ag_year(year, month)) for year in years
-    }
-    mean = sum(annual.values()) / len(annual)
-    result = {}
-    for year in years:
-        fractions = {
-            m: by_month[m] / annual[year] for m in months_of_ag_year(year, month)
-        }
-        r = sum(
-            numbers[ep1.R_ID] * fraction * annual[year] / mean
-            for fraction in fractions.values()
-        )
-        c = 0.0
-        for m, fraction in fractions.items():
-            ratios = [ratio_of_day(day) for day in days[m]]
-            c += fraction * sum(ratios) / len(ratios)
-        result[year] = (r, c)
-    return result
-
-
-def expected_soil_loss(numbers: dict[str, float], calendar: Any) -> dict[int, float]:
-    """``equation.annual_soil_loss`` of R and C computed again here, K and P
-    of the catalogue and LS through ls.py, for every covered year."""
+def expected_soil_loss(numbers: dict[str, float]) -> float:
+    """The annual value of the main route: ``equation.annual_soil_loss`` of the
+    mean annual level of R, K, LS through ls.py, the declared C and P (D69,
+    D84, USER-G)."""
     accepted = ep1.ACCEPTED_UNITS
-    expected = {}
-    for year, (r, c) in expected_r_and_c(numbers, calendar).items():
-        product = equation.annual_soil_loss(
-            r=equation.Factor(r, accepted.r),
-            k=equation.Factor(numbers[ep1.K_ID], accepted.k),
-            ls=equation.Factor(expected_ls(numbers), accepted.ls),
-            c=equation.Factor(c, accepted.c),
-            p=equation.Factor(numbers[ep1.P_ID], accepted.p),
-            accepted_units=accepted,
-            unit_guard_reason=ep1.UNIT_NOT_ACCEPTED,
-        )
-        assert isinstance(product, float)
-        expected[year] = product
-    return expected
+    product = equation.annual_soil_loss(
+        r=equation.Factor(numbers[ep1.R_ID], accepted.r),
+        k=equation.Factor(numbers[ep1.K_ID], accepted.k),
+        ls=equation.Factor(expected_ls(numbers), accepted.ls),
+        c=equation.Factor(numbers[ep1.C_ID], accepted.c),
+        p=equation.Factor(numbers[ep1.P_ID], accepted.p),
+        accepted_units=accepted,
+        unit_guard_reason=ep1.UNIT_NOT_ACCEPTED,
+    )
+    assert isinstance(product, float)
+    return product
+
+
+def expected_month(numbers: dict[str, float], month: int) -> float:
+    """A monthly value of the main route, computed here: the level of R times
+    the share of the calendar month in the twelve monthly records (January
+    first), times K, LS, C and P."""
+    monthly = [numbers[pid] for pid in ep1.MONTHLY_EROSIVITY_IDS]
+    return (
+        numbers[ep1.R_ID]
+        * (monthly[month - 1] / sum(monthly))
+        * numbers[ep1.K_ID]
+        * expected_ls(numbers)
+        * numbers[ep1.C_ID]
+        * numbers[ep1.P_ID]
+    )
 
 
 # --- the chain through the real runner ----------------------------------------
@@ -725,39 +534,55 @@ def test_CH06_complete_placeholder_catalogue_gives_the_product_of_equation_py():
     catalogue = complete_catalogue()
     assert check_catalogue(catalogue) == []
     numbers = placeholder_numbers()
-    years = covered()
-    assert len(years) >= 1
 
-    # Through the runner, on the calendar EP2 builds (2027 to 2028), outside
-    # the record (2001 to 2002): R, K, LS and P are computed, and C is missing
-    # because the crop and the residue of every day of the record are not
-    # known until the rotation is repeated over the record (D47).
     outcome, _ = run_chain(catalogue)
     result = outcome.result
     assert isinstance(result, ResultsPerRotation)
     assert_round_trip(result)
     soil_loss = result.soil_loss
     assert isinstance(soil_loss, SoilLossResults)
-    assert outcome.calendar.start_date > precipitation().end_date
+
+    # The main route of EP1 (docs/METHODS.md M1.2; D69, D84, USER-G): the
+    # annual value is equation.py of the level of R, K, LS, the declared C and
+    # P, and each month is the level times the climatological fraction of the
+    # month, times K, LS, C and P; all computed again here.
+    expected = expected_soil_loss(numbers)
+    years = covered()
+    computed = 0
     for item in soil_loss.annual:
-        assert item.value is None
         if item.ag_year not in years:
-            assert item.missing.reason == "NO_COVERAGE"
+            assert item.value is None and item.missing.reason == "NO_COVERAGE"
             continue
-        assert item.missing.reason == "MISSING_INPUT"
-        detail = item.missing.detail
-        assert (
-            "factor 'c' is missing (reason MISSING_INPUT: C of agricultural year "
-            f"{item.ag_year} is not computed"
-        ) in detail
-        assert ep1.OUTSIDE_CALENDAR in detail
-        for factor in ("r", "k", "ls", "p"):
-            assert f"factor '{factor}'" not in detail, factor
-        assert "has no record" not in detail
+        computed += 1
+        assert item.missing is None
+        assert item.value == pytest.approx(expected, rel=1e-9)
+        assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+        assert item.source is not None
+        assert "DECLARED" in item.source
+        for pid in ep1.PARAMETER_IDS:
+            assert f"'{pid}'" in item.source
+    assert computed == len(years) >= 1
+    months = 0
     for item in soil_loss.monthly:
-        assert item.value is None
-        assert_not_an_identity_absence(item.missing)
-    assert outcome.values_present == 0
+        if item.ag_year not in years:
+            assert_not_an_identity_absence(item.missing)
+            continue
+        months += 1
+        assert item.missing is None
+        assert item.value == pytest.approx(
+            expected_month(numbers, item.month), rel=1e-9
+        )
+        assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+        for pid in ep1.MONTHLY_EROSIVITY_IDS:
+            assert f"'{pid}'" in item.source
+    assert months == 12 * len(years)
+    # The months of a covered year add up to its value (C1.2).
+    for year in years:
+        total = sum(i.value for i in soil_loss.monthly if i.ag_year == year)
+        assert total == pytest.approx(expected, rel=1e-9)
+    assert outcome.values_present == computed + months
+    # Every annual and monthly value is present, so the module is available.
+    assert module(outcome, EROSION.module_id).state == "available"
     # The runner passes EP1's output unchanged.
     assert soil_loss == ep1.compute_soil_loss(
         calendar=outcome.calendar,
@@ -765,42 +590,6 @@ def test_CH06_complete_placeholder_catalogue_gives_the_product_of_equation_py():
         soil_slope=soil_slope(),
         parameters=catalogue,
     )
-
-    # EP1 on the same calendar laid on the record: the annual soil loss of
-    # each covered year is equation.py of R through r_factor/ and C through
-    # c_factor/, both computed again here, with K, LS through ls.py and P.
-    calendar = record_calendar(outcome.calendar)
-    on_record = ep1.compute_soil_loss(
-        calendar=calendar,
-        climate=climate(),
-        soil_slope=soil_slope(),
-        parameters=catalogue,
-    )
-    assert isinstance(on_record, SoilLossResults)
-    expected = expected_soil_loss(numbers, calendar)
-    assert sorted(expected) == years
-    computed = 0
-    for item in on_record.annual:
-        if item.ag_year not in years:
-            assert item.value is None and item.missing.reason == "NO_COVERAGE"
-            continue
-        computed += 1
-        assert item.missing is None
-        assert item.value == pytest.approx(expected[item.ag_year], rel=1e-9)
-        assert item.provenance == PROVENANCE_OF_SOIL_LOSS
-        assert item.source is not None
-        for part in ("engine/erosion/r_factor/", "engine/erosion/c_factor/"):
-            assert part in item.source
-        for pid in (*ep1.PARAMETER_IDS, *ep1.CROP_PARAMETER_IDS):
-            assert f"'{pid}'" in item.source
-    assert computed == len(years)
-    # One year of the same number every day: its ratio is one and each
-    # fraction is the share of the month's days, so R is the level.
-    for year, (r, _) in expected_r_and_c(numbers, calendar).items():
-        assert r == pytest.approx(numbers[ep1.R_ID]), year
-    for item in on_record.monthly:
-        assert item.value is None
-        assert_not_an_identity_absence(item.missing)
 
     assert_water_missing_for_every_covered_year(outcome, catalogue)
 
