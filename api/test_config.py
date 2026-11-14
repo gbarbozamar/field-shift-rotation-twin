@@ -475,3 +475,134 @@ def test_the_committed_settings_file_builds_the_app_with_the_period_of_d29(
     assert requested[0].params["start"] == "20010101"
     assert requested[0].params["end"] == "20241231"
     assert requested[0].params["community"] == "ag"
+
+
+# --- the parameter catalogue (Q3, D46, D56 of #77; PROPOSED) -------------------
+
+PARAMS = ROOT / "params"
+PARAMS_EXAMPLES = PARAMS / "examples"
+
+
+def copy_example(folder: Path, name: str, target: str, **change: Any) -> dict:
+    """Copy a record of params/examples/ into ``folder``, with fields removed or changed."""
+    record = json.loads((PARAMS_EXAMPLES / name).read_text(encoding="utf-8"))
+    for key, value in change.items():
+        if value is None:
+            del record[key]
+        else:
+            record[key] = value
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / target).write_text(json.dumps(record), encoding="utf-8")
+    return record
+
+
+def catalogue_error(folder: Path) -> str:
+    with pytest.raises(ConfigError) as caught:
+        load_config({}, parameters_folder=folder)
+    message = str(caught.value)
+    assert f"'{folder}'" in message  # the folder, written plainly
+    return message
+
+
+def test_the_catalogue_folder_is_params_records_of_the_repository():
+    assert config_module.PARAMETERS_FOLDER == (PARAMS / "records").resolve()
+
+
+def test_the_repository_catalogue_starts_the_app_with_an_empty_catalogue():
+    config = load_config({})
+    assert config.parameters == {}
+    response = TestClient(build_app(config)).get("/health")
+    assert response.status_code == 200
+
+
+def test_an_empty_folder_is_an_empty_catalogue(tmp_path):
+    assert load_config({}, parameters_folder=tmp_path).parameters == {}
+
+
+def test_a_file_that_is_not_json_refuses_start_up(tmp_path):
+    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
+    message = catalogue_error(tmp_path)
+    assert "broken.json: not a readable record file" in message
+
+
+def test_a_file_that_is_not_a_record_file_refuses_start_up(tmp_path):
+    (tmp_path / "notes.txt").write_text("", encoding="utf-8")
+    assert "notes.txt: not a .json record file" in catalogue_error(tmp_path)
+
+
+def test_a_folder_that_does_not_exist_refuses_start_up(tmp_path):
+    folder = tmp_path / "absent"
+    assert "absent: the folder does not exist" in catalogue_error(folder)
+
+
+def test_a_malformed_record_refuses_start_up(tmp_path):
+    copy_example(tmp_path, "PLACEHOLDER_with_value.json", "record.json", unit=None)
+    message = catalogue_error(tmp_path)
+    assert "record.json: required field 'unit' is absent" in message
+
+
+def test_two_records_with_the_same_identity_refuse_start_up(tmp_path):
+    for target in ("one.json", "two.json"):
+        copy_example(tmp_path, "PLACEHOLDER_with_value.json", target)
+    message = catalogue_error(tmp_path)
+    assert "same 'id' and 'scope' in: one.json, two.json" in message
+
+
+@pytest.mark.parametrize(
+    "name", ["PLACEHOLDER_with_value.json", "PLACEHOLDER_missing_value.json"]
+)
+def test_a_placeholder_record_refuses_start_up(tmp_path, name):
+    copy_example(tmp_path, name, "record.json")
+    message = catalogue_error(tmp_path)
+    assert "record.json: contains the word PLACEHOLDER, so it is not a parameter" in (
+        message
+    )
+
+
+def test_each_problem_is_on_its_own_line(tmp_path):
+    for target in ("one.json", "two.json"):
+        copy_example(tmp_path, "PLACEHOLDER_with_value.json", target)
+    records, problems = config_module.load_folder(tmp_path)
+    expected = config_module.check_catalogue(records)
+    assert problems == [] and len(expected) > 1
+    lines = catalogue_error(tmp_path).splitlines()
+    assert lines[1:] == expected
+
+
+def test_a_problem_while_loading_is_reported_before_the_check(tmp_path):
+    (tmp_path / "broken.json").write_text("{", encoding="utf-8")
+    copy_example(tmp_path, "PLACEHOLDER_with_value.json", "record.json")
+    _records, problems = config_module.load_folder(tmp_path)
+    lines = catalogue_error(tmp_path).splitlines()
+    assert problems and lines[1:] == problems
+
+
+def recorded_engines(monkeypatch) -> list[Any]:
+    """Record every ``EntryPointEngines`` that ``create_app`` builds."""
+    from api import app as app_module
+
+    built: list[Any] = []
+    real = app_module.EntryPointEngines
+
+    def recording(*args: Any, **kwargs: Any) -> Any:
+        built.append(real(*args, **kwargs))
+        return built[-1]
+
+    monkeypatch.setattr(app_module, "EntryPointEngines", recording)
+    return built
+
+
+def test_build_app_gives_the_loaded_catalogue_to_the_engines(monkeypatch):
+    loaded: dict[str, dict] = {}
+    built = recorded_engines(monkeypatch)
+    build_app(AppConfig(parameters=loaded))
+    (engines,) = built
+    assert engines.parameters is loaded
+
+
+def test_load_config_and_build_app_pass_the_same_catalogue(monkeypatch, tmp_path):
+    config = load_config({}, parameters_folder=tmp_path)
+    built = recorded_engines(monkeypatch)
+    build_app(config)
+    (engines,) = built
+    assert engines.parameters is config.parameters

@@ -16,6 +16,14 @@ Two rules carry the design:
 Every value a person decides arrives as configuration; nothing here has a
 default. An empty or blank value counts as unset.
 
+The parameter catalogue is not a variable: contracts/ENTRYPOINTS.md names its
+folder, ``params/records/`` of the repository, found from the location of the
+``params`` package (never from the working directory). ``load_config`` loads
+it once with ``params.catalogue.load_folder`` and checks it with
+``params.catalogue.check_catalogue``; any problem of either is a
+``ConfigError`` naming the folder and listing the problems, one per line. An
+empty catalogue is not a problem (Q3, D46, D56 of issue #77).
+
 Status: PROPOSED (blueprint section 3.7), including the variable names, the
 rules above and the message texts.
 """
@@ -35,12 +43,14 @@ import httpx
 from fastapi import FastAPI
 from pydantic import ValidationError
 
+import params
 from adapters.cache import FileCache
 from adapters.example_soil_slope import ExampleSoilSlopeSource
 from adapters.power import PowerClimateSource, PowerSettings
 from api.app import create_app, parse_origins
 from api.ports import RunSettings
 from contracts.inputs import SiteSoilSlope
+from params.catalogue import RECORDS_FOLDER, check_catalogue, load_folder
 
 # --- the variables (PROPOSED names) -------------------------------------------
 
@@ -61,6 +71,10 @@ VARIABLES: tuple[str, ...] = (
 )
 
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+# The folder of the parameter catalogue (contracts/ENTRYPOINTS.md, Q3):
+# ``params/records/``, resolved from the ``params`` package.
+PARAMETERS_FOLDER = Path(params.__file__).resolve().parent / RECORDS_FOLDER
 
 ClientFactory = Callable[[PowerSettings], httpx.Client]
 
@@ -85,6 +99,8 @@ class AppConfig:
     climate: ClimateConfig | None = None
     run_settings: RunSettings = field(default_factory=RunSettings)
     soil_slope_example_file: Path | None = None
+    # The parameter catalogue as loaded and checked; ``{}`` when it is empty.
+    parameters: dict[str, dict] = field(default_factory=dict)
 
 
 # --- reading the variables ----------------------------------------------------
@@ -188,13 +204,41 @@ def _soil_slope_example(environ: Mapping[str, str]) -> Path | None:
     return path
 
 
-def load_config(environ: Mapping[str, str]) -> AppConfig:
-    """Read the configuration from ``environ`` only. Raises ``ConfigError``."""
+def load_parameters(folder: Path) -> dict[str, dict]:
+    """The parameter catalogue under ``folder``, loaded and checked.
+
+    Returns exactly what ``load_folder`` returned, never edited, filled or
+    filtered. Raises ``ConfigError`` when ``load_folder`` or
+    ``check_catalogue`` reports any problem; the message names the folder and
+    lists the problems as those functions wrote them, one per line. An empty
+    catalogue is returned as ``{}``. PROPOSED.
+    """
+    records, problems = load_folder(folder)
+    if not problems:
+        problems = check_catalogue(records)
+    if problems:
+        listed = "\n".join(problems)
+        raise ConfigError(
+            f"the parameter catalogue in '{folder}' has {len(problems)} "
+            f"problem(s):\n{listed}"
+        )
+    return records
+
+
+def load_config(
+    environ: Mapping[str, str], *, parameters_folder: Path = PARAMETERS_FOLDER
+) -> AppConfig:
+    """Read the configuration from ``environ`` only. Raises ``ConfigError``.
+
+    The parameter catalogue is read from ``parameters_folder``, by default
+    ``params/records/`` of the repository; tests give another folder.
+    """
     return AppConfig(
         cors_origins=tuple(parse_origins(_value(environ, CORS_ORIGINS))),
         climate=_climate(environ),
         run_settings=_run_settings(environ),
         soil_slope_example_file=_soil_slope_example(environ),
+        parameters=load_parameters(parameters_folder),
     )
 
 
@@ -229,7 +273,7 @@ def build_app(
     ``client_factory`` makes the HTTP client of the climate source from its
     settings (default: ``default_client``); the client is closed when the app
     shuts down. Engines and the rotation validator are the defaults of
-    ``create_app``.
+    ``create_app``; the engines get the parameter catalogue of ``config``.
     """
     if not isinstance(config, AppConfig):
         raise TypeError("build_app needs an AppConfig")
@@ -251,6 +295,7 @@ def build_app(
         climate=climate,
         soil_slope=soil_slope,
         settings=config.run_settings,
+        parameters=config.parameters,
     )
     if client is not None:
         _close_on_shutdown(app, client)
