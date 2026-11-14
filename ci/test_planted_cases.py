@@ -9,7 +9,8 @@ folder; nothing planted is stored in the repository.
 Checks without a planted case yet, both OPEN:
 
 - frontend build: needs ``web/``;
-- contract validation: needs ``contracts/`` and the agreed command.
+- contract validation: runs ``uv run pytest contracts/``; the invalid variants
+  that each contract folder rejects are its planted cases, owned by lane L0.
 """
 
 from __future__ import annotations
