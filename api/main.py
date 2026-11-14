@@ -25,6 +25,10 @@ start. No variable has a default.
   example, served as ``example``. Unset: the soil-and-slope source is the
   stand-in.
 
+The parameter catalogue is not a variable: ``load_config`` loads it once from
+``params/records/`` and checks it; a problem stops start-up, an empty
+catalogue does not.
+
 ``create_app`` (in ``api/app.py``) stays the way tests inject fakes; it and
 ``parse_origins`` are re-exported here.
 """
