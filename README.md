@@ -12,7 +12,9 @@ Bootstrap. This repository holds the licence, the working rules and the developm
 
 ## How we work
 
-Read [docs/DEVELOPMENT_BLUEPRINT.md](docs/DEVELOPMENT_BLUEPRINT.md) before opening a branch. In short:
+New to the repository? Start with [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md): access, a clean place to work, and the first steps of each lane.
+
+Then read [docs/DEVELOPMENT_BLUEPRINT.md](docs/DEVELOPMENT_BLUEPRINT.md) before opening a branch. In short:
 
 - English only, in code, documents and interface text.
 - Every piece lands with its acceptance test.
