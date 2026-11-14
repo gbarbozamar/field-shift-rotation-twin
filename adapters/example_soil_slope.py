@@ -7,8 +7,13 @@ contracts/ENTRYPOINTS.md, issue 18).
 
 Which file is "the accepted example" is a person's decision, so the path has
 no default; the running app serves it only when ``SOIL_SLOPE_EXAMPLE_FILE``
-names the file (api/config.py). The file is
-returned as it is: nothing is filled in, renamed or converted.
+names the file (api/config.py).
+
+The example stands in for any field (decision D38 of issue #77): the document
+served carries the ``case_id`` and ``field_id`` of the request, written into a
+new model instance; ``example_data`` stays true and the state stays
+``example``. Everything else is the file's: nothing is filled in, renamed or
+converted, and the file is never written.
 
 A file that is absent, cannot be read, does not load into the model, or is not
 marked ``example_data: true`` gives ``data=None``, ``state="unavailable"`` and
@@ -39,6 +44,9 @@ DETAIL_NOT_LOADABLE = (
     "the example file does not load into the contract model SiteSoilSlope"
 )
 DETAIL_NOT_EXAMPLE = "the file is not marked as example data (example_data is false)"
+DETAIL_IDENTIFIERS_REFUSED = (
+    "the requested case_id or field_id is refused by the contract model SiteSoilSlope"
+)
 
 
 class ExampleSoilSlopeSource:
@@ -75,7 +83,7 @@ class ExampleSoilSlopeSource:
         )
 
     def get_soil_slope(self, case_id: str, field_id: str) -> SoilSlopeResult:
-        """The example, whatever field is asked for (see README, OPEN)."""
+        """The example, under the identifiers of the request (D38)."""
         try:
             text = self._path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -86,6 +94,13 @@ class ExampleSoilSlopeSource:
             return self._unavailable(DETAIL_NOT_LOADABLE)
         if not data.example_data:
             return self._unavailable(DETAIL_NOT_EXAMPLE)
+        # A new instance, validated again, with the identifiers of the request.
+        try:
+            data = SiteSoilSlope.model_validate(
+                {**data.model_dump(), "case_id": case_id, "field_id": field_id}
+            )
+        except ValidationError:
+            return self._unavailable(DETAIL_IDENTIFIERS_REFUSED)
         return SoilSlopeResult(
             data=data,
             source=SourceInfo(id=self._source_id, contract=CONTRACT, state="example"),

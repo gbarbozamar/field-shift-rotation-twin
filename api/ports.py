@@ -122,7 +122,8 @@ class EnginesResult:
     the route). ``values_present`` and ``values_missing`` count the indicator
     values inside ``result`` (``api.engines.count_values``), so the route can
     derive the outcome without reading the result: both are zero without a
-    result, and with a result they count at least one value.
+    result, and with a result they count at least one value. A part in the
+    not-built form (D12) counts as one missing value.
     """
 
     calendar: CalendarPayload | None

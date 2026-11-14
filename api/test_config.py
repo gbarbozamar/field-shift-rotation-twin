@@ -232,6 +232,21 @@ def test_settings_file_not_json(tmp_path):
     assert SECRET not in str(error)
 
 
+# A path written with backslashes, as on Windows (issue #18). It is never
+# created; on any system it names a file that does not exist.
+BACKSLASH_PATH = r"C:\made\up\settings.json"
+
+
+@pytest.mark.parametrize("variable", [POWER_SETTINGS_FILE, SOIL_SLOPE_EXAMPLE_FILE])
+def test_a_path_is_written_plainly_in_the_message(tmp_path, variable):
+    """Single backslashes, between single quotes: never the doubled ``repr``."""
+    error = config_error(
+        {variable: BACKSLASH_PATH, CLIMATE_CACHE_DIR: str(tmp_path / "cache")}
+    )
+    assert f"'{BACKSLASH_PATH}'" in str(error)
+    assert "\\\\" not in str(error)
+
+
 @pytest.mark.parametrize(
     "document, reason",
     [
