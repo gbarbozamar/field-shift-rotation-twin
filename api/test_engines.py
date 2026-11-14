@@ -889,3 +889,148 @@ def test_default_app_assembles_a_result_once_the_three_engines_exist(
         ("site_data_climate", "fresh"),
         ("site_data_soil_slope", "example"),
     ]
+
+
+# --- 11. site data of another field (PROPOSED) --------------------------------
+
+OTHER_CASE = "PLACEHOLDER_OTHER_CASE_SUBMITTED"
+OTHER_FIELD = "PLACEHOLDER_OTHER_FIELD_SUBMITTED"
+
+
+class SameFieldOrRaise(Fake):
+    """An EP1 or EP3 that raises, as G5 says, when its arguments name other fields."""
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        identities = {
+            (kwargs[name].case_id, kwargs[name].field_id)
+            for name in ("calendar", "climate", "soil_slope")
+        }
+        if len(identities) != 1:
+            raise ValueError("PLACEHOLDER: the arguments name different fields")
+        return super().__call__(*args, **kwargs)
+
+
+def checking_fakes() -> tuple[Fake, SameFieldOrRaise, SameFieldOrRaise]:
+    return Fake(calendar()), SameFieldOrRaise(soil_loss()), SameFieldOrRaise(water())
+
+
+def soil_of_another_field(**update: str) -> SiteSoilSlope:
+    return SOIL_SLOPE.model_copy(update=update)
+
+
+def climate_of_another_field(**update: str) -> SiteClimate:
+    return CLIMATE.model_copy(update=update)
+
+
+@pytest.mark.parametrize(
+    "climate_data, soil_data, named, fields",
+    [
+        (
+            CLIMATE,
+            soil_of_another_field(field_id=OTHER_FIELD),
+            ["soil_slope"],
+            "field_id",
+        ),
+        (
+            climate_of_another_field(case_id=OTHER_CASE),
+            SOIL_SLOPE,
+            ["climate"],
+            "case_id",
+        ),
+        (
+            climate_of_another_field(case_id=OTHER_CASE, field_id=OTHER_FIELD),
+            soil_of_another_field(field_id=OTHER_FIELD),
+            ["climate", "soil_slope"],
+            "case_id and field_id",
+        ),
+    ],
+)
+def test_site_data_of_another_field_is_missing_input(
+    climate_data, soil_data, named, fields
+):
+    calendar_fn, soil_fn, water_fn = checking_fakes()
+    result = run(
+        functions(calendar_fn, soil_fn, water_fn),
+        climate=climate_result(climate_data),
+        soil=soil_result(soil_data),
+    )
+    assert soil_fn.calls == [] and water_fn.calls == []
+    assert result.result is None
+    assert result.calendar == calendar_fn.answer
+    assert result.result_missing.reason == "MISSING_INPUT"
+    detail = result.result_missing.detail
+    assert detail.startswith(runner.OTHER_FIELD)
+    for name in named:
+        assert name in detail
+    assert fields in detail
+    assert states(result) == {
+        "calendar": ("available", None),
+        "erosion": ("not_available", "MISSING_INPUT"),
+        "water": ("not_available", "MISSING_INPUT"),
+        **CARBON_STATES,
+    }
+    calendar_ids = (calendar_fn.answer.case_id, calendar_fn.answer.field_id)
+    for text in [detail, *(m.detail or "" for m in result.modules)]:
+        for identifier in (OTHER_CASE, OTHER_FIELD, *calendar_ids):
+            assert identifier not in text
+
+
+def test_another_field_with_an_engine_not_built_keeps_the_precedence_rule():
+    calendar_fn, soil_fn, _ = checking_fakes()
+    result = run(
+        functions(calendar_fn, soil_fn, None),
+        soil=soil_result(soil_of_another_field(field_id=OTHER_FIELD)),
+    )
+    assert soil_fn.calls == []
+    assert result.result_missing.reason == "MISSING_INPUT"
+    assert states(result)["erosion"] == ("not_available", "MISSING_INPUT")
+    assert states(result)["water"] == ("not_available", "NOT_AVAILABLE")
+
+
+def test_site_data_of_the_same_field_calls_the_engines():
+    calendar_fn, soil_fn, water_fn = checking_fakes()
+    result = run(functions(calendar_fn, soil_fn, water_fn))
+    assert len(soil_fn.calls) == 1 and len(water_fn.calls) == 1
+    assert result.result is not None
+    assert result.result_missing is None
+
+
+def test_site_data_of_another_field_is_answered_200_not_500():
+    calendar_fn, soil_fn, water_fn = checking_fakes()
+    engines = EntryPointEngines(
+        functions(calendar_fn, soil_fn, water_fn), carbon_models=CARBON_MODELS
+    )
+
+    class OtherFieldSoil:
+        source_id = "PLACEHOLDER_SOIL"
+        contract = "site_data_soil_slope"
+
+        def get_soil_slope(self, case_id: str, field_id: str) -> SoilSlopeResult:
+            return soil_result(soil_of_another_field(field_id=OTHER_FIELD))
+
+    submitted = {
+        **BODY,
+        "site": {**BODY["site"], "field_id": "PLACEHOLDER_SUBMITTED_FIELD_ID"},
+    }
+    response = client(engines, soil_slope=OtherFieldSoil()).post(ROUTE, json=submitted)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["outcome"] == "no_result"
+    assert body["result"] is None
+    assert body["result_missing"]["reason"] == "MISSING_INPUT"
+    detail = body["result_missing"]["detail"]
+    for identifier in (
+        "PLACEHOLDER_SUBMITTED_FIELD_ID",
+        BODY["site"]["case_id"],
+        OTHER_FIELD,
+    ):
+        assert identifier not in detail
+    assert soil_fn.calls == [] and water_fn.calls == []
+
+
+def test_other_field_inputs_names_only_the_fields_that_differ():
+    cal = calendar()
+    assert runner.other_field_inputs(cal, climate=CLIMATE, soil_slope=SOIL_SLOPE) == []
+    assert runner.other_field_inputs(
+        cal, soil_slope=soil_of_another_field(case_id=OTHER_CASE)
+    ) == [("soil_slope", ("case_id",))]

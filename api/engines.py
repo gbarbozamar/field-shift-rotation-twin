@@ -7,7 +7,9 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
 2. EP1 ``compute_soil_loss`` and EP3 ``compute_water_deficit_exposure`` with
    the keyword arguments ``calendar``, ``climate`` and ``soil_slope`` (G3),
    also when the calendar is infeasible: the engine writes the missing values
-   and their reason (G4);
+   and their reason (G4), but only when the climate and soil-and-slope data carry the calendar's
+   ``case_id`` and ``field_id``; otherwise neither is called and the result
+   is absent, ``MISSING_INPUT`` (PROPOSED);
 3. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend`` written here as missing,
    because no carbon engine is built (decision Q15 c).
@@ -91,6 +93,12 @@ CARBON_MODELS_NOT_CONFIGURED = (
     "the identifiers of the carbon models are not configured "
     "(question 7 of contracts/results/README.md), so soil_carbon_trend cannot be written"
 )
+
+# PROPOSED: the start of the detail when site data belong to another field.
+# The detail names the input and the identifier fields that differ, never
+# their values.
+OTHER_FIELD = "site data of another field than the calendar"
+IDENTITY_FIELDS: tuple[str, ...] = ("case_id", "field_id")
 
 _INPUT_NAMES = {
     "climate": "site data: climate",
@@ -345,7 +353,33 @@ class EntryPointEngines:
                 ),
             )
 
-        # 3. EP1 and EP3, also for an infeasible calendar (G4).
+        # 3. The site data must belong to the calendar's field (G5): otherwise
+        # the engines would raise. PROPOSED: a typed absence instead.
+        other = other_field_inputs(
+            calendar, climate=climate.data, soil_slope=soil_slope.data
+        )
+        if other:
+            detail = (
+                OTHER_FIELD
+                + ": "
+                + "; ".join(
+                    f"{name} ({_INPUT_NAMES[name]}) differs in {' and '.join(fields)}"
+                    for name, fields in other
+                )
+            )
+            return EnginesResult(
+                calendar=calendar,
+                result=None,
+                result_missing=Missing(reason="MISSING_INPUT", detail=detail),
+                modules=(
+                    calendar_module,
+                    _dependent(EROSION, soil_loss_function, detail),
+                    _dependent(WATER, water_function, detail),
+                    *_carbon_modules(),
+                ),
+            )
+
+        # 4. EP1 and EP3, also for an infeasible calendar (G4).
         arguments = {
             "calendar": calendar,
             "climate": climate.data,
@@ -397,7 +431,7 @@ class EntryPointEngines:
                 modules=modules,
             )
 
-        # 4. What ResultsPerRotation cannot hold.
+        # 5. What ResultsPerRotation cannot hold.
         not_built = [
             _name(point)
             for point, function in (
@@ -416,7 +450,7 @@ class EntryPointEngines:
             return without_result("NOT_AVAILABLE", CARBON_MODELS_NOT_CONFIGURED)
         assert isinstance(soil_loss, SoilLossResults) and water is not None
 
-        # 5. Assemble.
+        # 6. Assemble.
         result = ResultsPerRotation(
             case_id=calendar.case_id,
             field_id=calendar.field_id,
@@ -434,6 +468,26 @@ class EntryPointEngines:
             values_present=count.present,
             values_missing=count.missing,
         )
+
+
+def other_field_inputs(
+    calendar: RotationCalendar, **inputs: Any
+) -> list[tuple[str, tuple[str, ...]]]:
+    """Each input whose ``case_id`` or ``field_id`` differs from the calendar's.
+
+    Returns ``(input name, identifier fields that differ)`` in the order given.
+    Pure; compares the identifiers only. PROPOSED.
+    """
+    other = []
+    for name, data in inputs.items():
+        fields = tuple(
+            field
+            for field in IDENTITY_FIELDS
+            if getattr(data, field) != getattr(calendar, field)
+        )
+        if fields:
+            other.append((name, fields))
+    return other
 
 
 def _dependent(
