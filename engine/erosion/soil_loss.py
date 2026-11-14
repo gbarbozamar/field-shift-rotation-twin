@@ -332,7 +332,7 @@ def compute_soil_loss(
                     missing_of(
                         _first_day(year, month),
                         _last_day(year, month),
-                        f"the month {year:04d}-{month:02d}",
+                        f"the month {_first_day(year, month).strftime('%Y-%m')}",
                     ),
                 )
             )

@@ -36,7 +36,7 @@ Decisions of the lead developer, recorded in issue #77. They are cited, not reop
 | D47, rotation repeated over the years | **Not implemented.** This unit computes no cover-management factor, so it has nothing to repeat. OPEN for the cover-management unit (OPEN 2) |
 | D23, source of daily precipitation | The quantity identifier `precipitation`, the only climate series the soil-loss method reads (`docs/METHODS.md` M1.2). It is the one string of the climate vocabulary written in `soil_loss.py` |
 | D46, parameters passed by the runner | Not applied yet: waiting for the platform developer's agreement. The signature stays `(calendar, climate, soil_slope)` |
-| D7, start month required (Q4) | The route no longer lets a request without a start month reach an engine. `RotationCalendar` still accepts a missing start month, so EP1 keeps the answer it has on `main`: one `Missing`, see below |
+| D7, start month required (Q4) | Decided, not implemented yet: on `main` the route has no check that rejects a request without a start month (`api/README.md` says such a request "will be invalid"), and `RotationCalendar` still accepts a missing start month. So EP1 keeps the answer it has on `main`: one `Missing`, see below and OPEN 7 |
 | D12 and D31, meaning of `NOT_AVAILABLE` | Used only for a part that is not built: the monthly erosivity fraction of `R` and the cover-management unit of `C` |
 | D4, D10, D45, D48 | Cited in the detail of `P`, `K`, `C` and `K` respectively, as the facts of each factor |
 
@@ -87,14 +87,14 @@ English, for developers.
 
 ## Numbers in the module
 
-`soil_loss.py` holds two integers, both for month arithmetic, and no other number (a test reads the module and fails on any other):
+`soil_loss.py` holds two integers, both for month arithmetic, and no other number. A test reads the module and fails on any other number, and on any format specification in an f-string (where a width such as `04d` would hide one); the month in a detail is written with `strftime("%Y-%m")`:
 
 | Integer | Where | Why |
 |---|---|---|
 | `12` | `_MONTHS_IN_A_YEAR` | Twelve calendar months to a year and to an agricultural year (C5.1, C5.3) |
 | `1` | `_FIRST` | Months and days are counted from one (C5.1): the first day of a month, a step of one day, one month later, the year before the start month, and the last year of an inclusive range |
 
-The test file uses the same two integers for the same arithmetic, the integer `2` to lay out a span of several agricultural years, and `0` as a position counter. Its daily values repeat the items of the example series; it writes no value.
+The test file uses the same two integers for the same arithmetic, the integer `2` to lay out a span of several agricultural years, `0` as a position counter, and list positions (`0`, `-1` and slices) to pick the first and last year or month. Its daily values repeat the items of the example series; it writes no value.
 
 ## PROPOSED cases
 
@@ -106,6 +106,7 @@ The identifier is the name of the test function in `test_soil_loss.py` without `
 | `start-month-missing-returns-one-missing-input` | A missing start month: one `Missing`, reason `MISSING_INPUT`, detail names the start month (EP1 as written on `main`) |
 | `infeasible-calendar-makes-every-value-not-computable` | An infeasible calendar: every annual and monthly value missing, reason `NOT_COMPUTABLE` (G4, first row), also for years the series does not cover |
 | `year-or-month-not-covered-by-precipitation-is-no-coverage` | A series that starts and ends inside agricultural years: those years are `NO_COVERAGE` (C5.5); each month the series does not cover is `NO_COVERAGE` and each month it covers is `MISSING_INPUT`, also inside a year that is not covered whole (PROPOSED) |
+| `series-one-day-short-at-each-end-leaves-first-and-last-not-covered` | A series from one day after the first day of an agricultural year to one day before the last day of a later one: the first and last agricultural years, and the first and last months, are `NO_COVERAGE`; every year and month between is `MISSING_INPUT` (C5.5; the boundaries of `_covers` and of the last day of a month) |
 | `calendar-dates-outside-the-record-keep-the-years-of-the-record` | A calendar moved past the last day of the record: the years are still those of the record, and the result equals the one with the example calendar (D47) |
 | `no-precipitation-series-returns-one-missing-input` | No `precipitation` series: one `Missing`, reason `MISSING_INPUT`, detail names `precipitation` (G4, third row) |
 | `every-other-value-is-missing-input-naming-each-factor` | Every other value is `MISSING_INPUT`; its detail names `R`, `K`, `LS`, `C` and `P`, each with the codes and the facts of the table above; `NOT_AVAILABLE` only for a part that is not built |
@@ -114,7 +115,7 @@ The identifier is the name of the test function in `test_soil_loss.py` without `
 | `arguments-of-another-case-or-field-raise-value-error` | `case_id` or `field_id` of `climate` or `soil_slope` differs from the calendar: `ValueError` naming the field (G5) |
 | `argument-that-is-not-its-model-raises-type-error` | An argument given as a dictionary, or as an instance of another model: `TypeError` naming the argument (G5) |
 | `arguments-unchanged-and-second-call-equal` | The arguments are equal to a deep copy taken before the call, and a second call gives an equal result (G1) |
-| `module-imports-only-allowed-modules-and-holds-only-month-integers` | `soil_loss.py` imports only the standard library, `contracts.inputs.*` and `contracts.results.models`, and holds no number except `12` and `1` |
+| `module-imports-only-allowed-modules-and-holds-only-month-integers` | `soil_loss.py` imports only the standard library, `contracts.inputs.*` and `contracts.results.models`, holds no number except `12` and `1`, and has no format specification in an f-string |
 | `package-exposes-compute-soil-loss-with-exactly-three-parameters` | `from engine.erosion import compute_soil_loss` works and its parameters are exactly `calendar`, `climate`, `soil_slope` |
 | `proposed-cases-match-soil-loss-md` | This list and the test functions agree |
 
