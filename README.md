@@ -24,13 +24,14 @@ Then read [docs/DEVELOPMENT_BLUEPRINT.md](docs/DEVELOPMENT_BLUEPRINT.md) before 
 
 ## Lanes
 
-Three developers write code across four lanes, each orchestrating several AI coding sessions in parallel. A developer can own more than one lane. Two science reviewers validate and never write code.
+Three developers write code across four lanes (the platform lane is split in two sub-lanes), each orchestrating several AI coding sessions in parallel. A developer can own more than one lane. Two science reviewers validate and never write code.
 
 | Lane | Owner (role) | What it builds | Folders |
 |---|---|---|---|
 | L0 Core | Lead developer | Contracts and conventions, erosion engine, validation harness, integration into `main` | `contracts/`, `params/`, `engine/erosion/`, `validation/` |
 | L1 Engines | Engines developer | Rotation calendar, daily water balance, residue ledger, AMG soil carbon | `engine/calendar/`, `engine/water/`, `engine/residues/`, `engine/amg/` |
-| L2 Platform | Platform developer | Data adapters, decision layer, RothC soil carbon, API, saved case, CI and deploy | `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/` |
+| L2a Platform: data and service | Platform developer | Data adapters, API, CI and deploy | `adapters/`, `api/` |
+| L2b Platform: decision and carbon | Interface developer | Decision layer, RothC soil carbon, saved case | `decision/`, `engine/rothc/`, `demo/` |
 | L3 Interface | Interface developer | Multi-field map, rotation editor, results, printable sheet, demo path | `web/` |
 | Science review | Two science reviewers | Calibration, uncertainty ranges, test design, validation, plan adaptation | `docs/VALIDATION.md`; review of values |
 
