@@ -1,0 +1,48 @@
+{
+  "source": "PLACEHOLDER: example data, no real dataset",
+  "example_data": true,
+  "groups": [
+    {
+      "soil_group": "PLACEHOLDER_GROUP_A",
+      "soil_properties": [
+        {
+          "quantity": "placeholder_soil_property_a",
+          "value": 1.0,
+          "unit": "PLACEHOLDER_unit",
+          "provenance": "DERIVED",
+          "source": "PLACEHOLDER: example data, no real source",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+          }
+        },
+        {
+          "quantity": "placeholder_soil_property_b",
+          "value": null,
+          "unit": "PLACEHOLDER_unit",
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER: example of a value the table does not give for this soil group"
+          }
+        }
+      ]
+    },
+    {
+      "soil_group": "PLACEHOLDER_GROUP_B",
+      "soil_properties": [
+        {
+          "quantity": "placeholder_soil_property_a",
+          "value": 2.0,
+          "unit": "PLACEHOLDER_unit",
+          "provenance": "DERIVED",
+          "source": "PLACEHOLDER: example data, no real source",
+          "range": {
+            "low": 1.0,
+            "high": 3.0,
+            "kind": "PLACEHOLDER_range_kind"
+          }
+        }
+      ]
+    }
+  ]
+}
