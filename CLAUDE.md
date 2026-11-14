@@ -18,14 +18,14 @@ uv run pytest                            # all tests
 uv run pytest api/test_cors.py::test_preflight_from_allowed_origin   # one test
 uv run ruff check api/ && uv run ruff format --check api/            # lint (scope to your lane's folders)
 uv run uvicorn api.main:app --reload     # backend on http://localhost:8000
-docker compose watch                     # backend in a container; edits to api/ reload it
+docker compose watch                     # the whole app: backend on :8000 and frontend on :5173/field-shift-rotation-twin/, both reloading on edits
 uv run pip-licenses --with-system --format=json | uv run python -m ci.licences   # licence check
 FORBIDDEN_NAMES="$(cat <list>)" uv run python -m ci.names_scan                   # names scan
 ```
 
 Tests live next to the code they check (`params/test_layout.py`, `validation/test_layout.py`, `api/test_*.py`); `params/` and `validation/` use the standard library only. Docs written before uv existed say `python -m pytest <folder>/`, which still works.
 
-`compose.yaml` syncs `api/` into the container and rebuilds on `pyproject.toml` or `uv.lock` changes. Add a new backend folder (e.g. `adapters/`) to its watch list when it is created.
+`compose.yaml` runs two services. `api`: the backend image; edits under `api/`, `adapters/`, `contracts/`, `engine/` and `params/` are synced and uvicorn reloads; `pyproject.toml` or `uv.lock` rebuild it. `web`: a Node 22 container running the Vite dev server on the mounted `web/` folder, with `node_modules` in a volume (never in `web/` on the host). `WEB_PORT` and `API_PORT` change the host ports; `CORS_ORIGINS` and `VITE_API_URL` follow them. The `api` service has real climate data switched on (the settings file, the period of D29) with its cache in the named volume `climate_cache` mounted at `/data`, and serves the PLACEHOLDER soil-and-slope example; the image creates `/data` owned by the `app` user so the volume is writable. **A session never sends a rotation request to a stack started this way** (it would call the real service): start it with `POWER_SETTINGS_FILE= CLIMATE_START_DATE= CLIMATE_END_DATE= docker compose up`, which switches the climate source off. Add a new backend folder to the `api` watch list when it is created.
 
 ## Platform decisions (L2a)
 

@@ -19,6 +19,7 @@ Add a row **when the item is first used**, not at the end.
 | pytest (development) | 9.2.0 | https://pypi.org/project/pytest/ | MIT | L2a | 2026-11-14 |
 | Ruff (development) | 0.17.5 | https://pypi.org/project/ruff/ | MIT | L2a | 2026-11-14 |
 | Python container image `python:3.12-slim` | 3.12 | https://hub.docker.com/_/python | PSF-2.0 (Python); Debian packages under their own licences | L2a | 2026-11-14 |
+| Node.js container image `node:22-slim` (local development of the frontend, `compose.yaml`) | 22 | https://hub.docker.com/_/node | MIT (Node.js and the image scripts); Debian packages under their own licences | L2a | 2026-11-14 |
 | uv (container image `ghcr.io/astral-sh/uv`) | 0.12.2 | https://github.com/astral-sh/uv | MIT OR Apache-2.0 | L2a | 2026-11-14 |
 | pip-licenses (development: licence check) | 5.5.5 | https://pypi.org/project/pip-licenses/ | MIT | L2a | 2026-11-14 |
 | gitleaks (CI: secret scan, container image `ghcr.io/gitleaks/gitleaks`) | 8.21.2 | https://github.com/gitleaks/gitleaks | MIT | L2a | 2026-11-14 |
