@@ -1,0 +1,27 @@
+{
+  "contract": "site_data_soil_slope",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "slope_length": {
+    "value": 123456.25,
+    "unit": "example_length_unit",
+    "provenance": "DECLARED",
+    "source": "PLACEHOLDER: chain example data, not a real slope, no real source",
+    "range_missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+    }
+  },
+  "slope_steepness": {
+    "value": 1234.5,
+    "unit": "percent",
+    "provenance": "DECLARED",
+    "source": "PLACEHOLDER: chain example data, not a real slope, no real source",
+    "range_missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER: the example carries no uncertainty range for this value"
+    }
+  },
+  "soil_properties": []
+}
