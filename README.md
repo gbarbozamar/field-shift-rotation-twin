@@ -20,9 +20,21 @@ Read [docs/DEVELOPMENT_BLUEPRINT.md](docs/DEVELOPMENT_BLUEPRINT.md) before openi
 - Every AI-assisted unit is recorded in [AI_USE_LOG.md](AI_USE_LOG.md).
 - No secrets, no private data, no data from real producers.
 
-## Prior work and AI use
+## Lanes
 
-The team did literature research and planning before the event. Those notes are not part of this repository. All code in this repository is written during the event window, from published literature, open data and open-source libraries.
+Four developers write code, each orchestrating several AI coding sessions in parallel. Two science reviewers validate and never write code.
+
+| Lane | Owner (role) | What it builds | Folders |
+|---|---|---|---|
+| L0 Core | Lead developer | Contracts and conventions, erosion engine, validation harness, integration into `main` | `contracts/`, `params/`, `engine/erosion/`, `validation/` |
+| L1 Engines | Engines developer | Rotation calendar, daily water balance, residue ledger, AMG soil carbon | `engine/calendar/`, `engine/water/`, `engine/residues/`, `engine/amg/` |
+| L2 Platform | Platform developer | Data adapters, decision layer, RothC soil carbon, API, saved case, CI and deploy | `adapters/`, `engine/rothc/`, `decision/`, `api/`, `demo/` |
+| L3 Interface | Interface developer | Multi-field map, rotation editor, results, printable sheet, demo path | `web/` |
+| Science review | Two science reviewers | Calibration, uncertainty ranges, test design, validation, plan adaptation | `docs/VALIDATION.md`; review of values |
+
+One lane, one set of folders: nobody edits another lane's folder.
+
+## AI use
 
 AI coding assistants are used and declared: see [AI_USE_LOG.md](AI_USE_LOG.md). The product itself does not call a language model.
 
