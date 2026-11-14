@@ -27,7 +27,7 @@ import dataclasses
 import pytest
 
 from contracts.results.models import Missing
-from engine.water.et0.constants import Et0Constants
+from engine.water.et0.constants import Et0Bounds, Et0Constants
 from engine.water.et0.daily import Et0Steps, reference_evapotranspiration_day
 
 # Filled by a person from FAO-56, Chapter 4, EXAMPLE 18, with the record D34
@@ -52,21 +52,28 @@ EXAMPLE_18: dict | None = None
 # transcribe" of engine/water/et0/README.md, transcribed and checked (D34).
 CONSTANTS: Et0Constants | None = None
 
+# Filled by a person: the two bounds of decision D82 (PC-4), rows
+# "relative_shortwave_bound.upper_bound" and "wind_speed_bound.lower_bound"
+# of the same table, transcribed and checked (D34).
+BOUNDS: Et0Bounds | None = None
+
 WAITS_FOR = (
     "[H2] waits for: (1) the inputs, intermediate results, final value of "
     "FAO-56 Chapter 4 EXAMPLE 18, transcribed from the manual and checked by "
     "a person (D34 of issue #77); (2) the tolerance and the printed precision "
     "used, set by the science reviewers (H2 in docs/VALIDATION.md is OPEN); "
     "(3) the constants of the table in engine/water/et0/README.md, "
-    "transcribed and checked; (4) a person's check of the PROPOSED forms of "
-    "the equations"
+    "transcribed and checked, the two bounds of D82 included; (4) a person's "
+    "check of the PROPOSED forms of the equations"
 )
 
 
-@pytest.mark.skipif(EXAMPLE_18 is None or CONSTANTS is None, reason=WAITS_FOR)
+@pytest.mark.skipif(
+    EXAMPLE_18 is None or CONSTANTS is None or BOUNDS is None, reason=WAITS_FOR
+)
 def test_h2_worked_example_18_of_fao_56():
     steps = reference_evapotranspiration_day(
-        **EXAMPLE_18["inputs"], constants=CONSTANTS
+        **EXAMPLE_18["inputs"], constants=CONSTANTS, bounds=BOUNDS
     )
     names = {item.name for item in dataclasses.fields(Et0Steps)}
     expected = EXAMPLE_18["steps"]
@@ -83,3 +90,4 @@ def test_h2_the_skip_says_what_it_waits_for():
     assert "EXAMPLE 18" in WAITS_FOR
     assert "D34" in WAITS_FOR
     assert "tolerance" in WAITS_FOR
+    assert "D82" in WAITS_FOR
