@@ -18,7 +18,15 @@ from __future__ import annotations
 from collections import Counter
 from typing import Annotated, Literal, Self, get_args
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    Tag,
+    model_validator,
+)
 
 # --- closed vocabularies of the conventions sheet ----------------------------
 
@@ -355,6 +363,132 @@ class SoilCarbonTrend(IndicatorValue):
     computation: TrendComputation
 
 
+# --- a part whose engine is not built (decision D12) --------------------------
+#
+# Decided (lead developer, 14 November 2026, decision D12, issues #18 and
+# #77): each part of ``ResultsPerRotation`` may be wholly missing, only when
+# the engine that produces it is not built, and only with reason
+# ``NOT_AVAILABLE`` (C3.2). A built engine keeps the present form.
+#
+# PROPOSED by this unit, for the platform developer and the interface
+# developer to accept or rename: the form itself. The class names, the field
+# ``units`` and the way the two forms are told apart (an object with a
+# ``missing`` part for ``soil_loss``; an object in place of the list for
+# ``water_deficit_exposure`` and ``soil_carbon_trend``) are proposals, not
+# decisions.
+
+REASON_OF_A_PART_NOT_BUILT = "NOT_AVAILABLE"  # D12, C3.2
+
+
+class PartNotBuilt(_Contract):
+    """A whole part of ``ResultsPerRotation`` whose engine is not built (D12).
+
+    PROPOSED form. It keeps the indicator identifier, its direction and its
+    units (C3.1): ``units`` lists every unit the part carries in its present
+    form, in the order of ``UNITS_OF``, so ``soil_loss`` names both its
+    annual and its monthly unit. It carries no value of any kind.
+    """
+
+    indicator: IndicatorId
+    direction: Direction
+    units: list[str]
+    missing: Missing
+
+    @model_validator(mode="before")
+    @classmethod
+    def _carries_no_values(cls, data: object) -> object:
+        if isinstance(data, dict):
+            found = sorted(set(data) & _FIELDS_OF_THE_PRESENT_FORM)
+            if found:
+                raise ValueError(
+                    "a part that is wholly missing carries no values: "
+                    f"{', '.join(repr(key) for key in found)} belong to the present form (D12)"
+                )
+        return data
+
+    @model_validator(mode="after")
+    def _follows_d12_and_the_conventions(self) -> Self:
+        if self.missing.reason != REASON_OF_A_PART_NOT_BUILT:
+            raise ValueError(
+                f"a part is wholly missing only when its engine is not built, with reason "
+                f"'{REASON_OF_A_PART_NOT_BUILT}', not '{self.missing.reason}' (D12, C3.2)"
+            )
+        if self.direction != DIRECTION_OF[self.indicator]:
+            raise ValueError(
+                f"the direction of '{self.indicator}' is '{DIRECTION_OF[self.indicator]}', "
+                f"not '{self.direction}' (C1.1)"
+            )
+        if tuple(self.units) != UNITS_OF[self.indicator]:
+            expected = ", ".join(f"'{unit}'" for unit in UNITS_OF[self.indicator])
+            raise ValueError(
+                f"the units of a wholly missing '{self.indicator}' are [{expected}], "
+                f"in that order (C1.1, C3.1)"
+            )
+        return self
+
+
+class SoilLossNotBuilt(PartNotBuilt):
+    """``soil_loss`` wholly missing: the erosion engine is not built (D12)."""
+
+    indicator: Literal["soil_loss"]
+
+
+class WaterDeficitExposureNotBuilt(PartNotBuilt):
+    """``water_deficit_exposure`` wholly missing: the water engine is not built (D12)."""
+
+    indicator: Literal["water_deficit_exposure"]
+
+
+class SoilCarbonTrendNotBuilt(PartNotBuilt):
+    """``soil_carbon_trend`` wholly missing: no carbon engine is built (D12)."""
+
+    indicator: Literal["soil_carbon_trend"]
+
+
+# Keys that belong to the present form of a part or of one of its items and
+# never to the wholly missing form.
+_FIELDS_OF_THE_PRESENT_FORM = (
+    set(SoilLossResults.model_fields)
+    | set(AnnualSoilLoss.model_fields)
+    | set(MonthlySoilLoss.model_fields)
+    | set(WaterDeficitExposure.model_fields)
+    | set(SoilCarbonTrend.model_fields)
+) - set(PartNotBuilt.model_fields)
+
+
+def _soil_loss_form(data: object) -> str:
+    # PROPOSED: the wholly missing form of ``soil_loss`` is told apart by its
+    # ``missing`` part; the present form has none.
+    if isinstance(data, PartNotBuilt) or (isinstance(data, dict) and "missing" in data):
+        return "not_built"
+    return "present"
+
+
+def _list_part_form(data: object) -> str:
+    # PROPOSED: the wholly missing form of a part that is a list in its
+    # present form is one object in place of the list.
+    if isinstance(data, (dict, PartNotBuilt)):
+        return "not_built"
+    return "present"
+
+
+SoilLossPart = Annotated[
+    Annotated[SoilLossResults, Tag("present")]
+    | Annotated[SoilLossNotBuilt, Tag("not_built")],
+    Discriminator(_soil_loss_form),
+]
+WaterDeficitExposurePart = Annotated[
+    Annotated[list[WaterDeficitExposure], Field(min_length=1), Tag("present")]
+    | Annotated[WaterDeficitExposureNotBuilt, Tag("not_built")],
+    Discriminator(_list_part_form),
+]
+SoilCarbonTrendPart = Annotated[
+    Annotated[list[SoilCarbonTrend], Field(min_length=1), Tag("present")]
+    | Annotated[SoilCarbonTrendNotBuilt, Tag("not_built")],
+    Discriminator(_list_part_form),
+]
+
+
 def _check_one_time_basis(values: list) -> None:
     """Values of water-deficit exposure in one document share one time basis."""
     if len({item.time_basis for item in values}) > 1:
@@ -364,18 +498,24 @@ def _check_one_time_basis(values: list) -> None:
 
 
 class ResultsPerRotation(_Contract):
-    """Contract "Results per rotation": the three indicators of one rotation."""
+    """Contract "Results per rotation": the three indicators of one rotation.
+
+    Each part is in its present form, or wholly missing when its engine is
+    not built (decision D12; the form of that case is PROPOSED).
+    """
 
     case_id: Text
     field_id: Text
     rotation_id: Text
-    soil_loss: SoilLossResults
-    water_deficit_exposure: list[WaterDeficitExposure] = Field(min_length=1)
-    soil_carbon_trend: list[SoilCarbonTrend] = Field(min_length=1)
+    soil_loss: SoilLossPart
+    water_deficit_exposure: WaterDeficitExposurePart
+    soil_carbon_trend: SoilCarbonTrendPart
 
     @model_validator(mode="after")
     def _water_values_are_distinct(self) -> Self:
         values = self.water_deficit_exposure
+        if isinstance(values, PartNotBuilt):
+            return self
         _check_one_time_basis(values)
         if values[0].time_basis == "rotation" and len(values) > 1:
             raise ValueError(
@@ -390,6 +530,8 @@ class ResultsPerRotation(_Contract):
 
     @model_validator(mode="after")
     def _every_model_has_the_three_computations(self) -> Self:
+        if isinstance(self.soil_carbon_trend, PartNotBuilt):
+            return self
         computations: dict[str, list[str]] = {}
         for item in self.soil_carbon_trend:
             computations.setdefault(item.carbon_model, []).append(item.computation)

@@ -76,6 +76,7 @@ SECRET = "PLACEHOLDER_FILE_CONTENT_MARKER"
 def settings_document(**overrides: Any) -> dict[str, Any]:
     fields = settings_fields(**overrides)
     fields["parameters"] = [dataclasses.asdict(p) for p in fields["parameters"]]
+    fields["point"] = dataclasses.asdict(fields["point"])
     return fields
 
 

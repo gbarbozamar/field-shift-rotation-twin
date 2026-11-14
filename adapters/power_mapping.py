@@ -29,6 +29,9 @@ _SOURCE_DATE = re.compile(r"\d{8}")
 DETAIL_FILL_VALUE = "the source gave its fill value for this day"
 DETAIL_NOT_IN_RESPONSE = "the response holds no value for this day"
 DETAIL_NO_RANGE = "the source gives no uncertainty range for this series"
+DETAIL_NO_POINT_RANGE = "the source gives no uncertainty range for this value"
+DETAIL_POINT_NOT_REPORTED = "the response of the source does not report this value"
+DETAIL_POINT_FILL_VALUE = "the source gave its fill value for this value"
 
 
 class UnusableResponse(ValueError):
@@ -92,6 +95,47 @@ def _check_declared_fill_value(raw: Any, fill_value: float) -> None:
         )
 
 
+def _read_point(raw: dict[str, Any]) -> tuple[Any, Any, Any]:
+    """Latitude, longitude and elevation as the response reports them, or None.
+
+    The response is a GeoJSON feature: ``geometry.coordinates`` holds
+    longitude, latitude and elevation, in that order. A part that is absent
+    or is not a finite number is None; nothing is taken from the request.
+    """
+    geometry = raw.get("geometry")
+    coordinates = geometry.get("coordinates") if isinstance(geometry, dict) else None
+    if not isinstance(coordinates, list):
+        coordinates = []
+    parts = [
+        float(item) if _is_number(item) and math.isfinite(item) else None
+        for item in coordinates[:3]
+    ]
+    parts += [None] * (3 - len(parts))
+    longitude, latitude, elevation = parts
+    return latitude, longitude, elevation
+
+
+def _point_value(value: Any, unit: str, settings: PowerSettings) -> dict[str, Any]:
+    """One value of the point in the shape of ``Value``: a number or missing."""
+    if value is None or value == settings.fill_value:
+        detail = DETAIL_POINT_NOT_REPORTED if value is None else DETAIL_POINT_FILL_VALUE
+        return {
+            "value": None,
+            "unit": unit,
+            "missing": {"reason": settings.fill_reason, "detail": detail},
+        }
+    return {
+        "value": value,
+        "unit": unit,
+        "provenance": settings.point.provenance,
+        "source": settings.source_id,
+        "range_missing": {
+            "reason": settings.range_missing_reason,
+            "detail": DETAIL_NO_POINT_RANGE,
+        },
+    }
+
+
 def to_site_climate(
     raw: Any, request: ClimateRequest, settings: PowerSettings
 ) -> dict[str, Any]:
@@ -105,10 +149,17 @@ def to_site_climate(
     holds a date that cannot be parsed. Every day from ``start_date`` to
     ``end_date`` appears once, in order; a fill value or an absent day becomes
     a missing value with its reason, never zero.
+
+    The ``point`` of the record (issue 77, D9 and D18) is what the response
+    reports in ``geometry.coordinates``, never the point of the request. A
+    part the response does not report, or reports as its fill value, is
+    missing with its reason; a real zero stays zero.
     """
     if not isinstance(raw, dict):
         raise UnusableResponse("the response is not a JSON object")
     _check_declared_fill_value(raw, settings.fill_value)
+
+    latitude, longitude, elevation = _read_point(raw)
 
     days = _days(request.start_date, request.end_date)
     daily_series: list[dict[str, Any]] = []
@@ -156,6 +207,15 @@ def to_site_climate(
         "example_data": False,
         "case_id": request.case_id,
         "field_id": request.field_id,
+        "point": {
+            "latitude": _point_value(latitude, settings.point.latitude_unit, settings),
+            "longitude": _point_value(
+                longitude, settings.point.longitude_unit, settings
+            ),
+            "elevation": _point_value(
+                elevation, settings.point.elevation_unit, settings
+            ),
+        },
         "daily_series": daily_series,
         "monthly_series": [],
     }

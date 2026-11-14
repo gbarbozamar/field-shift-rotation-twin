@@ -12,7 +12,7 @@ This folder holds a Pydantic model and one example for three contracts of bluepr
 
 Blueprint section 5 says the producer of a contract writes its example. No producer example exists yet, so a builder session proposed the models and the examples. The producers correct them: the engines lane for the rotation calendar, sub-lane L2a for the two site-data contracts. The consumers named above approve the pull request.
 
-**The examples are PLACEHOLDER data.** Every number, date, identifier, unit string and source string in them is illustrative. They describe no real place, no real field and no real producer, and they carry no coordinates. Each example says `"example_data": true`.
+**The examples are PLACEHOLDER data.** Every number, date, identifier, unit string and source string in them is illustrative. They describe no real place, no real field and no real producer. The climate example carries a point because its model requires one (see [Site data: climate](#site-data-climate-site_climatepy)): the three numbers of that point are illustrative, in a placeholder unit, and they are not the coordinates of any field. The other two examples carry no coordinates. Each example says `"example_data": true`.
 
 Acceptance test, from the repository root:
 
@@ -115,8 +115,41 @@ Rules on dates are checked only between dates that are present. A missing date i
 | `contract` | `"site_data_climate"` | Required |
 | `example_data` | true or false | Required |
 | `case_id`, `field_id` | text | Required, not empty |
+| `point` | `ClimatePoint` | Required. The point the series of the record are valid for |
 | `daily_series` | list of `DailySeries` | Required key. `quantity` is unique in the list |
 | `monthly_series` | list of `MonthlySeries` | Required key, may be empty. `quantity` is unique in the list |
+
+### The point the series are valid for (`ClimatePoint`)
+
+The lead developer decided that latitude, longitude and elevation travel in this contract, as the point the series is valid for, with provenance label and source (issue #77, decision D9, 14 November 2026). That is a person's decision. What follows is how a builder session wrote it into the model: the field names and the shape are **PROPOSED**.
+
+| Field | Type | Rule |
+|---|---|---|
+| `latitude` | `Value` | Required key. Can be missing with its reason (while question 27 is open) |
+| `longitude` | `Value` | Required key. Can be missing with its reason (while question 27 is open) |
+| `elevation` | `Value` | Required key. Can be missing with its reason |
+
+Each of the three is a `Value` of `common.py`, unchanged, with every rule of that shape:
+
+- a number carries its unit string, its provenance label (one of the four of C4.1), its `source` or the assumption mark (C4.2), and a `range` or the reason it has none in `range_missing` (C2.2);
+- a missing one is null with its `missing` part and reason (C3.1), keeps its unit, and carries no provenance label and no range;
+- a number that is not finite, or written as text, is rejected.
+
+A record without `point`, or a point without one of the three keys, is rejected: a value that is not known is sent as missing, not left out.
+
+What the model does **not** fix, because a person has to choose it (see [OPEN](#open), questions 25 to 31):
+
+- No unit string. `unit` is any text that is not empty; the document supplies it. No angle or length unit is written anywhere in the model.
+- No datum and no vertical reference. The model has no field for either.
+- No provenance label. Any of the four is accepted.
+- No source. `source` is text, as for every other value of this contract (question 22).
+- No bound. No range check on latitude or longitude and no limit on elevation.
+
+One point holds for every series of the record. The model has no place for a second point (question 31).
+
+Agreed with the platform developer in issue #18, for the adapter that fills this model: the adapter takes the point from what the response of the source reports for it, not from the request. The model cannot check where a number came from; that is tested in the adapter.
+
+In the example the three values use the unit `PLACEHOLDER_unit`, the label `OBSERVED` and a placeholder source. Those are there so that the example loads. They are not a proposal of a unit, a label or a source for real data.
 
 `DailySeries`:
 
@@ -191,6 +224,23 @@ Every case below is a change to one example. The invalid ones must be rejected; 
 | `climate-without-example-data-flag` | `example_data` is left out |
 | `climate-with-another-contract-identifier` | `contract` names another contract |
 
+### Site data: climate, the point, rejected
+
+Proposed by unit `l0/climate-point`. A row that names three cases holds the same variant for each value of the point; the test checks that the error names that value.
+
+| Case | The variant |
+|---|---|
+| `climate-without-point` | The record has no `point` |
+| `point-without-latitude`, `point-without-longitude`, `point-without-elevation` | The value is left out of the point instead of being sent as missing |
+| `point-latitude-without-unit`, `point-longitude-without-unit`, `point-elevation-without-unit` | The value has no `unit` (C1.1) |
+| `point-latitude-without-provenance-label`, `point-longitude-without-provenance-label`, `point-elevation-without-provenance-label` | The value has no `provenance` (C4.1) |
+| `point-latitude-without-source-or-assumption-mark`, `point-longitude-without-source-or-assumption-mark`, `point-elevation-without-source-or-assumption-mark` | The value has neither `source` nor the assumption mark (C4.2) |
+| `point-latitude-missing-without-reason`, `point-longitude-missing-without-reason`, `point-elevation-missing-without-reason` | The value is null, keeps its unit and has no `missing` part (C3.1) |
+| `point-latitude-not-a-number`, `point-longitude-not-a-number`, `point-elevation-not-a-number` | The value is "not a number" (C3.1) |
+| `point-latitude-infinite`, `point-longitude-infinite`, `point-elevation-infinite` | The value is infinite |
+| `point-value-written-as-text` | The latitude is a number written as text |
+| `point-unknown-extra-field` | An unknown field inside the point |
+
 ### Site data: soil and slope, rejected
 
 | Case | The variant |
@@ -255,6 +305,8 @@ These variants stay valid. They show shapes that the examples do not contain.
 | `accepted-missing-slope-with-reason` | Slope length is missing with reason `NO_COVERAGE` and keeps its unit |
 | `accepted-zero-as-a-value` | Slope steepness is zero with a range: zero is a value |
 | `accepted-while-open-overlapping-components` | Two components of the same field overlap. Neither the conventions nor the blueprint forbid or allow it; see OPEN, question 1. The model does not reject it **only** until a person decides. This case is not a proposal to allow overlap |
+| `accepted-missing-elevation-with-reason` | The elevation of the point is missing, with its reason, and keeps its unit |
+| `accepted-while-open-missing-latitude-and-longitude-with-reason` | The latitude and the longitude of the point are missing, each with its reason. Whether a record may travel without them is not decided; see OPEN, question 27. The model does not reject it **only** until a person decides. This case is not a proposal to allow it |
 
 ## OPEN
 
@@ -281,6 +333,16 @@ Each item is a question a person has to answer. Until then the models keep the g
 14. **Does a daily value ever carry an uncertainty range, and in which shape?** The proposal states the reason for the absent range once per series. For the science reviewers.
 15. **Can two series of one record carry the same quantity from two sources?** The model rejects it. For the platform developer.
 
+Questions on the point the series are valid for, added by unit `l0/climate-point`. They are numbered after the last question of this file, so that no number that another file refers to changes.
+
+25. **In which unit does each of the three values travel, and to which datum does it refer?** Three unit strings (latitude, longitude, elevation), the horizontal reference of the two coordinates and the vertical reference of the elevation. The model fixes none of them and has no field for a datum: if the datum has to travel with the value, that is a further field. C1.1 lists no unit symbol for an angle or for a length, so the spelling of the unit strings is also an addition to C1.1 (the same kind of question as O13 of `contracts/CLIMATE_QUANTITIES.md`). For the science reviewers; the lead developer for the field and the addition to C1.1.
+26. **Which provenance label do the three values carry?** One of the four of C4.1; the model accepts any. Whether one label holds for all three, and whether it changes when a value is not the one the source reports (for example an elevation declared by the user), is part of the question. For the science reviewers.
+27. **Is a missing latitude or a missing longitude acceptable at all?** The shared `Value` shape lets each be missing with its reason, and the model adds no rule. If a record without them must not exist, the model gains the rule and the case `accepted-while-open-missing-latitude-and-longitude-with-reason` becomes a rejected one. A missing elevation is accepted: the brief of the unit asks for it. For the lead developer.
+28. **Which elevation is it, when the source reports the average of a grid cell?** `contracts/CLIMATE_QUANTITIES.md` quotes the source: its data, "including the elevation value, represent average values over their original source spatial resolution". Is the elevation of the point that average, the elevation of the field declared by the user, or one taken from the terrain data? This is part (b) of O9 of that file. The same holds for the two coordinates: the adapter writes what the response reports for the point (agreed in issue #18), and whether that is the requested point or a point of the grid of the source is for a person to read in the source. For the science reviewers.
+29. **Does the contract check a bound on any of the three values, and which?** The model checks none: neither the brief of the unit, nor the conventions sheet, nor issue #77 asks for one, and a bound depends on the unit of question 25. For the science reviewers (the bounds) and the lead developer (whether the contract checks them).
+30. **Do the three values carry an uncertainty range, and which reason code states that they have none?** As every `Value`, each carries a `range` or a `range_missing` with a code of C3.2 (C2.2), so the adapter has to write one of the two. No code of the closed list says "the source gives no range for this value": this is O6 of `contracts/CLIMATE_QUANTITIES.md`, now also for the point. For the lead developer; the science reviewers if a range exists.
+31. **Is one point enough for a record whose series come from more than one source?** The decision speaks of the point the series is valid for, and the model holds one point for every series of the record. If precipitation comes from another source than the rest (O4 of `contracts/CLIMATE_QUANTITIES.md`), the two sources may answer for different points. For the lead developer and the platform developer.
+
 ### Site data: soil and slope
 
 16. **Which soil properties does the contract deliver, with which identifier, from which source and in which unit?** Blueprint section 8 names none. For the science reviewers (source and unit) and the platform developer (identifiers).
@@ -292,6 +354,8 @@ Each item is a question a person has to answer. Until then the models keep the g
 
 20. **Is a case one field or several?** The blueprint caches climate "per case" and speaks of a multi-field map. The models carry both `case_id` and `field_id` and one record describes one field. For the lead developer and the interface developer.
 21. **Does site data repeat the place the source answered for (point, grid cell)?** The models carry no coordinates, so the examples cannot hold a real place. If a location is added, the example needs a way to stay free of real coordinates. For the platform developer and the lead developer.
+    - `DECIDED` for the climate contract (decided by the lead developer on 14 November 2026, issue #77, D9): it carries the point the series is valid for (latitude, longitude, elevation), with its provenance label and source. The model has it as `point`; its example holds illustrative numbers in a placeholder unit, which are not the coordinates of any field.
+    - Still `OPEN`: whether "Site data: soil and slope" carries a place, and whether the grid cell of the source travels besides the point. For the same roles as before. What a person still has to supply for the point itself is in questions 25 to 31.
 22. **What is the format of `source`?** The model takes any text that is not empty. A person decides whether it is free text, a key of `ATTRIBUTIONS.md` or something else, and whether a record also carries the date on which the data was retrieved. For the lead developer.
 23. **Which labels can `kind` of a range take?** This is the OPEN point of C2.3. For the science reviewers.
 24. **Should the shared value shape (`Value`, `Missing`, `Range`) live in one place for every contract?** It is defined in this folder because the unit owns only this folder. Other contracts need the same shape and should not define a second one. For the lead developer.

@@ -11,7 +11,7 @@ import datetime as dt
 from typing import Any
 
 from adapters.ports import ClimateRequest
-from adapters.power import ParameterSpec, PowerSettings
+from adapters.power import ParameterSpec, PointSpec, PowerSettings
 
 PLACEHOLDER_FILL = -1.0e9  # a placeholder fill value, not the source's
 
@@ -33,6 +33,12 @@ def settings_fields(**overrides: Any) -> dict[str, Any]:
                 unit="PLACEHOLDER_unit",
                 provenance="OBSERVED",
             ),
+        ),
+        "point": PointSpec(
+            latitude_unit="PLACEHOLDER_unit",
+            longitude_unit="PLACEHOLDER_unit",
+            elevation_unit="PLACEHOLDER_unit",
+            provenance="OBSERVED",
         ),
         "optional_arguments": {},
         "fill_value": PLACEHOLDER_FILL,
