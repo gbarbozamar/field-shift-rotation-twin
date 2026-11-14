@@ -13,6 +13,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx",
+    "pip-licenses>=5.5.5",
     "pytest",
     "ruff",
 ]
