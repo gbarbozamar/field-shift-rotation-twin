@@ -12,6 +12,15 @@ expected value, no tolerance and no citation: people supply those.
 
 ``check_record``, ``check_references`` and ``summarise`` are pure functions.
 ``load_store`` only reads files below the folder it is given.
+
+What each public function does with an input it was not written for:
+
+- ``check_record`` and ``is_placeholder`` accept any object and never raise;
+- ``check_references`` reports a problem for any record, and raises
+  ``ValueError`` when one of its three arguments is not a dict;
+- ``summarise`` raises ``ValueError`` when it is not given a store whose
+  records are well-formed, as ``load_store`` returns it;
+- ``load_store`` raises ``TypeError`` when ``root`` is not a path.
 """
 
 from __future__ import annotations
@@ -21,6 +30,7 @@ import math
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +68,8 @@ EXAMPLES_FOLDER = "examples"
 
 _TOO_DEEP = "is nested too deeply to be a record"
 _OUTSIDE = "is outside 'expected/', 'runs/' and 'results/': a record lives in one of these three folders"
+
+_INEXACT_INTEGER = "is an integer that a float cannot hold exactly, so it would change when read"
 
 _PLACEHOLDER_WORD = "placeholder"
 _CITATION_NEEDED = "CITATION NEEDED"
@@ -127,19 +139,82 @@ def _is_number(value: Any) -> bool:
         return False
 
 
+class _ChangedNumber(float):
+    """A number written in a file with digits that are lost when it is read.
+
+    ``_read_json`` puts it in place of the number, so that the record can
+    still be checked and the field is reported. No slot accepts it.
+    """
+
+    literal: str
+
+    def __new__(cls, value: float, literal: str = "") -> "_ChangedNumber":
+        number = super().__new__(cls, value)
+        number.literal = literal
+        return number
+
+
+def _exactness_problem(value: Any) -> str | None:
+    """Why a number would not be read back as it is written, or None.
+
+    Engines and other readers of a JSON file hold a number as a float, so a
+    number that a float cannot hold exactly is reported, never rounded.
+    """
+    if isinstance(value, _ChangedNumber):
+        literal = value.literal if len(value.literal) <= 40 else value.literal[:40] + "..."
+        return f"is written as {literal}, which would change when read as a number"
+    if isinstance(value, int) and not isinstance(value, bool):
+        try:
+            exact = float(value) == value
+        except OverflowError:
+            exact = False
+        if not exact:
+            return _INEXACT_INTEGER
+    return None
+
+
+def _shown(value: Any) -> str:
+    """A short description of any value for a problem message. Never raises."""
+    if isinstance(value, str):
+        return repr(value if len(value) <= 60 else value[:60] + "...")
+    if value is None or isinstance(value, bool):
+        return repr(value)
+    if isinstance(value, (int, float)):
+        try:
+            return repr(value)
+        except ValueError:
+            return "an integer too long to print"
+    return f"a value of type {type(value).__name__}"
+
+
+def _key_text(key: Any) -> str:
+    return key if isinstance(key, str) else _shown(key)
+
+
 def _person_key(name: str) -> str:
     """Two spellings that differ only in case or spacing are the same person."""
     return " ".join(name.split()).casefold()
 
 
 def is_placeholder(record: Any) -> bool:
-    """True when any key or any text anywhere in the record contains PLACEHOLDER."""
-    if isinstance(record, str):
-        return _PLACEHOLDER_WORD in record.casefold()
-    if isinstance(record, dict):
-        return any(is_placeholder(key) or is_placeholder(value) for key, value in record.items())
-    if isinstance(record, list):
-        return any(is_placeholder(item) for item in record)
+    """True when any key or any text anywhere in the record contains PLACEHOLDER.
+
+    Accepts any object and never raises, however deeply it is nested.
+    """
+    pending = [record]
+    seen: set[int] = set()
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            if _PLACEHOLDER_WORD in item.casefold():
+                return True
+        elif isinstance(item, (dict, list)) and id(item) not in seen:
+            seen.add(id(item))
+            if isinstance(item, dict):
+                pending.extend(item.keys())
+                pending.extend(item.values())
+            else:
+                pending.extend(item)
     return False
 
 
@@ -147,10 +222,10 @@ def is_placeholder(record: Any) -> bool:
 
 
 def _check_keys(obj: dict, required: frozenset, optional: frozenset, where: str, problems: list[str]) -> None:
-    for key in sorted(required - obj.keys(), key=str):
+    for key in sorted(required - obj.keys()):
         problems.append(f"{where}: missing field '{key}'")
-    for key in sorted(obj.keys() - required - optional, key=str):
-        problems.append(f"{where}: unknown field '{key}'")
+    for text in sorted(_key_text(key) for key in obj.keys() - required - optional):
+        problems.append(f"{where}: unknown field '{text}'")
 
 
 def _check_text(obj: dict, key: str, where: str, problems: list[str]) -> None:
@@ -180,7 +255,10 @@ def _check_value(obj: Any, where: str, problems: list[str]) -> str | None:
     """Check a value slot. Returns its form: 'number', 'text' or 'missing'."""
     form = _match_form(obj, _VALUE_FORMS, where, problems)
     if form == "number":
-        if not _is_number(obj["number"]):
+        exactness = _exactness_problem(obj["number"])
+        if exactness is not None:
+            problems.append(f"{where}.number: {exactness}")
+        elif not _is_number(obj["number"]):
             problems.append(f"{where}.number: must be a finite number, not a string or a boolean")
         if not _is_text(obj["unit"]):
             problems.append(f"{where}.unit: a number must state its unit as a non-empty string")
@@ -195,7 +273,7 @@ def _check_value(obj: Any, where: str, problems: list[str]) -> str | None:
 def _check_test_code(code: Any, where: str, problems: list[str]) -> None:
     if not isinstance(code, str) or not _TEST_CODE_RE.fullmatch(code):
         problems.append(
-            f"{where}: must be a test code of family E, H or D, such as 'E3' or 'E1b'; got {code!r}"
+            f"{where}: must be a test code of family E, H or D, such as 'E3' or 'E1b'; got {_shown(code)}"
         )
 
 
@@ -203,7 +281,7 @@ def _check_common(record: dict, problems: list[str]) -> None:
     if "format_version" in record:
         version = record["format_version"]
         if type(version) is not int or version != FORMAT_VERSION:
-            problems.append(f"format_version: must be the integer {FORMAT_VERSION}; got {version!r}")
+            problems.append(f"format_version: must be the integer {FORMAT_VERSION}; got {_shown(version)}")
     if "id" in record:
         identifier = record["id"]
         if not isinstance(identifier, str) or not _ID_RE.fullmatch(identifier):
@@ -249,8 +327,12 @@ def _check_expected(record: dict, problems: list[str]) -> None:
             form = _match_form(tolerance, _TOLERANCE_FORMS, "tolerance", problems)
             if form == "missing":
                 _check_missing_reason(tolerance, "tolerance", problems)
-            elif form is not None and (not _is_number(tolerance[form]) or tolerance[form] < 0):
-                problems.append(f"tolerance.{form}: must be a finite number, zero or greater")
+            elif form is not None:
+                exactness = _exactness_problem(tolerance[form])
+                if exactness is not None:
+                    problems.append(f"tolerance.{form}: {exactness}")
+                elif not _is_number(tolerance[form]) or tolerance[form] < 0:
+                    problems.append(f"tolerance.{form}: must be a finite number, zero or greater")
     elif value_form is not None and "tolerance" in record:
         problems.append("tolerance: only a numeric expected value carries a tolerance")
 
@@ -306,7 +388,7 @@ def _check_result(record: dict, problems: list[str]) -> None:
     outcome = record.get("outcome")
     outcome_known = isinstance(outcome, str) and outcome in OUTCOMES
     if "outcome" in record and not outcome_known:
-        problems.append(f"outcome: must be one of {', '.join(OUTCOMES)}; got {outcome!r}")
+        problems.append(f"outcome: must be one of {', '.join(OUTCOMES)}; got {_shown(outcome)}")
 
     observed_form = _check_value(record["observed"], "observed", problems) if "observed" in record else None
     if outcome_known:
@@ -332,12 +414,15 @@ def check_record(record: Any, *, allow_placeholders: bool = False) -> list[str]:
     A record that contains the word PLACEHOLDER anywhere is rejected unless
     ``allow_placeholders`` is true, so a placeholder can never stand in the
     real store as if it were a value with a source.
+
+    Accepts any object and never raises: whatever is wrong is a problem in
+    the list.
     """
     if not isinstance(record, dict):
         return ["record: must be a JSON object"]
     kind = record.get("kind")
     if not isinstance(kind, str) or kind not in _CHECK_BY_KIND:
-        return [f"kind: must be one of {', '.join(_CHECK_BY_KIND)}; got {kind!r}"]
+        return [f"kind: must be one of {', '.join(_CHECK_BY_KIND)}; got {_shown(kind)}"]
     problems: list[str] = []
     _check_common(record, problems)
     _CHECK_BY_KIND[kind](record, problems)
@@ -365,7 +450,13 @@ def check_references(
     Never raises on a record that was not checked before: a malformed result
     gets its own problems, and a malformed run or expected value counts as
     not accepted.
+
+    Raises ``ValueError``, and nothing else, when ``expected``, ``runs`` or
+    ``results`` is not a dict of records by id.
     """
+    for name, group in (("expected", expected), ("runs", runs), ("results", results)):
+        if not isinstance(group, dict):
+            raise ValueError(f"check_references: '{name}' must be a dict of records by id")
     runs = {key: run for key, run in runs.items() if not _problems_as(run, KIND_RUN)}
     expected = {key: value for key, value in expected.items() if not _problems_as(value, KIND_EXPECTED)}
     found: dict[str, list[str]] = {}
@@ -451,9 +542,33 @@ def _reject_constant(name: str) -> Any:
     raise ValueError(f"{name} is not a number; a missing value is written with 'missing_reason'")
 
 
+def _parse_float(literal: str) -> float:
+    value = float(literal)
+    if not math.isfinite(value):
+        return value  # reported by the check as not finite
+    try:
+        unchanged = Decimal(literal) == Decimal(repr(value))
+    except (InvalidOperation, ValueError):
+        unchanged = False
+    return value if unchanged else _ChangedNumber(value, literal)
+
+
+def _parse_int(literal: str) -> int | float:
+    try:
+        return int(literal)
+    except ValueError:  # more digits than Python converts
+        return _ChangedNumber(float(literal), literal)
+
+
+def _entries(directory: Path) -> list[Path]:
+    return sorted(directory.iterdir())
+
+
 def _read_json(path: Path) -> tuple[Any, str | None]:
     try:
-        text = path.read_text(encoding="utf-8")
+        # utf-8-sig also reads a file that starts with a byte-order mark,
+        # which editors on Windows write by default.
+        text = path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeDecodeError) as exc:
         return None, f"cannot be read as UTF-8 text: {exc}"
     try:
@@ -461,6 +576,8 @@ def _read_json(path: Path) -> tuple[Any, str | None]:
             text,
             object_pairs_hook=_object_without_duplicate_keys,
             parse_constant=_reject_constant,
+            parse_float=_parse_float,
+            parse_int=_parse_int,
         )
     except ValueError as exc:
         return None, f"is not valid JSON: {exc}"
@@ -482,8 +599,17 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
     misnamed folder is not lost. Only two things are not looked at: the
     folder ``examples/`` directly below ``root``, and files outside the three
     folders that are not ``.json`` files.
+
+    The extension of a record file is read without regard to case, so
+    ``<id>.JSON`` is a record file too. Two files of one folder that carry
+    the same id are both rejected.
+
+    Raises ``TypeError``, and nothing else, when ``root`` is not a path.
     """
-    root = Path(root)
+    try:
+        root = Path(root)
+    except TypeError:
+        raise TypeError("load_store: 'root' must be a path, given as text or as a path object") from None
     accepted: dict[str, dict[str, dict]] = {kind: {} for kind in FOLDER_BY_KIND}
     paths: dict[tuple[str, str], str] = {}
     problems: list[tuple[str, str]] = []
@@ -502,9 +628,9 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
         directory = root / folder
         if not directory.is_dir():
             continue
-        for path in sorted(directory.iterdir()):
+        for path in _entries(directory):
             relative = f"{folder}/{path.name}"
-            if path.is_dir() or path.suffix != ".json":
+            if path.is_dir() or path.suffix.lower() != ".json":
                 problems.append((relative, "is not a record: this folder holds only files named <id>.json"))
                 continue
             record, error = _read_json(path)
@@ -523,12 +649,25 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
                         f"'{FOLDER_BY_KIND[record_kind]}/', not in '{folder}/'"
                     )
                 record_id = record.get("id")
-                if isinstance(record_id, str) and path.name != f"{record_id}.json":
+                if isinstance(record_id, str) and path.stem != record_id:
                     found.append(f"id: the file must be named '{record_id}.json'")
             if found:
                 problems.extend((relative, message) for message in found)
                 if _says_failed(record):
                     failed_malformed.append(relative)
+                continue
+            first = paths.get((kind, record["id"]))
+            if first is not None:
+                # Possible only where two file names differ in the case of
+                # the extension. Neither file replaces the other.
+                problems.append((relative, f"id: '{record['id']}' is also the id of '{first}'"))
+                if _says_failed(record):
+                    failed_malformed.append(relative)
+                earlier = accepted[kind].pop(record["id"], None)
+                if earlier is not None:
+                    problems.append((first, f"id: '{record['id']}' is also the id of '{relative}'"))
+                    if _says_failed(earlier):
+                        failed_malformed.append(first)
                 continue
             accepted[kind][record["id"]] = record
             paths[(kind, record["id"])] = relative
@@ -553,6 +692,30 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
 # --- reporting ----------------------------------------------------------------
 
 
+def _require_sound_store(store: Any) -> None:
+    if not isinstance(store, Store):
+        raise ValueError("summarise: needs a Store, as load_store returns it")
+    for name, kind in (("runs", KIND_RUN), ("results", KIND_RESULT), ("unresolved", KIND_RESULT)):
+        group = getattr(store, name)
+        if not isinstance(group, dict):
+            raise ValueError(f"summarise: store.{name} must be a dict of records by id")
+        for key, record in group.items():
+            if not isinstance(key, str) or _problems_as(record, kind):
+                raise ValueError(
+                    f"summarise: store.{name} holds, under the key {_shown(key)}, "
+                    f"something that is not a well-formed '{kind}' record"
+                )
+    problems = store.problems
+    if not isinstance(problems, (tuple, list)) or not all(
+        isinstance(item, (tuple, list)) and len(item) == 2 and all(isinstance(part, str) for part in item)
+        for item in problems
+    ):
+        raise ValueError("summarise: store.problems must be a sequence of (path, message) pairs of text")
+    paths = store.failed_malformed
+    if not isinstance(paths, (tuple, list)) or not all(isinstance(path, str) for path in paths):
+        raise ValueError("summarise: store.failed_malformed must be a sequence of paths as text")
+
+
 def summarise(store: Store) -> dict:
     """Report the results of a store without dropping anything.
 
@@ -574,7 +737,11 @@ def summarise(store: Store) -> dict:
     are not trusted, so it does not remove a test from ``no_result``.
 
     ``results_total`` is the number of results counted under an outcome.
+
+    Raises ``ValueError``, and nothing else, when ``store`` is not a store
+    whose records are well-formed, as ``load_store`` returns it.
     """
+    _require_sound_store(store)
     counts = {outcome: 0 for outcome in OUTCOMES}
     by_outcome: dict[str, list[str]] = {outcome: [] for outcome in OUTCOMES}
     reported: set[tuple[str, str]] = set()
