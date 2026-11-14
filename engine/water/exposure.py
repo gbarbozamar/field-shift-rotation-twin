@@ -455,6 +455,40 @@ def _crop_of_day(
     return crop
 
 
+@dataclass(frozen=True)
+class Growth:
+    """The growth stage of a day with a crop and the root depth of that day.
+
+    ``stage`` is one of the stage words of STAGES, the scope word under which
+    the basal crop coefficient of the day is read; ``root_depth`` is the root
+    depth of the balance on that day.
+    """
+
+    stage: str
+    root_depth: float
+
+
+def _growth_of_day(
+    calendar: RotationCalendar,
+) -> Callable[[dt.date, str], Growth | Missing]:
+    """The growth stage and root depth of a day with a crop, or why they are not known.
+
+    D78 gives the basal crop coefficient one value per growth stage (FAO-56
+    Table 17) and the root depth a crop-specific growth (FAO-56 Annex 8);
+    both need the dates of the stages. The calendar carries no growth stage
+    and no part builds the growth of the root zone, so on every day with a
+    crop both are missing (D79, OPEN 4). The unit that brings the stage
+    dates replaces this function and nothing else; a test replaces it with
+    synthetic stages to check the balance on days with transpiration.
+    PROPOSED.
+    """
+
+    def growth(day: dt.date, crop: str) -> Growth | Missing:
+        return Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
+
+    return growth
+
+
 # --- the daily chain -----------------------------------------------------------
 
 
@@ -655,6 +689,7 @@ def _run_chain(
     precipitation_values = _series_values(precipitation_series)
     wind_values = _series_values(by_quantity.get(WIND_SPEED_2M))
     crop_of = _crop_of_day(calendar)
+    growth_of = _growth_of_day(calendar)
 
     chain: list[ChainDay] = []
     for day in days:
@@ -684,17 +719,39 @@ def _run_chain(
                 crop_day = None
             else:
                 # Every record of the crop is read, so that one that is
-                # missing is named (D56); none gives the value of the day,
-                # because the stage of the day is not known (D79, OPEN 4).
+                # missing is named (D56).
                 for stage in STAGES:
                     catalogue.value(
                         BASAL_CROP_COEFFICIENT, (*scope, (STAGE_KEY, stage)), day
                     )
                 catalogue.value(ROOT_DEPTH, scope, day)
-                catalogue.value(READILY_AVAILABLE_FRACTION, scope, day)
-                stage_unknown = Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
-                notes.note(stage_unknown, day)
-                kcb = crop_day = stage_unknown
+                fraction = catalogue.value(READILY_AVAILABLE_FRACTION, scope, day)
+                growth = growth_of(day, crop)
+                if isinstance(growth, Missing):
+                    # Today on every day with a crop (D79, OPEN 4).
+                    notes.note(growth, day)
+                    kcb = crop_day = growth
+                else:
+                    kcb = catalogue.value(
+                        BASAL_CROP_COEFFICIENT,
+                        (*scope, (STAGE_KEY, growth.stage)),
+                        day,
+                    )
+                    absent = [
+                        item for item in (kcb, fraction) if isinstance(item, Missing)
+                    ]
+                    crop_day = (
+                        Missing(
+                            reason="MISSING_INPUT",
+                            detail="; ".join(item.detail for item in absent),
+                        )
+                        if absent
+                        else balance.CropDay(
+                            transpiration_coefficient=kcb,
+                            root_depth=growth.root_depth,
+                            readily_available_fraction=fraction,
+                        )
+                    )
 
         # 2. Runoff by the Curve Number.
         runoff = runoff_day(

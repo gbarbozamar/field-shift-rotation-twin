@@ -96,6 +96,12 @@ PLACEHOLDER_SITE = {
     # Zero, structurally: the pressure does not depend on the elevation, so
     # the bracket of its form stays above zero at any elevation.
     "atmospheric_pressure_lapse_rate": 0.0,
+    # The two bounds of D82 (PC-4), plainly not their values. With no
+    # longwave term (the Stefan-Boltzmann constant above is zero) the bound of
+    # Rs/Rso changes nothing; the bound of the wind speed lies below every
+    # placeholder wind speed, so it changes nothing either.
+    "net_longwave_relative_shortwave_maximum": 7.77,
+    "penman_monteith_minimum_wind_speed": 0.111,
     "soil_heat_flux_daily_value": 1.11,
     "initial_abstraction_ratio": 0.555,
     "retention_numerator": 2.22,
@@ -127,7 +133,10 @@ PLACEHOLDER_CROP = {
     "readily_available_fraction": {"crop-a": 0.444, "crop-b": 0.888},
 }
 # The value of every record read by crop and growth stage.
-PLACEHOLDER_STAGE = 0.555
+PLACEHOLDER_STAGE = {"initial": 0.444, "mid": 0.555, "end": 0.666}
+# The root depth of a day with a crop in the case with synthetic stages: above
+# zero and not deeper than the column (column_depth).
+PLACEHOLDER_GROWTH_ROOT_DEPTH = 1.11
 CROPS = ("crop-a", "crop-b")
 
 # The water records drafted for the lead developer's check
@@ -316,7 +325,9 @@ def marked_catalogue() -> dict[str, dict]:
             for stage in module.STAGES:
                 records.append(
                     placeholder_record(
-                        parameter_id, PLACEHOLDER_STAGE, scope_of(f"{crop}:{stage}")
+                        parameter_id,
+                        PLACEHOLDER_STAGE[stage],
+                        scope_of(f"{crop}:{stage}"),
                     )
                 )
     return {
@@ -684,6 +695,60 @@ def test_daily_balance_closes_its_mass_every_day():
         branches["runoff"] += b.runoff > 0
         assert b.transpiration == 0  # no day of the calendar has a crop
     assert all(count > 0 for count in branches.values()), branches
+
+
+def synthetic_stage(day: dt.date) -> str:
+    """A growth stage given directly by the test, in turn day after day."""
+    return module.STAGES[day.toordinal() % len(module.STAGES)]
+
+
+def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_synthetic_stages(
+    monkeypatch,
+):
+    # The calendar contract carries no growth stage, so the stages and the
+    # root depth of each day with a crop are given by replacing the one
+    # function of EP3 that would read them (_growth_of_day). Synthetic: they
+    # come from no phenology and no root-growth curve.
+    def synthetic_growth(calendar_):
+        return lambda day, crop: module.Growth(
+            stage=synthetic_stage(day), root_depth=PLACEHOLDER_GROWTH_ROOT_DEPTH
+        )
+
+    monkeypatch.setattr(module, "_growth_of_day", synthetic_growth)
+    calendar_ = chain_calendar()
+    components = [
+        (component.start.date, component.end.date) for component in calendar_.components
+    ]
+    days = chain(calendar_)
+    capacity = PLACEHOLDER_SITE["column_capacity"]
+    with_transpiration = 0
+    for day in days:
+        b = day.balance
+        flows = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
+        assert all(is_number(flow) and flow >= 0 for flow in flows)
+        change = b.storage_end - b.storage_start
+        balance = (
+            b.precipitation - b.runoff - b.evaporation - b.transpiration - b.drainage
+        )
+        scale = max(abs(term) for term in (b.storage_start, b.storage_end, *flows))
+        assert abs(change - balance) <= 64 * sys.float_info.epsilon * max(scale, 1.0)
+        assert 0 <= b.storage_end <= capacity
+        if any(start <= day.date <= end for start, end in components):
+            # The basal coefficient of the stage given for the day.
+            kcb = PLACEHOLDER_STAGE[synthetic_stage(day.date)]
+            assert b.transpiration_demanded == pytest.approx(
+                kcb * day.reference_evapotranspiration
+            )
+            assert is_number(b.stress_coefficient)
+            with_transpiration += b.transpiration > 0
+        else:
+            assert b.transpiration == 0
+    assert with_transpiration > 0
+    # Every year is computed, so it is missing only for the definition (D61).
+    result = run(calendar_=calendar_)
+    assert_loads(result)
+    for item in result:
+        assert_definition_incomplete(item)
 
 
 def test_crop_of_each_day_follows_the_calendar():
