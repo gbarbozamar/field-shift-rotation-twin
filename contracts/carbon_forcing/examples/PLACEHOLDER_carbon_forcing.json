@@ -1,0 +1,175 @@
+{
+  "example_data": true,
+  "case_id": "PLACEHOLDER-case",
+  "field_id": "PLACEHOLDER-field",
+  "rotation_id": "PLACEHOLDER-rotation",
+  "horizon": {
+    "start": {
+      "year": 2001,
+      "month": 1
+    },
+    "end": {
+      "year": 2001,
+      "month": 4
+    }
+  },
+  "soil_depth": {
+    "value": null,
+    "unit": "PLACEHOLDER_unit",
+    "missing": {
+      "reason": "NOT_DECLARED",
+      "detail": "PLACEHOLDER: example of a value nobody has given yet"
+    }
+  },
+  "climate": [
+    {
+      "quantity": "placeholder_climate_quantity_a",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2001,
+        "month": 4
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": 1.0
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": 2.0
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": null,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER: example of a month without data"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": 4.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_climate_quantity_b",
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2001,
+        "month": 4
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": 5.0
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": 6.0
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": 7.0
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": 8.0
+        }
+      ]
+    }
+  ],
+  "carbon_inputs": [
+    {
+      "quantity": "placeholder_carbon_input_a",
+      "unit": "PLACEHOLDER_unit",
+      "origin": "placeholder_origin",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2001,
+        "month": 4
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": 1.0
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": 2.0
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": 3.0
+        }
+      ]
+    }
+  ],
+  "soil_properties": [
+    {
+      "quantity": "placeholder_soil_property_a",
+      "value": 4.0,
+      "unit": "PLACEHOLDER_unit",
+      "provenance": "OBSERVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      }
+    },
+    {
+      "quantity": "placeholder_soil_property_b",
+      "value": null,
+      "unit": "PLACEHOLDER_unit",
+      "missing": {
+        "reason": "NO_COVERAGE",
+        "detail": "PLACEHOLDER: example of a value the source does not have for this place"
+      }
+    }
+  ]
+}

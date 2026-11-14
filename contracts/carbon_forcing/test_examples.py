@@ -1,0 +1,341 @@
+"""Acceptance test of unit l2/carbon-forcing.
+
+The PLACEHOLDER example loads into ``CarbonForcing``, and each invalid variant
+of it is rejected. The variants are PROPOSED (blueprint section 3.7) and are
+listed in ``README.md`` under "PROPOSED cases"; a test checks that the two
+lists agree.
+
+Run from the repository root: ``uv run pytest contracts/carbon_forcing/``.
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import pytest
+from pydantic import ValidationError
+
+from contracts.carbon_forcing import CarbonForcing
+
+HERE = Path(__file__).parent
+EXAMPLES = HERE / "examples"
+EXAMPLE = EXAMPLES / "PLACEHOLDER_carbon_forcing.json"
+
+Mutation = Callable[[dict[str, Any]], None]
+
+CLIMATE = ["climate", 0]  # the series with one missing month
+CARBON = ["carbon_inputs", 0]
+
+
+def load() -> dict[str, Any]:
+    return json.loads(EXAMPLE.read_text(encoding="utf-8"))
+
+
+def put(path: list[Any], value: Any) -> Mutation:
+    """Set the item at ``path`` to ``value``."""
+
+    def mutate(data: dict[str, Any]) -> None:
+        target = data
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+
+    return mutate
+
+
+def drop(path: list[Any]) -> Mutation:
+    """Remove the key or the list item at ``path``."""
+
+    def mutate(data: dict[str, Any]) -> None:
+        target = data
+        for key in path[:-1]:
+            target = target[key]
+        del target[path[-1]]
+
+    return mutate
+
+
+def apply(change: Callable[[dict[str, Any]], None]) -> Mutation:
+    return change
+
+
+def _duplicate_month(data: dict[str, Any]) -> None:
+    months = data["climate"][0]["months"]
+    months[1] = copy.deepcopy(months[0])
+
+
+def _swap_months(data: dict[str, Any]) -> None:
+    months = data["climate"][0]["months"]
+    months[0], months[1] = months[1], months[0]
+
+
+def _duplicate_climate_quantity(data: dict[str, Any]) -> None:
+    data["climate"][1]["quantity"] = data["climate"][0]["quantity"]
+
+
+def _duplicate_soil_quantity(data: dict[str, Any]) -> None:
+    data["soil_properties"][1]["quantity"] = data["soil_properties"][0]["quantity"]
+
+
+def _series_shorter_than_horizon(data: dict[str, Any]) -> None:
+    """A series consistent in itself that stops one month before the horizon."""
+    series = data["climate"][1]
+    series["months"].pop()
+    series["end"] = {"year": 2001, "month": 3}
+
+
+# (case, mutation, fragment of the error message)
+INVALID: list[tuple[str, Mutation, str]] = [
+    ("unknown-field", put(["unknown_part"], 1), "unknown_part: Extra inputs"),
+    (
+        "unknown-field-in-series",
+        put([*CLIMATE, "unknown_part"], 1),
+        "unknown_part: Extra inputs",
+    ),
+    (
+        "number-written-as-text",
+        put([*CLIMATE, "months", 0, "value"], "1.0"),
+        "months.0.value: Input should be a valid number",
+    ),
+    (
+        "soil-depth-number-written-as-text",
+        put(
+            ["soil_depth"],
+            {
+                "value": "1.0",
+                "unit": "PLACEHOLDER_unit",
+                "provenance": "DECLARED",
+                "assumption": True,
+                "range_missing": {"reason": "NOT_AVAILABLE"},
+            },
+        ),
+        "soil_depth.value: Input should be a valid number",
+    ),
+    (
+        "month-written-as-text",
+        put(["horizon", "start", "month"], "1"),
+        "horizon.start.month: Input should be a valid integer",
+    ),
+    ("example-data-left-out", drop(["example_data"]), "example_data: Field required"),
+    ("horizon-left-out", drop(["horizon"]), "horizon: Field required"),
+    ("soil-depth-left-out", drop(["soil_depth"]), "soil_depth: Field required"),
+    (
+        "series-one-month-short",
+        drop([*CLIMATE, "months", 3]),
+        "the months stop before end",
+    ),
+    (
+        "series-shorter-than-horizon",
+        apply(_series_shorter_than_horizon),
+        "start and end are those of the horizon",
+    ),
+    (
+        "carbon-inputs-shorter-than-horizon",
+        apply(
+            lambda data: (
+                data["carbon_inputs"][0]["months"].pop(),
+                data["carbon_inputs"][0].update(end={"year": 2001, "month": 3}),
+            )
+        ),
+        "carbon_inputs 'placeholder_carbon_input_a': start and end are those of the horizon",
+    ),
+    (
+        "duplicate-month",
+        apply(_duplicate_month),
+        "every month from start to end appears once, in order",
+    ),
+    (
+        "month-out-of-order",
+        apply(_swap_months),
+        "every month from start to end appears once, in order",
+    ),
+    (
+        "duplicate-climate-quantity",
+        apply(_duplicate_climate_quantity),
+        "climate: the quantity identifier 'placeholder_climate_quantity_a' appears",
+    ),
+    (
+        "duplicate-soil-property-quantity",
+        apply(_duplicate_soil_quantity),
+        "soil_properties: the quantity identifier 'placeholder_soil_property_a'",
+    ),
+    (
+        "quantity-not-an-identifier",
+        put([*CLIMATE, "quantity"], "PLACEHOLDER_quantity"),
+        "quantity: String should match pattern",
+    ),
+    (
+        "origin-left-out",
+        drop([*CARBON, "origin"]),
+        "origin: Field required",
+    ),
+    (
+        "missing-month-written-as-zero",
+        put([*CLIMATE, "months", 2, "value"], 0.0),
+        "an item holds a value or a missing part, never both",
+    ),
+    (
+        "missing-month-without-reason",
+        drop([*CLIMATE, "months", 2, "missing"]),
+        "a missing value carries a missing part with its reason",
+    ),
+    (
+        "missing-soil-depth-written-as-zero",
+        put(["soil_depth", "value"], 0.0),
+        "soil_depth: Value error, value: an item holds a value or a missing part",
+    ),
+    (
+        "missing-soil-depth-without-unit",
+        drop(["soil_depth", "unit"]),
+        "soil_depth.unit: Field required",
+    ),
+    (
+        "series-without-unit",
+        drop([*CLIMATE, "unit"]),
+        "unit: Field required",
+    ),
+    (
+        "horizon-ends-before-it-starts",
+        put(["horizon", "end"], {"year": 2000, "month": 12}),
+        "horizon: ends before it starts",
+    ),
+]
+
+# (case, mutation): variants the model accepts.
+VALID: list[tuple[str, Mutation]] = [
+    (
+        "series-all-months-missing-keeps-unit",
+        apply(
+            lambda data: data["climate"][1].update(
+                months=[
+                    {
+                        "year": item["year"],
+                        "month": item["month"],
+                        "value": None,
+                        "missing": {"reason": "SOURCE_UNAVAILABLE"},
+                    }
+                    for item in data["climate"][1]["months"]
+                ],
+                provenance=None,
+                source=None,
+                range_missing=None,
+            )
+        ),
+    ),
+    ("zero-is-a-real-value", put([*CLIMATE, "months", 0, "value"], 0.0)),
+    (
+        "empty-lists",
+        apply(
+            lambda data: data.update(climate=[], carbon_inputs=[], soil_properties=[])
+        ),
+    ),
+    (
+        "same-quantity-in-two-lists",
+        put([*CARBON, "quantity"], "placeholder_climate_quantity_a"),
+    ),
+]
+
+
+def test_example_loads_into_its_model() -> None:
+    text = EXAMPLE.read_text(encoding="utf-8")
+    loaded = CarbonForcing.model_validate_json(text)
+    # Nothing is added, dropped or changed on the way through the model.
+    assert json.loads(loaded.model_dump_json(exclude_unset=True)) == json.loads(text)
+    assert CarbonForcing.model_validate(json.loads(text)) == loaded
+
+
+def test_example_is_marked_as_example_data() -> None:
+    data = load()
+    assert data["example_data"] is True
+    for key in ("case_id", "field_id", "rotation_id"):
+        assert data[key].startswith("PLACEHOLDER")
+
+
+def test_example_shows_the_absence_form() -> None:
+    """At least one missing month and a missing soil depth, each with its reason."""
+    data = load()
+    assert data["soil_depth"]["value"] is None
+    assert data["soil_depth"]["missing"]["reason"]
+    assert data["soil_depth"]["unit"] == "PLACEHOLDER_unit"
+    missing_months = [
+        item
+        for series in data["climate"] + data["carbon_inputs"]
+        for item in series["months"]
+        if item["value"] is None
+    ]
+    assert missing_months
+    assert all(item["missing"]["reason"] for item in missing_months)
+
+
+def test_example_holds_placeholders_only() -> None:
+    data = load()
+    units = [data["soil_depth"]["unit"]]
+    for series in data["climate"] + data["carbon_inputs"]:
+        units.append(series["unit"])
+        assert series["quantity"].startswith("placeholder_")
+        assert series["source"].startswith("PLACEHOLDER")
+    for item in data["soil_properties"]:
+        units.append(item["unit"])
+        assert item["quantity"].startswith("placeholder_")
+    for series in data["carbon_inputs"]:
+        assert series["origin"].startswith("placeholder_")
+    assert set(units) == {"PLACEHOLDER_unit"}
+
+
+def test_every_example_file_is_checked() -> None:
+    assert sorted(path.name for path in EXAMPLES.iterdir()) == [EXAMPLE.name]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "fragment"),
+    [pytest.param(mutation, fragment, id=case) for case, mutation, fragment in INVALID],
+)
+def test_invalid_variant_is_rejected(mutation: Mutation, fragment: str) -> None:
+    data = load()
+    variant = copy.deepcopy(data)
+    mutation(variant)
+    assert variant != data, "the mutation changed nothing"
+    with pytest.raises(ValidationError) as rejected:
+        CarbonForcing.model_validate(variant)
+    assert fragment in _describe(rejected.value)
+    # The same variant is rejected when it arrives as JSON text.
+    with pytest.raises(ValidationError):
+        CarbonForcing.model_validate_json(json.dumps(variant))
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [pytest.param(mutation, id=case) for case, mutation in VALID],
+)
+def test_valid_variant_is_accepted(mutation: Mutation) -> None:
+    variant = load()
+    mutation(variant)
+    CarbonForcing.model_validate(variant)
+    CarbonForcing.model_validate_json(json.dumps(variant))
+
+
+def test_case_identifiers_are_unique() -> None:
+    cases = [case for case, *_ in INVALID] + [case for case, _ in VALID]
+    assert len(cases) == len(set(cases))
+
+
+def test_readme_lists_every_proposed_case() -> None:
+    readme = (HERE / "README.md").read_text(encoding="utf-8")
+    assert "## PROPOSED cases" in readme
+    assert "## OPEN" in readme
+    listed = readme.split("## PROPOSED cases", 1)[1].split("\n## ", 1)[0]
+    for case in [case for case, *_ in INVALID] + [case for case, _ in VALID]:
+        assert f"`{case}`" in listed, f"README.md does not list the case {case}"
+
+
+def _describe(error: ValidationError) -> str:
+    """Location and message of every error, one per line."""
+    lines = []
+    for item in error.errors():
+        location = ".".join(str(part) for part in item["loc"])
+        lines.append(f"{location}: {item['msg']}")
+    return "\n".join(lines)
