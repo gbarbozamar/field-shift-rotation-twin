@@ -34,7 +34,12 @@ CONVENTIONS = HERE.parent / "CONVENTIONS.md"
 WORD = "PLACEHOLDER"
 TABLE = "PLACEHOLDER_results_table.json"
 ROTATION = "PLACEHOLDER_results_per_rotation.json"
-MODEL_OF = {TABLE: ResultsTable, ROTATION: ResultsPerRotation}
+NOT_BUILT = "PLACEHOLDER_results_per_rotation_not_built.json"
+MODEL_OF = {
+    TABLE: ResultsTable,
+    ROTATION: ResultsPerRotation,
+    NOT_BUILT: ResultsPerRotation,
+}
 BOTH = (TABLE, ROTATION)
 
 SOURCE = "PLACEHOLDER source"
@@ -68,12 +73,14 @@ def values_of(name, document):
     """Every indicator value of a document, as parsed JSON objects."""
     if name == TABLE:
         return document["rows"]
-    return [
-        *document["soil_loss"]["annual"],
-        *document["soil_loss"]["monthly"],
-        *document["water_deficit_exposure"],
-        *document["soil_carbon_trend"],
-    ]
+    values = []
+    soil_loss = document["soil_loss"]
+    if "missing" not in soil_loss:  # a part wholly missing holds no value (D12)
+        values += [*soil_loss["annual"], *soil_loss["monthly"]]
+    for part in ("water_deficit_exposure", "soil_carbon_trend"):
+        if isinstance(document[part], list):
+            values += document[part]
+    return values
 
 
 def first(name, document, condition):
@@ -1249,7 +1256,7 @@ def texts_of(item):
 
 def test_e1_examples_cannot_be_mistaken_for_results():
     names = sorted(path.name for path in EXAMPLES.iterdir())
-    assert names == sorted(BOTH)
+    assert names == sorted(MODEL_OF)
     for name in names:
         assert name.startswith(WORD)
         # Every text that is not a word of a closed list carries the marker.
@@ -1298,6 +1305,242 @@ def test_e4_examples_show_every_way_a_value_can_travel(name):
     assert any(item.get("range_missing") for item in shown)
     assert any(item["value"] is None for item in shown)
     assert {item["indicator"] for item in shown} == set(get_args(models.IndicatorId))
+
+
+def test_e5_example_of_parts_not_built_loads():
+    text = (EXAMPLES / NOT_BUILT).read_text(encoding="utf-8")
+    loaded = ResultsPerRotation.model_validate_json(text)
+    assert ResultsPerRotation.model_validate(json.loads(text)) == loaded
+    for part in PARTS:
+        assert isinstance(getattr(loaded, part), models.PartNotBuilt), part
+        assert getattr(loaded, part).missing.reason == "NOT_AVAILABLE"
+
+
+# --- N: a part whose engine is not built (decision D12) ----------------------
+#
+# D12 is decided: a part may be wholly missing only with reason
+# NOT_AVAILABLE. The form these cases write (``indicator``, ``direction``,
+# ``units``, ``missing``) is PROPOSED.
+
+PARTS = ("soil_loss", "water_deficit_exposure", "soil_carbon_trend")
+OTHER_REASONS = [
+    reason
+    for reason in get_args(models.ReasonCode)
+    if reason != models.REASON_OF_A_PART_NOT_BUILT
+]
+ONLY_NOT_AVAILABLE = "only when its engine is not built"
+CARRIES_VALUES = "a part that is wholly missing carries no values"
+
+
+def not_built(part, reason="NOT_AVAILABLE"):
+    """The wholly missing form of one part, as parsed JSON (PROPOSED form)."""
+    return {
+        "indicator": part,
+        "direction": models.DIRECTION_OF[part],
+        "units": list(models.UNITS_OF[part]),
+        "missing": {"reason": reason, "detail": "PLACEHOLDER detail: not built"},
+    }
+
+
+def with_parts_not_built(*parts, reason="NOT_AVAILABLE"):
+    """The per-rotation example with the named parts wholly missing."""
+    document = example(ROTATION)
+    for part in parts:
+        document[part] = not_built(part, reason)
+    return document
+
+
+ACCEPTED_NOT_BUILT = [pytest.param((part,), id=f"{part} only") for part in PARTS] + [
+    pytest.param(PARTS, id="all three")
+]
+
+
+@pytest.mark.parametrize("parts", ACCEPTED_NOT_BUILT)
+def test_n1_part_wholly_missing_with_not_available_loads(parts):
+    loaded = load(ROTATION, with_parts_not_built(*parts))
+    for part in PARTS:
+        is_missing = isinstance(getattr(loaded, part), models.PartNotBuilt)
+        assert is_missing == (part in parts), part
+
+
+def test_n1_detail_of_a_part_not_built_may_be_left_out():
+    document = with_parts_not_built("soil_loss")
+    del document["soil_loss"]["missing"]["detail"]
+    load(ROTATION, document)
+
+
+@pytest.mark.parametrize("parts", ACCEPTED_NOT_BUILT)
+def test_n2_accepted_document_written_back_as_json_loads_again(parts):
+    loaded = load(ROTATION, with_parts_not_built(*parts))
+    dumped = loaded.model_dump(mode="json")
+    assert ResultsPerRotation.model_validate(dumped) == loaded
+    assert ResultsPerRotation.model_validate_json(json.dumps(dumped)) == loaded
+
+
+def test_n2_example_of_parts_not_built_written_back_loads_again():
+    loaded = load(NOT_BUILT, example(NOT_BUILT))
+    assert ResultsPerRotation.model_validate(loaded.model_dump(mode="json")) == loaded
+
+
+@pytest.mark.parametrize("parts", ACCEPTED_NOT_BUILT)
+@pytest.mark.parametrize("reason", OTHER_REASONS)
+def test_n3_part_wholly_missing_with_another_reason_is_rejected(parts, reason):
+    with pytest.raises(ValidationError) as caught:
+        load(ROTATION, with_parts_not_built(*parts, reason=reason))
+    error = caught.value
+    # One error per part, each for the reason only.
+    assert error.error_count() == len(parts), str(error)
+    for detail in error.errors():
+        assert ONLY_NOT_AVAILABLE in detail["msg"], str(error)
+
+
+def _present(part, key):
+    def content():
+        return example(ROTATION)[part][key]
+
+    return content
+
+
+def _fixed(content):
+    return lambda: copy.deepcopy(content)
+
+
+CARRYING_VALUES = [
+    ("soil_loss", "annual", _present("soil_loss", "annual")),
+    ("soil_loss", "monthly", _present("soil_loss", "monthly")),
+    ("soil_loss", "value", _fixed(1.0)),
+    ("soil_loss", "ag_year", _fixed(2001)),
+    ("water_deficit_exposure", "value", _fixed(0.5)),
+    ("water_deficit_exposure", "time_basis", _fixed("rotation")),
+    ("water_deficit_exposure", "ag_year", _fixed(2001)),
+    ("soil_carbon_trend", "carbon_model", _fixed("PLACEHOLDER_carbon_model_one")),
+    ("soil_carbon_trend", "computation", _fixed("end_minus_start")),
+    ("soil_carbon_trend", "unit", _fixed(models.UNIT_SOIL_CARBON_TREND)),
+]
+
+
+@pytest.mark.parametrize(
+    "part, key, content",
+    [pytest.param(*case, id=f"{case[0]} with {case[1]}") for case in CARRYING_VALUES],
+)
+def test_n4_part_wholly_missing_that_carries_values_is_rejected(part, key, content):
+    document = with_parts_not_built(part)
+    document[part][key] = content()
+    assert_rejected(ROTATION, document, CARRIES_VALUES)
+
+
+@pytest.mark.parametrize("part", ["water_deficit_exposure", "soil_carbon_trend"])
+def test_n4_list_holding_a_part_not_built_is_rejected(part):
+    """The wholly missing form replaces the list; it is not an item of it."""
+    document = example(ROTATION)
+    document[part] = [not_built(part)]
+    with pytest.raises(ValidationError):
+        load(ROTATION, document)
+
+
+def _set(key, content):
+    def change(item):
+        item[key] = copy.deepcopy(content)
+
+    return change
+
+
+def _drop(key):
+    def change(item):
+        del item[key]
+
+    return change
+
+
+def _reason(code):
+    def change(item):
+        item["missing"]["reason"] = code
+
+    return change
+
+
+KEEPING_WHAT_IS_MISSING = [
+    (
+        "soil_loss",
+        "direction of the other kind",
+        _set("direction", "higher_is_better"),
+        "the direction of 'soil_loss' is",
+    ),
+    (
+        "water_deficit_exposure",
+        "without a direction",
+        _drop("direction"),
+        FIELD_REQUIRED,
+    ),
+    (
+        "soil_loss",
+        "only one of its two units",
+        _set("units", [models.UNIT_SOIL_LOSS_ANNUAL]),
+        "the units of a wholly missing 'soil_loss'",
+    ),
+    (
+        "soil_loss",
+        "its two units in the other order",
+        _set("units", [models.UNIT_SOIL_LOSS_MONTHLY, models.UNIT_SOIL_LOSS_ANNUAL]),
+        "the units of a wholly missing 'soil_loss'",
+    ),
+    (
+        "water_deficit_exposure",
+        "the unit of another indicator",
+        _set("units", [models.UNIT_SOIL_CARBON_TREND]),
+        "the units of a wholly missing 'water_deficit_exposure'",
+    ),
+    (
+        "soil_carbon_trend",
+        "an empty list of units",
+        _set("units", []),
+        "the units of a wholly missing 'soil_carbon_trend'",
+    ),
+    ("soil_carbon_trend", "without its units", _drop("units"), FIELD_REQUIRED),
+    (
+        "water_deficit_exposure",
+        "indicator of another part",
+        _set("indicator", "soil_carbon_trend"),
+        "Input should be 'water_deficit_exposure'",
+    ),
+    ("soil_carbon_trend", "without its indicator", _drop("indicator"), FIELD_REQUIRED),
+    (
+        "water_deficit_exposure",
+        "without its missing part",
+        _drop("missing"),
+        FIELD_REQUIRED,
+    ),
+    (
+        "soil_carbon_trend",
+        "reason code not in the list",
+        _reason("PLACEHOLDER_REASON"),
+        NO_SUCH_REASON,
+    ),
+    ("soil_loss", "unknown field", _set("PLACEHOLDER_field", 1), EXTRA),
+]
+
+
+@pytest.mark.parametrize(
+    "part, title, change, expected",
+    [
+        pytest.param(*case, id=f"{case[0]} {case[1]}")
+        for case in KEEPING_WHAT_IS_MISSING
+    ],
+)
+def test_n5_part_wholly_missing_keeps_its_identifier_direction_and_units(
+    part, title, change, expected
+):
+    document = with_parts_not_built(part)
+    change(document[part])
+    assert_rejected(ROTATION, document, expected)
+
+
+def test_n6_present_form_of_each_part_is_unchanged():
+    """The per-rotation example still loads into the present form of each part."""
+    loaded = load(ROTATION, example(ROTATION))
+    assert isinstance(loaded.soil_loss, models.SoilLossResults)
+    assert isinstance(loaded.water_deficit_exposure, list)
+    assert isinstance(loaded.soil_carbon_trend, list)
 
 
 # --- C: the models say what the conventions sheet says -----------------------
