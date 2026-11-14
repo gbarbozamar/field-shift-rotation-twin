@@ -20,7 +20,9 @@ Where an expected value lives with its source, where a run of the validation pro
 
 `expected/`, `runs/` and `results/` do not exist yet: each is created by the first unit that stores a record in it. A folder that does not exist holds no record.
 
-Each of the three folders holds only files named `<id>.json`. Anything else in them is reported as a problem, including a file whose name starts with a dot.
+Each of the three folders holds only files named `<id>.json`. Anything else in them is reported as a problem, including a file whose name starts with a dot and a directory whose name ends in `.json`.
+
+The extension is read without regard to case, so `<id>.JSON` is a record file too. The name before the extension is the id, letter for letter. Where a file system allows two files that carry the same id, such as `<id>.json` and `<id>.JSON`, both are rejected: neither replaces the other.
 
 A `.json` file anywhere else below the root of a store is reported as a problem too, so a record saved in a misnamed folder such as `result/` is not lost. Exactly two things are not looked at:
 
@@ -29,13 +31,14 @@ A `.json` file anywhere else below the root of a store is reported as a problem 
 
 ## Record format (PROPOSED)
 
-A record is one JSON object in one UTF-8 file. The file name is the `id` of the record followed by `.json`.
+A record is one JSON object in one UTF-8 file. The file name is the `id` of the record followed by `.json`. A file that starts with a byte-order mark, as editors on Windows write it by default, is read as valid.
 
 Rules that hold for every record:
 
 - A field that is not listed below is rejected, so a misspelt field cannot hide a missing one.
 - A field written twice in the same file is rejected.
 - `NaN` and `Infinity` are rejected.
+- **An integer that would change when read is rejected** (PROPOSED). Engines and other readers of a JSON file hold a number as a float. An integer that a float cannot hold exactly, such as `9007199254740993` or `100000000000000000000000`, is reported as a problem in its field; it is never rounded silently. This rule is about integers only, that is, numbers written without a decimal point and without an exponent. A number written with a decimal point or an exponent is read as the float it denotes, as any JSON reader does, and is not checked for the digits it loses: `0.10000000000000001` is the same number as `0.1`, `1e23` and `12345678901234567890.0` are accepted, and `1e-400` is read as zero. A number that a float reads as infinity, such as `1e400`, is rejected like `Infinity`.
 - **A missing value is always written `{"missing_reason": "<why>"}`.** It is never `null`, never left out and never zero.
 - A record that contains the word `PLACEHOLDER` anywhere is rejected in the real store. Placeholders are accepted only where the caller asks for them, as the examples store and the tests do.
 
@@ -159,10 +162,11 @@ A failed result is a well-formed record. It is stored like any other and it is r
 
 | Function | What it does |
 |---|---|
-| `check_record(record, allow_placeholders=False)` | Returns every problem of one record as a list of sentences. An empty list means the record is accepted |
-| `load_store(root, allow_placeholders=False)` | Reads the three folders below `root`, checks every file, then checks what each result points to. Returns the accepted records by id, every problem with its file path, and under `unresolved` the well-formed results whose references are broken. One file that cannot be read, such as one nested too deeply, is listed as a problem and the rest still loads |
-| `check_references(expected, runs, results)` | Checks what each result points to. Given a record that was not checked before, it reports a problem and does not raise |
-| `summarise(store)` | Counts the results by outcome, lists the failed and the not-evaluated ones by id, lists under `broken_references` every well-formed result whose references are broken, lists under `failed_malformed` every rejected file that says its outcome is failed, lists under `no_result` every test that a run lists without a counted result, and lists under `rejected` every file that was rejected |
+| `check_record(record, allow_placeholders=False)` | Returns every problem of one record as a list of sentences. An empty list means the record is accepted. Accepts any object and never raises |
+| `is_placeholder(record)` | Says whether the word PLACEHOLDER appears anywhere in a record. Accepts any object and never raises |
+| `load_store(root, allow_placeholders=False)` | Reads the three folders below `root`, checks every file, then checks what each result points to. Returns the accepted records by id, every problem with its file path, and under `unresolved` the well-formed results whose references are broken. One file that cannot be read, such as one nested too deeply, is listed as a problem and the rest still loads. Raises `TypeError`, and nothing else, when `root` is not a path |
+| `check_references(expected, runs, results)` | Checks what each result points to. Given a record that was not checked before, it reports a problem and does not raise. Raises `ValueError`, and nothing else, when one of its three arguments is not a dict |
+| `summarise(store)` | Counts the results by outcome, lists the failed and the not-evaluated ones by id, lists under `broken_references` every well-formed result whose references are broken, lists under `failed_malformed` every rejected file that says its outcome is failed, lists under `no_result` every test that a run lists without a counted result, and lists under `rejected` every file that was rejected. Raises `ValueError`, and nothing else, when it is not given a store whose records are well-formed, as `load_store` returns it |
 
 Nothing is dropped silently: a malformed record is left out of the accepted ones and is listed with its path and the reason; a failed result is counted and listed as failed.
 
@@ -256,6 +260,11 @@ For a person to approve. The code in the first column is the start of the test i
 | R46 | A placeholder record, unless placeholders are explicitly allowed |
 | R47 | A record with two faults reports both, not only the first |
 | R48 | `check_references` given records that were not checked (a result without `run_id`, `expected` or `outcome`, with a `run_id` that is not a text, that is not an object, or of another kind; a malformed run; a malformed expected value) reports a problem for each and does not raise |
+| R49 | An integer too large for a float (10 to the power 400, positive or negative) as an expected number, an observed number, an absolute or a relative tolerance is reported as one problem in that field; the check does not raise |
+| R50 | An integer that a float cannot hold exactly (2 to the power 53, plus 1) is reported in each of the same four fields; integers and numbers that a float holds exactly are accepted |
+| R51 | `check_record` and `is_placeholder` accept anything without raising: every well-formed record with each field dropped or replaced by each of 27 unexpected values (among them `null`, numbers too long to print, lists 5 000 deep, a list that holds itself, objects that are not JSON), and those values on their own |
+| R52 | `check_references` reports a problem for every such record and raises only `ValueError`, and only when one of its three arguments is not a dict |
+| R53 | Every fixture that looks like a record carries the word PLACEHOLDER: the records built in the test file, every file under `examples/`, and every file a test writes, which all go through one helper that refuses a content without the word; the check that the helper refuses uses pytest's temporary folder |
 
 ### Store on disk
 
@@ -287,8 +296,15 @@ For a person to approve. The code in the first column is the start of the test i
 | S24 | A record in a misnamed folder (`result/` instead of `results/`) is listed as a problem |
 | S25 | A file in a record folder whose name starts with a dot is listed as a problem, whether or not it ends in `.json` |
 | S26 | A `.json` file at the root of the store or in any other folder is listed; `examples/` below the root and files that are not `.json` outside the three folders are not looked at |
-| S27 | A file nested too deeply to be read (500, 5 000 and 100 000 levels) is listed as a problem and the rest of the store still loads |
-| S28 | Every rejected file that says failed is counted as failed: an outcome written ` FAILED `, a failed result under a file name that is not its id, a failed result in the folder of another kind, a failed result with a field nested too deeply to be checked. A rejected result that says passed, and a file that is not valid JSON, are not counted |
+| S27 | A deeply nested file (500, 5 000 and 100 000 levels) is listed as a problem, whether it is too deep to be read at all or is read and then rejected for its form; the rest of the store still loads |
+| S28 | Every rejected file that says failed is counted as failed: an outcome written ` FAILED `, a failed result under a file name that is not its id, a failed result in the folder of another kind, a failed result with a deeply nested list where a wording is expected. A rejected result that says passed, and a file that is not valid JSON, are not counted |
+| S29 | A file saved as UTF-8 with a byte-order mark is read as valid |
+| S30 | A record file whose extension differs only in letter case (`.JSON`, `.Json`) is read as a record; the name before the extension must still be the id, letter for letter |
+| S31 | Two files of one folder that carry the same id are both rejected, whichever is listed first; a failed result among them is still counted as failed |
+| S32 | A directory whose name looks like a record file, in each of the three folders, is listed as a problem; the loader does not raise and the rest still loads |
+| S33 | An integer in a file that would change when read (one above the last that a float holds exactly, one too large for a float, one with more digits than Python converts) is reported in its field, in a value, a tolerance and an observed value; integers that a float holds exactly are accepted and stay integers; a number written with a decimal point or an exponent is accepted as the float it denotes, whatever its digits; a failed result that holds such an integer is still counted as failed |
+| S34 | `summarise` raises only `ValueError` when it is given anything that is not a store of well-formed records, a store object that was never initialised included, and works on a sound store built by hand; `load_store` raises only `TypeError` when `root` is not a path, and a path that does not exist is an empty store |
+| S35 | A passed result whose observed number is written with more digits than a float keeps (`0.10000000000000001`, `1e23`, `12345678901234567890.0`) is accepted, counted as passed, and its test is not listed under `no_result` |
 
 One more test, without a case code, checks that every case code above appears in this section.
 
