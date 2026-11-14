@@ -41,6 +41,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-14 | L0 | Union merge for the AI use log (#91): `.gitattributes` | Claude Code (Anthropic) | An AI session added one rule so that lines appended to this file by different branches are kept side by side; it checked locally that two open pull requests of other lanes stop conflicting with it | Merged by an AI session on the instruction of the lead developer, without a review recorded on the pull request and before the platform developer, who decides the structure of the repository, had agreed |
 | 2026-11-14 | L2a | `l2/app-config` (#99): `api/`, `adapters/`, `compose.yaml`, `CLAUDE.md` | Claude Code (Anthropic) | An orchestrating session wrote the plan; a builder session wrote the configuration of the running app from environment variables, the start-up checks, the rule for site data of another field, the placeholder settings template and the tests. No value of a setting is written anywhere | The orchestrating session checked scope, tests and the start-up behaviour on a running server; no independent verifier session. The variable names, the start-up failures and the rule for another field's data are PROPOSED |
 
+| 2026-11-14 | l3 | `web/` frontend skeleton | ZCode (GLM) | Scaffolded the frontend skeleton from the brief of #36 (React, Vite, TypeScript, Tailwind CSS, TanStack Query, hash routing, Pages base path); a separate verifier session ran the acceptance test and reviewed the diff | Martín |
 Rules:
 
 - No generated images, video or voice in the submission.
