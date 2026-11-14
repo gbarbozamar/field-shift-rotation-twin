@@ -1,0 +1,45 @@
+{
+  "contract": "rotation_definition",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "rotation_id": "example-rotation-1",
+  "label": "Illustrative rotation",
+  "repeats": true,
+  "components": [
+    {
+      "component_id": "c1",
+      "position": 1,
+      "crop_id": "PLACEHOLDER_crop",
+      "purpose": "grain",
+      "sowing": {
+        "date": "2027-11-15",
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "harvest": {
+        "date": "2028-04-10",
+        "provenance": "DECLARED",
+        "source": "user"
+      }
+    },
+    {
+      "component_id": "c2",
+      "position": 2,
+      "crop_id": "PLACEHOLDER_cover_crop",
+      "purpose": "cover",
+      "sowing": {
+        "date": "2028-04-20",
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "harvest": {
+        "date": null,
+        "missing": {
+          "reason": "NOT_APPLICABLE",
+          "detail": "cover crop is terminated, not harvested"
+        }
+      }
+    }
+  ]
+}
