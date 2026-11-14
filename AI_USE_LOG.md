@@ -64,6 +64,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-14 | L0 | #137: the stack table of `docs/DEVELOPMENT_BLUEPRINT.md` section 4 names leaflet instead of react-leaflet | Claude Code (Anthropic) | An AI liaison session made the one-line correction the platform developer asked for on #18 and merged it after the seven checks passed | Line added after the merge, in the pull request of #143, because #137 was merged without it |
 
 | 2026-11-14 | l3 | `l3/map` (#107): `web/`, `ATTRIBUTIONS.md` | ZCode (GLM) | A builder session built the fields map on OpenStreetMap tiles with leaflet directly (after the platform developer rejected react-leaflet's licence), lifted the selection into a shared store, and added the attribution rows; a separate verifier ran the suite and read the diff; the map-rebuild defect it found was fixed | Martín |
+| 2026-11-14 | L1 | `l1/water-runoff-cn` (#148): `engine/water/runoff/` | Claude Code (Anthropic) | A builder session wrote the daily runoff by the Curve Number method (D44) as pure functions with every coefficient supplied by the caller, no value of the method and PLACEHOLDER tests; a separate verifier accepted it with remarks (a placeholder equal to a published ratio, a reason naming the wrong operand, a zero unit factor accepted), which the builder fixed | Equation forms PROPOSED, constants to be transcribed and checked by a person (D34); the worked-example test is skipped |
 Rules:
 
 - No generated images, video or voice in the submission.
