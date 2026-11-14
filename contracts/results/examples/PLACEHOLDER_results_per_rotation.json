@@ -224,7 +224,7 @@
   ],
   "soil_carbon_trend": [
     {
-      "carbon_model": "PLACEHOLDER_carbon_model_one",
+      "carbon_model": "amg",
       "computation": "end_minus_start",
       "indicator": "soil_carbon_trend",
       "direction": "higher_is_better",
@@ -235,7 +235,7 @@
       "source": "PLACEHOLDER source: written by hand, not the output of an engine"
     },
     {
-      "carbon_model": "PLACEHOLDER_carbon_model_one",
+      "carbon_model": "amg",
       "computation": "fitted_slope",
       "indicator": "soil_carbon_trend",
       "direction": "higher_is_better",
@@ -246,7 +246,7 @@
       "source": "PLACEHOLDER source: written by hand, not the output of an engine"
     },
     {
-      "carbon_model": "PLACEHOLDER_carbon_model_one",
+      "carbon_model": "amg",
       "computation": "mean_over_cycles",
       "indicator": "soil_carbon_trend",
       "direction": "higher_is_better",
@@ -255,7 +255,7 @@
       "missing": {"reason": "NOT_COMPUTABLE", "detail": "PLACEHOLDER detail: the example horizon holds no whole rotation cycle"}
     },
     {
-      "carbon_model": "PLACEHOLDER_carbon_model_two",
+      "carbon_model": "rothc",
       "computation": "end_minus_start",
       "indicator": "soil_carbon_trend",
       "direction": "higher_is_better",
@@ -264,7 +264,7 @@
       "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
     },
     {
-      "carbon_model": "PLACEHOLDER_carbon_model_two",
+      "carbon_model": "rothc",
       "computation": "fitted_slope",
       "indicator": "soil_carbon_trend",
       "direction": "higher_is_better",
@@ -273,7 +273,7 @@
       "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
     },
     {
-      "carbon_model": "PLACEHOLDER_carbon_model_two",
+      "carbon_model": "rothc",
       "computation": "mean_over_cycles",
       "indicator": "soil_carbon_trend",
       "direction": "higher_is_better",
