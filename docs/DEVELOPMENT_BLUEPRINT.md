@@ -87,18 +87,18 @@ Flow of a unit:
 
 ### 3.5 Never delegated to a session
 
-- The value of a parameter, a threshold or a range.
-- The expected value of a test.
-- A citation. A citation produced by an AI session is a defect.
+- A threshold.
 - The choice of a data source or of a dependency.
 - What is claimed in the interface or in the submission, and with which word.
 - Pushing to `main`, deploying, cutting scope, submitting.
+
+Who transcribes a value from its source into `params/` or `docs/VALIDATION.md` is decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622). An AI session may transcribe a value, a unit, a range, an expected result or a citation from a published source, and one person checks it against that source. The transcription is valid only if it carries the full reference, the locator (page, table, equation or example number, or URL with anchor), the verbatim text it comes from, and the date it was read. The person who checks opens the source at the locator, checks every number, and signs the check. A value written by an AI session from memory, without a source opened and quoted, is still a defect.
 
 ### 3.6 Three classes of change
 
 | Class | Examples | Who writes it | Who accepts it |
 |---|---|---|---|
-| **Science** | Parameters, thresholds, ranges, expected values, equations, units, citations | A person writes the values; a second person checks them against the source | A science reviewer |
+| **Science** | Parameters, thresholds, ranges, expected values, equations, units, citations | A value is transcribed from its source as decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622) says (section 3.5), and one person checks it against the source | A science reviewer |
 | **Logic with a known answer** | Calendar, matrix, decision, routes | A person designs the cases first; a builder implements | Lane owner and the consumer of the seam |
 | **Interface and glue** | Screens, wiring, pipeline | Builder | Folder owner; someone who did not build it looks at the screen with real data |
 
