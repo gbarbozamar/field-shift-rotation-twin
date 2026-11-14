@@ -1,8 +1,8 @@
 """Shared shapes of the rotation definition contract. PROPOSED (blueprint section 3.7).
 
-The date value, its ``missing`` part and the provenance label, as
+The date value, its ``missing`` part, the month number and the provenance label, as
 ``contracts/CONVENTIONS.md`` defines them: section 3 (missing values),
-section 4 (provenance and source) and C5.2 (dates).
+section 4 (provenance and source), C5.1 (months) and C5.2 (dates).
 
 These shapes repeat the ones of ``contracts/inputs/common.py`` on purpose.
 This folder imports from no other contract folder until question Q1 of
@@ -22,6 +22,7 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     ConfigDict,
+    Field,
     StringConstraints,
     model_validator,
 )
@@ -43,6 +44,9 @@ ReasonCode = Literal[
 
 # Text that is not empty and not only white space.
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
+
+# C5.1: a calendar month is an integer, January 1 to December 12.
+MonthNumber = Annotated[int, Field(ge=1, le=12)]
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
