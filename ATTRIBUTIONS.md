@@ -14,7 +14,7 @@ Add a row **when the item is first used**, not at the end.
 | FastAPI | 0.162.7 | https://pypi.org/project/fastapi/ | MIT | L2a | 2026-11-14 |
 | Pydantic | 2.14.3 | https://pypi.org/project/pydantic/ | MIT | L2a | 2026-11-14 |
 | Uvicorn | 0.54.0 | https://pypi.org/project/uvicorn/ | BSD-3-Clause | L2a | 2026-11-14 |
-| HTTPX (development: test client) | 0.28.1 | https://pypi.org/project/httpx/ | BSD-3-Clause | L2a | 2026-11-14 |
+| HTTPX (runtime: HTTP client of the data adapters in `adapters/`; development: test client) | 0.28.1 | https://pypi.org/project/httpx/ | BSD-3-Clause | L2a | 2026-11-14 |
 | pytest (development) | 9.2.0 | https://pypi.org/project/pytest/ | MIT | L2a | 2026-11-14 |
 | Ruff (development) | 0.17.5 | https://pypi.org/project/ruff/ | MIT | L2a | 2026-11-14 |
 | Python container image `python:3.12-slim` | 3.12 | https://hub.docker.com/_/python | PSF-2.0 (Python); Debian packages under their own licences | L2a | 2026-11-14 |

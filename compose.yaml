@@ -14,7 +14,9 @@ services:
         - action: sync
           path: ./api
           target: /app/api
-        # Add ./adapters here when the folder exists.
+        - action: sync
+          path: ./adapters
+          target: /app/adapters
         - action: rebuild
           path: pyproject.toml
         - action: rebuild
