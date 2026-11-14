@@ -1,14 +1,16 @@
-import { useState } from 'react'
 import { exampleCase } from './exampleCase'
+import { setSelectedFieldId, useSelectedFieldId } from './selection'
+import FieldsMap from '../map/FieldsMap'
 import { strings } from '../strings'
 
 /**
- * Multi-field identity screen on example data: a list of the fields of the
- * example case (no map yet), the example-data banner on every render, and a
- * selected-field state driven by clicking a field.
+ * Multi-field identity screen on example data: the example-data banner on
+ * every render, the map of the fields and the field list below it. The list
+ * and the map share the selected-field state through the selection module,
+ * so a click on either selects the field on both.
  */
 export default function FieldsScreen() {
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
+  const selectedFieldId = useSelectedFieldId()
   const selectedField =
     exampleCase.fields.find((field) => field.field_id === selectedFieldId) ?? null
 
@@ -31,6 +33,14 @@ export default function FieldsScreen() {
           <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
         </div>
       )}
+
+      <div className="mt-6">
+        <h3 className="text-base font-semibold">{strings['map.title']}</h3>
+        <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
+        <div className="mt-2">
+          <FieldsMap />
+        </div>
+      </div>
 
       <ul className="mt-6 space-y-3">
         {exampleCase.fields.map((field) => {
