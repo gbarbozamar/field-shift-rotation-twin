@@ -46,7 +46,7 @@ The method that produces the value is not defined here. Its description and its 
 
 Status: PROPOSED
 
-The direction and the absence of a unit below are not proposals of the session. The lead developer stated them on 14 November 2026 as a consequence of the decision recorded under C1.4: with a ratio of water transpired to water demanded, higher is better and the value has no unit. Acceptance by a science reviewer is pending. The rest of this item is proposed by the session.
+The direction and the absence of a unit below are not proposals of the session. The lead developer stated them on 14 November 2026 as a consequence of the decision recorded under C1.4: with a ratio of water transpired to water demanded, higher is better and the value has no unit. Acceptance by a science reviewer is pending. The quantity and the critical period restate the decision recorded under C1.4. The identifier and the unit string are proposed by the session. The time basis for a rotation is not decided, as its row says.
 
 | Aspect | Convention |
 |---|---|
@@ -275,6 +275,8 @@ Still to be supplied by a person:
 Status: PROPOSED
 
 An agricultural year that the data series does not cover from its first day to its last is not reported as a full year. Its yearly values are missing with reason `NO_COVERAGE`.
+
+This item is about the extent of the series only: a year that begins before the first day of the series or ends after its last day. Days missing inside the series are covered by C3.3 and C3.4.
 
 ## 6. Time zone of every daily series
 
