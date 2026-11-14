@@ -100,12 +100,12 @@ def _value(environ: Mapping[str, str], name: str) -> str | None:
 
 def _read_file(name: str, path: Path) -> str:
     if not path.is_file():
-        raise ConfigError(f"{name}: the file {str(path)!r} does not exist")
+        raise ConfigError(f"{name}: the file '{path}' does not exist")
     try:
         return path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         raise ConfigError(
-            f"{name}: the file {str(path)!r} cannot be read as UTF-8 text"
+            f"{name}: the file '{path}' cannot be read as UTF-8 text"
         ) from None
 
 
@@ -115,14 +115,14 @@ def _load_power_settings(path: Path) -> PowerSettings:
         document: Any = json.loads(text)
     except json.JSONDecodeError as error:
         raise ConfigError(
-            f"{POWER_SETTINGS_FILE}: the file {str(path)!r} is not valid JSON "
+            f"{POWER_SETTINGS_FILE}: the file '{path}' is not valid JSON "
             f"(line {error.lineno}, column {error.colno})"
         ) from None
     try:
         return PowerSettings.from_mapping(document)
     except (TypeError, ValueError) as error:
         raise ConfigError(
-            f"{POWER_SETTINGS_FILE}: the settings in {str(path)!r} are rejected: {error}"
+            f"{POWER_SETTINGS_FILE}: the settings in '{path}' are rejected: {error}"
         ) from None
 
 
@@ -177,12 +177,12 @@ def _soil_slope_example(environ: Mapping[str, str]) -> Path | None:
         data = SiteSoilSlope.model_validate_json(text)
     except ValidationError:
         raise ConfigError(
-            f"{SOIL_SLOPE_EXAMPLE_FILE}: the file {str(path)!r} does not load into "
+            f"{SOIL_SLOPE_EXAMPLE_FILE}: the file '{path}' does not load into "
             "the contract model SiteSoilSlope"
         ) from None
     if not data.example_data:
         raise ConfigError(
-            f"{SOIL_SLOPE_EXAMPLE_FILE}: the file {str(path)!r} is not marked as "
+            f"{SOIL_SLOPE_EXAMPLE_FILE}: the file '{path}' is not marked as "
             "example data (example_data is false)"
         )
     return path

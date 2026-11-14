@@ -12,7 +12,12 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    is absent, ``MISSING_INPUT`` (PROPOSED);
 3. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend`` written here as missing,
-   because no carbon engine is built (decision Q15 c).
+   because no carbon engine is built (decision Q15 c). A part whose engine is
+   not built is written in the not-built form of the contract (decision D12
+   of issue #77): ``SoilLossNotBuilt`` or ``WaterDeficitExposureNotBuilt``,
+   reason ``NOT_AVAILABLE``, built from the constants of
+   contracts/results/models.py. Only an engine that is not built gives that
+   form; every other absence keeps ``result=None`` with its reason.
 
 Each engine function is injected (``EngineFunctions``). ``None`` means "this
 engine is not built". ``discover_engine_functions`` imports each one by the
@@ -26,7 +31,9 @@ engine raises (G5, Q7): the route answers ``500``. An engine that returns
 something other than the type its signature names is a defect: ``TypeError``.
 
 Status: PROPOSED (blueprint section 3.7), including every rule of the table in
-api/README.md, the module identifiers and the detail texts.
+api/README.md, the detail texts and the counting rule. Decided: the module
+identifiers (D13), the comparison of identifiers by the runner (D14) and the
+not-built form of a part (D12), all of issue #77.
 """
 
 from __future__ import annotations
@@ -34,7 +41,7 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, get_args
 
 from adapters.ports import ClimateResult, SoilSlopeResult
 from api.ports import EnginesResult, Missing, ModuleStatus, ReasonCode
@@ -42,13 +49,18 @@ from api.rotation_validator import load_rotation_definition
 from contracts.inputs import RotationCalendar
 from contracts.results.models import (
     DIRECTION_OF,
+    REASON_OF_A_PART_NOT_BUILT,
     TREND_COMPUTATIONS,
     UNIT_SOIL_CARBON_TREND,
+    UNITS_OF,
     IndicatorValue,
+    PartNotBuilt,
     ResultsPerRotation,
     SoilCarbonTrend,
+    SoilLossNotBuilt,
     SoilLossResults,
     WaterDeficitExposure,
+    WaterDeficitExposureNotBuilt,
 )
 from contracts.results.models import Missing as ResultsMissing
 
@@ -166,11 +178,20 @@ class ValueCount:
     first_missing: ResultsMissing | None  # the ``missing`` part of the first one
 
 
-def count_values(values: Iterable[IndicatorValue]) -> ValueCount:
-    """Count present and missing values, in the order given. Pure. PROPOSED."""
+def count_values(values: Iterable[IndicatorValue | PartNotBuilt]) -> ValueCount:
+    """Count present and missing values, in the order given. Pure. PROPOSED.
+
+    A part whose engine is not built (``PartNotBuilt``, D12) carries no value
+    and counts as one missing value, with its own ``missing`` part.
+    """
     present = missing = 0
     first: ResultsMissing | None = None
     for item in values:
+        if isinstance(item, PartNotBuilt):
+            missing += 1
+            if first is None:
+                first = item.missing
+            continue
         if not isinstance(item, IndicatorValue):
             raise TypeError("count_values counts indicator values only")
         if item.value is None:
@@ -182,17 +203,34 @@ def count_values(values: Iterable[IndicatorValue]) -> ValueCount:
     return ValueCount(present=present, missing=missing, first_missing=first)
 
 
-def soil_loss_values(soil_loss: SoilLossResults) -> list[IndicatorValue]:
-    """The annual values, then the monthly values."""
+def _part_values(
+    part: PartNotBuilt | Sequence[IndicatorValue],
+) -> list[IndicatorValue | PartNotBuilt]:
+    """The items of a list part, or the not-built part itself as one item."""
+    if isinstance(part, PartNotBuilt):
+        return [part]
+    return list(part)
+
+
+def soil_loss_values(
+    soil_loss: SoilLossResults | SoilLossNotBuilt,
+) -> list[IndicatorValue | PartNotBuilt]:
+    """The annual values, then the monthly values; a not-built part as one item."""
+    if isinstance(soil_loss, PartNotBuilt):
+        return [soil_loss]
     return [*soil_loss.annual, *soil_loss.monthly]
 
 
-def result_values(result: ResultsPerRotation) -> list[IndicatorValue]:
-    """Every indicator value of a result: soil loss, water, then carbon."""
+def result_values(result: ResultsPerRotation) -> list[IndicatorValue | PartNotBuilt]:
+    """Every indicator value of a result: soil loss, water, then carbon.
+
+    A part in the not-built form (D12) is one item, counted as one missing
+    value by ``count_values``.
+    """
     return [
         *soil_loss_values(result.soil_loss),
-        *result.water_deficit_exposure,
-        *result.soil_carbon_trend,
+        *_part_values(result.water_deficit_exposure),
+        *_part_values(result.soil_carbon_trend),
     ]
 
 
@@ -250,6 +288,28 @@ def _not_built(point: EntryPoint) -> ModuleStatus:
 
 def _missing_input(module_id: str, detail: str) -> ModuleStatus:
     return _status(module_id, "not_available", "MISSING_INPUT", detail)
+
+
+def part_not_built(
+    model: type[SoilLossNotBuilt | WaterDeficitExposureNotBuilt],
+    point: EntryPoint,
+) -> PartNotBuilt:
+    """A whole part whose engine is not built, in the not-built form of D12.
+
+    The indicator is read from the model's own field, its direction and units
+    from ``DIRECTION_OF`` and ``UNITS_OF``, and the reason is the contract's
+    ``REASON_OF_A_PART_NOT_BUILT``. The detail names the engine function.
+    """
+    (indicator,) = get_args(model.model_fields["indicator"].annotation)
+    return model(
+        indicator=indicator,
+        direction=DIRECTION_OF[indicator],  # type: ignore[arg-type]
+        units=list(UNITS_OF[indicator]),
+        missing=ResultsMissing(
+            reason=REASON_OF_A_PART_NOT_BUILT,  # type: ignore[arg-type]
+            detail=f"{NOT_BUILT}: {_name(point)}",
+        ),
+    )
 
 
 def _carbon_modules() -> tuple[ModuleStatus, ...]:
@@ -432,31 +492,27 @@ class EntryPointEngines:
             )
 
         # 5. What ResultsPerRotation cannot hold.
-        not_built = [
-            _name(point)
-            for point, function in (
-                (EROSION, soil_loss_function),
-                (WATER, water_function),
-            )
-            if function is None
-        ]
-        if not_built:
-            return without_result(
-                "NOT_AVAILABLE", "engine not built: " + "; ".join(not_built)
-            )
         if isinstance(soil_loss, ResultsMissing):
             return without_result(soil_loss.reason, soil_loss.detail)
         if not self._carbon_models:
             return without_result("NOT_AVAILABLE", CARBON_MODELS_NOT_CONFIGURED)
-        assert isinstance(soil_loss, SoilLossResults) and water is not None
 
-        # 6. Assemble.
+        # 6. Assemble. A part whose engine is not built takes the not-built
+        # form (D12); a part whose engine ran is its output, unchanged.
         result = ResultsPerRotation(
             case_id=calendar.case_id,
             field_id=calendar.field_id,
             rotation_id=calendar.rotation_id,
-            soil_loss=soil_loss,
-            water_deficit_exposure=water,
+            soil_loss=(
+                soil_loss
+                if soil_loss is not None
+                else part_not_built(SoilLossNotBuilt, EROSION)
+            ),
+            water_deficit_exposure=(
+                water
+                if water is not None
+                else part_not_built(WaterDeficitExposureNotBuilt, WATER)
+            ),
             soil_carbon_trend=missing_carbon_trend(self._carbon_models),
         )
         count = count_values(result_values(result))

@@ -172,8 +172,9 @@ Decisions D9 and D18 of issue #77: the record carries the point its series are v
 `ExampleSoilSlopeSource(path, *, source_id="soil_slope_example")` implements `SoilSlopeSource`:
 
 - `path` is required and has **no default**. Which file is "the accepted example" is a person's decision, so the running app serves it only when `SOIL_SLOPE_EXAMPLE_FILE` names the file (`api/README.md`, "Configuration"). Tests use `contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json`.
-- Each call reads the file and loads it into `SiteSoilSlope`, returned unchanged with `state="example"` and no `retrieved_at`. The route shows it as `sources[].state == "example"` next to the result (decision Q16).
-- A file that is absent or cannot be read, that does not load into the model, or whose `example_data` is false gives `data=None`, `unavailable`, `NOT_AVAILABLE` and a `detail`. It never raises for the file.
+- Each call reads the file and loads it into `SiteSoilSlope`, with `state="example"` and no `retrieved_at`. The route shows it as `sources[].state == "example"` next to the result (decision Q16).
+- **The example serves any field (decision D38 of #77).** The document returned carries the `case_id` and `field_id` of the request: a new model instance, validated again, with those two fields replaced. Everything else is the file's, unchanged; `example_data` stays true; the file is never written. The engine runner still compares identifiers (D14); with this source they always match, so "site data of another field" is reached only by a source that does not rewrite.
+- A file that is absent or cannot be read, that does not load into the model, or whose `example_data` is false gives `data=None`, `unavailable`, `NOT_AVAILABLE` and a `detail`. It never raises for the file. Requested identifiers the model refuses (blank text) give the same answer with their own `detail` (PROPOSED).
 - `contract` is read from the `contract` field of `SiteSoilSlope`.
 
 ## Tests
@@ -187,6 +188,11 @@ No network: `httpx.MockTransport` for the service, `tmp_path` for the cache, a f
 ## PROPOSED
 
 Designed by the builder sessions; a person accepts or corrects them in the pull request.
+
+Unit `l2/runner-partial`:
+
+- How the example source writes the identifiers of the request (a new instance validated again), and the answer `unavailable` / `NOT_AVAILABLE` with the detail "the requested case_id or field_id is refused by the contract model SiteSoilSlope" for identifiers the model refuses.
+- The new test cases in `test_example_soil_slope.py`.
 
 Unit `l2/app-config`:
 
@@ -206,12 +212,12 @@ Unit `l2/power-adapter`:
 2. The cache layout above: key, one JSON file per key with `body`, `query`, `retrieved_at`; first response wins; atomic write; corrupt entry treated as absent; only usable responses stored.
 3. The query: parameter codes sorted (so the configured order does not change the query or the cache key); coordinates as shortest round-trip decimal text; `format=JSON` sent explicitly; argument order as in the table.
 4. `optional_arguments`: a required setting (may be empty) limited to `units`, `site-elevation`, `wind-elevation`, `wind-surface`, so that a reviewers' choice on those arguments arrives as configuration. Not in the plan's settings table; added so that the service default (for example of `units`) is never a hidden decision.
-5. The failure-to-reason mapping: every failure in the table is `SOURCE_UNAVAILABLE`, including an error payload (see OPEN 12).
+5. The failure-to-reason mapping: every failure in the table is `SOURCE_UNAVAILABLE`, including an error payload (decided: D16).
 6. What counts as an error payload: a JSON object without `properties` and with a non-empty `messages` list. A response that has the data layout is used whatever its `messages` say (see OPEN 13).
 7. A response whose `header.fill_value` differs from the configured `fill_value` is unusable; a response without `header` or without `header.fill_value` is accepted.
 8. A value that is not a finite number (text, null, true/false, infinity) makes the whole response unusable rather than one missing day.
 9. Days outside the requested period are ignored.
-10. One `fill_reason` for both a fill value and an absent day, with two different `detail` texts.
+10. One `fill_reason` for both a fill value and an absent day, with two different `detail` texts (decided: D36, `NO_COVERAGE`).
 11. A cache write that fails still returns the fresh data, with a `detail`.
 12. A stored entry that cannot be mapped returns `unavailable` and is kept.
 13. `base_url` must be https.
@@ -219,34 +225,47 @@ Unit `l2/power-adapter`:
 15. The test cases in `test_cache.py`, `test_power.py`, `test_power_mapping.py`.
 16. Concurrency: two processes asking for the same key at the same moment may both fetch; the cache keeps one entry (the last rename of the two simultaneous first writers). Not designed further.
 
-### The point of the series (PROPOSED)
+### The point of the series
 
-- A response that reports no point, or only part of one, is still usable: the missing parts are written as missing with `fill_reason`. The alternative, treating such a response as unusable, is for the lead developer (question 27 of `contracts/inputs/README.md`).
-- One reason code (`fill_reason`) covers a part that is not reported and a part reported as the fill value, with two different details.
-- One provenance label for the three values (`point.provenance`).
+- Decided (D51): a response that reports no point, or only part of one, is still usable: the missing parts are written as missing with `fill_reason`.
+- PROPOSED: one reason code (`fill_reason`) covers a part that is not reported and a part reported as the fill value, with two different details.
+- Decided (D52): one provenance label for the three values (`point.provenance`).
+
+## Decided
+
+Decisions of issue #77 that settle what earlier units left PROPOSED or OPEN here.
+
+| Decision | What it settles |
+|---|---|
+| D12 | A part of `ResultsPerRotation` whose engine is not built: the not-built form (written by the runner, `api/README.md`) |
+| D13 | The module identifiers are the six engine folder names |
+| D14 | The runner compares `case_id` and `field_id` before any engine is called |
+| D16 | An error payload of the climate service is `SOURCE_UNAVAILABLE` (was OPEN 12) |
+| D17, D43 | One recorded real response may be committed; it is, under `docs/evidence/` (was OPEN 11) |
+| D18, D9 | The point of the series travels in "Site data: climate", from the response of the source (was OPEN 18) |
+| D19 | Field identity is a new contract; `SiteReference` stays until it is on `main` |
+| D20, D37 | The platform developer writes the adapter settings, from accepted values |
+| D23 to D35 | The seven series, the community and the period 2001-01-01 to 2024-12-31, as recorded in #77 and `contracts/CLIMATE_QUANTITIES.md` (were OPEN 1, 2 and 5; OPEN 8 for the route of precipitation) |
+| D31 | `range_missing_reason`: `NO_COVERAGE` (was OPEN 9) |
+| D36 | `fill_reason`: `NO_COVERAGE`, for a fill value and for an absent day (was OPEN 6) |
+| D38 | The soil-and-slope example source serves any field, under the identifiers of the request (was OPEN 20; unit `l2/runner-partial`) |
+| D51, D52 | A response without a point is usable; one provenance label for the three values of the point |
 
 ## OPEN
 
-Each item is a question a person answers. Until then the setting has no value and the adapter is not constructed for real.
+Each item is a question a person answers. Until then the setting has no value and the adapter is not constructed for real. The numbers of the earlier list are kept, so references to them stay valid; the decided ones are in [Decided](#decided).
 
-1. **Which parameters are requested, and with which quantity identifier, unit string and provenance label each?** (`parameters`.) For the science reviewers; quantity identifiers with the lead developer. The scout report lists candidates and does not choose.
-2. **Which community?** (`community`.) It fixes the units of some parameters and which parameters are offered. For the science reviewers.
-3. **Does the unit of each source parameter, in the chosen community, equal the configured unit string?** The adapter does not convert. A person checks it against the service. For the science reviewers.
-4. **Which optional arguments are sent, if any (`units`, `site-elevation`, `wind-elevation`, `wind-surface`)?** (`optional_arguments`; empty sends none and the service defaults apply.) For the science reviewers.
-5. **Which years of record does a case request?** The service documents a first allowed date; the period is chosen by the caller. For the science reviewers and the lead developer.
-6. **Which fill value, and which reason code does it become?** The scout report quotes `-999`; a person confirms. Should the reason differ for a gap inside the record, a day before a source starts and a day after the latest available day? Today one `fill_reason` covers all, and an absent day too. For the science reviewers.
-7. **How does the service bound a UTC day for each variable?** The scout report did not find it stated (NOT FOUND); daily extremes are described for the local solar day. For the science reviewers, citation needed (C6.2).
-8. **Does IMERG precipitation come through this service or directly from its own source?** For the science reviewers.
-9. **Which reason code goes in `range_missing`?** (`range_missing_reason`.) For the lead developer.
-10. **How does a field polygon become one point?** `ClimateRequest` carries one point; how it is chosen is OPEN in `ports.py`. For the lead developer and the science reviewers.
-11. **May a recorded real response be committed (for a test or for `demo/`)?** None is. For the platform developer and the lead developer.
-12. **Is an error payload from the service `SOURCE_UNAVAILABLE`, or another reason?** C3.2 is closed and says "did not answer". Proposed: `SOURCE_UNAVAILABLE`. For the lead developer.
-13. **What does an error payload of the service look like, and does a non-empty `messages` list on a response with data mean the data is unusable?** The scout report documents `messages: []` and the status codes, not their content. For the platform developer, after a first real request.
-14. **Does the deploy host keep files between restarts?** If not, `FileCache` loses its entries on restart and another `ResponseCache` is needed. For the platform developer.
-15. **What is the base URL?** The scout report documents the path `/api/temporal/daily/point` and that the specification is served from the service's host; a person confirms the full URL. (`base_url`.) For the science reviewers and the platform developer.
-16. **What are `attribution`, `source_id` and `timeout_seconds`?** The `ATTRIBUTIONS.md` data row for NASA POWER is written by a person when the data is first used for real. For the platform developer.
-17. **What does the adapter do on status 429 (too many requests)?** Today it is one failure like any other; the next call tries again. No retry and no back-off. For the platform developer.
-18. **Should the place the source answered for (grid cell, elevation in the response) travel with the data?** The contract has no field for it (contracts/inputs OPEN 21). For the platform developer and the lead developer.
-19. **Which file is the accepted soil-and-slope example?** (`ExampleSoilSlopeSource(path)`, set in the running app with `SOIL_SLOPE_EXAMPLE_FILE`.) The placeholder example's numbers mean nothing, and the engines may reject its units. For the lead developer and the platform developer.
-20. **Is the example served for any field?** It carries its own `case_id` and `field_id` and is returned unchanged whatever field is asked. An engine that receives site data of another field raises `ValueError` (G5), and the route answers `500`. Unit `l2/app-config` PROPOSES that the engine runner checks the identifiers first and answers `MISSING_INPUT` without calling the engines (`api/README.md`); whether the example may stand in for any field, and if so whether the source rewrites the identifiers or the engines stop comparing them, is OPEN for the lead developer.
-- **The point of the series:** the three unit strings and the datum they refer to, the provenance label, and which elevation it is when the source reports the average of a grid cell (`contracts/inputs/README.md`, questions 25, 26 and 28). For the science reviewers. Until they are decided, the real settings file cannot be written.
+**The settings file is not written in this unit.** The values of D23 to D35 are accepted (D37), but `point` is a required setting and its three unit strings and its provenance label are not decided (questions 25, 26 and 28 of `contracts/inputs/README.md`). For the science reviewers, or the lead developer as for D23 to D35. Until then `POWER_SETTINGS_FILE` stays unset.
+
+- OPEN 3: **Does the unit of each source parameter, in the chosen community, equal the configured unit string?** The adapter does not convert. A person checks it against the service. For the science reviewers.
+- OPEN 4: **Which optional arguments are sent, if any (`units`, `site-elevation`, `wind-elevation`, `wind-surface`)?** (`optional_arguments`; empty sends none and the service defaults apply.) For the science reviewers.
+- OPEN 7: **How does the service bound a UTC day for each variable?** The scout report did not find it stated (NOT FOUND); daily extremes are described for the local solar day. For the science reviewers, citation needed (C6.2).
+- OPEN 8: **Which IMERG run does the value of a given day come from?** D23 takes precipitation from NASA POWER; which run of the product a day's value is, and whether it can change later, is not stated here. For the science reviewers.
+- OPEN 10: **How does a field polygon become one point?** `ClimateRequest` carries one point; how it is chosen is OPEN in `ports.py`. For the science reviewers (D41, D48).
+- OPEN 13: **What does an error payload of the service look like, and does a non-empty `messages` list on a response with data mean the data is unusable?** The scout report documents `messages: []` and the status codes, not their content. For the platform developer, after a first real request.
+- OPEN 14: **Does the deploy host keep files between restarts?** D42: a persistent volume is mounted for the cache and its path becomes `CLIMATE_CACHE_DIR`; the path is posted by the lead developer. For the platform developer to set.
+- OPEN 15: **What is the base URL?** The scout report documents the path `/api/temporal/daily/point` and that the specification is served from the service's host; a person confirms the full URL. (`base_url`.) For the science reviewers and the platform developer.
+- OPEN 16: **What are `attribution`, `source_id` and `timeout_seconds`?** The `ATTRIBUTIONS.md` data row for NASA POWER is written by a person when the data is first used for real. For the platform developer.
+- OPEN 17: **What does the adapter do on status 429 (too many requests)?** Today it is one failure like any other; the next call tries again. No retry and no back-off. For the platform developer.
+- OPEN 19: **Which file holds the demonstration values of soil and slope?** A person supplies them; the PLACEHOLDER file is for testing the pipeline only (#77), its numbers mean nothing and the engines may reject its units. D48 and D49 bring soil, slope and available water from public data through adapters of this lane, once the elevation model, the polygon-to-point rule and the licence of D49 are settled. For the science reviewers, the lead developer and the platform developer.
+- **D46, the argument `parameters`:** agreed by the platform developer, waiting for `contracts/ENTRYPOINTS.md` to state it. No adapter change.
