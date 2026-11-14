@@ -5,22 +5,25 @@ engine (``engine/water/``, entry point EP3 of contracts/ENTRYPOINTS.md); the
 route does not call it. See engine/water/et0/README.md.
 """
 
-from .constants import Et0Constants
+from .constants import Et0Bounds, Et0Constants
 from .daily import (
     DailyReferenceEvapotranspiration,
     Et0Steps,
     reference_evapotranspiration_day,
     reference_evapotranspiration_from_climate,
+    reference_evapotranspiration_from_climate_with_bounds,
 )
 from .quantities import ACCEPTED_UNITS, InputValue, PointUnits
 
 __all__ = [
     "ACCEPTED_UNITS",
     "DailyReferenceEvapotranspiration",
+    "Et0Bounds",
     "Et0Constants",
     "Et0Steps",
     "InputValue",
     "PointUnits",
     "reference_evapotranspiration_day",
     "reference_evapotranspiration_from_climate",
+    "reference_evapotranspiration_from_climate_with_bounds",
 ]

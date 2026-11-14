@@ -10,6 +10,7 @@ Status: **PROPOSED** (blueprint section 3.7). Nothing here is in force until peo
 - **The forms of the equations are PROPOSED.** A builder session wrote each form in the docstring of its function, without the method's text in front of it. A person checks every form against FAO-56 chapter 7 and confirms its source (OPEN 1).
 - **Equation numbers are OPEN.** Issue #13 reports only the reference evapotranspiration chapters (2 to 4) and gives no equation of chapter 7, and no other source was read by this session.
 - The citation of the method is CITATION NEEDED: a person composes it, with its row in `ATTRIBUTIONS.md`.
+- **The balance of the surface layer leaves out the transpiration drawn from it (`Tew`).** That is a declared limit of the method, by decision D82 of issue #77 (PC-5), with the scope written in [Declared limit: `Tew` left out](#declared-limit-tew-left-out).
 
 Acceptance test, from the repository root:
 
@@ -17,7 +18,19 @@ Acceptance test, from the repository root:
 python -m pytest engine/water/evaporation/
 ```
 
-Identifiers such as C3.2 refer to `contracts/CONVENTIONS.md`; G1 to G7 to `contracts/ENTRYPOINTS.md`; D34, D44, D46, D56 to decisions on issue #77.
+Identifiers such as C3.2 refer to `contracts/CONVENTIONS.md`; G1 to G7 to `contracts/ENTRYPOINTS.md`; D34, D44, D46, D56, D77, D78, D82 to decisions on issue #77.
+
+## Declared limit: `Tew` left out
+
+Decision D82 of issue #77, PC-5 of `docs/SCIENCE_DECISIONS.md` (finding 6 of the AI pre-check, F52; recorded in M2.2 of `docs/METHODS.md`). The pre-check reports that the balance of the surface layer in FAO-56 chapter 7, Eq. 77, carries `Tew`, the transpiration drawn from the exposed and wetted fraction of the surface layer, and that the manual allows leaving it out in some cases. The daily step of this folder has no `Tew` term. The lead developer chose to keep it that way and to **declare the omission as a limit of the method**, with this scope:
+
+- **What is left out.** The depletion of the surface layer (`depletion_start`, `depletion_end`) is not raised by any transpiration of the crop. The transpiration of the crop is still taken, as before, from the root-zone column of `engine/water/balance/`; only the account of the surface layer leaves it out. No input, constant or output of this folder carries `Tew`.
+- **Rain-fed.** The balance has no irrigation term (D44): the water entering the surface layer is the precipitation less the runoff.
+- **Where it weighs most.** With the 0.10 m evaporation layer of D77 (USER-AG) and the shallow roots of the early season (D78), the surface layer is a large share of the early root zone. That is where a crop draws most of its water from the surface layer, and so where leaving `Tew` out weighs most.
+- **Which way it goes (PROPOSED, read from the forms, not measured).** On a day the crop would transpire from the surface layer, leaving `Tew` out keeps the depletion lower than Eq. 77 would. `Kr` never rises with the depletion (R4 and the case `reduction-coefficient-falls-linearly-to-zero-in-stage-two`), so `Kr`, and the evaporation asked of the layer, stay at or above what Eq. 77 would give. No size of the effect is claimed.
+- **Applies to** every day of every rotation. On a day with no crop there is no transpiration to leave out. Because it weighs most while roots are shallow, it need not weigh the same in every rotation; whether it changes a comparison is not tested (OPEN 4).
+
+The cases in which FAO-56 allows the omission are not transcribed here (OPEN 4).
 
 ## Files
 
@@ -205,7 +218,7 @@ Each question names the role that answers it.
 1. **The forms and their source.** Every form in the table of functions, and the equation numbers, are to be checked against FAO-56 chapter 7 and cited (CITATION NEEDED). *Science reviewers; lead developer (D44).*
 2. **Which `Ke` goes to the balance when the surface layer runs short.** `evaporation_coefficient` is `Ke` of the method. On a day with `evaporation_shortfall > 0` the balance, taking that `Ke`, asks for `Ke · ET0`, more than the surface layer supplied, and takes it from the whole column. Pass `Ke` as here, pass `evaporation / ET0` (undefined when `ET0` is zero), or have the balance take the evaporation itself? This changes `balance/` or EP3, out of this unit. *Lead developer; science reviewers.*
 3. **Order within a day (R3) and the depletion `Kr` follows (R4).** Here `Kr` uses the depletion before the day's rain, so a storm on a dry day does not raise that day's `Kr`. *Science reviewers.*
-4. **Transpiration from the surface layer.** The balance here has no transpiration term drawn from the surface layer; whether the method's balance carries one and how it is supplied is not decided. *Science reviewers.*
+4. **Transpiration from the surface layer.** Decided by D82 (PC-5): `Tew` is left out and the omission is a declared limit ([Declared limit: `Tew` left out](#declared-limit-tew-left-out)). Still open: the cases in which FAO-56 allows the omission, read at the locator of Eq. 77 and checked by a person (D34); whether the full Eq. 77 is built later (the other option of finding 6), which would need the transpiration split between the surface layer and the rest of the root zone, and so a change to `balance/` or EP3; and whether the omission changes a comparison of rotations, for instance in a sensitivity run. *Science reviewers; lead developer.*
 5. **How the cover-fraction exponent follows the crop height**, and whether `fc` comes observed or from `Kcb`. The caller supplies the exponent and the cover fraction. *Science reviewers; lead developer.*
 6. **Limits the method may set** on `fc`, on `1 − fc`, on a `Kcb` below `Kc_min`, or on `TEW` (R8). The module clips nothing and reports `NOT_COMPUTABLE` instead. *Science reviewers.*
 7. **Where the minimum relative humidity, crop height and wind speed of the climate term come from.** `contracts/CLIMATE_QUANTITIES.md` carries the dew point and air temperatures, not a minimum relative humidity; the crop height of a day is not in the calendar. *Lead developer; platform developer; science reviewers.*

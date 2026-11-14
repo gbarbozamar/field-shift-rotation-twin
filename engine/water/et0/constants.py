@@ -17,6 +17,14 @@ used in the README table and in the ``detail`` of a missing result.
 How each constant enters its equation is written in the docstring of the
 function of engine/water/et0/equations.py that uses it. Those forms are
 PROPOSED: a person checks them against the equations of the method.
+
+The two bounds of decision D82 of issue #77 (PC-4) are in ``Et0Bounds``,
+apart from ``Et0Constants``: the ratio of solar radiation to clear-sky solar
+radiation in Eq. 39, bounded above, and the wind speed at 2 m where Eq. 6
+uses it, bounded below. Their identifier is ``<field of Et0Bounds>.<field of
+its class>``, for example ``wind_speed_bound.lower_bound``. They are kept out
+of ``Et0Constants`` so that the parameters EP3 reads do not change in this
+unit (engine/water/et0/README.md, OPEN list).
 """
 
 from __future__ import annotations
@@ -200,3 +208,33 @@ class Et0Constants:
     net_longwave: NetLongwaveConstants
     soil_heat_flux: SoilHeatFluxConstants
     penman_monteith: PenmanMonteithConstants
+
+
+@dataclass(frozen=True)
+class RelativeShortwaveBound:
+    """Upper bound of the ratio of solar to clear-sky solar radiation in FAO-56 Eq. 39.
+
+    Decision D82 of issue #77 (PC-4). Form (PROPOSED): the ratio used in
+    Eq. 39 is the smaller of ``Rs / Rso`` and ``upper_bound``.
+    """
+
+    upper_bound: Constant
+
+
+@dataclass(frozen=True)
+class WindSpeedBound:
+    """Lower bound of the wind speed at 2 m where FAO-56 Eq. 6 uses it.
+
+    Decision D82 of issue #77 (PC-4). Form (PROPOSED): the wind speed used in
+    Eq. 6 is the larger of ``u2`` and ``lower_bound``.
+    """
+
+    lower_bound: Constant
+
+
+@dataclass(frozen=True)
+class Et0Bounds:
+    """The two bounds of decision D82 (PC-4), by the quantity they bound."""
+
+    relative_shortwave_bound: RelativeShortwaveBound
+    wind_speed_bound: WindSpeedBound

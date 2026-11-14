@@ -26,8 +26,13 @@ of contracts/CONVENTIONS.md):
 - When the arithmetic has no finite real result (division by zero, the
   arc cosine or the square root outside its domain, a power that is not
   real, an overflow), the result is missing, reason ``NOT_COMPUTABLE``.
-  This is arithmetic, not a limit of the method: no limit that the method
-  may state is applied here (README, OPEN list).
+  This is arithmetic, not a limit of the method.
+- The only limits of the method applied here are the two bounds of
+  decision D82 of issue #77 (PC-4), each in its own function and each with
+  its value supplied by the caller: ``relative_shortwave_radiation`` (the
+  ratio of Eq. 39, bounded above) and ``wind_speed_for_penman_monteith``
+  (the wind speed of Eq. 6, bounded below). No other limit the method may
+  state is applied (README, OPEN list).
 
 The temperatures are in the unit of the climate quantities that the caller
 checked (engine/water/et0/quantities.py); the functions do not know units.
@@ -54,10 +59,12 @@ from .constants import (
     NetShortwaveConstants,
     PenmanMonteithConstants,
     PsychrometricConstants,
+    RelativeShortwaveBound,
     SaturationVapourPressureConstants,
     SlopeConstants,
     SoilHeatFluxConstants,
     SolarDeclinationConstants,
+    WindSpeedBound,
 )
 
 # An operand or a result: a number, or missing with its reason (C3.1).
@@ -501,28 +508,65 @@ def net_shortwave_radiation(
     )
 
 
+def shortwave_ratio(
+    solar_radiation: Quantity, clear_sky_radiation: Quantity
+) -> Quantity:
+    """Ratio of solar radiation to clear-sky solar radiation, before any bound (Eq. 39).
+
+    Form PROPOSED: ``Rs / Rso``.
+    """
+    operands = _inputs(
+        solar_radiation=solar_radiation, clear_sky_radiation=clear_sky_radiation
+    )
+    return _compute(
+        "ratio of solar to clear-sky solar radiation",
+        operands,
+        lambda: solar_radiation / clear_sky_radiation,
+    )
+
+
+def relative_shortwave_radiation(
+    shortwave_ratio: Quantity, constants: RelativeShortwaveBound
+) -> Quantity:
+    """Relative shortwave radiation used in Eq. 39, after its bound (D82, PC-4).
+
+    Form PROPOSED: the smaller of ``shortwave_ratio`` and ``upper_bound``.
+    Decision D82 of issue #77 (PC-4) states this bound, citing FAO-56
+    Eq. 39; its value is supplied by the caller and transcribed in the
+    README table of constants (D34). Whether
+    the bound changed the ratio is read by comparing the two
+    (engine/water/et0/daily.py).
+    """
+    operands = _inputs(shortwave_ratio=shortwave_ratio) | _constants(
+        "relative_shortwave_bound", constants, RelativeShortwaveBound
+    )
+    return _compute(
+        "relative shortwave radiation",
+        operands,
+        lambda: min(shortwave_ratio, constants.upper_bound),
+    )
+
+
 def net_longwave_radiation(
     temperature_max: Quantity,
     temperature_min: Quantity,
     actual_vapour_pressure: Quantity,
-    solar_radiation: Quantity,
-    clear_sky_radiation: Quantity,
+    relative_shortwave_radiation: Quantity,
     constants: NetLongwaveConstants,
 ) -> Quantity:
     """Net longwave radiation (FAO-56 Eq. 39). Form PROPOSED.
 
     ``stefan_boltzmann * mean(fourth power of (Tmax + kelvin_offset), fourth
     power of (Tmin + kelvin_offset)) * (humidity_intercept - humidity_slope *
-    sqrt(ea)) * (cloudiness_multiplier * Rs / Rso - cloudiness_offset)``.
-    No bound on ``Rs / Rso`` is applied: whether the method states one is
-    OPEN (README).
+    sqrt(ea)) * (cloudiness_multiplier * relative_shortwave_radiation -
+    cloudiness_offset)``. ``relative_shortwave_radiation`` is ``Rs / Rso``
+    after the bound of D82 (``relative_shortwave_radiation`` above).
     """
     operands = _inputs(
         temperature_max=temperature_max,
         temperature_min=temperature_min,
         actual_vapour_pressure=actual_vapour_pressure,
-        solar_radiation=solar_radiation,
-        clear_sky_radiation=clear_sky_radiation,
+        relative_shortwave_radiation=relative_shortwave_radiation,
     ) | _constants("net_longwave", constants, NetLongwaveConstants)
 
     def formula() -> object:
@@ -537,8 +581,7 @@ def net_longwave_radiation(
             actual_vapour_pressure
         )
         cloudiness = (
-            c.cloudiness_multiplier * solar_radiation / clear_sky_radiation
-            - c.cloudiness_offset
+            c.cloudiness_multiplier * relative_shortwave_radiation - c.cloudiness_offset
         )
         return emission * humidity * cloudiness
 
@@ -572,6 +615,28 @@ def soil_heat_flux_daily(constants: SoilHeatFluxConstants) -> Quantity:
 # --- the equation ----------------------------------------------------------------------
 
 
+def wind_speed_for_penman_monteith(
+    wind_speed_2m: Quantity, constants: WindSpeedBound
+) -> Quantity:
+    """Wind speed at 2 m used in Eq. 6, after its bound (D82, PC-4).
+
+    Form PROPOSED: the larger of ``wind_speed_2m`` and ``lower_bound``.
+    Decision D82 of issue #77 (PC-4) states this bound where Eq. 6 is used;
+    its value is supplied by the caller and transcribed in the README table
+    of constants (D34).
+    Whether the bound changed the wind speed is read by comparing the two
+    (engine/water/et0/daily.py).
+    """
+    operands = _inputs(wind_speed_2m=wind_speed_2m) | _constants(
+        "wind_speed_bound", constants, WindSpeedBound
+    )
+    return _compute(
+        "wind speed at 2 m used in the Penman-Monteith equation",
+        operands,
+        lambda: max(wind_speed_2m, constants.lower_bound),
+    )
+
+
 def reference_evapotranspiration(
     *,
     slope: Quantity,
@@ -590,7 +655,8 @@ def reference_evapotranspiration(
     kelvin_offset)) * u2 * (es - ea)) / (D + g + g * denominator_constant *
     u2)``, with ``D`` the slope of the curve, ``g`` the psychrometric
     constant and ``T`` the mean temperature. The wind speed is at 2 m and is
-    not converted (D26).
+    not converted (D26); the composition of engine/water/et0/daily.py passes
+    it after the bound of D82 (``wind_speed_for_penman_monteith``).
     """
     operands = _inputs(
         slope=slope,

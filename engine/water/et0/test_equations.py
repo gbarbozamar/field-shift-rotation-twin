@@ -26,6 +26,7 @@ from engine.water.et0 import equations as eq
 from engine.water.et0.constants import (
     AtmosphericPressureConstants,
     ClearSkyRadiationConstants,
+    Et0Bounds,
     Et0Constants,
     ExtraterrestrialRadiationConstants,
     InverseRelativeDistanceConstants,
@@ -33,10 +34,12 @@ from engine.water.et0.constants import (
     NetShortwaveConstants,
     PenmanMonteithConstants,
     PsychrometricConstants,
+    RelativeShortwaveBound,
     SaturationVapourPressureConstants,
     SlopeConstants,
     SoilHeatFluxConstants,
     SolarDeclinationConstants,
+    WindSpeedBound,
 )
 
 NOT_TRANSCRIBED = Missing(
@@ -87,6 +90,14 @@ PLACEHOLDER_CONSTANTS = Et0Constants(
     net_longwave=LONGWAVE,
     soil_heat_flux=SOIL,
     penman_monteith=PENMAN,
+)
+
+# PLACEHOLDER bounds of D82 (PC-4). Neither is the value D82 states: they are
+# chosen so that the hand computations below are easy and visibly not real.
+SHORTWAVE_BOUND = RelativeShortwaveBound(upper_bound=7.0)
+WIND_BOUND = WindSpeedBound(lower_bound=2.0)
+PLACEHOLDER_BOUNDS = Et0Bounds(
+    relative_shortwave_bound=SHORTWAVE_BOUND, wind_speed_bound=WIND_BOUND
 )
 
 
@@ -211,16 +222,29 @@ CASES: dict[str, Case] = {
         {"constants": SHORTWAVE},
         -10.0,
     ),
+    # 4 / 2 = 2
+    "shortwave_ratio": Case(
+        eq.shortwave_ratio,
+        {"solar_radiation": 4.0, "clear_sky_radiation": 2.0},
+        {},
+        2.0,
+    ),
+    # the smaller of 9 and the bound 7 is 7: the bound changes the ratio
+    "relative_shortwave_radiation": Case(
+        eq.relative_shortwave_radiation,
+        {"shortwave_ratio": 9.0},
+        {"constants": SHORTWAVE_BOUND},
+        7.0,
+    ),
     # (1 + 2) ** 4 = 81, (-1 + 2) ** 4 = 1, mean 41; 11 - 3 x sqrt(4) = 5;
-    # 3 x 4 / 2 - 5 = 1; 2 x 41 x 5 x 1 = 410
+    # 3 x 2 - 5 = 1; 2 x 41 x 5 x 1 = 410
     "net_longwave_radiation": Case(
         eq.net_longwave_radiation,
         {
             "temperature_max": 1.0,
             "temperature_min": -1.0,
             "actual_vapour_pressure": 4.0,
-            "solar_radiation": 4.0,
-            "clear_sky_radiation": 2.0,
+            "relative_shortwave_radiation": 2.0,
         },
         {"constants": LONGWAVE},
         410.0,
@@ -234,6 +258,13 @@ CASES: dict[str, Case] = {
     ),
     # the constant itself
     "soil_heat_flux_daily": Case(eq.soil_heat_flux_daily, {}, {"constants": SOIL}, 3.0),
+    # the larger of 0.25 and the bound 2 is 2: the bound changes the wind speed
+    "wind_speed_for_penman_monteith": Case(
+        eq.wind_speed_for_penman_monteith,
+        {"wind_speed_2m": 0.25},
+        {"constants": WIND_BOUND},
+        2.0,
+    ),
     # numerator: 2 x 3 x (7 - 2) = 30; 5 x (10 / (3 + 2)) x 4 x (11 - 7) = 160; 190
     # denominator: 3 + 5 + 5 x 1.5 x 4 = 38; 190 / 38 = 5
     "reference_evapotranspiration": Case(
@@ -277,6 +308,8 @@ def _group_name(group: object) -> str:
         NetLongwaveConstants: "net_longwave",
         SoilHeatFluxConstants: "soil_heat_flux",
         PenmanMonteithConstants: "penman_monteith",
+        RelativeShortwaveBound: "relative_shortwave_bound",
+        WindSpeedBound: "wind_speed_bound",
     }[type(group)]
 
 
@@ -411,21 +444,14 @@ def test_eq4_a_missing_operand_is_reported_before_a_non_finite_one():
                 "temperature_max": 1.0,
                 "temperature_min": -1.0,
                 "actual_vapour_pressure": -4.0,
-                "solar_radiation": 4.0,
-                "clear_sky_radiation": 2.0,
+                "relative_shortwave_radiation": 2.0,
             },
             None,
         ),
         # a clear-sky radiation of zero: division by zero
         (
-            "net_longwave_radiation",
-            {
-                "temperature_max": 1.0,
-                "temperature_min": -1.0,
-                "actual_vapour_pressure": 4.0,
-                "solar_radiation": 4.0,
-                "clear_sky_radiation": 0.0,
-            },
+            "shortwave_ratio",
+            {"solar_radiation": 4.0, "clear_sky_radiation": 0.0},
             None,
         ),
         # an exponent that overflows
@@ -517,3 +543,58 @@ def test_eq8_pass_through_keeps_a_missing_input_and_checks_a_number():
     assert "'x'" in result.detail
     with pytest.raises(TypeError):
         eq.pass_through("x", "3")
+
+
+# --- BD1: the two bounds of D82 (PC-4), with PLACEHOLDER values ---
+
+
+@pytest.mark.parametrize(
+    ("ratio", "expected"),
+    [
+        (9.0, 7.0),  # above the bound 7: the bound
+        (7.0, 7.0),  # at the bound: unchanged
+        (3.0, 3.0),  # below the bound: unchanged
+        (-1.0, -1.0),  # below the bound: unchanged, nothing else is applied
+    ],
+)
+def test_bd1_the_ratio_of_eq_39_is_bounded_above(ratio, expected):
+    assert eq.relative_shortwave_radiation(ratio, SHORTWAVE_BOUND) == expected
+
+
+@pytest.mark.parametrize(
+    ("wind", "expected"),
+    [
+        (0.25, 2.0),  # below the bound 2: the bound
+        (0.0, 2.0),  # calm: the bound
+        (2.0, 2.0),  # at the bound: unchanged
+        (5.0, 5.0),  # above the bound: unchanged
+    ],
+)
+def test_bd1_the_wind_speed_of_eq_6_is_bounded_below(wind, expected):
+    assert eq.wind_speed_for_penman_monteith(wind, WIND_BOUND) == expected
+
+
+def test_bd1_eq_39_uses_the_bounded_ratio_and_eq_6_the_bounded_wind():
+    # Eq. 39 with the ratio 9 bounded at 7: 3 x 7 - 5 = 16; 2 x 41 x 5 x 16 = 6560
+    relative = eq.relative_shortwave_radiation(
+        eq.shortwave_ratio(18.0, 2.0), SHORTWAVE_BOUND
+    )
+    longwave = CASES["net_longwave_radiation"].call(
+        inputs=CASES["net_longwave_radiation"].inputs
+        | {"relative_shortwave_radiation": relative}
+    )
+    assert longwave == pytest.approx(6560.0)
+    # Eq. 6 with the wind 0.25 bounded at 2:
+    # numerator 30 + 5 x 2 x 2 x 4 = 110; denominator 3 + 5 + 5 x 1.5 x 2 = 23
+    wind = eq.wind_speed_for_penman_monteith(0.25, WIND_BOUND)
+    result = CASES["reference_evapotranspiration"].call(
+        inputs=CASES["reference_evapotranspiration"].inputs | {"wind_speed_2m": wind}
+    )
+    assert result == pytest.approx(110.0 / 23.0)
+
+
+def test_bd1_a_bound_is_not_a_field_of_the_constants_ep3_reads():
+    # EP3 reads the parameters of Et0Constants (engine/water/exposure.py);
+    # the bounds stay apart until a person agrees how they reach EP3 (OPEN).
+    groups = {item.type for item in dataclasses.fields(Et0Constants)}
+    assert not groups & {"Et0Bounds", "RelativeShortwaveBound", "WindSpeedBound"}
