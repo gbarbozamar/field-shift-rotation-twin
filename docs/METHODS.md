@@ -5,13 +5,13 @@ Which method each engine implements, and where it is published. This file names 
 ## How to read this file
 
 - Every item has one status: `PROPOSED`, `DECIDED` or `OPEN`, with the meaning of blueprint section 3.7 and of `contracts/CONVENTIONS.md`.
-- The items below were transcribed by an AI session from the planning notes of the lead developer. They are `PROPOSED` until the lead developer approves them, and they are science class: a science reviewer still has to accept them.
+- The items below were transcribed by an AI session from the planning notes of the lead developer, who approved them on 14 November 2026: they are `DECIDED`. They are science class: a science reviewer still has to accept them. A point marked `OPEN` inside a decided item is not decided.
 - A citation here says where a method is published. The column "Read" says how far the planning notes got with the source: `read` (the abstract or the text was read), `fragments` (only fragments of the abstract), or `located` (the reference was found, nothing of it was read). A builder session never takes a number from memory of these sources: it reads it from the parameter catalogue, and returns a missing value with its reason when the catalogue does not have it.
 - If an engine needs a method that is not in this file, that is an `OPEN` point for the lead developer, not something a session chooses.
 
 ## M1 Soil loss: `engine/erosion/`
 
-Status of the whole section: `PROPOSED`.
+Status of the whole section: `DECIDED`, except the points marked `OPEN` in M1.3, M1.5 and M1.7. Acceptance by a science reviewer is pending.
 
 ### M1.1 The method
 
