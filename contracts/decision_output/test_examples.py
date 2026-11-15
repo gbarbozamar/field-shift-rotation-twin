@@ -23,7 +23,7 @@ import pytest
 from pydantic import ValidationError
 
 from contracts.decision_output import STATE_NAMES, DecisionOutput
-from contracts.results.models import ResultsTable
+from contracts.results.models import CARBON_MODELS, TREND_COMPUTATIONS, ResultsTable
 
 HERE = Path(__file__).parent
 EXAMPLE = HERE / "examples" / "PLACEHOLDER_decision_output.json"
@@ -311,6 +311,46 @@ def _pair_count_not_given_by_sign(data: dict[str, Any]) -> None:
     item = data["pair_cell_counts"][0]
     item["by_sign_of_point_value"] = None
     item["by_sign_of_point_value_missing"] = {"reason": "NOT_DECLARED"}
+
+
+# D169: "One count per pair, scenario, indicator, carbon model and
+# computation" for the soil carbon trend.
+WATER_PAIR_COUNT = ["pair_cell_counts", 1]
+
+
+def _carbon_counts_split(
+    carbon_models: tuple[str, ...], computations: tuple[str, ...]
+) -> Mutation:
+    """The example's one count of the soil carbon trend becomes one count per
+    carbon model and computation, each with the counts of the example's (D169)."""
+
+    def mutate(data: dict[str, Any]) -> None:
+        unsplit = data["pair_cell_counts"].pop(CARBON_PAIR_COUNT[1])
+        for carbon_model in carbon_models:
+            for computation in computations:
+                data["pair_cell_counts"].append(
+                    {
+                        **copy.deepcopy(unsplit),
+                        "carbon_model": carbon_model,
+                        "computation": computation,
+                    }
+                )
+
+    return mutate
+
+
+def _then(*mutations: Mutation) -> Mutation:
+    def mutate(data: dict[str, Any]) -> None:
+        for mutation in mutations:
+            mutation(data)
+
+    return mutate
+
+
+def _split_count_beside_the_unsplit_one(data: dict[str, Any]) -> None:
+    split = copy.deepcopy(data["pair_cell_counts"][CARBON_PAIR_COUNT[1]])
+    split.update(carbon_model="amg", computation="end_minus_start")
+    data["pair_cell_counts"].append(split)
 
 
 def _three_rotations_one_uncounted(data: dict[str, Any]) -> None:
@@ -727,6 +767,61 @@ INVALID: list[tuple[str, Mutation, str]] = [
         "scenario_id",
     ),
     ("pair-count-repeated", _repeat(["pair_cell_counts"], 0), "repeats"),
+    # D169: the counts of a pair's cells by carbon model and computation.
+    (
+        "pair-count-carbon-key-repeated",
+        _then(
+            _carbon_counts_split(CARBON_MODELS, TREND_COMPUTATIONS),
+            _repeat(["pair_cell_counts"], 3),
+        ),
+        "repeats pair, scenario, indicator, carbon model and computation",
+    ),
+    (
+        "pair-count-carbon-model-on-soil-loss",
+        put(SOIL_LOSS_PAIR_COUNT + ["carbon_model"], "amg"),
+        "belong to 'soil_carbon_trend' only, not to 'soil_loss' (D169)",
+    ),
+    (
+        "pair-count-computation-on-soil-loss",
+        put(SOIL_LOSS_PAIR_COUNT + ["computation"], "end_minus_start"),
+        "belong to 'soil_carbon_trend' only, not to 'soil_loss' (D169)",
+    ),
+    (
+        "pair-count-carbon-model-on-water",
+        lambda data: data["pair_cell_counts"][WATER_PAIR_COUNT[1]].update(
+            carbon_model="amg", computation="end_minus_start"
+        ),
+        "belong to 'soil_carbon_trend' only, not to 'water_deficit_exposure' (D169)",
+    ),
+    (
+        "pair-count-carbon-model-without-computation",
+        put(CARBON_PAIR_COUNT + ["carbon_model"], "amg"),
+        "names its carbon model and its computation together (D169)",
+    ),
+    (
+        "pair-count-computation-without-carbon-model",
+        put(CARBON_PAIR_COUNT + ["computation"], "fitted_slope"),
+        "names its carbon model and its computation together (D169)",
+    ),
+    (
+        "pair-count-carbon-model-not-decided",
+        lambda data: data["pair_cell_counts"][CARBON_PAIR_COUNT[1]].update(
+            carbon_model="AMG", computation="end_minus_start"
+        ),
+        "Input should be 'amg' or 'rothc'",
+    ),
+    (
+        "pair-count-computation-not-in-the-list",
+        lambda data: data["pair_cell_counts"][CARBON_PAIR_COUNT[1]].update(
+            carbon_model="amg", computation="slope"
+        ),
+        "Input should be 'end_minus_start', 'fitted_slope' or 'mean_over_cycles'",
+    ),
+    (
+        "pair-count-carbon-split-beside-unsplit",
+        _split_count_beside_the_unsplit_one,
+        "a cell would be counted twice (D169)",
+    ),
     # D85, D86, D88, D91, D97: the state of a pair and its coverage.
     (
         "pair-state-unknown-name",
@@ -862,6 +957,14 @@ VALID: list[tuple[str, Mutation]] = [
     ("range-over-two-scenarios", _range_over_two_scenarios),
     ("no-range-across-scenarios", put(["range_across_scenarios"], [])),
     ("pair-count-not-given-by-sign", _pair_count_not_given_by_sign),
+    (
+        "pair-count-per-carbon-model-and-computation",
+        _carbon_counts_split(CARBON_MODELS, TREND_COMPUTATIONS),
+    ),
+    (
+        "pair-count-per-carbon-model-of-the-example",
+        _carbon_counts_split(CARBON_MODELS, ("end_minus_start",)),
+    ),
     ("not-evaluated-pair", _not_evaluated_pair),
     (
         "identical-with-its-reason",
@@ -1150,6 +1253,27 @@ def test_example_pair_counts_and_coverage_agree_with_the_differences() -> None:
     assert state.coverage.cells_compared == sum(
         item.difference.value is not None for item in differences
     )
+    _check_the_counts_agree_with_the_differences(document)
+
+
+def test_counts_split_by_carbon_model_agree_with_the_differences() -> None:
+    """D169: the example's carbon cells, counted apart per carbon model."""
+    data = load()
+    _carbon_counts_split(CARBON_MODELS, ("end_minus_start",))(data)
+    document = DecisionOutput.model_validate(data)
+    carbon = [
+        (count.carbon_model, count.computation)
+        for count in document.pair_cell_counts
+        if count.indicator == "soil_carbon_trend"
+    ]
+    assert carbon == [("amg", "end_minus_start"), ("rothc", "end_minus_start")]
+    _check_the_counts_agree_with_the_differences(document)
+
+
+def _check_the_counts_agree_with_the_differences(document: DecisionOutput) -> None:
+    """Each count holds the differences of its key; a count without a carbon
+    model holds every carbon model and computation of its indicator."""
+    differences = document.paired_differences
     for count in document.pair_cell_counts:
         cells = [
             item
@@ -1157,6 +1281,8 @@ def test_example_pair_counts_and_coverage_agree_with_the_differences() -> None:
             if item.pair == count.pair
             and item.scenario_id == count.scenario_id
             and item.indicator == count.indicator
+            and count.carbon_model in (None, item.carbon_model)
+            and count.computation in (None, item.computation)
         ]
         assert count.by_difference_range.cells() == sum(
             item.difference.range is not None for item in cells

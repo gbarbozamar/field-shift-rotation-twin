@@ -533,6 +533,8 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
 
 This entry has no bracketed code: the blueprint's section 8 does not name it. [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) asks for the check and its result to be recorded in this file. It is a science-class entry (blueprint section 3.6): the numbers below are restated from D148 and from the source, and a science reviewer has not accepted it.
 
+The two context blocks of this section (soil loss measured with ¹³⁷Cs, and the carbon inputs of EP4) were added by unit `l0/validation-local-context` (brief #319). They record local measurements a science reviewer needs when judging plausibility. They are not checks, tolerances or expected values, and no value of them enters `params/records/`.
+
 ### EP1: plausibility against the La Estanzuela runoff plots (2017–2019)
 
 - What it checks: the annual soil loss that EP1 (`compute_soil_loss`, main route, `docs/METHODS.md` M1.2) gives at the demonstration site, against the soil loss measured on the six Wischmeier runoff plots of La Estanzuela. It is not a check of the code (H2 and E3 cover the equations) and it is not a calibration: no value was fitted, calibrated or changed.
@@ -557,3 +559,61 @@ This entry has no bracketed code: the blueprint's section 8 does not name it. [D
 - Transcribed by: the AI session that ran the check (D34). The numbers of the source are restated here from D148 and from the pages cited above.
 - Checked by: OPEN. D148 records the lead developer's acceptance of the recommendation, not a check of the numbers against the pages of the paper.
 - Status: result observed and recorded (15 November 2026); no test is written; acceptance by a science reviewer pending.
+
+**Context: soil loss measured with ¹³⁷Cs in the rotation experiment of La Estanzuela.** Not a check, a tolerance or an expected value.
+
+- Source: Quincke, A., Tassano, M., González, J.M., Grahmann, K., Pérez-Bidegain, M., Ciganda, V., Evrard, O., Barolín, E., Cabrera, M. (2024). "Erosión del suelo: nuevos métodos de estudio en el 'viejo' experimento de rotaciones de La Estanzuela". *Revista INIA* N.º 77 (June 2024), pp. 47-50, https://www.inia.uy/sites/default/files/publications/2024-12/Revista-INIA-77-Junio-2024.pdf. Read in a copy of that issue.
+- The experiment:
+  - the crop-pasture rotation experiment "José L. Castro" of INIA La Estanzuela, installed in 1963 (p. 48);
+  - plots of 25 × 200 m laid along the slope, slope 2.5 to 3.0 %, on "un brunosol éutrico típico franco arcillo limoso con propiedades vérticas (Vertic Argiudoll según el USDA Soil Taxonomy)" (p. 48);
+  - two plots were sampled: continuous cropping (system 2, plot #5) and a rotation of two years of crops and one year of red-clover pasture (system 7, plot #1) (p. 48).
+- Method:
+  - ¹³⁷Cs inventories in layers of 2.5 cm at five points along each plot, at 40, 80, 120, 160 and 200 m from the top (pp. 48-49), against the inventory of an uneroded reference site of the station, 367 Bq/m² (p. 49);
+  - the inventories are converted into rates of erosion or accumulation with the mass-balance model II of Walling et al. (2011) (p. 49).
+- Period:
+  - the ¹³⁷Cs fallout peaked in South America "entre 1964 y 1972" (p. 48);
+  - the project quantified soil loss and accumulation "como consecuencia del proceso erosivo en casi 60 años de manejos contrastantes" (p. 48).
+  - The rates are therefore averages over about six decades of management, past tillage included. They are not rates of the present practice.
+- What the article prints, in Mg/ha/año (t ha-1 yr-1), all on p. 49:
+  - mean erosion of the continuous-cropping plot: 8.0, "excluyendo el punto de acumulación";
+  - mean erosion of the red-clover rotation plot: 4.4;
+  - accumulation at the last point (200 m, near the foot of the slope): 37.9 and 12.4 respectively;
+  - the four erosion points of the continuous-cropping plot "oscilan entre 4,0 y 11,7 Mg/ha/año". For the rotation plot the text prints no range; Cuadro 1 prints 2.4 as the lowest and 5.7 as the highest of its four erosion points.
+- What it is not:
+  - It is another experiment, on other plots, than the Wischmeier runoff plots of the check above and than the demonstration point. [D71](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) makes the La Estanzuela station the base of the demonstration and keeps the runoff plots of Grahmann et al. (2022) and the long-term carbon experiment LEELP1 as separate experiments: "a contrast from one is never merged with the other".
+  - It integrates about six decades and the past tillage of the plots. It is not a measurement under the no-till rotations of D128.
+  - It does not check the rotations of D128, nor the declared-`C` figure of D125 with the label of [D148](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333), nor what [D213](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6892169953) says about erosion and the two rotations. No ratio with any value of an engine is computed here.
+- Transcribed by an AI session (D34), from the pages cited, on 15 November 2026. Checked by: OPEN.
+
+### EP4: context for the annual carbon inputs
+
+- What it is:
+  - carbon inputs of soybean and corn measured at a Uruguayan site;
+  - a plausibility reference for the values EP4 will give once its records are signed (D197).
+- What it is not:
+  - an input of EP4: EP4 computes the inputs from yields and residue/yield ratios (D129, [D196](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765)) and from the records of [D197](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765);
+  - a check, a tolerance or an expected value.
+- Lane: L0 Core (EP4). Class (blueprint section 3.6): Science — PROPOSED.
+- Source: Mazzilli, S., Piñeiro, G., Kemanian, A. (2012). "Priming effects on soil organic carbon decomposition induced by high C:N crop inputs". *Agrociencia (Uruguay)* 16(3):191-198, https://doi.org/10.31285/AGRO.16.669. Read in a copy of the article.
+- Site:
+  - 10 km south of Paysandú (31° 21' S, 58° 02' W), a Typic Argiudol with 280 g kg−1 of clay in the first 0.3 m (p. 192);
+  - continuous wheat from 1940 to 1970, from 1970 to 1993 a six-year crop–pasture rotation of three years of a mixed pasture (white clover, birdsfoot trefoil and tall fescue) and three years of crops, not cropped from 1993 until the experiment of 2007 (pp. 192-193);
+  - no-till corn and soybean sown on 6 December 2007 and 28 November 2008 (p. 193).
+- What the article prints:
+  - Table 1, "Crop Production (Mg of C ha-1)", p. 194:
+    - soybean 6.5 ± 0.4 aboveground and 0.9 ± 0.1 belowground;
+    - corn 8.8 ± 0.1 aboveground and 1.9 ± 0.1 belowground.
+    - Aboveground: "Grain is not included". Belowground: "In the first 30 cm of soil".
+    - Table 1 does not print the period its values cover.
+  - Text, p. 194: "Carbon inputs per year from corn were on average 4.4 and 0.9 Mg ha-1 for aboveground and belowground, respectively". The same paragraph says these were "approximately 1.2 and 0.5 Mg.ha-1 higher than those for soybean". **The article prints no per-year value for soybean, and none is written here.**
+  - Abstract, p. 191: corn and soybean C inputs of "10.7 and 7.0 Mg ha-1". Reading of the transcriber, not printed: the corn total is the sum of the two corn values of Table 1 (8.8 + 1.9), and the per-year corn values of the text are about half of them, so Table 1 and the abstract read as totals over the two seasons. The soybean values of Table 1 add up to 7.4, not the 7.0 of the abstract, and the article does not say why.
+  - Carbon concentration, Table 1, p. 194, in g g-1 (written here because the 0.44 and 0.40 of D197 are compared with it): soybean 0.50 ± 0.1 aboveground and 0.39 ± 0.04 belowground; corn 0.44 ± 0.1 aboveground and 0.37 ± 0.04 belowground.
+- Limits the article states:
+  - "Crop biomass production in both years was high in relation to that expected for rainfed crops in this region" (p. 194);
+  - roots were measured at flowering with soil cores (p. 193);
+  - the humification estimates ignore the inputs from rhizodeposition (p. 194). The measured inputs therefore have no rhizodeposit term, while EP4 writes one (D197).
+- Other limits:
+  - Another site and soil than the demonstration point (Paysandú, not La Estanzuela).
+  - Two seasons only.
+  - No value of EP4 is compared with it here: EP4 gives none while its records are unsigned.
+- Transcribed by an AI session (D34), from the pages cited, on 15 November 2026. Checked by: OPEN.

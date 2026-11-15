@@ -15,7 +15,8 @@ the carbon model and computation of a count, counts of years over
 agricultural-year rows only, and the range across scenarios) are PROPOSED
 by a lane L0 builder; where two of those decisions do not fit together as
 written, ``README.md`` lists the clash under OPEN and the model takes no
-side beyond what the brief of issue #193 states.
+side beyond what the brief of issue #193 states. D169 adds the carbon model
+and computation to the key of a count of a pair's cells (brief: issue #314).
 
 The shared shapes are imported, never copied: the value of C2.1 (``Value``,
 ``Missing``, ``Range``) from ``contracts.inputs``; the indicator identifiers,
@@ -427,11 +428,22 @@ class PairCellCount(ContractModel):
     the pair, and no statistic or p-value is attached (D87). The count by the
     sign of the point value needs the tolerance of "equal" (D87); without it,
     it is ``null`` with ``by_sign_of_point_value_missing`` (C3.1).
+
+    D169: "One count per pair, scenario, indicator, carbon model and
+    computation, so that the cells of AMG and of RothC, which D155 never reads
+    together, are never added in one count." ``carbon_model`` and
+    ``computation`` are the names ``PairCounts`` of ``decision/functions.py``
+    uses. Only ``soil_carbon_trend`` names them, and it names both or neither.
+    A count of ``soil_carbon_trend`` that names neither (the key of D87 alone)
+    is accepted only while the producers that still write it change
+    (README.md, "D169", and OPEN 14).
     """
 
     pair: list[NonEmptyStr] = Field(min_length=2, max_length=2)
     scenario_id: NonEmptyStr
     indicator: IndicatorId
+    carbon_model: CarbonModel | None = None
+    computation: TrendComputation | None = None
     by_difference_range: CountByDifferenceRange
     by_sign_of_point_value: CountBySignOfPointValue | None
     by_sign_of_point_value_missing: Missing | None = None
@@ -439,6 +451,18 @@ class PairCellCount(ContractModel):
     @model_validator(mode="after")
     def _counts_are_consistent(self) -> PairCellCount:
         _check_pair(self.pair, "a count of a pair's cells")
+        if self.indicator != "soil_carbon_trend":
+            if self.carbon_model is not None or self.computation is not None:
+                raise ValueError(
+                    "a count of a pair's cells: 'carbon_model' and 'computation' "
+                    f"belong to 'soil_carbon_trend' only, not to '{self.indicator}' "
+                    "(D169)"
+                )
+        elif (self.carbon_model is None) != (self.computation is None):
+            raise ValueError(
+                "a count of a pair's cells of 'soil_carbon_trend' names its carbon "
+                "model and its computation together (D169)"
+            )
         given = self.by_sign_of_point_value is not None
         if given and self.by_sign_of_point_value_missing is not None:
             raise ValueError(
@@ -461,7 +485,16 @@ class PairCellCount(ContractModel):
         return self
 
     def key(self) -> tuple:
+        """D87: pair, scenario and indicator.
+
+        Kept as it was before D169, because ``demo/test_demo.py`` reads it;
+        the key of a count since D169 is ``key_with_the_carbon_model``.
+        """
         return (tuple(self.pair), self.scenario_id, self.indicator)
+
+    def key_with_the_carbon_model(self) -> tuple:
+        """D169: pair, scenario, indicator, carbon model and computation."""
+        return (*self.key(), self.carbon_model, self.computation)
 
 
 # --- state of a pair (D85, D86, D88, D91, D97) --------------------------------------
@@ -807,12 +840,28 @@ class DecisionOutput(ContractModel):
                     f"'{item.indicator}' has no tolerance of 'equal', so the count by "
                     "the sign of the point value is not given (D87, C3.1)"
                 )
-            keys.append(item.key())
+            keys.append(item.key_with_the_carbon_model())
         if _repeated(keys):
             raise ValueError(
-                "'pair_cell_counts' repeats pair, scenario and indicator "
-                f"{_repeated(keys)}"
+                "'pair_cell_counts' repeats pair, scenario, indicator, carbon model "
+                f"and computation {_repeated(keys)} (D169)"
             )
+        # PROPOSED (D169, D87): a count that names no carbon model holds every
+        # cell of its pair, scenario and indicator, so it does not stand beside
+        # counts of one carbon model and computation: a cell would be counted
+        # twice.
+        split = {
+            item.key()
+            for item in self.pair_cell_counts
+            if item.carbon_model is not None
+        }
+        for item in self.pair_cell_counts:
+            if item.carbon_model is None and item.key() in split:
+                raise ValueError(
+                    f"'pair_cell_counts' gives {item.key()} one count without a "
+                    "carbon model beside counts of one carbon model and computation: "
+                    "a cell would be counted twice (D169)"
+                )
         return self
 
     @model_validator(mode="after")
