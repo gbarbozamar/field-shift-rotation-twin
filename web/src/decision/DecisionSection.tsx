@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { missingPatternText } from '../components/ValueDisplay'
+import { ValueDisplay, missingPatternText } from '../components/ValueDisplay'
 import type { MissingPart } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import { useSelectedFieldId } from '../identity/selection'
@@ -8,13 +9,17 @@ import type { RotationDefinitionExample } from '../seam/rotationDefinition'
 import { ApiError } from '../seam/runRotationApi'
 import { strings } from '../strings'
 import type {
+  CountByYear,
   DecisionOutput,
   DecisionState,
+  MeasureFirstItem,
+  NotEvaluatedRow,
   PairCellCount,
   PairState,
+  PairedDifferenceItem,
   RangeAcrossScenarios,
 } from './decisionData'
-import { decisionExample, samePair } from './decisionData'
+import { agriculturalYearsOf, decisionExample, samePair } from './decisionData'
 import { demoRotationsD128 } from './demoRotations'
 import {
   ROTATIONS_PER_REQUEST,
@@ -26,9 +31,10 @@ import {
 import type { DecisionAnswer, RunDecisionRequest } from './decisionRoute'
 
 /**
- * The decision section (issue #241; the route's document, issue #354,
- * PROPOSED, interface lane under D159 and D161). It renders one decision
- * output document as it travels:
+ * The decision section (issue #241; the route's document, issue #354; Block 4
+ * "Measure first" with its field and named-years selector; PROPOSED,
+ * interface lane under D159 and D161). It renders one decision output
+ * document as it travels:
  *
  * - the document POST /api/decisions/run returns for the two rotations the
  *   interface holds for the selected field (decisionRoute.ts) — the two
@@ -61,20 +67,29 @@ import type { DecisionAnswer, RunDecisionRequest } from './decisionRoute'
  *   reason, never zeros;
  * - the years-within summary of each rotation of the pair: the range across
  *   the admitted scenarios with the scenario of the minimum (D96), or the
- *   missing pattern with its reason.
+ *   missing pattern with its reason;
+ * - the named-years selector (`decision.named_years`), built strictly from
+ *   the agricultural years present in `counts_by_year` or
+ *   `paired_differences` (`"all"` plus each discovered year, never inventing
+ *   years), filtering the displayed `counts_by_year` rows and scenario-year
+ *   (`ag_year`) paired differences;
+ * - the measurement priority (`measure_first`, D4) with the document's field
+ *   (`field_id`): each ranked item's rank, scope (`what`) and priority
+ *   reason (`why`), or the shared missing pattern (`NOT_DECLARED`) when
+ *   `measure_first` is empty.
  *
  * The section decides nothing and interprets nothing (D74): no winner is
  * named beyond the document's own preferred rotation and no count is summed.
- * The limits, the counts by year, the paired differences, the tolerances,
- * the indicators not resolved and the measurement priority are not rendered
- * (their labels are not in the wording sheet); nothing is invented for them.
+ * The limits, the tolerances, the paired-difference method and rotation-basis
+ * paired differences are not rendered; nothing is invented for them.
  *
- * The panel is a pure function of its state, so its whole behaviour is its
- * static markup in the tests; the container holds the call in one TanStack
+ * The panel is a pure function of its state (with optional controlled year
+ * selection for tests, defaulting to local state), so its whole behaviour is
+ * its static markup in the tests; the container holds the call in one TanStack
  * Query query. All user-visible wording lives in strings.ts; indicator,
- * scenario, rotation, model, computation and category identifiers render as
- * data, verbatim. Class lists are arrays of single-word tokens joined at
- * runtime.
+ * scenario, rotation, model, computation, field and category identifiers
+ * render as data, verbatim. Class lists are arrays of single-word tokens
+ * joined at runtime.
  */
 
 /** One count row: the label of the category, and the count as it travels. */
@@ -351,19 +366,334 @@ function OverallState({ state }: { state: DecisionState }) {
   )
 }
 
+/** The selected agricultural year in the named-years filter, or all years. */
+export type YearSelection = 'all' | number
+
+/** One count-by-year entry paired with its not-evaluated rows matching the selected year. */
+export interface FilteredCountByYear {
+  entry: CountByYear
+  notEvaluated: NotEvaluatedRow[]
+}
+
+/** Filter counts_by_year entries and their not_evaluated rows by agricultural year. */
+export function filterCountsByYear(
+  counts: readonly CountByYear[],
+  selectedYear: YearSelection,
+): FilteredCountByYear[] {
+  if (selectedYear === 'all') {
+    return counts.map((entry) => ({ entry, notEvaluated: entry.not_evaluated }))
+  }
+  return counts
+    .map((entry) => ({
+      entry,
+      notEvaluated: entry.not_evaluated.filter((row) => row.ag_year === selectedYear),
+    }))
+    .filter((item) => item.notEvaluated.length > 0 || item.entry.years_evaluated > 0)
+}
+
+/** Filter scenario-year (time_basis === 'ag_year') paired differences by agricultural year. */
+export function filterScenarioYearDifferences(
+  differences: readonly PairedDifferenceItem[],
+  selectedYear: YearSelection,
+): PairedDifferenceItem[] {
+  return differences.filter(
+    (diff) =>
+      diff.time_basis === 'ag_year' &&
+      diff.ag_year !== undefined &&
+      (selectedYear === 'all' || diff.ag_year === selectedYear),
+  )
+}
+
+/** Named-years selector with the filtered counts_by_year and scenario-year difference rows. */
+function NamedYearsSection({
+  document,
+  selectedYear,
+  onSelectYear,
+}: {
+  document: DecisionOutput
+  selectedYear: YearSelection
+  onSelectYear: (year: YearSelection) => void
+}) {
+  const years = agriculturalYearsOf(document)
+  const activeYear: YearSelection =
+    selectedYear === 'all' || years.includes(selectedYear) ? selectedYear : 'all'
+  const filteredCounts = filterCountsByYear(document.counts_by_year, activeYear)
+  const filteredDiffs = filterScenarioYearDifferences(document.paired_differences, activeYear)
+
+  return (
+    <div
+      data-testid="decision-named-years"
+      className={[
+        'mt-4',
+        'rounded-lg',
+        'border',
+        'border-slate-200',
+        'bg-white',
+        'px-4',
+        'py-3',
+      ].join(' ')}
+    >
+      <div>
+        <label
+          htmlFor="decision-named-years-select"
+          data-testid="decision-named-years-label"
+          className={['block', 'text-xs', 'font-semibold', 'text-slate-600'].join(' ')}
+        >
+          {strings['decision.named_years']}
+        </label>
+        <select
+          id="decision-named-years-select"
+          data-testid="decision-named-years-select"
+          value={String(activeYear)}
+          disabled={years.length === 0}
+          onChange={(event) => {
+            const raw = event.target.value
+            onSelectYear(raw === 'all' ? 'all' : Number(raw))
+          }}
+          className={[
+            'mt-1',
+            'rounded',
+            'border',
+            'border-slate-300',
+            'bg-white',
+            'px-2',
+            'py-1',
+            'text-sm',
+          ].join(' ')}
+        >
+          <option value="all">{strings['decision.named_years_all']}</option>
+          {years.map((year) => (
+            <option key={year} value={String(year)}>
+              {year}
+            </option>
+          ))}
+        </select>
+        {years.length === 0 ? (
+          <p
+            data-testid="decision-named-years-none"
+            className={['mt-1', 'text-xs', 'italic', 'text-slate-500'].join(' ')}
+          >
+            {strings['decision.named_years_none']}
+          </p>
+        ) : null}
+      </div>
+
+      <div data-testid="decision-counts-by-year" className={['mt-3'].join(' ')}>
+        <h5
+          data-testid="decision-counts-by-year-heading"
+          className={['text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+        >
+          {strings['decision.counts_by_year']}
+        </h5>
+        {filteredCounts.length === 0 ? (
+          <p
+            data-testid="decision-counts-by-year-empty"
+            className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+          >
+            {strings['decision.counts_by_year_empty']}
+          </p>
+        ) : (
+          <ul className={['mt-2', 'space-y-2'].join(' ')}>
+            {filteredCounts.map(({ entry, notEvaluated }) => (
+              <li
+                key={`${entry.rotation_id}:${entry.scenario_id}:${entry.indicator}:${entry.carbon_model ?? ''}:${entry.computation ?? ''}`}
+                data-testid="decision-count-by-year-item"
+                className={['text-sm'].join(' ')}
+              >
+                <p
+                  data-testid="decision-count-by-year-label"
+                  className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+                >
+                  {`${entry.rotation_id} ${entry.scenario_id} ${entry.indicator}`}
+                </p>
+                {entry.years_within_limits !== null ? (
+                  <p data-testid="decision-count-by-year-summary">
+                    {formatString(strings['decision.counts_by_year_summary'], {
+                      evaluated: entry.years_evaluated,
+                      within: entry.years_within_limits,
+                    })}
+                  </p>
+                ) : (
+                  <div>
+                    <p data-testid="decision-count-by-year-summary">
+                      {formatString(strings['decision.counts_by_year_evaluated'], {
+                        evaluated: entry.years_evaluated,
+                      })}
+                    </p>
+                    <p
+                      data-testid="decision-count-by-year-within-missing"
+                      className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+                    >
+                      {missingPatternText(strings['decision.counts_by_year_within'], {
+                        reason: 'NOT_DECLARED',
+                      })}
+                    </p>
+                  </div>
+                )}
+                {notEvaluated.length > 0 ? (
+                  <ul
+                    data-testid="decision-not-evaluated-list"
+                    className={['mt-1', 'space-y-0.5'].join(' ')}
+                  >
+                    {notEvaluated.map((row) => (
+                      <li
+                        key={`${row.ag_year}:${row.carbon_model ?? ''}:${row.computation ?? ''}`}
+                        data-testid="decision-not-evaluated-row"
+                        className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+                      >
+                        {missingPatternText(
+                          `${strings['decision.counts_by_year_not_evaluated']} ${row.ag_year}`,
+                          row.missing,
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div data-testid="decision-scenario-years" className={['mt-3'].join(' ')}>
+        <h5
+          data-testid="decision-scenario-years-heading"
+          className={['text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+        >
+          {strings['decision.scenario_years']}
+        </h5>
+        {filteredDiffs.length === 0 ? (
+          <p
+            data-testid="decision-scenario-years-empty"
+            className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+          >
+            {strings['decision.scenario_years_empty']}
+          </p>
+        ) : (
+          <ul className={['mt-2', 'space-y-2'].join(' ')}>
+            {filteredDiffs.map((diff) => (
+              <li
+                key={`${diff.pair[0]}:${diff.pair[1]}:${diff.scenario_id}:${diff.indicator}:${diff.ag_year}`}
+                data-testid="decision-scenario-year-row"
+                className={['text-sm'].join(' ')}
+              >
+                <p
+                  data-testid="decision-scenario-year-label"
+                  className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+                >
+                  {`${formatString(strings['decision.pair_of'], {
+                    first: diff.pair[0],
+                    second: diff.pair[1],
+                  })} ${diff.scenario_id} ${diff.indicator} ${diff.ag_year}`}
+                </p>
+                <ValueDisplay
+                  what={`${diff.indicator} ${diff.ag_year}`}
+                  item={diff.difference}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The measurement priority (D4) with its field: ranked items or NOT_DECLARED when empty. */
+function MeasureFirstBlock({
+  fieldId,
+  items,
+}: {
+  fieldId: string
+  items: readonly MeasureFirstItem[]
+}) {
+  return (
+    <div
+      data-testid="decision-measure-first"
+      className={[
+        'mt-4',
+        'rounded-lg',
+        'border',
+        'border-slate-200',
+        'bg-white',
+        'px-4',
+        'py-3',
+      ].join(' ')}
+    >
+      <h4
+        data-testid="decision-measure-first-heading"
+        className={['text-sm', 'font-semibold'].join(' ')}
+      >
+        {strings['decision.measure_first']}
+      </h4>
+      <p
+        data-testid="decision-measure-first-field"
+        className={['mt-1', 'font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+      >
+        {formatString(strings['decision.measure_first_field'], { field: fieldId })}
+      </p>
+      {items.length > 0 ? (
+        <ol data-testid="decision-measure-first-list" className={['mt-2', 'space-y-2'].join(' ')}>
+          {items.map((item, index) => (
+            <li
+              key={`${item.rank}:${index}`}
+              data-testid="decision-measure-first-item"
+              className={['text-sm'].join(' ')}
+            >
+              <p className={['font-medium'].join(' ')}>
+                <span
+                  data-testid="decision-measure-first-rank"
+                  className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+                >
+                  {formatString(strings['decision.measure_first_rank'], { rank: item.rank })}
+                </span>{' '}
+                <span data-testid="decision-measure-first-what">{item.what}</span>
+              </p>
+              <p
+                data-testid="decision-measure-first-why"
+                className={['text-sm', 'text-slate-600'].join(' ')}
+              >
+                {item.why}
+              </p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p
+          data-testid="decision-measure-first-empty"
+          className={['mt-2', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+        >
+          {missingPatternText(strings['decision.measure_first'], {
+            reason: 'NOT_DECLARED',
+            detail: strings['decision.measure_first_not_declared'],
+          })}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /** Where the rendered document comes from: the route, or the bundled example. */
 export type DecisionSource = 'route' | 'example'
 
-/** One document: the live-data label, the example banner, the state of the decision, one block per pair. */
+/** One document: the live-data label, the example banner, the state of the decision, one block per pair, named years, and measure first. */
 function DecisionDocument({
   document,
   source,
   liveData,
+  selectedYear,
+  onSelectYear,
 }: {
   document: DecisionOutput
   source: DecisionSource
   liveData: boolean
+  selectedYear?: YearSelection
+  onSelectYear?: (year: YearSelection) => void
 }) {
+  const [internalYear, setInternalYear] = useState<YearSelection>('all')
+  const currentYear = selectedYear ?? internalYear
+  const handleSelectYear = onSelectYear ?? setInternalYear
+
   return (
     <div data-testid="decision-document" data-source={source}>
       {liveData ? (
@@ -413,6 +743,14 @@ function DecisionDocument({
           document={document}
         />
       ))}
+
+      <NamedYearsSection
+        document={document}
+        selectedYear={currentYear}
+        onSelectYear={handleSelectYear}
+      />
+
+      <MeasureFirstBlock fieldId={document.field_id} items={document.measure_first} />
     </div>
   )
 }
@@ -473,7 +811,15 @@ function FallbackReason({ state }: { state: DecisionSectionState }) {
 }
 
 /** The section's panel: its title, then the route's document, the loading line, or the reason and the bundled example. */
-export function DecisionPanel({ state }: { state: DecisionSectionState }) {
+export function DecisionPanel({
+  state,
+  selectedYear,
+  onSelectYear,
+}: {
+  state: DecisionSectionState
+  selectedYear?: YearSelection
+  onSelectYear?: (year: YearSelection) => void
+}) {
   return (
     <section aria-labelledby="decision-title" className={['mt-8'].join(' ')}>
       <h3
@@ -493,11 +839,19 @@ export function DecisionPanel({ state }: { state: DecisionSectionState }) {
           document={state.answer.document}
           source="route"
           liveData={state.answer.liveData}
+          selectedYear={selectedYear}
+          onSelectYear={onSelectYear}
         />
       ) : (
         <>
           <FallbackReason state={state} />
-          <DecisionDocument document={decisionExample} source="example" liveData={false} />
+          <DecisionDocument
+            document={decisionExample}
+            source="example"
+            liveData={false}
+            selectedYear={selectedYear}
+            onSelectYear={onSelectYear}
+          />
         </>
       )}
     </section>
