@@ -40,7 +40,8 @@ def compute_rotation_margin(
 - A `crop_id` in `years` that is not in `facts.crops`: missing `MISSING_INPUT`, the detail names it.
 - Average: `sum over kinds of margin[t] * year_counts[t] / sum(year_counts)`. Missing `NOT_AVAILABLE` when `year_counts` is `None` (the kinds of year of the record are not classified); the three per-kind margins are still computed. Missing `MISSING_INPUT` when the margin of a kind with a count above zero is missing, the detail naming the kind. A kind with count 0 does not enter the average, so its missing margin does not make the average missing.
 - When `year_counts` is `None` and a kind is also missing, the average says `NOT_AVAILABLE` (the counts are checked first).
-- `ValueError` on structural misuse, which is not a missing fact: `years` empty; an entry empty (a bare fallow year has no declared fact; the option easiest to undo); `year_counts` with a key not in `KINDS_OF_YEAR`, a kind left out, a count that is negative, not an integer, or a boolean, or every count zero.
+- `ValueError` on structural misuse, which is not a missing fact: `years` empty, or a text instead of a list; an entry empty (a bare fallow year has no declared fact; the option easiest to undo), or a text instead of a list of `crop_id`s; an entry that holds a declared-margin crop together with any other crop; `year_counts` with a key not in `KINDS_OF_YEAR`, a kind left out, a count that is negative, not an integral number (any `numbers.Integral` is accepted, such as a numpy integer), or a boolean, or every count zero.
+- `RotationMargin.by_kind` is a read-only mapping: the result cannot be changed after it is computed.
 
 ## OPEN
 
@@ -48,3 +49,5 @@ def compute_rotation_margin(
 2. **Currency.** The contract accepts `USD` only and the unit is `USD ha-1 yr-1`; other currencies are question 2 of `contracts/economic_facts/README.md`.
 3. **Mapping from a rotation definition or a calendar onto `years`.** Not this unit (a later unit, S-018). Whether a `crop_id` of the facts must match one of the rotation definition is question 7 of the contract.
 4. **Fallow years.** An empty entry is refused; whether a fallow year should count as a year of zero cost, or carry a declared cost, is for the interface developer.
+5. **A declared-margin crop with another crop in the same year.** Refused (PROPOSED, the option easiest to undo). A declared margin is per hectare and agricultural year, so it already covers the whole year; adding a grain or cover cycle to the same year would count that year twice over, or would need a rule for splitting the year that nobody has decided. Whether a pasture can share a year with another crop, and how, is for the interface developer.
+6. **`MarginResult` is not the contract `Value` shape.** It carries no provenance (a computed margin would be `DERIVED`, C4.1), no source and no `range` or `range_missing` (C2.2). The service route (S-018) converts it into the contract shape; until then it stays an internal result.

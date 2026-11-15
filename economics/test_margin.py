@@ -11,7 +11,9 @@ PROPOSED.
 
 from __future__ import annotations
 
+import dataclasses
 import json
+import numbers
 import socket
 from pathlib import Path
 
@@ -251,11 +253,49 @@ def test_unknown_crop_id_is_missing_input():
             {"el_nino": 0, "neutral": 0, "la_nina": 0},
             id="year-counts-all-zero",
         ),
+        pytest.param(GRAIN_A, COUNTS, id="years-is-a-text"),
+        pytest.param([GRAIN_A], COUNTS, id="entry-is-a-text"),
+        pytest.param(
+            [[GRAIN_A, PASTURE]], COUNTS, id="declared-margin-shares-its-year"
+        ),
     ],
 )
 def test_structural_misuse_raises(years, counts):
     with pytest.raises(ValueError):
         compute_rotation_margin(years, _facts(), counts)
+
+
+class _IntegralStandIn:
+    """A stand-in for an integral number that is not a Python int (such as numpy's)."""
+
+    def __init__(self, number: int) -> None:
+        self._number = number
+
+    def __index__(self) -> int:
+        return self._number
+
+
+numbers.Integral.register(_IntegralStandIn)
+
+
+def test_year_counts_accept_any_integral():
+    counts = {kind: _IntegralStandIn(n) for kind, n in COUNTS.items()}
+    margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), counts)
+    el_nino = 300 * 3.0 - 500 - 90
+    neutral = 300 * 2.5 - 500 - 90
+    la_nina = 300 * 1.5 - 500 - 90
+    # PROPOSED expected value: the same as test 4.
+    _assert_present(
+        margin.average, (el_nino * 3 + neutral * 5 + la_nina * 2) / (3 + 5 + 2)
+    )
+
+
+def test_result_cannot_be_changed():
+    margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), COUNTS)
+    with pytest.raises(TypeError):
+        margin.by_kind["el_nino"] = margin.average
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        margin.average = margin.by_kind["el_nino"]
 
 
 # 10. No network call, no mutation of the inputs.
@@ -285,7 +325,15 @@ def test_contract_example_gives_present_margins():
         ["PLACEHOLDER_pasture"],
     ]
     margin = compute_rotation_margin(years, facts, COUNTS)
-    for kind in KINDS_OF_YEAR:
-        assert margin.by_kind[kind].value is not None
-        assert margin.by_kind[kind].reason is None
-    assert margin.average.value is not None
+    # PROPOSED expected values, from the invented numbers of the contract
+    # example: soybean price 400, cost 600, yields 2.6 / 3.0 / 1.6; cover crop
+    # cost 90; pasture declared margin 198 / 180 / 126. Two years.
+    el_nino = ((400 * 2.6 - 600) + (-90) + 198) / 2
+    neutral = ((400 * 3.0 - 600) + (-90) + 180) / 2
+    la_nina = ((400 * 1.6 - 600) + (-90) + 126) / 2
+    _assert_present(margin.by_kind["el_nino"], el_nino)
+    _assert_present(margin.by_kind["neutral"], neutral)
+    _assert_present(margin.by_kind["la_nina"], la_nina)
+    _assert_present(
+        margin.average, (el_nino * 3 + neutral * 5 + la_nina * 2) / (3 + 5 + 2)
+    )

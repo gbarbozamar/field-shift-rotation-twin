@@ -13,8 +13,11 @@ missing margin with its reason (C3.2 of contracts/CONVENTIONS.md), never zero.
 
 from __future__ import annotations
 
+import numbers
+import operator
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from contracts.economic_facts import (
     KINDS_OF_YEAR,
@@ -51,10 +54,17 @@ class MarginResult:
 
 @dataclass(frozen=True)
 class RotationMargin:
-    """The margin of one rotation in each kind of year and on average. PROPOSED."""
+    """The margin of one rotation in each kind of year and on average. PROPOSED.
 
-    by_kind: dict[str, MarginResult]
+    ``by_kind`` is stored as a read-only mapping, so the result cannot be
+    changed after it is computed.
+    """
+
+    by_kind: Mapping[str, MarginResult]
     average: MarginResult
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "by_kind", MappingProxyType(dict(self.by_kind)))
 
 
 def _missing(reason: ReasonCode, detail: str) -> MarginResult:
@@ -63,48 +73,54 @@ def _missing(reason: ReasonCode, detail: str) -> MarginResult:
 
 def _describe_absent(crop_id: str, member: str, kind: str, value: Value) -> str:
     """The detail of one missing input, naming the crop, member, kind and reason."""
-    reason = value.missing.reason if value.missing is not None else "UNKNOWN"
+    # The contract (C3.1) guarantees a missing value carries its missing part.
+    assert value.missing is not None
     text = (
-        f"crop_id {crop_id!r}: {member} in the {kind} kind of year is missing {reason}"
+        f"crop_id {crop_id!r}: {member} in the {kind} kind of year is missing "
+        f"{value.missing.reason}"
     )
-    if value.missing is not None and value.missing.detail is not None:
+    if value.missing.detail is not None:
         text += f" ({value.missing.detail})"
     return text
 
 
-def _cycle_margin(crop, kind: str) -> tuple[float | None, list[str]]:
-    """The margin of one crop cycle in ``kind``, or the details of what is missing."""
-    needed: list[tuple[str, Value]]
-    if isinstance(crop, GrainCrop):
-        needed = [
-            ("price", crop.price),
-            (f"yield.{kind}", getattr(crop.yield_, kind)),
-            ("cost", crop.cost),
-        ]
-    elif isinstance(crop, CoverCrop):
-        needed = [("cost", crop.cost)]
-    elif isinstance(crop, DeclaredMarginCrop):
-        needed = [(f"declared_margin.{kind}", getattr(crop.declared_margin, kind))]
-    else:  # pragma: no cover - the contract admits only the three kinds
-        raise TypeError(f"unknown kind of crop: {type(crop).__name__}")
-
-    absent = [
-        _describe_absent(crop.crop_id, member, kind, value)
-        for member, value in needed
+def _absent(crop_id: str, kind: str, values: Mapping[str, Value]) -> list[str]:
+    return [
+        _describe_absent(crop_id, member, kind, value)
+        for member, value in values.items()
         if value.value is None
     ]
-    if absent:
-        return None, absent
 
+
+def _cycle_margin(crop, kind: str) -> tuple[float | None, list[str]]:
+    """The margin of one crop cycle in ``kind``, or the details of what is missing."""
     if isinstance(crop, GrainCrop):
+        price = crop.price
+        yield_ = getattr(crop.yield_, kind)
+        cost = crop.cost
+        absent = _absent(
+            crop.crop_id, kind, {"price": price, f"yield.{kind}": yield_, "cost": cost}
+        )
+        if absent:
+            return None, absent
         # PROPOSED rule: price * yield in this kind of year - cost of the cycle.
-        price, yield_, cost = (value.value for _, value in needed)
-        return price * yield_ - cost, []
+        return price.value * yield_.value - cost.value, []
     if isinstance(crop, CoverCrop):
+        absent = _absent(crop.crop_id, kind, {"cost": crop.cost})
+        if absent:
+            return None, absent
         # PROPOSED rule: a cover crop is not sold; its cycle costs its cost.
         return -crop.cost.value, []
-    # PROPOSED rule: the declared margin, per hectare and agricultural year.
-    return needed[0][1].value, []
+    if isinstance(crop, DeclaredMarginCrop):
+        margin = getattr(crop.declared_margin, kind)
+        absent = _absent(crop.crop_id, kind, {f"declared_margin.{kind}": margin})
+        if absent:
+            return None, absent
+        # PROPOSED rule: the declared margin, per hectare and agricultural year.
+        return margin.value, []
+    raise TypeError(  # pragma: no cover - the contract admits only the three kinds
+        f"unknown kind of crop: {type(crop).__name__}"
+    )
 
 
 def _margin_in_kind(
@@ -136,18 +152,35 @@ def _margin_in_kind(
     return MarginResult(value=total / len(years))
 
 
-def _check_years(years: Sequence[Sequence[str]]) -> None:
+def _check_years(years: Sequence[Sequence[str]], crops: Mapping[str, object]) -> None:
+    # A str is a Sequence[str]: taken as years or as an entry it would be read
+    # letter by letter, so it is refused. ValueError, not TypeError: one
+    # exception type for every structural misuse (the brief names ValueError).
+    if isinstance(years, str):
+        raise ValueError("years: a list of agricultural years, not a text")  # noqa: TRY004
     if len(years) == 0:
         raise ValueError("years: the rotation has at least one agricultural year")
     for index, entry in enumerate(years):
+        if isinstance(entry, str):
+            raise ValueError(f"years[{index}]: a list of crop_ids, not a text")  # noqa: TRY004
         # PROPOSED: a bare fallow year has no declared fact, so it is refused.
         if len(entry) == 0:
             raise ValueError(
                 f"years[{index}]: an agricultural year holds at least one crop_id"
             )
+        # PROPOSED: a declared margin covers a whole agricultural year, so it
+        # does not share its year with another crop (README.md, OPEN).
+        if len(entry) > 1 and any(
+            isinstance(crops.get(crop_id), DeclaredMarginCrop) for crop_id in entry
+        ):
+            raise ValueError(
+                f"years[{index}]: a declared-margin crop covers the whole "
+                "agricultural year and shares it with no other crop"
+            )
 
 
-def _check_year_counts(year_counts: Mapping[str, int]) -> None:
+def _check_year_counts(year_counts: Mapping[str, int]) -> dict[str, int]:
+    """Check ``year_counts`` and give it back as plain integers."""
     unknown = sorted(set(year_counts) - set(KINDS_OF_YEAR))
     if unknown:
         raise ValueError(
@@ -156,16 +189,21 @@ def _check_year_counts(year_counts: Mapping[str, int]) -> None:
     absent = [kind for kind in KINDS_OF_YEAR if kind not in year_counts]
     if absent:
         raise ValueError(f"year_counts: no count for {absent}")
+    counts: dict[str, int] = {}
     for kind in KINDS_OF_YEAR:
         count = year_counts[kind]
-        if isinstance(count, bool) or not isinstance(count, int):
+        # Any integral number (such as a numpy integer) is a count; a boolean
+        # is not, although Python treats it as one.
+        if isinstance(count, bool) or not isinstance(count, numbers.Integral):
             # One exception type for every structural misuse (the brief of
             # l2/economics-margin names ValueError), hence no TypeError here.
             raise ValueError(f"year_counts[{kind!r}]: a count is an integer")  # noqa: TRY004
-        if count < 0:
+        counts[kind] = operator.index(count)
+        if counts[kind] < 0:
             raise ValueError(f"year_counts[{kind!r}]: a count is not negative")
-    if sum(year_counts[kind] for kind in KINDS_OF_YEAR) == 0:
+    if sum(counts.values()) == 0:
         raise ValueError("year_counts: at least one count is above zero")
+    return counts
 
 
 def _average(
@@ -207,9 +245,9 @@ def compute_rotation_margin(
     (see README.md); a missing fact is never an exception but a missing
     margin with its reason.
     """
-    _check_years(years)
-    if year_counts is not None:
-        _check_year_counts(year_counts)
     crops = {crop.crop_id: crop for crop in facts.crops}
+    _check_years(years, crops)
+    if year_counts is not None:
+        year_counts = _check_year_counts(year_counts)
     by_kind = {kind: _margin_in_kind(years, crops, kind) for kind in KINDS_OF_YEAR}
     return RotationMargin(by_kind=by_kind, average=_average(by_kind, year_counts))
