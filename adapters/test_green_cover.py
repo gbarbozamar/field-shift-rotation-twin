@@ -621,7 +621,7 @@ def test_readonly_cache_still_returns_fresh_data(tmp_path):
 
 
 def test_corrupted_cached_entry_returns_source_unavailable_without_network(tmp_path):
-    source, service, folder = build(tmp_path, answer_with(DOCUMENT))
+    source, _service, folder = build(tmp_path, answer_with(DOCUMENT))
     source.get_green_cover(REQUEST)
     (cache_file,) = stored_files(folder)
     payload = json.loads(cache_file.read_text(encoding="utf-8"))

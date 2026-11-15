@@ -37,7 +37,7 @@ from types import MappingProxyType
 from typing import Any, Literal, Protocol, Self, get_args
 
 import httpx
-from pydantic import FiniteFloat, ValidationError, model_validator
+from pydantic import Field, FiniteFloat, ValidationError, model_validator
 
 from adapters.cache import ResponseCache, StoredResponse, cache_key
 from adapters.ports import SourceInfo, SourceState
@@ -246,7 +246,7 @@ class GreenCoverStrip(ContractModel):
     time_zone: NonEmptyStr = TIME_ZONE
     observations: list[GreenCoverObservation]
     strip_missing: Missing | None = None
-    sources: list[NonEmptyStr] = []
+    sources: list[NonEmptyStr] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_strip(self) -> Self:
@@ -423,11 +423,10 @@ def _parse_observation(
     if "value" not in item:
         raise UnusableResponse("an observation item has no 'value'")
     raw_value = item["value"]
-    if raw_value is not None:
-        if not _is_number(raw_value) or not math.isfinite(raw_value):
-            raise UnusableResponse(
-                "an observation 'value' is not a finite number or null"
-            )
+    if raw_value is not None and (
+        not _is_number(raw_value) or not math.isfinite(raw_value)
+    ):
+        raise UnusableResponse("an observation 'value' is not a finite number or null")
 
     entry: dict[str, Any] = {
         "date": obs_date.isoformat(),
