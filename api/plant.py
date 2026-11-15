@@ -77,10 +77,9 @@ from api.rotation_validator import field_names, safe_message, submitted_texts
 from api.rotations import PERIOD_NOT_CONFIGURED, get_climate, source_out
 from contracts.plant_answer import PlantRequest
 from contracts.rotation_definition import RotationDefinition
-from economics import plant as rules
 
-# Moved to economics.plant (S-030) and imported back, so that
-# ``from api.plant import ...`` keeps working. Re-exported names.
+# Moved to economics.plant (S-030): the names the route uses, and the names
+# imported back so that ``from api.plant import ...`` keeps working.
 from economics.plant import (  # noqa: F401
     EROSIVITY,
     IGNORED_YEARS,
@@ -90,11 +89,17 @@ from economics.plant import (  # noqa: F401
     YEAR_NOT_OF_THE_RECORD,
     Classified,
     CycleYears,
-    _plain,
     _todays_price,
     assemble_answer,
     cycle_years,
+    plain,
     soil_loss_means,
+)
+
+# The same style; ruff's import sorting keeps an aliased name in its own
+# statement. The alias frees ``classify_years`` for the wrapper below.
+from economics.plant import (
+    classify_years as classify_record_years,
 )
 
 logger = logging.getLogger(__name__)
@@ -252,7 +257,7 @@ def classify_years(
         assert settings.start_date is not None and settings.end_date is not None
         years = whole_ag_years(start_month, settings.start_date, settings.end_date)
         why = NO_WHOLE_YEAR
-    return rules.classify_years(record, years, why, start_month, rotations)
+    return classify_record_years(record, years, why, start_month, rotations)
 
 
 # --- the sources and the rain stress ------------------------------------------
@@ -405,7 +410,7 @@ def make_plant_router(
                 runs,
                 classified=classified,
                 record=kinds_of_year_record,
-                rain_stress=None if run.echo is None else _plain(run.echo),
+                rain_stress=None if run.echo is None else plain(run.echo),
                 sources=sources,
                 example_data=example_data,
             )

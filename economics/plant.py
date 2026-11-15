@@ -6,15 +6,18 @@ margin and mean live here, not in ``api/``. The route ``api/plant.py`` gathers
 the request and the engine runs and hands them to ``assemble_answer``, the one
 entry function of this module.
 
-What ``assemble_answer`` does, in order (steps 4 and 5 of ``api/plant.py``):
+Steps 4 to 6 of ``api/plant.py`` happen here. ``classify_years`` classifies
+the whole agricultural years of the record (computed by the caller) on the
+ONI record, or lists the declared years unclassified when they are not known
+(step 4). Then ``assemble_answer``, in order:
 
-1. The soil loss per agricultural year of the phase-1 result
-   (``kinds_of_year.series_from_results``) is averaged by kind of year
-   (``mean_by_kind``); the kinds of year are the ones ``classify_years`` gives.
-2. The pure functions of ``economics/`` give the margins, the limit checks,
-   the decision and the tipping price.
-3. The answer is checked with ``check_answer_against_request``; a failure
-   raises (a defect of the caller's inputs or of this module).
+1. averages the soil loss per agricultural year of the phase-1 result
+   (``kinds_of_year.series_from_results``) by kind of year (``mean_by_kind``),
+   on the kinds of year of ``classify_years`` (step 4);
+2. gives the margins, the limit checks, the decision and the tipping price
+   through the pure functions of ``economics/`` (step 5);
+3. checks the answer with ``check_answer_against_request``; a failure raises
+   (a defect of the caller's inputs or of this module) (step 6).
 
 No number is computed here that does not come from a function of
 ``economics/`` or ``kinds_of_year/``, or is copied from an engine result or
@@ -367,24 +370,24 @@ def soil_loss_means(
 # --- the answer ---------------------------------------------------------------
 
 
-def _plain(value: Any) -> Any:
+def plain(value: Any) -> Any:
     """A dataclass or model as JSON-ready data: tuples as lists, mappings as dicts."""
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
-            field.name: _plain(getattr(value, field.name))
+            field.name: plain(getattr(value, field.name))
             for field in dataclasses.fields(value)
         }
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
     if isinstance(value, Mapping):
-        return {key: _plain(item) for key, item in value.items()}
+        return {key: plain(item) for key, item in value.items()}
     if isinstance(value, list | tuple):
-        return [_plain(item) for item in value]
+        return [plain(item) for item in value]
     return value
 
 
 def _margin_out(margin: MarginResult) -> dict[str, Any]:
-    return _plain(margin)
+    return plain(margin)
 
 
 def _missing_margin(reason: str, detail: str) -> MarginResult:
@@ -392,7 +395,7 @@ def _missing_margin(reason: str, detail: str) -> MarginResult:
 
 
 def _year_kind(ag_year: int, kind: KindOfYear) -> dict[str, Any]:
-    return {"ag_year": ag_year, **_plain(kind)}
+    return {"ag_year": ag_year, **plain(kind)}
 
 
 def _shared_tipping(
@@ -575,7 +578,7 @@ def assemble_answer(
         )
         # The decision at today's price is the answer itself (contract).
         tipping = {
-            key: value for key, value in _plain(found).items() if key != "decision"
+            key: value for key, value in plain(found).items() if key != "decision"
         }
         tipping["price_range"] = price_range
 
@@ -591,11 +594,11 @@ def assemble_answer(
                 "state": verdict.state,
                 "margin": {key: _margin_out(margin[key]) for key in margin},
                 "soil_loss": {
-                    "average": _plain(record_mean),
-                    **{kind: _plain(by_kind[kind]) for kind in KINDS_OF_YEAR},
+                    "average": plain(record_mean),
+                    **{kind: plain(by_kind[kind]) for kind in KINDS_OF_YEAR},
                 },
-                "limit": _plain(limit),
-                "limit_check": _plain(verdict.limit_check),
+                "limit": plain(limit),
+                "limit_check": plain(verdict.limit_check),
             }
         )
 
@@ -611,9 +614,9 @@ def assemble_answer(
         "detail": decision.detail,
         "tied": list(decision.tied),
         "options": options,
-        "limit_cost": _plain(decision.limit_cost),
+        "limit_cost": plain(decision.limit_cost),
         "tipping_price": tipping,
-        "rain_stress": None if rain_stress is None else _plain(rain_stress),
+        "rain_stress": None if rain_stress is None else plain(rain_stress),
         "erosivity": EROSIVITY,
         "kinds_of_year": {
             "source": record["id"],

@@ -210,13 +210,13 @@ def find_tipping_price(
 4. **The cost of the limit at the tipping price.** Not computed (out of scope).
 5. **Near-coincident crossings.** Three or more lines that cross at one real price give float breakpoints a few ulps apart; near-coincident crossings may report a `not_resolved` interval between them. No tolerance is invented; a tolerance is a person's choice.
 
-# economics: the answer of "What should I plant?"
+## economics: the answer of "What should I plant?"
 
 Status: **PROPOSED** (blueprint section 3.7). Built by unit `l2/plant-rules-to-economics` (S-030, point 2 of the platform review of PR 310).
 
 `economics/plant.py` holds the rules that decide which crops and years count in each margin and mean of the answer of `POST /api/plant/run`, behind one public entry function. The route `api/plant.py` only gathers the request and the engine runs and hands them over; it imports the moved names back, so `from api.plant import ...` keeps working. The module imports contracts, `economics/` and `kinds_of_year/` only, never `api/`, `adapters/` or `engine/` (checked by `test_plant.py`). Every answer of the route is the same as before the move.
 
-## Signature (PROPOSED)
+### Signature (PROPOSED)
 
 ```python
 def assemble_answer(
@@ -235,6 +235,6 @@ def assemble_answer(
 - `classified`: what `classify_years(record, record_years, why, start_month, rotations)` gives. `record_years` is the first and last whole agricultural year of the record as the caller computed them, or `None` with `why` the text of why they are not known (the route reads them from its settings).
 - `rain_stress`: the rain-stress echo already as JSON-ready data, or `None`; `sources`: the source rows of the answer as JSON-ready data. Both are copied unchanged.
 - The answer is checked with `check_answer_against_request`; a failure raises.
-- Also public, for the route's tests: `Classified`, `CycleYears`, `cycle_years`, `soil_loss_means`. `_ag_year_of` follows C5.3 of `contracts/CONVENTIONS.md` and is checked against `api.phases.ag_year_of`.
+- Also public: `Classified`, `CycleYears`, `cycle_years`, `soil_loss_means` (for the route's tests) and `plain` (a dataclass or model as JSON-ready data, which the route uses for the rain-stress echo). `_ag_year_of` follows C5.3 of `contracts/CONVENTIONS.md` and is checked against `api.phases.ag_year_of`.
 
 The rules themselves (`cycle_years`, `soil_loss_means`, `classify_years`) are written in their docstrings, with their PROPOSED and OPEN notes, moved unchanged from `api/plant.py`. `assemble_answer` is not exported from `economics/__init__.py` (PROPOSED: importing the package does not load the plant answer).

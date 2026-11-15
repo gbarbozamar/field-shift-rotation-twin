@@ -19,7 +19,7 @@ from pathlib import Path
 
 from api.phases import ag_year_of
 from api.plant import stressed_run
-from contracts.economic_facts import KINDS_OF_YEAR
+from contracts.economic_facts import KINDS_OF_YEAR, DeclaredMarginCrop
 from contracts.plant_answer import PlantRequest, check_answer_against_request
 from contracts.results.models import ResultsPerRotation
 from economics import plant
@@ -35,6 +35,15 @@ ANSWER = json.loads(
 )
 WHY = "PLACEHOLDER: why the years of the record are not known in this test"
 MISSING_DETAIL = "PLACEHOLDER: input not available: climate"
+RESULTS_EXAMPLE = json.loads(
+    (
+        ROOT
+        / "contracts"
+        / "results"
+        / "examples"
+        / "PLACEHOLDER_results_per_rotation.json"
+    ).read_text(encoding="utf-8")
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,16 +129,55 @@ def test_assemble_answer_on_the_contract_example_passes_the_contract_check():
         [NO_RESULT for _ in request.rotations],
         classified=classified,
         record=record,
-        rain_stress=plant._plain(echo),
+        rain_stress=plant.plain(echo),
         sources=ANSWER["sources"],
         example_data=True,
     )
     check_answer_against_request(request, answer)
-    assert answer.rain_stress.model_dump(mode="json") == plant._plain(echo)
+    assert answer.rain_stress.model_dump(mode="json") == plant.plain(echo)
     assert answer.kinds_of_year.source == record["id"]
     for option in answer.options:
         assert option.soil_loss.average.value is None
         assert MISSING_DETAIL in option.soil_loss.average.detail
+
+
+def test_assemble_answer_averages_the_soil_loss_of_a_contract_results_example():
+    """The averaging branch through ``assemble_answer``: every rotation's run
+    is the contract results example, loaded unchanged except for its
+    ``rotation_id`` (an identifier, set to the rotation it answers for), and
+    the record years are the agricultural years of that example."""
+    request = _request()
+    record = load_record()
+    start_month = request.rotations[0].ag_year_start.month
+    example = ResultsPerRotation.model_validate(RESULTS_EXAMPLE)
+    annual_years = [item.ag_year for item in example.soil_loss.annual]
+    classified = plant.classify_years(
+        record,
+        (min(annual_years), max(annual_years)),
+        WHY,
+        start_month,
+        request.rotations,
+    )
+    runs = [
+        _Run(example.model_copy(update={"rotation_id": r.rotation_id}), None)
+        for r in request.rotations
+    ]
+    answer = plant.assemble_answer(
+        request,
+        runs,
+        classified=classified,
+        record=record,
+        rain_stress=plant.plain(stressed_run(request, None, None, None).echo),
+        sources=ANSWER["sources"],
+        example_data=True,
+    )
+    check_answer_against_request(request, answer)
+    means = plant.soil_loss_means(runs[0], classified)
+    for option in answer.options:
+        assert option.soil_loss.average.model_dump(mode="json") == plant.plain(means[0])
+    # mean_by_kind read at least one year of the example (the averaging
+    # branch), not the missing-mean branch, whose ag_years are empty.
+    assert means[0].ag_years
 
 
 # --- d. years that are not years of the record ----------------------------------
@@ -165,12 +213,19 @@ def test_cycle_years_of_the_first_example_rotation():
     crops = {crop.crop_id: crop for crop in request.economic_facts.crops}
     cycle = plant.cycle_years(rotation, crops)
     assert cycle.years is not None and cycle.reason is None
-    month = rotation.ag_year_start.month
-    sown = [ag_year_of(c.sowing.date, month) for c in rotation.components]
-    assert len(cycle.years) == max(sown) - min(sown) + 1
-    assert sorted(crop for entry in cycle.years for crop in entry) == sorted(
-        c.crop_id for c in rotation.components
+    # No declared-margin crop: each component counts in the agricultural year
+    # of its sowing only, in position order, from the first year to the last.
+    assert not any(
+        isinstance(crops[c.crop_id], DeclaredMarginCrop) for c in rotation.components
     )
+    month = rotation.ag_year_start.month
+    ordered = sorted(rotation.components, key=lambda c: c.position)
+    sown = [ag_year_of(c.sowing.date, month) for c in ordered]
+    expected = [
+        [c.crop_id for c, year in zip(ordered, sown, strict=True) if year == ag_year]
+        for ag_year in range(min(sown), max(sown) + 1)
+    ]
+    assert cycle.years == expected
 
 
 def test_soil_loss_means_of_a_run_without_result_are_missing_with_its_reason():
