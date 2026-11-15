@@ -487,32 +487,19 @@ def test_an_engine_that_raises_answers_500_with_cors_and_no_exception_text():
     _is_internal_error(response)
 
 
-# --- a decision layer that fails: a typed absence, never a 500 ----------------------------
+# --- a decision layer that fails: a defect, 500 like an engine ---------------------------
 
 
-def _layer_failed(response, kind: str) -> None:
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["decision"] is None
-    assert body["decision_missing"]["reason"] == "NOT_AVAILABLE"
-    assert f"failed ({kind})" in body["decision_missing"]["detail"]
-    assert "PLACEHOLDER_SECRET_EXCEPTION_TEXT" not in response.text
-    assert "PLACEHOLDER_other" not in response.text
-    # The table was built: the legend and the rotations are still there.
-    assert len(body["scenarios"]) == 2
-    assert len(body["rotations"]) == 2
-
-
-def test_a_decision_layer_that_raises_answers_200_with_its_absence():
+def test_a_decision_layer_that_raises_answers_500():
     response = client(decision_layer=FakeDecisionLayer(raises=True)).post(
         ROUTE, json=BODY, headers={"Origin": ORIGIN}
     )
-    _layer_failed(response, "RuntimeError")
+    _is_internal_error(response)
 
 
 def test_any_injected_layer_is_checked_by_the_route():
     """A layer that is not the default one and returns a document whose
-    scenarios are not those of the table: the route's own check answers it."""
+    scenarios are not those of the table: the route's own check refuses it."""
 
     class Mismatched(FakeDecisionLayer):
         def decide(self, table, *, example_data):
@@ -520,11 +507,13 @@ def test_any_injected_layer_is_checked_by_the_route():
                 table, example_data=example_data, scenarios=["phase_1+phase_1"]
             )
 
-    response = client(decision_layer=Mismatched()).post(ROUTE, json=BODY)
-    _layer_failed(response, "TypeError")
+    response = client(decision_layer=Mismatched()).post(
+        ROUTE, json=BODY, headers={"Origin": ORIGIN}
+    )
+    _is_internal_error(response)
 
 
-def test_a_decision_function_that_returns_another_document_answers_its_absence():
+def test_a_decision_function_that_returns_another_document_answers_500():
     def another(table, *, example_data):
         return smallest_document(
             table, example_data=example_data, case_id="PLACEHOLDER_other"
@@ -533,24 +522,34 @@ def test_a_decision_function_that_returns_another_document_answers_its_absence()
     response = client(decision_layer=NamedDecisionLayer(another)).post(
         ROUTE, json=BODY, headers={"Origin": ORIGIN}
     )
-    _layer_failed(response, "TypeError")
+    _is_internal_error(response)
+    assert "PLACEHOLDER_other" not in response.text
 
 
 class _BrokenDecisionModule(MetaPathFinder):
-    """``decision.output`` exists and imports something absent."""
+    """``decision.output`` exists and raises when imported."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
 
     def find_spec(self, fullname, path=None, target=None):
         if fullname == "decision.output":
-            raise ModuleNotFoundError(
-                "No module named 'PLACEHOLDER_absent_dependency'",
-                name="PLACEHOLDER_absent_dependency",
-            )
+            raise self.error
 
 
-@pytest.fixture
-def broken_decision_module():
+@pytest.fixture(
+    params=[
+        ModuleNotFoundError(
+            "No module named 'PLACEHOLDER_absent_dependency'",
+            name="PLACEHOLDER_absent_dependency",
+        ),
+        RuntimeError("PLACEHOLDER_SECRET_EXCEPTION_TEXT"),
+    ],
+    ids=["imports-something-absent", "raises"],
+)
+def broken_decision_module(request):
     saved = sys.modules.pop("decision.output", None)
-    finder = _BrokenDecisionModule()
+    finder = _BrokenDecisionModule(request.param)
     sys.meta_path.insert(0, finder)
     yield
     sys.meta_path.remove(finder)
@@ -559,9 +558,9 @@ def broken_decision_module():
         sys.modules["decision.output"] = saved
 
 
-def test_a_decision_module_that_fails_to_import_breaks_nothing(broken_decision_module):
-    """The default app starts, its other routes answer as before, and the
-    decision route answers 200 with its absence."""
+def test_a_decision_module_that_fails_to_import_is_a_defect(broken_decision_module):
+    """Not "not built": the decision route answers 500. The default app still
+    starts and its other routes answer as before."""
     app = create_app(
         [ORIGIN],
         climate=FakeClimate(),
@@ -577,7 +576,24 @@ def test_a_decision_module_that_fails_to_import_breaks_nothing(broken_decision_m
         ).status_code
         == 200
     )
-    _layer_failed(web.post(ROUTE, json=BODY), "ModuleNotFoundError")
+    _is_internal_error(web.post(ROUTE, json=BODY, headers={"Origin": ORIGIN}))
+
+
+def test_a_decision_module_that_is_absent_is_not_built(monkeypatch):
+    """Only the absence of the module answers 200 ``NOT_AVAILABLE``."""
+    monkeypatch.setattr(
+        "api.decision_layer.DECISION_MODULE", "placeholder_absent_package.output"
+    )
+    app = create_app(
+        [ORIGIN],
+        climate=FakeClimate(),
+        soil_slope=FakeSoilSlope(),
+        engines=FakeEngines(),
+        settings=PERIOD,
+    )
+    body = TestClient(app).post(ROUTE, json=BODY).json()
+    assert body["decision"] is None
+    assert body["decision_missing"]["reason"] == "NOT_AVAILABLE"
 
 
 def test_the_default_app_imports_nothing_of_the_decision_layer_at_start_up():
@@ -608,6 +624,177 @@ def test_the_existing_route_is_unchanged_next_to_the_new_one():
     )
     assert response.status_code == 200
     assert response.json()["result"]["rotation_id"] == FIRST
+
+
+# --- phases: N x M scenarios, each rotation run once per phase --------------------------
+
+
+class PhasesByRotation:
+    """The phase functions of issue #221 as fakes, answering by the
+    ``rotation_id`` of the calendar: hand-written phase calendars, never a
+    computed rule (``api/test_phases.py``)."""
+
+    def __init__(self, answers: dict[str, dict[int, Any]], counts: dict[str, int]):
+        self.answers = answers
+        self.counts = counts
+        self.asked: list[tuple[str, int]] = []
+
+    def phase_calendar(self, cal, p: int):
+        self.asked.append((cal.rotation_id, p))
+        return self.answers[cal.rotation_id][p]
+
+    def list_phases(self, cal) -> list[int]:
+        return list(range(self.counts[cal.rotation_id]))
+
+
+def _as_rotation(cal, rotation_id: str):
+    from contracts.inputs import RotationCalendar
+
+    return RotationCalendar.model_validate(
+        {**cal.model_dump(mode="json"), "rotation_id": rotation_id}
+    )
+
+
+def test_two_rotations_of_n_and_m_phases_give_n_times_m_scenarios():
+    """N = 2 and M = 3: six scenarios ``phase_a+phase_b``; the engines of each
+    rotation run once per phase of that rotation (2 + 3 runs), never once per
+    scenario (6 x 2). Fakes only, with hand-written PLACEHOLDER calendars."""
+    from api.engines import EngineFunctions, EntryPointEngines
+    from api.test_engines import (
+        CARBON_MODELS,
+        SOIL_SLOPE_FILE,
+        Fake,
+        calendar,
+        soil_loss,
+        water,
+    )
+    from api.test_engines import PERIOD as ENGINES_PERIOD
+    from api.test_engines import FakeClimate as EnginesClimate
+    from api.test_phases import EXAMPLE_PHASES, THREE_YEARS, THREE_YEARS_PHASES
+
+    two, three = "PLACEHOLDER-rotation-two-phases", "PLACEHOLDER-rotation-three-phases"
+    calendars = {
+        two: _as_rotation(calendar(), two),
+        three: _as_rotation(THREE_YEARS, three),
+    }
+    phases = PhasesByRotation(
+        answers={
+            two: {p: _as_rotation(c, two) for p, c in EXAMPLE_PHASES.items()},
+            three: {p: _as_rotation(c, three) for p, c in THREE_YEARS_PHASES.items()},
+        },
+        counts={two: 2, three: 3},
+    )
+
+    class CalendarByRotation(Fake):
+        def __call__(self, *args, **kwargs):
+            super().__call__(*args, **kwargs)
+            (rotation,) = args
+            return calendars[rotation.rotation_id]
+
+    calendar_fn, soil_fn, water_fn = (
+        CalendarByRotation(),
+        Fake(soil_loss()),
+        Fake(water()),
+    )
+    engines = EntryPointEngines(
+        EngineFunctions(
+            build_rotation_calendar=calendar_fn,
+            compute_soil_loss=soil_fn,
+            compute_water_deficit_exposure=water_fn,
+            phase_calendar=phases.phase_calendar,
+            list_phases=phases.list_phases,
+        ),
+        carbon_models=CARBON_MODELS,
+    )
+    site = {**SITE, "case_id": "PLACEHOLDER-case", "field_id": "PLACEHOLDER-field"}
+    body = {
+        "site": site,
+        "rotations": [
+            rotation(rotation_id, case_id=site["case_id"], field_id=site["field_id"])
+            for rotation_id in (two, three)
+        ],
+    }
+    layer = FakeDecisionLayer()
+    response = client(
+        engines=engines,
+        climate=EnginesClimate(),
+        soil_slope=ExampleSoilSlopeSource(SOIL_SLOPE_FILE),
+        settings=ENGINES_PERIOD,
+        decision_layer=layer,
+    ).post(ROUTE, json=body)
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    assert answer["decision_missing"] is None, answer["decision_missing"]
+    assert [s["scenario_id"] for s in answer["scenarios"]] == [
+        f"phase_{a}+phase_{b}" for a in (1, 2) for b in (1, 2, 3)
+    ]
+    for item in answer["scenarios"]:
+        a, b = item["scenario_id"].split("+")
+        assert item["phases"] == [
+            {"rotation_id": two, "phase": a},
+            {"rotation_id": three, "phase": b},
+        ]
+    assert [len(r["phases"]) for r in answer["rotations"]] == [2, 3]
+    assert sorted(answer["decision"]["scenarios"]) == sorted(
+        s["scenario_id"] for s in answer["scenarios"]
+    )
+    # EP2 once per rotation; the phase function once per phase after the
+    # first; EP1 and EP3 once per phase of each rotation.
+    assert [args[0].rotation_id for args, _ in calendar_fn.calls] == [two, three]
+    assert phases.asked == [(two, 1), (three, 1), (three, 2)]
+    ran = [kwargs["calendar"].rotation_id for _, kwargs in soil_fn.calls]
+    assert ran == [two] * 2 + [three] * 3
+    assert [kwargs["calendar"].rotation_id for _, kwargs in water_fn.calls] == ran
+    ((table, _),) = layer.calls
+    assert len({row.scenario_id for row in table.rows}) == 6
+
+
+def _shifted(rotation_id: str, years: int) -> EnginesResult:
+    """The result example of a rotation with every agricultural year moved by
+    ``years`` (hand-written, PLACEHOLDER): the years a run of the same record
+    numbers differently, as another start month can."""
+    document = copy.deepcopy({**RESULT, "rotation_id": rotation_id})
+    for item in document["soil_loss"]["annual"]:
+        item["ag_year"] += years
+    for item in document["soil_loss"]["monthly"]:
+        item["ag_year"] += years
+        item["year"] += years
+    for item in document["water_deficit_exposure"]:
+        if item.get("ag_year") is not None:
+            item["ag_year"] += years
+    return EnginesResult(
+        calendar=None,
+        result=ResultsPerRotation.model_validate(document),
+        result_missing=None,
+        modules=MODULES,
+        values_present=1,
+        values_missing=1,
+    )
+
+
+def test_two_rotations_of_different_start_months_answer_no_decision_today():
+    """Today's answer, pinned: two rotations whose ``ag_year_start.month``
+    differs answer 200 with ``decision_missing`` ``NOT_COMPUTABLE``. The route
+    does not compare the months; the results table refuses the scenario
+    because the runs do not hold the same cells (their agricultural years
+    differ). Whether such a pair should be refused, aligned or compared is
+    asked of the lead developer on issue #18; this test pins the behaviour
+    until that answer, it does not decide it."""
+    first = rotation(FIRST)
+    second = rotation(SECOND)
+    month = first["ag_year_start"]["month"]
+    second["ag_year_start"] = {**second["ag_year_start"], "month": month % 12 + 1}
+    engines = FakeEngines({FIRST: with_result(FIRST), SECOND: _shifted(SECOND, 1)})
+    layer = FakeDecisionLayer()
+    response = client(engines=engines, decision_layer=layer).post(
+        ROUTE, json={"site": SITE, "rotations": [first, second]}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["decision"] is None
+    assert body["decision_missing"]["reason"] == "NOT_COMPUTABLE"
+    assert body["scenarios"] == []
+    assert layer.calls == []
 
 
 # --- the engines of the repository ------------------------------------------------------

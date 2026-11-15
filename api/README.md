@@ -224,12 +224,12 @@ imports.
   the implementation: a `DecisionOutput`, validated again, of the case and
   field of the table, with its rotations and scenarios, and the example mark
   it was given.
-- **A decision layer that fails** (its module does not import, the function
-  raises, or what it returns does not pass the check): `200`, `decision`
-  null, `decision_missing` `NOT_AVAILABLE` with the kind of error in the
-  detail (`the decision layer failed (TypeError) ...`); the error itself goes
-  to the log, never to the answer. Start-up and the other routes are never
-  affected. PROPOSED.
+- **A decision layer that fails** (its module exists and does not import,
+  the function raises, or what it returns does not pass the check) is a
+  defect, as an engine that raises: `500` `INTERNAL_ERROR`, no error text in
+  the answer, the error in the log. Only "not built" (the module or the
+  function absent) is `NOT_AVAILABLE`. Start-up and the other routes are
+  never affected, since nothing of it is imported before a request. PROPOSED.
 
 **Invalid requests (`422`; nothing is called):**
 
