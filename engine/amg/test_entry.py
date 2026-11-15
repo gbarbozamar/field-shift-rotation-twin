@@ -1,9 +1,12 @@
-"""Acceptance test of EP5 ``run_amg`` (unit l1/amg-ep5, issue #192).
+"""Acceptance test of EP5 ``run_amg`` (unit l1/amg-ep5, issue #192; the
+sixth modifier, the cut of the temperature modifier and the exponential step
+by unit l1/amg-v2-complete-d192, issue #299, decisions D192, D193 and D199
+of issue #77).
 
 Every number here is a PLACEHOLDER: plainly unreal values with repeated
 digits (a stable fraction of 0.999, a starting stock of 99999.9, a clay
-content of 999.9, temperatures near 100), chosen only so that the forms of
-the core give finite numbers. None is a value of
+content of 999.9, temperatures near 100, a soil C:N ratio of 44.4), chosen
+only so that the forms of the core give finite numbers. None is a value of
 AMG, and no expected value of the science is written: each computed number is
 compared with the core functions called a second time on the same inputs, or
 with the mass balance.
@@ -37,6 +40,7 @@ from contracts.results.models import TREND_COMPUTATIONS, UNIT_SOIL_CARBON_TREND
 from engine.amg import entry
 from engine.amg.entry import (
     FORCING_QUANTITIES,
+    MODIFIERS,
     PARAMETERS,
     SCHEME,
     STEP_UNIT,
@@ -46,6 +50,7 @@ from engine.amg.entry import (
 from engine.amg.modifiers import (
     carbonate_modifier,
     clay_modifier,
+    cn_ratio_modifier,
     moisture_modifier,
     ph_modifier,
     rate_coefficient,
@@ -94,6 +99,9 @@ VALUES: dict[str, tuple[float, str]] = {
     "carbonate_sensitivity": (0.0022, f"{CONTENT}-1"),
     "ph_optimum": (1.11, "dimensionless"),
     "ph_sensitivity": (0.044, "dimensionless"),
+    "cn_ratio_sensitivity": (0.0077, "dimensionless"),
+    "cn_ratio_optimum": (55.5, "dimensionless"),
+    "cn_ratio_minimum": (0.333, "dimensionless"),
 }
 HUMIFICATION = {ORIGINS[0]: 0.33, ORIGINS[1]: 0.44}
 
@@ -212,6 +220,7 @@ def forcing_data() -> dict:
         soil(quantity["clay_content"], 999.9, unmark(CONTENT)),
         soil(quantity["carbonate_content"], 99.9, unmark(CONTENT)),
         soil(quantity["ph"], 9.99, "dimensionless"),
+        soil(quantity["cn_ratio"], 44.4, "dimensionless"),
     ]
     data["starting_state"] = [
         {
@@ -252,8 +261,17 @@ def details(balance: CarbonBalance) -> list[str]:
     ]
 
 
-def core_run(data: dict, parameters: dict[str, float]):
-    """The same run built a second time from the core functions, by hand."""
+def core_run(
+    data: dict,
+    parameters: dict[str, float],
+    *,
+    scheme: str = SCHEME,
+    names: tuple[str, ...] = MODIFIERS,
+):
+    """The same run built a second time from the core functions, by hand.
+
+    ``names``: the modifiers the rate coefficient multiplies, in this order.
+    """
     years = data["annual_climate"]
     temperature = {y["ag_year"]: y["value"] for y in years[0]["years"]}
     balance = {y["ag_year"]: y["value"] for y in years[1]["years"]}
@@ -277,6 +295,12 @@ def core_run(data: dict, parameters: dict[str, float]):
             ph=soil_values[q["ph"]],
             optimum_ph=parameters["ph_optimum"],
             sensitivity_coefficient=parameters["ph_sensitivity"],
+        ),
+        "cn_ratio": cn_ratio_modifier(
+            cn_ratio=soil_values[q["cn_ratio"]],
+            optimum_cn_ratio=parameters["cn_ratio_optimum"],
+            sensitivity_coefficient=parameters["cn_ratio_sensitivity"],
+            minimum=parameters["cn_ratio_minimum"],
         ),
     }
     steps = []
@@ -314,7 +338,8 @@ def core_run(data: dict, parameters: dict[str, float]):
                     carbon_inputs=inputs, humification_coefficients=coefficients
                 ),
                 rate_coefficient=rate_coefficient(
-                    potential_rate=parameters["potential_rate"], modifiers=modifiers
+                    potential_rate=parameters["potential_rate"],
+                    modifiers={name: modifiers[name] for name in names},
                 ),
                 duration=1,
             )
@@ -328,7 +353,7 @@ def core_run(data: dict, parameters: dict[str, float]):
         steps=steps,
         rate_coefficient_per_unit=STEP_UNIT,
         duration_unit=STEP_UNIT,
-        scheme=SCHEME,
+        scheme=scheme,
     )
 
 
@@ -403,6 +428,86 @@ def test_mass_balance_holds_at_every_step():
         rel_tol=1e-12,
         abs_tol=tolerance,
     )
+
+
+def test_rate_coefficient_multiplies_six_modifiers():
+    """D192: the rate coefficient is the potential rate times six modifiers,
+    the C:N modifier among them, and the yearly step is the exponential one.
+    Every stock equals the core's run built a second time by hand with the
+    six and the scheme written here; the mass balance holds."""
+    six = ("temperature", "moisture", "clay", "carbonate", "ph", "cn_ratio")
+    assert MODIFIERS == six
+    assert SCHEME == "exponential"
+    parameters = catalogue()
+    assert check_catalogue(parameters) == []
+    for name in ("cn_ratio_sensitivity", "cn_ratio_optimum", "cn_ratio_minimum"):
+        (found,) = [r for r in parameters.values() if r["id"] == PARAMETERS[name][0]]
+        assert found["scope"] == {} and found["unit"] == "dimensionless"
+    data = forcing_data()
+    assert FORCING_QUANTITIES["cn_ratio"] == ("soil_properties", "soil_cn_ratio")
+    assert "soil_cn_ratio" in [p["quantity"] for p in data["soil_properties"]]
+    balance = run_amg(forcing(data), parameters=parameters)
+    expected = core_run(data, PLACEHOLDER_NUMBERS, scheme="exponential", names=six)
+    stocks = [balance.total_stock.initial.value] + [
+        s.value for s in balance.total_stock.steps
+    ]
+    assert all(stock is not None for stock in stocks)
+    assert stocks == list(expected.total_stocks())
+    active, stable = balance.pools
+    humified, mineralised = balance.flows
+    for position, step in enumerate(expected.steps):
+        assert active.steps[position].value == step.end.active
+        assert stable.steps[position].value == step.end.stable
+        assert humified.steps[position].value == step.humified_input
+        assert mineralised.steps[position].value == step.mineralised
+    # The mass balance, to the precision of the stocks.
+    tolerance = 1e-12 * max(abs(stock) for stock in stocks)
+    for position in range(len(stocks) - 1):
+        assert math.isclose(
+            stocks[position + 1] - stocks[position],
+            humified.steps[position].value - mineralised.steps[position].value,
+            rel_tol=1e-12,
+            abs_tol=tolerance,
+        )
+    # The sixth modifier and the scheme are both used: without the C:N
+    # modifier, or with the explicit step, the stocks are other numbers.
+    five = core_run(data, PLACEHOLDER_NUMBERS, scheme="exponential", names=six[:-1])
+    explicit = core_run(data, PLACEHOLDER_NUMBERS, scheme="explicit", names=six)
+    assert list(five.total_stocks()) != stocks
+    assert list(explicit.total_stocks()) != stocks
+    # The source text of a value names the scheme, the quantity and the records.
+    source = balance.total_stock.source
+    assert "scheme 'exponential'" in source
+    assert "soil_properties 'soil_cn_ratio'" in source
+    for name in ("cn_ratio_sensitivity", "cn_ratio_optimum", "cn_ratio_minimum"):
+        assert f"'{PARAMETERS[name][0]}'" in source
+    # A C:N ratio in a unit other than "dimensionless" is not computed (C1.1).
+    data["soil_properties"][-1]["unit"] = unmark(CONTENT)
+    detail = run_amg(forcing(data), parameters=parameters).total_stock.steps[0]
+    assert detail.value is None
+    assert "soil property 'soil_cn_ratio' is in" in detail.missing.detail
+    assert "reason NOT_COMPUTABLE" in detail.missing.detail
+
+
+def test_a_year_at_or_below_zero_temperature_mineralises_nothing():
+    """The cut of S8 (D192) through the entry point: in a year whose mean
+    temperature is zero or below, the rate coefficient is zero, so the
+    mineralised carbon of that year is zero, a value and not a missing, and
+    the active pool gains the whole humified input."""
+    data = forcing_data()
+    data["annual_climate"][0] = annual(
+        FORCING_QUANTITIES["temperature"][1], unmark(DEGREE), [88.8, 0.0, -11.1, 77.7]
+    )
+    balance = run_amg(forcing(data), parameters=catalogue())
+    active = balance.pools[0]
+    humified, mineralised = balance.flows
+    assert [s.value == 0 for s in mineralised.steps] == [False, True, True, False]
+    assert all(s.value is not None for s in balance.total_stock.steps)
+    before = [active.initial.value] + [s.value for s in active.steps]
+    for position in (1, 2):
+        assert active.steps[position].value == (
+            before[position] + humified.steps[position].value
+        )
 
 
 def test_trend_values_are_those_of_the_core_and_mean_over_cycles_waits_for_its_input():
