@@ -208,148 +208,215 @@ def add_carbon_item(rotation_id: str, carbon_model: str) -> Mutation:
     return mutate
 
 
-# (case identifier, mutation, fragment of the expected error).
-# The fragment shows that the variant is rejected for the intended reason.
-INVALID: list[tuple[str, Mutation, str]] = [
+# (case identifier, mutation, location, message).
+# The variant is rejected with exactly one error, at that location (its
+# ``loc``, dotted; empty for a rule of the whole document), and its message
+# holds that text: so it is rejected for the intended reason, at the
+# intended place, and for no other.
+DOCUMENT = ""  # the location of an error raised by a rule of the whole document
+CARBON_ITEM_0 = "carbon_balances.0"  # an error raised by a rule of the first item
+
+INVALID: list[tuple[str, Mutation, str, str]] = [
     # --- The header -----------------------------------------------------------
     (
         "unknown-member-of-the-document",
         put(["tipping_point"], {"value": None}),
         "tipping_point",
+        "Extra inputs are not permitted",
     ),
     (
         "unknown-member-of-a-carbon-item",
         put([*ROTHC_1, "variant"], "placeholder_variant"),
         "carbon_balances.1.variant",
+        "Extra inputs are not permitted",
     ),
-    ("contract-of-another-name", put(["contract"], "field_identity"), "contract"),
-    ("example-data-as-text", put(["example_data"], "true"), "example_data"),
-    ("case-id-blank", put(["case_id"], "   "), "case_id"),
-    ("field-id-blank", put(["field_id"], ""), "field_id"),
-    ("saved-on-not-a-date", put(["saved_on"], "15 November 2026"), "saved_on"),
-    ("saved-on-with-a-time", put(["saved_on"], "2026-11-15T05:35:00"), "saved_on"),
-    ("saved-on-null", put(["saved_on"], None), "saved_on"),
+    (
+        "contract-of-another-name",
+        put(["contract"], "field_identity"),
+        "contract",
+        "Input should be 'saved_case'",
+    ),
+    (
+        "example-data-as-text",
+        put(["example_data"], "true"),
+        "example_data",
+        "Input should be a valid boolean",
+    ),
+    (
+        "case-id-blank",
+        put(["case_id"], "   "),
+        "case_id",
+        "String should match pattern",
+    ),
+    (
+        "field-id-blank",
+        put(["field_id"], ""),
+        "field_id",
+        "String should have at least 1 character",
+    ),
+    (
+        "saved-on-not-a-date",
+        put(["saved_on"], "15 November 2026"),
+        "saved_on",
+        "a date is written YYYY-MM-DD (C5.2)",
+    ),
+    (
+        "saved-on-with-a-time",
+        put(["saved_on"], "2026-11-15T05:35:00"),
+        "saved_on",
+        "a date is written YYYY-MM-DD (C5.2)",
+    ),
+    (
+        "saved-on-null",
+        put(["saved_on"], None),
+        "saved_on",
+        "a date is written YYYY-MM-DD (C5.2)",
+    ),
     # --- A part and its missing part ------------------------------------------
     (
         "field-identity-null-without-missing-part",
         put(FIELD_IDENTITY, None),
+        DOCUMENT,
         "field_identity: a part that is null carries field_identity_missing",
     ),
     (
         "results-table-null-without-missing-part",
         put(RESULTS_TABLE, None),
+        DOCUMENT,
         "results_table: a part that is null carries results_table_missing",
     ),
     (
         "decision-output-null-without-missing-part",
         put(DECISION_OUTPUT, None),
+        DOCUMENT,
         "decision_output: a part that is null carries decision_output_missing",
     ),
     (
         "carbon-balance-null-without-missing-part",
         put(BALANCE, None),
+        CARBON_ITEM_0,
         "carbon_balance: a part that is null carries carbon_balance_missing",
     ),
     (
         "field-identity-and-missing-part-both",
         put(["field_identity_missing"], REASON),
+        DOCUMENT,
         "field_identity: a part holds its document or field_identity_missing, never both",
     ),
     (
         "results-table-and-missing-part-both",
         put(["results_table_missing"], REASON),
+        DOCUMENT,
         "results_table: a part holds its document or results_table_missing, never both",
     ),
     (
         "decision-output-and-missing-part-both",
         put(["decision_output_missing"], REASON),
+        DOCUMENT,
         "decision_output: a part holds its document or decision_output_missing, never both",
     ),
     (
         "carbon-balance-and-missing-part-both",
         put([*AMG_1, "carbon_balance_missing"], REASON),
+        CARBON_ITEM_0,
         "carbon_balance: a part holds its document or carbon_balance_missing, never both",
     ),
     (
         "missing-part-with-reason-not-in-the-sheet",
         missing("field_identity", {"reason": "NOT_SAVED"}),
         "field_identity_missing.reason",
+        "Input should be 'NOT_DECLARED'",
     ),
     (
         "missing-part-with-reason-in-lower-case",
         put([*ROTHC_1, "carbon_balance_missing", "reason"], "not_available"),
         "carbon_balances.1.carbon_balance_missing.reason",
+        "Input should be 'NOT_DECLARED'",
     ),
     (
         "missing-part-without-reason",
         missing("results_table", {"detail": "PLACEHOLDER detail"}),
         "results_table_missing.reason",
+        "Field required",
     ),
     (
         "missing-input-without-detail",
         missing("decision_output", {"reason": "MISSING_INPUT"}),
-        "needs a detail that names the input",
+        "decision_output_missing",
+        "reason MISSING_INPUT needs a detail that names the input (C3.2)",
     ),
     # --- The carbon items -----------------------------------------------------
     (
         "two-carbon-items-for-one-rotation-and-model",
         put([*ROTHC_1, "carbon_model"], "amg"),
+        DOCUMENT,
         "two carbon items for rotation 'example-rotation-1' and carbon model 'amg'",
     ),
     (
         "carbon-item-of-another-rotation-than-its-balance",
         put([*BALANCE, "rotation_id"], "example-rotation-2"),
+        CARBON_ITEM_0,
         "the rotation_id of the item is the rotation_id of the balance",
     ),
     (
         "carbon-item-of-another-model-than-its-balance",
         both(drop(ROTHC_1), put([*AMG_1, "carbon_model"], "rothc")),
+        CARBON_ITEM_0,
         "the carbon_model of the item is the carbon_model of the balance",
     ),
     (
         "carbon-model-not-decided",
         put([*ROTHC_1, "carbon_model"], "RothC"),
         "carbon_balances.1.carbon_model",
+        "Input should be 'amg' or 'rothc'",
     ),
     # --- A carried document of another case or field ---------------------------
     (
         "field-identity-of-another-case",
         put([*FIELD_IDENTITY, "case_id"], "example-case-2"),
+        DOCUMENT,
         "field_identity: its case_id is not the case_id of the saved case",
     ),
     (
         "field-identity-without-the-field",
         put([*FIELD_IDENTITY, "fields", 0, "field_id"], "example-field-9"),
+        DOCUMENT,
         "field_identity: the field_id of the saved case is not a field of the case",
     ),
     (
         "results-table-of-another-case",
         put([*RESULTS_TABLE, "case_id"], "example-case-2"),
+        DOCUMENT,
         "results_table: its case_id is not the case_id of the saved case",
     ),
     (
         "results-table-of-another-field",
         put([*RESULTS_TABLE, "field_id"], "example-field-2"),
+        DOCUMENT,
         "results_table: its field_id is not the field_id of the saved case",
     ),
     (
         "carbon-balance-of-another-case",
         put([*BALANCE, "case_id"], "example-case-2"),
+        DOCUMENT,
         "carbon_balances.0.carbon_balance: its case_id is not the case_id",
     ),
     (
         "carbon-balance-of-another-field",
         put([*BALANCE, "field_id"], "example-field-2"),
+        DOCUMENT,
         "carbon_balances.0.carbon_balance: its field_id is not the field_id",
     ),
     (
         "decision-output-of-another-case",
         put([*DECISION_OUTPUT, "case_id"], "example-case-2"),
+        DOCUMENT,
         "decision_output: its case_id is not the case_id of the saved case",
     ),
     (
         "decision-output-of-another-field",
         put([*DECISION_OUTPUT, "field_id"], "example-field-2"),
+        DOCUMENT,
         "decision_output: its field_id is not the field_id of the saved case",
     ),
     # --- example_data -----------------------------------------------------------
@@ -358,11 +425,13 @@ INVALID: list[tuple[str, Mutation, str]] = [
         both(
             example_data_everywhere(False), put([*FIELD_IDENTITY, "example_data"], True)
         ),
+        DOCUMENT,
         "example_data: field_identity is example data",
     ),
     (
         "example-data-false-while-a-carbon-balance-says-true",
         both(example_data_everywhere(False), put([*BALANCE, "example_data"], True)),
+        DOCUMENT,
         "example_data: carbon_balances.0.carbon_balance is example data",
     ),
     (
@@ -371,6 +440,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
             example_data_everywhere(False),
             put([*DECISION_OUTPUT, "example_data"], True),
         ),
+        DOCUMENT,
         "example_data: decision_output is example data",
     ),
 ]
@@ -533,20 +603,26 @@ def test_readme_lists_every_identifier_changed() -> None:
 
 
 @pytest.mark.parametrize(
-    ("mutation", "fragment"),
-    [pytest.param(mutation, fragment, id=case) for case, mutation, fragment in INVALID],
+    ("mutation", "location", "message"),
+    [
+        pytest.param(mutation, location, message, id=case)
+        for case, mutation, location, message in INVALID
+    ],
 )
-def test_invalid_variant_is_rejected(mutation: Mutation, fragment: str) -> None:
+def test_invalid_variant_is_rejected(
+    mutation: Mutation, location: str, message: str
+) -> None:
     data = load()
     variant = copy.deepcopy(data)
     mutation(variant)
     assert variant != data, "the mutation changed nothing"
     with pytest.raises(ValidationError) as rejected:
         SavedCase.model_validate(variant)
-    assert fragment in _describe(rejected.value)
-    # The same variant is rejected when it arrives as JSON text.
-    with pytest.raises(ValidationError):
+    _assert_one_error(rejected.value, location, message)
+    # The same variant is rejected, in the same way, when it arrives as JSON text.
+    with pytest.raises(ValidationError) as rejected:
         SavedCase.model_validate_json(json.dumps(variant))
+    _assert_one_error(rejected.value, location, message)
 
 
 @pytest.mark.parametrize(
@@ -592,8 +668,13 @@ def test_no_member_can_be_left_out(path: list[Any]) -> None:
     drop(path)(data)
     with pytest.raises(ValidationError) as rejected:
         SavedCase.model_validate(data)
-    location = ".".join(str(part) for part in path)
-    assert f"{location}: " in _describe(rejected.value)
+    # Exactly one error: the member itself is required, at its own location.
+    # A rule of the whole document (C3.1) firing instead would mean the
+    # member has a default and was not required.
+    errors = rejected.value.errors()
+    assert [(error["loc"], error["type"]) for error in errors] == [
+        (tuple(path), "missing")
+    ], _describe(rejected.value)
 
 
 @pytest.mark.parametrize("reason", get_args(ReasonCode))
@@ -626,6 +707,18 @@ def test_readme_lists_every_proposed_case() -> None:
     # And the README lists no case that this file does not hold.
     in_readme = re.findall(r"^\| `([a-z0-9-]+)` \|", listed, re.MULTILINE)
     assert sorted(in_readme) == sorted(cases)
+
+
+def _assert_one_error(error: ValidationError, location: str, message: str) -> None:
+    """Exactly one error, at ``location``, whose message holds ``message``."""
+    found = [
+        (".".join(str(part) for part in item["loc"]), item["msg"])
+        for item in error.errors()
+    ]
+    assert len(found) == 1, _describe(error)
+    ((found_location, found_message),) = found
+    assert found_location == location, _describe(error)
+    assert message in found_message, _describe(error)
 
 
 def _describe(error: ValidationError) -> str:
