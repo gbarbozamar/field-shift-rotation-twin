@@ -647,7 +647,7 @@ def test_wheat_soybean_maize_with_a_lead_in_answers_200(monkeypatch):
     docs/SCIENCE_DECISIONS.md. The wheat is sown before the start month, so
     each phase has a cycle before the first that ends inside the record: the
     lead-in of D141 (point 13 of engine/calendar/repeat.py). EP4 writes its
-    component as cycle -1, which the ledger contract admits (D-LEAD-IN).
+    component as cycle -1, which the ledger contract admits (D160).
 
     Site data: the PLACEHOLDER chain examples, posted as ``_post`` of
     api/test_phases.py posts them. Catalogue: ``params/records/``, as the

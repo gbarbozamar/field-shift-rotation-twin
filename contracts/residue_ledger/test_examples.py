@@ -126,7 +126,7 @@ def test_component_twice_in_one_cycle_is_rejected():
 
 def test_lead_in_cycle_is_admitted_and_nothing_lower():
     """Cycle -1 is the lead-in of D141 (point 13 of engine/calendar/repeat.py),
-    admitted by D-LEAD-IN; no cycle comes before it."""
+    admitted by D160; no cycle comes before it."""
     data = load()
     data["components"][0]["cycle"] = -1
     ledger = ResidueLedger.model_validate(data)

@@ -87,7 +87,7 @@ class LedgerComponent(ContractModel):
     ``cycle`` is the index of the cycle: the first is 0. -1 is the lead-in,
     the cycle before the first, laid out when one of its components ends
     inside the record (D141 of #77; point 13 and ``LEAD_IN`` of
-    ``engine/calendar/repeat.py``). The ledger admits it by D-LEAD-IN, and
+    ``engine/calendar/repeat.py``). The ledger admits it by D160 of #77, and
     nothing lower: no cycle comes before the lead-in.
     """
 

@@ -501,7 +501,7 @@ def test_component_starting_before_the_start_month_gives_a_lead_in_entry():
     The first component starts before the start month, so the calendar starts
     in the agricultural year before, and the cycle before the first ends
     inside the record. Its entries are written as cycle -1, which the ledger
-    contract admits (D-LEAD-IN). Their harvests fall in the first agricultural
+    contract admits (D160). Their harvests fall in the first agricultural
     year, and that year is their value: it is not "before the first cycle".
     """
     early = calendar_data(start_date="2001-05-25", end_date="2002-05-20")

@@ -29,7 +29,7 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 | Field | Shape | Notes |
 |---|---|---|
 | `component_id`, `crop_id` | non-empty text | Those of the calendar |
-| `cycle` | integer, -1 or more | The cycle of the repeated rotation: the first is 0; -1 is the lead-in of D141 (`engine/calendar/repeat.py` point 13), admitted by D-LEAD-IN |
+| `cycle` | integer, -1 or more | The cycle of the repeated rotation: the first is 0; -1 is the lead-in of D141 (`engine/calendar/repeat.py` point 13), admitted by D160 of #77 |
 | `purpose` | `grain`, `cover` or `pasture`, or `NotGiven` | Copied from the rotation definition. It keeps a cover crop apart from a grain crop |
 | `residue_management` | `left_on_surface`, `incorporated` or `removed`, or `NotGiven` | The declared `management.residue` of the rotation definition, copied |
 | `harvest` | `DateValue` of `contracts/inputs/common.py` | The end date of the component in this cycle, or missing with its reason |
@@ -45,7 +45,7 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 ## Rules the model checks
 
 - The years are given, or `years_missing` is given, never both and never neither. Without years the ledger lists no component and no series. `first_ag_year` is not after `last_ag_year`.
-- `cycle` is -1 or more. -1 is the lead-in of D141, the cycle before the first; nothing lower is a cycle (D-LEAD-IN).
+- `cycle` is -1 or more. -1 is the lead-in of D141, the cycle before the first; nothing lower is a cycle (D160 of #77).
 - A component appears at most once per cycle, the lead-in included.
 - Every mass value is in `mass_unit` and every carbon value in `carbon_unit`, including a value that is missing (C3.1).
 - `ag_year` is given exactly when the harvest date is given.
