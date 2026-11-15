@@ -17,8 +17,12 @@ its ``id`` and ``scope`` (``engine/water/_parameters.py``). Unit
 ``l1/water-ep3-identifiers`` (issue #191) reads every parameter of the
 drafted water records: the basal crop coefficient by crop and stage, the
 maximum root depth, the layer of the total evaporable water (D77, D78) and
-the bounds of D82 (PC-4). The calendar carries no growth stage, so a day with
-a crop has no basal coefficient and no root depth (D79). The daily chain is
+the bounds of D82 (PC-4). Unit ``l1/water-crop-stages`` (issue #206) places
+the four FAO-56 growth stages inside each crop period of the calendar from
+stage lengths read by crop (``engine/water/stages.py``), and takes the basal
+crop coefficient and the root depth of each crop day from its stage (D78); a
+crop period whose stage lengths are missing keeps the behaviour of D79: its
+days are missing with the reason. The daily chain is
 then reduced to one ``WaterDeficitExposure`` per agricultural year of the
 record (D47). The definition of the indicator is incomplete (convention
 C1.4), so no year carries a number: a year whose daily balance was computed
@@ -73,6 +77,12 @@ from engine.water.runoff import (
     RunoffDayInput,
     RunoffDayResult,
     runoff_day,
+)
+from engine.water.stages import (
+    STAGE_LENGTH_PARAMETERS,
+    StageDay,
+    by_stage,
+    place_stages,
 )
 
 __all__ = ["compute_water_deficit_exposure"]
@@ -196,10 +206,13 @@ STAGES: tuple[str, ...] = ("initial", "mid", "end")
 CROP_HEIGHT = "crop_height"
 COVER_FRACTION_EXPONENT = "cover_fraction_exponent"
 CURVE_NUMBER = "curve_number"
-# Per crop only: the crop of a balance day (CropDay). The maximum root depth
-# is read but not used as the root depth of a day: the growth of the root
-# zone (FAO-56 Annex 8, D78) needs the stage dates (OPEN 4).
+# Per crop only: the crop of a balance day (CropDay). The root depth of a
+# crop day grows by stage (engine/water/stages.py, ``by_stage``) from the
+# initial root depth to the maximum root depth (D78, provisional curves of
+# FAO-56 Annex 8; the identifier of the initial depth is PROPOSED by unit
+# #206, no record is drafted for it).
 ROOT_DEPTH = "maximum_root_depth"
+INITIAL_ROOT_DEPTH = "initial_root_depth"
 READILY_AVAILABLE_FRACTION = "readily_available_fraction"
 
 # Every parameter the chain reads, by the scope it is looked up with; the
@@ -226,8 +239,14 @@ DAY_PARAMETERS: tuple[str, ...] = (
     COVER_FRACTION_EXPONENT,
     CURVE_NUMBER,
 )
-# Looked up with the crop of the day only.
-CROP_PARAMETERS: tuple[str, ...] = (ROOT_DEPTH, READILY_AVAILABLE_FRACTION)
+# Looked up with the crop of the day only: the crop of the balance, the
+# initial root depth and the length of each growth stage (issue #206).
+CROP_PARAMETERS: tuple[str, ...] = (
+    ROOT_DEPTH,
+    READILY_AVAILABLE_FRACTION,
+    INITIAL_ROOT_DEPTH,
+    *STAGE_LENGTH_PARAMETERS.values(),
+)
 
 # Day and month arithmetic (C5.1, C5.3): months and days counted from one.
 _FIRST = 1
@@ -272,10 +291,12 @@ CROP_DATES_MISSING = (
 )
 STAGE_UNKNOWN = (
     "the growth stage of the day is not known: the calendar carries no growth "
-    "stage, so neither the basal crop coefficient of the day (one value per "
-    "stage, FAO-56 Table 17, decision D78 of issue #77) nor its root depth (the "
-    "root growth of FAO-56 Annex 8, D78) can be taken, and missing stages stay "
-    "missing (decision D79 of issue #77, OPEN 4)"
+    "stage and a stage length of the crop has no value in parameters (the "
+    "parameters are named in their own item, issue #206), so neither the basal "
+    "crop coefficient of the day (one value per stage, FAO-56 Table 17, "
+    "decision D78 of issue #77) nor its root depth (the root growth of FAO-56 "
+    "Annex 8, D78) can be taken, and missing stages stay missing (decision D79 "
+    "of issue #77)"
 )
 CROPS_OVERLAP = (
     "two components of the calendar cover the day, and the water chain takes "
@@ -457,34 +478,95 @@ def _crop_of_day(
 
 @dataclass(frozen=True)
 class Growth:
-    """The growth stage of a day with a crop and the root depth of that day.
+    """The basal crop coefficient and the root depth of one day with a crop,
+    each taken from the growth stage of the day."""
 
-    ``stage`` is one of the stage words of STAGES, the scope word under which
-    the basal crop coefficient of the day is read; ``root_depth`` is the root
-    depth of the balance on that day.
-    """
-
-    stage: str
+    basal_crop_coefficient: float
     root_depth: float
 
 
 def _growth_of_day(
-    calendar: RotationCalendar,
+    calendar: RotationCalendar, catalogue: Catalogue
 ) -> Callable[[dt.date, str], Growth | Missing]:
-    """The growth stage and root depth of a day with a crop, or why they are not known.
+    """The basal crop coefficient and root depth of a day with a crop, or why they are not known.
 
-    D78 gives the basal crop coefficient one value per growth stage (FAO-56
-    Table 17) and the root depth a crop-specific growth (FAO-56 Annex 8);
-    both need the dates of the stages. The calendar carries no growth stage
-    and no part builds the growth of the root zone, so on every day with a
-    crop both are missing (D79, OPEN 4). The unit that brings the stage
-    dates replaces this function and nothing else; a test replaces it with
-    synthetic stages to check the balance on days with transpiration.
-    PROPOSED.
+    PROPOSED (issue #206). The day lies in the period of the one dated
+    component that carries the crop (``_crop_of_day`` gives the crop only
+    then). The four stage lengths of the crop are read by crop
+    (``STAGE_LENGTH_PARAMETERS``) once per component, on the first day of it
+    the chain meets, and the stages are placed from the start of the
+    component, its sowing (``stages.place_stages``):
+
+    - a stage length with no value: every day of the period is
+      ``MISSING_INPUT`` with STAGE_UNKNOWN (D79), and the missing records are
+      named by the catalogue (D56);
+    - stages that cannot be placed: ``NOT_COMPUTABLE``, as ``place_stages``
+      says why (OPEN 25 of EXPOSURE.md).
+
+    Otherwise the basal crop coefficient of the day is ``stages.by_stage`` of
+    the three records of FAO-56 Table 17 (D78), and the root depth is
+    ``stages.by_stage`` of ``initial_root_depth`` at the initial value and
+    ``maximum_root_depth`` at the mid and end values (D78, provisional
+    curves). A record the stage of the day needs that is missing makes the
+    day ``MISSING_INPUT``, naming it.
     """
+    dated = [
+        (component.start.date, component.end.date, component)
+        for component in calendar.components
+        if component.start.date is not None and component.end.date is not None
+    ]
+    placed: dict[str, dict[dt.date, StageDay] | Missing] = {}
 
     def growth(day: dt.date, crop: str) -> Growth | Missing:
-        return Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
+        ((start, end, component),) = [
+            (start, end, component)
+            for start, end, component in dated
+            if component.crop_id == crop and start <= day <= end
+        ]
+        scope: Scope = ((CROP_KEY, crop),)
+        key = component.component_id
+        if key not in placed:
+            lengths = {
+                stage: catalogue.value(parameter_id, scope, day)
+                for stage, parameter_id in STAGE_LENGTH_PARAMETERS.items()
+            }
+            numbers = {
+                stage: value
+                for stage, value in lengths.items()
+                if not isinstance(value, Missing)
+            }
+            placed[key] = (
+                place_stages(start, end, numbers, what=f"component '{key}'")
+                if len(numbers) == len(lengths)
+                else Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
+            )
+        stages = placed[key]
+        if isinstance(stages, Missing):
+            return stages
+        stage_day = stages[day]
+        kcb = by_stage(
+            stage_day,
+            *(
+                catalogue.value(
+                    BASAL_CROP_COEFFICIENT, (*scope, (STAGE_KEY, stage)), day
+                )
+                for stage in STAGES
+            ),
+        )
+        maximum = catalogue.value(ROOT_DEPTH, scope, day)
+        root_depth = by_stage(
+            stage_day,
+            catalogue.value(INITIAL_ROOT_DEPTH, scope, day),
+            maximum,
+            maximum,
+        )
+        absent = [item for item in (kcb, root_depth) if isinstance(item, Missing)]
+        if absent:
+            return Missing(
+                reason="MISSING_INPUT",
+                detail="; ".join(item.detail for item in absent),
+            )
+        return Growth(basal_crop_coefficient=kcb, root_depth=root_depth)
 
     return growth
 
@@ -689,7 +771,7 @@ def _run_chain(
     precipitation_values = _series_values(precipitation_series)
     wind_values = _series_values(by_quantity.get(WIND_SPEED_2M))
     crop_of = _crop_of_day(calendar)
-    growth_of = _growth_of_day(calendar)
+    growth_of = _growth_of_day(calendar, catalogue)
 
     chain: list[ChainDay] = []
     for day in days:
@@ -724,28 +806,24 @@ def _run_chain(
                     catalogue.value(
                         BASAL_CROP_COEFFICIENT, (*scope, (STAGE_KEY, stage)), day
                     )
-                catalogue.value(ROOT_DEPTH, scope, day)
+                for parameter_id in CROP_PARAMETERS:
+                    catalogue.value(parameter_id, scope, day)
                 fraction = catalogue.value(READILY_AVAILABLE_FRACTION, scope, day)
                 growth = growth_of(day, crop)
                 if isinstance(growth, Missing):
-                    # Today on every day with a crop (D79, OPEN 4).
-                    notes.note(growth, day)
+                    # A record that is missing is named by the catalogue; a
+                    # stage not known (D79) or not placed is noted.
+                    if (
+                        growth.detail == STAGE_UNKNOWN
+                        or growth.reason != "MISSING_INPUT"
+                    ):
+                        notes.note(growth, day)
                     kcb = crop_day = growth
                 else:
-                    kcb = catalogue.value(
-                        BASAL_CROP_COEFFICIENT,
-                        (*scope, (STAGE_KEY, growth.stage)),
-                        day,
-                    )
-                    absent = [
-                        item for item in (kcb, fraction) if isinstance(item, Missing)
-                    ]
+                    kcb = growth.basal_crop_coefficient
                     crop_day = (
-                        Missing(
-                            reason="MISSING_INPUT",
-                            detail="; ".join(item.detail for item in absent),
-                        )
-                        if absent
+                        Missing(reason="MISSING_INPUT", detail=fraction.detail)
+                        if isinstance(fraction, Missing)
                         else balance.CropDay(
                             transpiration_coefficient=kcb,
                             root_depth=growth.root_depth,

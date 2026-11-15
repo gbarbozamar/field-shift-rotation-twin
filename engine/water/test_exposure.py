@@ -1,5 +1,6 @@
-"""Acceptance test of units l1/water-ep3-parameters (issue #153) and
-l1/water-ep3-identifiers (issue #191).
+"""Acceptance test of units l1/water-ep3-parameters (issue #153),
+l1/water-ep3-identifiers (issue #191) and l1/water-crop-stages (issue #206;
+the stages themselves are checked in ``test_stages.py``).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases"; a test checks that the two lists
@@ -51,6 +52,7 @@ from contracts.results.models import (
 from engine.water import _parameters
 from engine.water import exposure as module
 from engine.water.et0.quantities import CLIMATE_QUANTITIES
+from engine.water.stages import GROWTH_STAGES, STAGE_LENGTH_PARAMETERS
 from params.catalogue import check_catalogue, check_record
 
 HERE = Path(__file__).parent
@@ -128,16 +130,23 @@ PLACEHOLDER_DAY = {
     "cover_fraction_exponent": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 1.11},
     "curve_number": {"crop-a": 1.11, "crop-b": 0.555, "no_crop": 1.11},
 }
+# The root depths lie above zero and not deeper than the column (column_depth).
 PLACEHOLDER_CROP = {
     "maximum_root_depth": {"crop-a": 1.11, "crop-b": 2.22},
+    "initial_root_depth": {"crop-a": 0.111, "crop-b": 0.222},
     "readily_available_fraction": {"crop-a": 0.444, "crop-b": 0.888},
 }
 # The value of every record read by crop and growth stage.
 PLACEHOLDER_STAGE = {"initial": 0.444, "mid": 0.555, "end": 0.666}
-# The root depth of a day with a crop in the case with synthetic stages: above
-# zero and not deeper than the column (column_depth).
-PLACEHOLDER_GROWTH_ROOT_DEPTH = 1.11
 CROPS = ("crop-a", "crop-b")
+# The length in days of the first three growth stages of each crop. The late
+# stage takes the days left of the first period of the crop in the example
+# calendar (placeholder_stage_lengths), so that the four fill it; the test
+# calendar gives every period of a crop that many days (chain_calendar).
+PLACEHOLDER_STAGE_LENGTHS = {
+    "crop-a": {"initial": 11.0, "development": 22.0, "mid": 111.0},
+    "crop-b": {"initial": 11.0, "development": 33.0, "mid": 111.0},
+}
 
 # The water records drafted for the lead developer's check
 # (params_borrador/agua/, outside the repository, issue #191): exactly their
@@ -311,6 +320,27 @@ def label_of(scope: dict) -> str | None:
     return f"{crop}:{scope['stage']}" if "stage" in scope else crop
 
 
+def period_days(crop: str) -> int:
+    """The days of the first period of the crop in the example calendar."""
+    for component in calendar_document()["components"]:
+        if component["crop_id"] == crop_word(crop):
+            start, end = (
+                dt.date.fromisoformat(component[edge]["date"])
+                for edge in ("start", "end")
+            )
+            return (end - start).days + 1
+    raise AssertionError(f"no period of {crop} in the example calendar")
+
+
+def placeholder_stage_lengths(crop: str) -> dict[str, float]:
+    """The four stage lengths of a crop: PLACEHOLDER_STAGE_LENGTHS and the late
+    stage, the days left of the period (period_days)."""
+    lengths = dict(PLACEHOLDER_STAGE_LENGTHS[crop])
+    lengths["late"] = float(period_days(crop) - sum(lengths.values()))
+    assert lengths["late"] >= 1
+    return {stage: lengths[stage] for stage in GROWTH_STAGES}
+
+
 def marked_catalogue() -> dict[str, dict]:
     """Every parameter the chain reads, keyed as load_folder keys a record."""
     records = []
@@ -330,6 +360,13 @@ def marked_catalogue() -> dict[str, dict]:
                         scope_of(f"{crop}:{stage}"),
                     )
                 )
+    for crop in CROPS:
+        for stage, length in placeholder_stage_lengths(crop).items():
+            records.append(
+                placeholder_record(
+                    STAGE_LENGTH_PARAMETERS[stage], length, scope_of(crop)
+                )
+            )
     return {
         f"PLACEHOLDER_{position}.json": record
         for position, record in enumerate(records)
@@ -490,11 +527,15 @@ def calendar() -> RotationCalendar:
     return RotationCalendar.model_validate(calendar_document())
 
 
-def chain_calendar_document() -> dict[str, Any]:
+def chain_calendar_document(*, fill_periods: bool = True) -> dict[str, Any]:
     """The example calendar over the three years of ``several_full_years``.
 
     One component is added, copied from the second with its dates moved into
-    the third year, and the crop identifiers are unmarked.
+    the third year, and the crop identifiers are unmarked. With
+    ``fill_periods``, the end of each component is moved so that every period
+    of a crop holds the days of its first one (``period_days``), which the
+    four PLACEHOLDER stage lengths of the crop fill; without it, the third and
+    fourth periods are each one day off from the first period of their crop.
     """
     document = calendar_document()
     first, last = several_full_years()
@@ -508,6 +549,11 @@ def chain_calendar_document() -> dict[str, Any]:
     added["end"]["date"] = (last - dt.timedelta(days=91)).isoformat()
     document["components"].append(added)
     for component in document["components"]:
+        if fill_periods:
+            crop = component["crop_id"].split("-", 1)[1]
+            start = dt.date.fromisoformat(component["start"]["date"])
+            end = start + ONE_DAY * (period_days(crop) - 1)
+            component["end"]["date"] = end.isoformat()
         component["crop_id"] = unmarked(component["crop_id"])
     return document
 
@@ -519,10 +565,8 @@ def chain_calendar() -> RotationCalendar:
 def bare_calendar() -> RotationCalendar:
     """The calendar of ``chain_calendar`` with no component: no day has a crop.
 
-    On a day with a crop the chain has no value, because the growth stage of
-    the day is not known (D79, OPEN 4 of EXPOSURE.md), and the states carried
-    from day to day stay missing after it. The cases that check the chain
-    itself run on this calendar, so that every day is computed.
+    The cases that check the chain itself and the parameters of the site run
+    on this calendar, so that no crop parameter is needed.
     """
     document = chain_calendar_document()
     document["components"] = []
@@ -697,31 +741,50 @@ def test_daily_balance_closes_its_mass_every_day():
     assert all(count > 0 for count in branches.values()), branches
 
 
-def synthetic_stage(day: dt.date) -> str:
-    """A growth stage given directly by the test, in turn day after day."""
-    return module.STAGES[day.toordinal() % len(module.STAGES)]
+def crop_period_of(
+    calendar_: RotationCalendar, day: dt.date
+) -> tuple[str, dt.date] | None:
+    """The crop label and the first day of the component covering ``day``."""
+    for component in calendar_.components:
+        if component.start.date <= day <= component.end.date:
+            return component.crop_id.split("-", 1)[1], component.start.date
+    return None
 
 
-def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_synthetic_stages(
+def expected_by_stage(
+    crop: str, day_number: int, initial: float, mid: float, end: float
+) -> float:
+    """The value of day ``day_number`` of a period (counted from one), written
+    out here from the PROPOSED form of FAO-56 Eq. 66, independently of
+    ``stages.py``."""
+    lengths = placeholder_stage_lengths(crop)
+    ini, dev, mid_days, late = (lengths[stage] for stage in GROWTH_STAGES)
+    if day_number <= ini:
+        return initial
+    if day_number <= ini + dev:
+        return initial + (day_number - ini) / dev * (mid - initial)
+    if day_number <= ini + dev + mid_days:
+        return mid
+    return mid + (day_number - ini - dev - mid_days) / late * (end - mid)
+
+
+def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_stage_lengths(
     monkeypatch,
 ):
-    # The calendar contract carries no growth stage, so the stages and the
-    # root depth of each day with a crop are given by replacing the one
-    # function of EP3 that would read them (_growth_of_day). Synthetic: they
-    # come from no phenology and no root-growth curve.
-    def synthetic_growth(calendar_):
-        return lambda day, crop: module.Growth(
-            stage=synthetic_stage(day), root_depth=PLACEHOLDER_GROWTH_ROOT_DEPTH
-        )
+    # The balance is wrapped to see the crop of each day it is given.
+    crops_given: dict[dt.date, Any] = {}
+    step = module.balance.step
 
-    monkeypatch.setattr(module, "_growth_of_day", synthetic_growth)
+    def spy(storage, day, **kwargs):
+        crops_given[day.date] = day.crop
+        return step(storage, day, **kwargs)
+
+    monkeypatch.setattr(module.balance, "step", spy)
     calendar_ = chain_calendar()
-    components = [
-        (component.start.date, component.end.date) for component in calendar_.components
-    ]
     days = chain(calendar_)
     capacity = PLACEHOLDER_SITE["column_capacity"]
     with_transpiration = 0
+    sloped = {"development": 0, "late": 0}
     for day in days:
         b = day.balance
         flows = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
@@ -733,17 +796,38 @@ def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_syntheti
         scale = max(abs(term) for term in (b.storage_start, b.storage_end, *flows))
         assert abs(change - balance) <= 64 * sys.float_info.epsilon * max(scale, 1.0)
         assert 0 <= b.storage_end <= capacity
-        if any(start <= day.date <= end for start, end in components):
-            # The basal coefficient of the stage given for the day.
-            kcb = PLACEHOLDER_STAGE[synthetic_stage(day.date)]
-            assert b.transpiration_demanded == pytest.approx(
-                kcb * day.reference_evapotranspiration
-            )
-            assert is_number(b.stress_coefficient)
-            with_transpiration += b.transpiration > 0
-        else:
+        period = crop_period_of(calendar_, day.date)
+        if period is None:
             assert b.transpiration == 0
+            assert crops_given[day.date] is None
+            continue
+        crop, sowing = period
+        day_number = (day.date - sowing).days + 1
+        # The basal coefficient of the stage of the day, interpolated.
+        kcb = expected_by_stage(crop, day_number, *PLACEHOLDER_STAGE.values())
+        assert b.transpiration_demanded == pytest.approx(
+            kcb * day.reference_evapotranspiration
+        )
+        # The root depth grows from the initial to the maximum root depth.
+        maximum = PLACEHOLDER_CROP["maximum_root_depth"][crop]
+        root_depth = expected_by_stage(
+            crop,
+            day_number,
+            PLACEHOLDER_CROP["initial_root_depth"][crop],
+            maximum,
+            maximum,
+        )
+        given = crops_given[day.date]
+        assert given.root_depth == pytest.approx(root_depth)
+        assert given.transpiration_coefficient == pytest.approx(kcb)
+        assert is_number(b.stress_coefficient)
+        with_transpiration += b.transpiration > 0
+        lengths = placeholder_stage_lengths(crop)
+        ini, dev, mid_days = (lengths[s] for s in GROWTH_STAGES[:3])
+        sloped["development"] += ini < day_number <= ini + dev
+        sloped["late"] += day_number > ini + dev + mid_days
     assert with_transpiration > 0
+    assert all(count > 0 for count in sloped.values()), sloped
     # Every year is computed, so it is missing only for the definition (D61).
     result = run(calendar_=calendar_)
     assert_loads(result)
@@ -753,22 +837,42 @@ def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_syntheti
 
 def test_crop_of_each_day_follows_the_calendar():
     calendar_ = chain_calendar()
-    components = [
-        (component.start.date, component.end.date) for component in calendar_.components
-    ]
-    first_crop_day = min(start for start, _ in components)
+    first_crop_day = min(component.start.date for component in calendar_.components)
     days = chain(calendar_)
     assert days[0].date < first_crop_day
     for day in days:
-        covered = any(start <= day.date <= end for start, end in components)
         b = day.balance
-        if day.date < first_crop_day:
+        assert is_number(b.storage_end)
+        if crop_period_of(calendar_, day.date) is None:
             # A day with no crop: computed, with no transpiration.
-            assert not covered
-            assert is_number(b.storage_end)
             assert b.transpiration == 0
             assert isinstance(b.transpiration_demanded, Missing)
             assert b.transpiration_demanded.reason == "NOT_APPLICABLE"
+        else:
+            # A day with a crop: the crop of the balance is given.
+            assert is_number(b.transpiration_demanded)
+            assert is_number(b.root_zone_depletion)
+
+
+def stage_length_key(crop: str, stage: str) -> tuple[str, str]:
+    return (STAGE_LENGTH_PARAMETERS[stage], crop)
+
+
+def test_without_stage_lengths_crop_days_are_missing_with_the_reason_of_d79():
+    calendar_ = chain_calendar()
+    first_crop_day = min(component.start.date for component in calendar_.components)
+    parameters = catalogue_with(
+        {
+            stage_length_key(crop, stage): None
+            for crop in CROPS
+            for stage in GROWTH_STAGES
+        }
+    )
+    days = chain(calendar_, parameters=parameters)
+    for day in days:
+        b = day.balance
+        if day.date < first_crop_day:
+            assert is_number(b.storage_end)
         elif day.date == first_crop_day:
             # The basal coefficient and the crop of the balance are missing,
             # because the stage of the day is not known (D79).
@@ -782,15 +886,121 @@ def test_crop_of_each_day_follows_the_calendar():
             # The storage carried from that day stays missing (no reset).
             assert isinstance(b.storage_start, Missing)
             assert "missing since" in b.storage_start.detail
-    result = run(calendar_=calendar_)
+    result = run(calendar_=calendar_, parameters=parameters)
     assert_loads(result)
     for item in result:
         assert item.missing.reason == "MISSING_INPUT"
-        assert f"chain MISSING_INPUT: {module.STAGE_UNKNOWN}" in items_of(
-            item.missing.detail
-        )
-        assert "D79" in item.missing.detail
+        detail = item.missing.detail
+        assert f"chain MISSING_INPUT: {module.STAGE_UNKNOWN}" in items_of(detail)
+        assert "D79" in detail
+        named = no_record_item(detail, json.dumps(unmarked(scope_of("crop-a"))))
+        for parameter_id in STAGE_LENGTH_PARAMETERS.values():
+            assert f"'{parameter_id}'" in named
     assert f"the first on {first_crop_day.isoformat()}" in result[0].missing.detail
+
+
+def test_one_crop_without_stage_lengths_leaves_the_other_crop_computed():
+    calendar_ = chain_calendar()
+    first_b = min(
+        component.start.date
+        for component in calendar_.components
+        if component.crop_id.endswith("crop-b")
+    )
+    parameters = catalogue_with({stage_length_key("crop-b", "late"): None})
+    days = chain(calendar_, parameters=parameters)
+    for day in days:
+        b = day.balance
+        if day.date < first_b:
+            # Crop-a days before it, and days with no crop, are computed.
+            assert is_number(b.storage_end)
+        else:
+            assert isinstance(b.storage_end, Missing)
+    (first_missing,) = [day for day in days if day.date == first_b]
+    assert "crop (MISSING_INPUT)" in first_missing.balance.storage_end.detail
+
+
+def test_stage_lengths_that_do_not_fill_the_period_leave_it_missing_naming_open_25():
+    # The third and fourth periods are each one day off the first period of
+    # their crop, which the four PLACEHOLDER stage lengths fill.
+    calendar_ = RotationCalendar.model_validate(
+        chain_calendar_document(fill_periods=False)
+    )
+    first, _, third, _ = calendar_.components
+    assert first.crop_id == third.crop_id
+    assert (third.end.date - third.start.date) != (first.end.date - first.start.date)
+    days = chain(calendar_)
+    for day in days:
+        if day.date < third.start.date:
+            assert is_number(day.balance.storage_end)
+        elif day.date == third.start.date:
+            assert isinstance(day.balance.storage_end, Missing)
+            assert "crop (NOT_COMPUTABLE)" in day.balance.storage_end.detail
+    result = run(calendar_=calendar_)
+    assert_loads(result)
+    sowing = third.start.date
+    missing_from = sowing.year if sowing.month >= start_month() else sowing.year - 1
+    for item in result:
+        if item.ag_year < missing_from:
+            assert_definition_incomplete(item)
+            continue
+        detail = item.missing.detail
+        assert item.missing.reason != "NOT_AVAILABLE"
+        (placed,) = [
+            entry
+            for entry in items_of(detail)
+            if entry.startswith(
+                "chain NOT_COMPUTABLE: the growth stages of component "
+                f"'{third.component_id}'"
+            )
+        ]
+        assert "OPEN 25" in placed
+        assert "no stage is guessed" in placed
+
+
+def test_stage_length_that_is_not_whole_days_is_not_computable():
+    record = unmarked(
+        placeholder_record(STAGE_LENGTH_PARAMETERS["mid"], 11.5, scope_of("crop-a"))
+    )
+    parameters = catalogue_with({stage_length_key("crop-a", "mid"): record})
+    result = run(calendar_=chain_calendar(), parameters=parameters)
+    assert_loads(result)
+    for item in result:
+        assert item.missing.reason != "NOT_AVAILABLE"
+        assert (
+            "chain NOT_COMPUTABLE: the growth stages of component"
+            in item.missing.detail
+        )
+        assert "not a whole number of days" in item.missing.detail
+        assert "11.5" not in item.missing.detail  # no value is repeated
+
+
+def test_a_record_only_late_days_need_leaves_the_earlier_days_computed():
+    # Without the basal coefficient at the end of the late stage, the days of
+    # the initial, development and mid stages of the crop are computed.
+    calendar_ = chain_calendar()
+    first, *_ = calendar_.components
+    lengths = placeholder_stage_lengths("crop-a")
+    first_late = first.start.date + ONE_DAY * int(
+        sum(lengths[stage] for stage in GROWTH_STAGES[:3])
+    )
+    parameters = catalogue_with({("basal_crop_coefficient", "crop-a:end"): None})
+    days = chain(calendar_, parameters=parameters)
+    for day in days:
+        if day.date < first_late:
+            assert is_number(day.balance.storage_end)
+        elif day.date == first_late:
+            ke = day.surface_layer.evaporation_coefficient
+            assert isinstance(ke, Missing)
+            assert "basal_crop_coefficient (MISSING_INPUT)" in ke.detail
+            assert isinstance(day.balance.storage_end, Missing)
+    result = run(calendar_=calendar_, parameters=parameters)
+    scope = json.dumps(unmarked(scope_of("crop-a:end")))
+    for item in result:
+        if item.missing.reason == "NOT_AVAILABLE":
+            assert last_day_of(item.ag_year) < first_late
+        else:
+            named = no_record_item(item.missing.detail, scope)
+            assert named.endswith(": 'basal_crop_coefficient'")
 
 
 def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by_id_and_scope():
@@ -853,8 +1063,8 @@ def test_parameter_with_no_record_is_missing_input_naming_it_and_no_other(key):
     parameter_id, label = key
     # A parameter of the site or of a day with no crop is checked on the
     # calendar with no crop, on which every year is computed with the whole
-    # catalogue; a parameter of a crop on the calendar with crops, on which the
-    # years are missing anyway (the stage of a crop day is not known, D79).
+    # catalogue; a parameter of a crop on the calendar with crops, on which
+    # every year is computed too with the whole catalogue (issue #206).
     with_crops = label not in (None, "no_crop")
     calendar_ = chain_calendar() if with_crops else bare_calendar()
     result = run(calendar_=calendar_, parameters=catalogue_with({key: None}))
@@ -1502,9 +1712,11 @@ def test_arguments_unchanged_and_second_call_equal():
                     "engine.water.et0",
                     "engine.water.et0.quantities",
                     "engine.water.runoff",
+                    "engine.water.stages",
                 )
             ),
         ),
+        ("stages.py", lambda name: name == "contracts.results.models"),
         (
             "_parameters.py",
             lambda name: name in ("contracts.results.models", "params.catalogue"),
