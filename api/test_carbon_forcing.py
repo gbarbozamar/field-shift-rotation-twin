@@ -210,14 +210,22 @@ def test_every_value_but_the_decided_ones_is_missing_with_its_reason():
         "ph",
         "soil_cn_ratio",
     ]
-    # Monthly parts: the climate of RothC (D220); the monthly carbon inputs
-    # (D221) and the cover (D222) are not written by this producer yet.
+    # Monthly parts: the climate of RothC (D220); no monthly carbon inputs
+    # without a ledger (D221); the cover of D222, every month missing when the
+    # runner passes no count of the days with a live crop.
     assert [series.quantity for series in forcing.climate] == [
         "rainfall",
         "potential_evapotranspiration",
         "mean_temperature",
     ]
-    assert (forcing.carbon_inputs, forcing.soil_cover) == ([], [])
+    assert forcing.carbon_inputs == []
+    (cover,) = forcing.soil_cover
+    assert (cover.quantity, cover.unit) == ("soil_cover_state", "dimensionless")
+    assert cover.months and all(item.value is None for item in cover.months)
+    assert {item.missing.reason for item in cover.months} == {"NOT_AVAILABLE"}
+    assert "D222" in cover.months[0].missing.detail
+    assert "did not pass" in cover.months[0].missing.detail
+    assert (cover.provenance, cover.source, cover.range_missing) == (None, None, None)
 
 
 def test_one_carbon_input_series_per_crop_with_the_crop_as_origin():
