@@ -41,7 +41,8 @@ services:
       #   KINDS_OF_YEAR_RECORD_FILE=<path> docker compose watch
       KINDS_OF_YEAR_RECORD_FILE: ${KINDS_OF_YEAR_RECORD_FILE-}
       # RAIN_STRESS_TEST: the heavier-rain stress test stays off unless a
-      # person sets exactly `on`; any other non-blank value stops the server
+      # person sets exactly `on` (after stripping spaces); any other non-blank
+      # value stops the server
       # with a ConfigError (api/config.py, _rain_stress_switched_on; api/README.md).
       RAIN_STRESS_TEST: ${RAIN_STRESS_TEST-}
     ports:
