@@ -2,7 +2,7 @@
 
 Signed files that hold the expected values of a check of `docs/VALIDATION.md` together with the inputs and constants the check needs, read by the test of that check. Unit `l0/validation-h2-e3-ready` (issue #225).
 
-> **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443); this folder holds no value of a source.
+> **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), amended for two H2 steps by [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727); this folder holds no value of a source.
 >
 > **This folder holds no fixture yet.** The two signed files arrive in their own commit, after the lead developer signs them (D34, D66). Until then both tests skip.
 
@@ -19,7 +19,7 @@ A test **skips**, with a reason that names its file and every part that is not s
 - the `checked_by` of the file is empty or missing; or
 - a parameter record the file carries (the constants and bounds of H2, the unit length of E3) is absent or has an empty `checked_by`.
 
-Once everything is signed the test **runs**. From then on a malformed file, a value outside its tolerance, or a tolerance that is not the one of D124 is a **failure**, never a skip.
+Once everything is signed the test **runs**. From then on a malformed file, a value outside its tolerance, or a tolerance that is not the one of D124 (or of D138, for its two H2 steps) is a **failure**, never a skip.
 
 Each test also has cases that write a PLACEHOLDER fixture to a temporary folder (`tmp_path`) and show that the loader and the comparison run and pass, and that a value outside its tolerance fails. Those PLACEHOLDER numbers are made up or computed by the engine itself; none is a value of a source.
 
@@ -46,7 +46,7 @@ A **parameter record** below is a record in the format of `params/README.md` ("R
 |---|---|---|
 | `inputs` | object | Exactly the eight inputs of `reference_evapotranspiration_day`, each an entry (below): `day_of_year`, `elevation`, `temperature_max`, `temperature_min`, `actual_vapour_pressure` (the row of Eq. 17), `wind_speed_2m` (the row of Eq. 47), `solar_radiation` (the row of Eq. 35), and the latitude as **one** of `latitude_radians` or `latitude_degrees`. A latitude in degrees is converted by FAO-56 Eq. 22 (degrees times pi over 180), a definition, not a value of the example |
 | `steps` | object | The rows the example prints, one entry per field of `Et0Steps` it prints. Must include `reference_evapotranspiration`. A name that is not a field of `Et0Steps` fails. A step the example does not print is left out and not compared |
-| `tolerance` | object | `{step: absolute tolerance}`, one per step, in the unit of the step. D124: half a unit of the last digit of `printed`; `soil_heat_flux` exactly, so `0`. The test recomputes each from `printed` and fails if the file says otherwise |
+| `tolerance` | object | `{step: absolute tolerance}`, one per step, in the unit of the step. D124: half a unit of the last digit of `printed`; `soil_heat_flux` exactly, so `0`. [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727), which amends D124 after results were seen: **one** unit of the last digit of `printed` for `vapour_pressure_deficit` and `net_shortwave_radiation` only. The test recomputes each from `printed` and fails if the file says otherwise, so a fixture that widens any other step fails |
 | `constants` | list | The 31 parameter records of `Et0Constants`, one per field, by the identifiers EP3 reads: `<field of Et0Constants>_<field of its class>`, as `ET0_PARAMETERS` of `engine/water/exposure.py` builds them (for example `net_longwave_stefan_boltzmann`). Each signed in its own `checked_by` |
 | `bounds` | list | The two parameter records of D82, by the identifiers of `ET0_BOUND_PARAMETERS` of `engine/water/exposure.py`: `net_longwave_relative_shortwave_maximum` and `penman_monteith_minimum_wind_speed`. Each signed in its own `checked_by` |
 

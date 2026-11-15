@@ -122,6 +122,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-15 | L0 | `l0/source-status-cleanup` (#230): `docs/METHODS.md` sources, `engine/erosion/LS.md` | Claude Code (Anthropic) | A builder session brought the source statuses up to date with links to the signed records and decisions; a separate verifier reviewed it | Documentation only |
 | 2026-11-15 | L0 | `l0/e3-fixture`: `validation/fixtures/e3_ah703_tables.json` | Claude Code (Anthropic) | The scientific-integration session transcribed the E3 values; the lead developer checked them against the pages and signed; the E3 test now runs and passes | Values signed by the lead developer (D34) |
 | 2026-11-15 | L1 | `l1/calendar-phases-d109` (#221): `engine/calendar/repeat.py`, `test_repeat.py` | Claude Code (Anthropic) | A builder session added `phase_calendar` and `list_phases` (D109, D132, D133); a separate verifier reviewed it | Points 8 to 12 PROPOSED; repeat_over_record unchanged |
+| 2026-11-15 | L0 | `l0/validation-h2-d138`: `test_h2.py` (D138), fixtures README, VALIDATION H2, signed `h2_example18.json` | Claude Code (Anthropic) | A builder session made H2 accept D138 for two steps; the integration session transcribed the fixture and the lead developer signed it; the H2 test now runs and passes | D138 decided after results were seen, and says so |
 Rules:
 
 - No generated images, video or voice in the submission.

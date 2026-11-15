@@ -1,0 +1,781 @@
+{
+  "test": "engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56",
+  "source": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 4, EXAMPLE 18, Determination of ETo with daily data",
+    "url": "https://www.fao.org/4/X0490E/x0490e08.htm",
+    "read": "2026-11-14"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "tolerance_rule": "D124: half a unit of the last printed digit of each step; soil heat flux exactly. Amended by the lead developer on 14 November 2026, after the results were seen, for two steps where the example prints a result that does not match its own printed arithmetic: vapour_pressure_deficit (1.997 - 1.409 = 0.588, printed 0.589) and net_shortwave_radiation (0.77 x 22.07 = 16.9939, printed 17.00) are compared within one unit of the last printed digit (0.001 and 0.01). Recorded in issue #77 as D138 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727), which amends D124 for these two steps and states that it was decided after the results were seen.",
+  "tolerance_decided_by": "Lead developer, explicit chat reply to the science integration session on 14 November 2026 (\"Sí, las recomendadas\"). A choice of the lead developer, not a value of the source. Recorded in issue #77 as D124: https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443",
+  "inputs": {
+    "day_of_year": {
+      "value": 187,
+      "unit": "day",
+      "printed": "187",
+      "verbatim": "«From Table 2.5: Month 7, Day = 6 … J =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 213)",
+      "note": "From Table 2.5"
+    },
+    "latitude_degrees": {
+      "value": 50.8,
+      "unit": "degree north",
+      "printed": "50.80",
+      "verbatim": "«Latitude = 50°48'N =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 214)",
+      "note": "The test takes latitude_radians: converted by Eq. 22 (pi/180), a definition, not a value of the example."
+    },
+    "elevation": {
+      "value": 100,
+      "unit": "m",
+      "printed": "100",
+      "verbatim": "«Given the meteorological data as measured on 6 July in Uccle (Brussels, Belgium) located at 50°48'N and at 100 m above sea level»",
+      "locator": "Chapter 4, Example 18 (check sheet row 190)",
+      "note": ""
+    },
+    "temperature_max": {
+      "value": 21.5,
+      "unit": "°C",
+      "printed": "21.5",
+      "verbatim": "«Maximum air temperature (Tmax) =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 191)",
+      "note": ""
+    },
+    "temperature_min": {
+      "value": 12.3,
+      "unit": "°C",
+      "printed": "12.3",
+      "verbatim": "«Minimum air temperature (Tmin) =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 192)",
+      "note": ""
+    },
+    "actual_vapour_pressure": {
+      "value": 1.409,
+      "unit": "kPa",
+      "printed": "1.409",
+      "verbatim": "«From Eq. 17: ea = [1.431 (0.84) + 2.564 (0.63)]/2 =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 211)",
+      "note": "Row of Eq. 17 entered as an input (engine/water/et0/README.md OPEN 4)."
+    },
+    "wind_speed_2m": {
+      "value": 2.078,
+      "unit": "m s-1",
+      "printed": "2,078 (decimal comma as printed)",
+      "verbatim": "«From Eq. 47, with z = 10 m: At standard height, u2 = 0.748 (2.78) =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 199)",
+      "note": "Printed with a decimal comma, «2,078». Row of Eq. 47 entered as an input."
+    },
+    "solar_radiation": {
+      "value": 22.07,
+      "unit": "MJ m-2 day-1",
+      "printed": "22.07",
+      "verbatim": "«From Eq. 35 Rs = [0.25 + 0.50 (0.57)] 41.09»",
+      "locator": "Chapter 4, Example 18 (check sheet row 218)",
+      "note": "Row of Eq. 35 entered as an input."
+    }
+  },
+  "steps": {
+    "atmospheric_pressure": {
+      "value": 100.1,
+      "unit": "kPa",
+      "printed": "100.1",
+      "verbatim": "«From Eq. 7, for: altitude = 100 m … P =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 200)",
+      "note": ""
+    },
+    "mean_temperature": {
+      "value": 16.9,
+      "unit": "°C",
+      "printed": "16.9",
+      "verbatim": "«Tmean = (21.5 + 12.3)/2 =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 201)",
+      "note": ""
+    },
+    "slope": {
+      "value": 0.122,
+      "unit": "kPa °C-1",
+      "printed": "0.122",
+      "verbatim": "«From Eq. 13, for: Tmean = 16.9 °C … Δ =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 202)",
+      "note": ""
+    },
+    "psychrometric_constant": {
+      "value": 0.0666,
+      "unit": "kPa °C-1",
+      "printed": "0.0666",
+      "verbatim": "«From Eq. 8, for: P = 100.1 kPa … γ =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 203)",
+      "note": ""
+    },
+    "mean_saturation_vapour_pressure": {
+      "value": 1.997,
+      "unit": "kPa",
+      "printed": "1.997",
+      "verbatim": "«e s = (2.564 + 1.431) = 1.997 kPa»",
+      "locator": "Chapter 4, Example 18 (check sheet row 210)",
+      "note": "ODDITY: the row prints «es = (2.564 + 1.431) =» without «/2», but 1.997 is the mean."
+    },
+    "vapour_pressure_deficit": {
+      "value": 0.589,
+      "unit": "kPa",
+      "printed": "0.589",
+      "verbatim": "«Vapour pressure deficit (es - ea) = (1.997-1.409) =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 212)",
+      "note": "ODDITY: 1.997 − 1.409 = 0.588 by hand; the example prints 0.589 (rounding of unrounded intermediates). Tolerance one unit of the last printed digit (D138 of issue #77, amending D124; decided after the results were seen)."
+    },
+    "extraterrestrial_radiation": {
+      "value": 41.09,
+      "unit": "MJ m-2 day-1",
+      "printed": "41.09",
+      "verbatim": "«From Eq. 21: … Ra =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 215)",
+      "note": ""
+    },
+    "clear_sky_solar_radiation": {
+      "value": 30.9,
+      "unit": "MJ m-2 day-1",
+      "printed": "30.90",
+      "verbatim": "«From Eq. 37 Rso = (0.75 +2(100)/100000) 41.09 =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 219)",
+      "note": ""
+    },
+    "shortwave_ratio": {
+      "value": 0.71,
+      "unit": "dimensionless",
+      "printed": "0.71",
+      "verbatim": "«Rs/Rso =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 220)",
+      "note": "Rs/Rso; below 1, so the D82 bound does not change it."
+    },
+    "relative_shortwave_radiation": {
+      "value": 0.71,
+      "unit": "dimensionless",
+      "printed": "0.71",
+      "verbatim": "«Rs/Rso =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 220)",
+      "note": "Same printed row as shortwave_ratio (bounded value)."
+    },
+    "net_shortwave_radiation": {
+      "value": 17.0,
+      "unit": "MJ m-2 day-1",
+      "printed": "17.00",
+      "verbatim": "«From Eq. 38 Rns = 0.77 (22.07) =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 221)",
+      "note": " ODDITY: 0.77 x 22.07 = 16.9939 by hand; the example prints 17.00. Tolerance one unit of the last printed digit (D138 of issue #77, amending D124; decided after the results were seen)."
+    },
+    "net_longwave_radiation": {
+      "value": 3.71,
+      "unit": "MJ m-2 day-1",
+      "printed": "3.71",
+      "verbatim": "«From Eq. 39 Rnl = 34.76(0.17)0.61 =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 229)",
+      "note": ""
+    },
+    "net_radiation": {
+      "value": 13.28,
+      "unit": "MJ m-2 day-1",
+      "printed": "13.28",
+      "verbatim": "«From Eq. 40 Rn = (17.00 - 3.71) =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 230)",
+      "note": ""
+    },
+    "soil_heat_flux": {
+      "value": 0,
+      "unit": "MJ m-2 day-1",
+      "printed": "0",
+      "verbatim": "«From Eq. 42 G =»",
+      "locator": "Chapter 4, Example 18 (check sheet row 231)",
+      "note": ""
+    },
+    "reference_evapotranspiration": {
+      "value": 3.88,
+      "unit": "mm day-1",
+      "printed": "3.88",
+      "verbatim": "«ETo (Eq. 6) = 2.81 + 1.07 = 3.88 ≈»",
+      "locator": "Chapter 4, Example 18 (check sheet row 236)",
+      "note": "The Eq. 6 line of Example 18, as D124 fixes it (fixtures README OPEN 3).",
+      "candidates": {
+        "3.88": "Eq. 6 line: «ETo (Eq. 6) = 2.81 + 1.07 = 3.88 ≈ 3.9 mm/day»",
+        "3.9": "Closing sentence: «The grass reference evapotranspiration is 3.9 mm/day.» (row 237)"
+      }
+    }
+  },
+  "tolerance": {
+    "atmospheric_pressure": 0.05,
+    "mean_temperature": 0.05,
+    "slope": 0.0005,
+    "psychrometric_constant": 5e-05,
+    "mean_saturation_vapour_pressure": 0.0005,
+    "vapour_pressure_deficit": 0.001,
+    "extraterrestrial_radiation": 0.005,
+    "clear_sky_solar_radiation": 0.005,
+    "shortwave_ratio": 0.005,
+    "relative_shortwave_radiation": 0.005,
+    "net_shortwave_radiation": 0.01,
+    "net_longwave_radiation": 0.005,
+    "net_radiation": 0.005,
+    "soil_heat_flux": 0,
+    "reference_evapotranspiration": 0.005
+  },
+  "constants": [
+    {
+      "id": "atmospheric_pressure_sea_level_pressure",
+      "scope": {},
+      "value": 101.3,
+      "unit": "kPa (not printed with the value; symbol list: P [kPa])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 7, `x0490e0c.gif` (check sheet row 151, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 7: «P = 101.3 ((293 − 0.0065 z)/293)^5.26» Value as printed: 101.3. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "atmospheric_pressure_reference_temperature",
+      "scope": {},
+      "value": 293.0,
+      "unit": "K (not printed; the text says 20 °C for a standard atmosphere)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 7 (check sheet row 152, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 7: «P = 101.3 ((293 − 0.0065 z)/293)^5.26» Value as printed: 293. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "atmospheric_pressure_lapse_rate",
+      "scope": {},
+      "value": 0.0065,
+      "unit": "K m-1 (not printed; z in [m])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 7 (check sheet row 153, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 7: «P = 101.3 ((293 − 0.0065 z)/293)^5.26» Value as printed: 0.0065. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "atmospheric_pressure_exponent",
+      "scope": {},
+      "value": 5.26,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 7 (check sheet row 154, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 7: «P = 101.3 ((293 − 0.0065 z)/293)^5.26» Value as printed: 5.26. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "psychrometric_coefficient",
+      "scope": {},
+      "value": 0.000665,
+      "unit": "kPa-1 x kPa °C-1, as printed: gamma [kPa °C-1] = coefficient x P [kPa]",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 8, `x0490e0d.gif` (check sheet row 158, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 8: «= 0.665×10⁻³ P» Value as printed: 0.665 × 10-3. One coefficient instead of the quantities it combines: OPEN 6 of engine/water/et0/README.md. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "saturation_vapour_pressure_scale",
+      "scope": {},
+      "value": 0.6108,
+      "unit": "kPa (not printed with the value; e°(T) in [kPa])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, `x0490e0g.gif`, `x0490e0i.gif`, `x0490e0j.gif` (check sheet row 159, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 11: «e°(T) = 0.6108 exp[17.27 T/(T + 237.3)]» Value as printed: 0.6108. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "saturation_vapour_pressure_numerator",
+      "scope": {},
+      "value": 17.27,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, `x0490e0g.gif`, `x0490e0i.gif`, `x0490e0j.gif` (check sheet row 160, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 11: «e°(T) = 0.6108 exp[17.27 T/(T + 237.3)]» Value as printed: 17.27. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "saturation_vapour_pressure_offset",
+      "scope": {},
+      "value": 237.3,
+      "unit": "°C (not printed; T in [°C])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, `x0490e0g.gif`, `x0490e0i.gif`, `x0490e0j.gif` (check sheet row 161, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 11: «e°(T) = 0.6108 exp[17.27 T/(T + 237.3)]» Value as printed: 237.3. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "slope_multiplier",
+      "scope": {},
+      "value": 4098.0,
+      "unit": "°C (not printed; Delta in [kPa °C-1])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 13, `x0490e0i.gif` (check sheet row 162, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 13: «Δ = 4098 [0.6108 exp(17.27 T/(T + 237.3))] / (T + 237.3)^2». The last digit is half hidden by the bracket in the image and reads «8» Value as printed: 4098. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "inverse_relative_distance_offset",
+      "scope": {},
+      "value": 1.0,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 23, image x0490e0w.gif",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «dr = 1 + 0.033 cos(2π J/365)» No row of the check sheet holds this term; it was read in the image of Eq. 23 by the AI pre-check (form F27)."
+    },
+    {
+      "id": "inverse_relative_distance_amplitude",
+      "scope": {},
+      "value": 0.033,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 23, `x0490e0w.gif` (check sheet row 166, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 23: «dr = 1 + 0.033 cos(2π J/365)» Value as printed: 0.033. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "inverse_relative_distance_days_in_year",
+      "scope": {},
+      "value": 365.0,
+      "unit": "day (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 23 and 24 (check sheet row 167, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 23: «dr = 1 + 0.033 cos(2π J/365)»; image of Eq. 24: «δ = 0.409 sin(2π J/365 − 1.39)». The text says J runs from 1 to «365 or 366 (31 December)» Value as printed: 365. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "solar_declination_amplitude",
+      "scope": {},
+      "value": 0.409,
+      "unit": "rad (not printed with the value; delta in [rad])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 24, `x0490e0x.gif` (check sheet row 168, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 24: «δ = 0.409 sin(2π J/365 − 1.39)» Value as printed: 0.409. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "solar_declination_days_in_year",
+      "scope": {},
+      "value": 365.0,
+      "unit": "day (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 23 and 24 (check sheet row 167, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 23: «dr = 1 + 0.033 cos(2π J/365)»; image of Eq. 24: «δ = 0.409 sin(2π J/365 − 1.39)». The text says J runs from 1 to «365 or 366 (31 December)» Value as printed: 365. Same printed number as inverse_relative_distance_days_in_year (one sheet row covers Eq. 23 and Eq. 24); check it in Eq. 24. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "solar_declination_phase",
+      "scope": {},
+      "value": 1.39,
+      "unit": "rad (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 24 (check sheet row 169, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 24: «δ = 0.409 sin(2π J/365 − 1.39)» Value as printed: 1.39. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "extraterrestrial_radiation_time_factor",
+      "scope": {},
+      "value": 1440.0,
+      "unit": "min day-1 (not printed; printed as 24(60))",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 21, `x0490e0u.gif` (check sheet row 165, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 21: «24(60)/π» Value as printed: 24(60). The value 1440 is the product 24 x 60 printed as «24(60)»: an arithmetic step, to check. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "extraterrestrial_radiation_solar_constant",
+      "scope": {},
+      "value": 0.082,
+      "unit": "MJ m-2 min-1",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, list of symbols of Eq. 21 (check sheet row 164, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Gsc solar constant = 0.0820 MJ m-2 min-1» Value as printed: 0.0820."
+    },
+    {
+      "id": "clear_sky_radiation_base",
+      "scope": {},
+      "value": 0.75,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 37 (text) (check sheet row 173, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Rso = (0.75 + 2 l0-5z)Ra» Value as printed: 0.75."
+    },
+    {
+      "id": "clear_sky_radiation_elevation_coefficient",
+      "scope": {},
+      "value": 2e-05,
+      "unit": "m-1 (not printed; z in [m])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 37 (check sheet row 174, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Rso = (0.75 + 2 l0-5z)Ra» (Eq. 37 as text; the OCR reads «l0-5» for 10-5) Value as printed: 2 × 10-5 (impreso «2 l0-5» por OCR)."
+    },
+    {
+      "id": "net_shortwave_albedo",
+      "scope": {},
+      "value": 0.23,
+      "unit": "dimensionless",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, list of symbols of Eq. 38 (check sheet row 175, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «albedo or canopy reflection coefficient, which is 0.23 for the hypothetical grass reference crop [dimensionless]» Value as printed: 0.23."
+    },
+    {
+      "id": "net_longwave_stefan_boltzmann",
+      "scope": {},
+      "value": 4.903e-09,
+      "unit": "MJ K-4 m-2 day-1",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, list of symbols of Eq. 39 (check sheet row 176, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «s Stefan-Boltzmann constant [4.903 10-9 MJ K-4 m-2 day-1]» (OCR: σ→s) Value as printed: 4.903 10-9."
+    },
+    {
+      "id": "net_longwave_kelvin_offset",
+      "scope": {},
+      "value": 273.16,
+      "unit": "K (text: K = °C + 273.16)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, section «Air temperature»; also list of symbols of Eq. 39 (check sheet row 163, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «by adding 273.16 to the temperature expressed in degrees Celsius (in practice K = °C + 273.16)» Value as printed: 273.16."
+    },
+    {
+      "id": "net_longwave_humidity_intercept",
+      "scope": {},
+      "value": 0.34,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 39, `x0490e18.gif` (check sheet row 177, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image and text: «The term (0.34-0.14√ ea) expresses the correction for air humidity» Value as printed: 0.34."
+    },
+    {
+      "id": "net_longwave_humidity_slope",
+      "scope": {},
+      "value": 0.14,
+      "unit": "kPa-0.5 (not printed; ea in [kPa])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 39, `x0490e18.gif` (check sheet row 178, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image and text of Eq. 39: «The term (0.34-0.14√ ea) expresses the correction for air humidity» Value as printed: 0.14. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "net_longwave_cloudiness_multiplier",
+      "scope": {},
+      "value": 1.35,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 39, `x0490e18.gif` (check sheet row 179, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «The effect of cloudiness is expressed by (1.35 Rs/Rso - 0.35)» Value as printed: 1.35."
+    },
+    {
+      "id": "net_longwave_cloudiness_offset",
+      "scope": {},
+      "value": 0.35,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 39, `x0490e18.gif` (check sheet row 180, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «The effect of cloudiness is expressed by (1.35 Rs/Rso - 0.35)» Value as printed: 0.35."
+    },
+    {
+      "id": "soil_heat_flux_daily_value",
+      "scope": {},
+      "value": 0.0,
+      "unit": "MJ m-2 day-1",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, «Soil heat flux», daily case (check sheet row 182, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Gday » 0» y «it may be ignored» Value as printed: ≈ 0. The source prints «≈ 0» and says it may be ignored for day periods; the value 0 is read from that."
+    },
+    {
+      "id": "penman_monteith_radiation_factor",
+      "scope": {},
+      "value": 0.408,
+      "unit": "mm day-1 per MJ m-2 day-1 (not printed in Eq. 6; Eq. 20 converts [MJ m-2 day-1] to [mm day-1])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, Eq. 20 (text); Eq. 6 (image) (check sheet row 145, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «a conversion factor equal to the inverse of the latent heat heat of vaporization (1/l = 0.408)» Value as printed: 0.408."
+    },
+    {
+      "id": "penman_monteith_numerator_constant",
+      "scope": {},
+      "value": 900.0,
+      "unit": "not printed",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 2, Eq. 6, `x0490e05.gif` (check sheet row 146, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e06.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 6: «γ 900/(T+273) u2 (es − ea)» Value as printed: 900. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "penman_monteith_kelvin_offset",
+      "scope": {},
+      "value": 273.0,
+      "unit": "K (not printed; T in [°C])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 2, Eq. 6 (check sheet row 147, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e06.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 6: «T+273» Value as printed: 273. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    },
+    {
+      "id": "penman_monteith_denominator_constant",
+      "scope": {},
+      "value": 0.34,
+      "unit": "s m-1 (not printed; u2 in [m s-1])",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 2, Eq. 6 (check sheet row 148, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e06.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 6: «Δ+γ(1+0.34u2)» Value as printed: 0.34. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+    }
+  ],
+  "bounds": [
+    {
+      "id": "net_longwave_relative_shortwave_maximum",
+      "scope": {},
+      "value": 1.0,
+      "unit": "dimensionless (not printed)",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, list of symbols of Eq. 39 (check sheet row 181, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Rs/Rso relative shortwave radiation (limited to ≤ 1.0)» Value as printed: 1.0. Decision PC-4 (docs/SCIENCE_DECISIONS.md): lane L1 applies this bound in net_longwave_radiation. Identifier PROPOSED; not yet read by EP3."
+    },
+    {
+      "id": "penman_monteith_minimum_wind_speed",
+      "scope": {},
+      "value": 0.5,
+      "unit": "m s-1",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+        "locator": "Chapter 3, end of «Missing wind speed data» (check sheet row 186, block B7)",
+        "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «wind speed at 2 m, u2, should be limited to about u2 ≥ 0.5 m/s when used in the ETo equation (Equation 6)» Value as printed: 0.5. Decision PC-4: lane L1 applies this bound where Eq. 6 is used. Identifier PROPOSED; not yet read by EP3."
+    }
+  ],
+  "not_printed_by_the_example": [
+    "inverse_relative_distance",
+    "solar_declination",
+    "sunset_hour_angle"
+  ],
+  "printed_but_not_compared_by_the_test": {
+    "198": "`ex18_uz` = 2.78",
+    "204": "`ex18_wind_factor` = 1.71",
+    "205": "`ex18_radiation_weight` = 0.518",
+    "206": "`ex18_aerodynamic_weight` = 0.282",
+    "207": "`ex18_aerodynamic_coefficient` = 6.450",
+    "208": "`ex18_es_at_tmax` = 2.564",
+    "209": "`ex18_es_at_tmin` = 1.431",
+    "216": "`ex18_daylight_hours` = 16.1",
+    "217": "`ex18_relative_sunshine` = 0.57",
+    "222": "`ex18_tmax_kelvin` = 294.7",
+    "223": "`ex18_sigma_tmax_k4` = 36.96",
+    "224": "`ex18_tmin_kelvin` = 285.5",
+    "225": "`ex18_sigma_tmin_k4` = 32.56",
+    "226": "`ex18_sigma_tk4_mean` = 34.76",
+    "227": "`ex18_humidity_correction` = 0.17",
+    "228": "`ex18_cloudiness_correction` = 0.61",
+    "233": "`ex18_rn_minus_g_equivalent` = 5.42",
+    "234": "`ex18_radiation_term` = 2.81",
+    "235": "`ex18_aerodynamic_term` = 1.07"
+  },
+  "signature_note": "Signed gbarbozamar on the lead developer's explicit instruction in the chat of the science integration session, 14 November 2026, after the lead developer confirmed having checked every value against the original pages (D34, D66). The session wrote the signature; it did not check the values itself."
+}

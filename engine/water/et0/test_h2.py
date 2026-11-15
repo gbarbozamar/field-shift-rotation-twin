@@ -15,7 +15,9 @@ Decision D124 of issue #77 fixed the expected values and the tolerance before
 any run (docs/VALIDATION.md, "Section 10"): the expected reference
 evapotranspiration is the one of the Eq. 6 line of the example, and each step
 is compared within half a unit of the last digit the example prints, the soil
-heat flux exactly.
+heat flux exactly. Decision D138 amends D124, after results were seen, for two
+steps only: the vapour pressure deficit and the net shortwave radiation are
+compared within one unit of the last printed digit.
 
 **This file holds no value of the example.** ``EXAMPLE_18``, ``CONSTANTS``
 and ``BOUNDS`` are read from the signed fixture ``FIXTURE``
@@ -84,6 +86,12 @@ STEP_FIELDS = tuple(
 
 # D124: the soil heat flux is compared exactly.
 EXACT_STEPS = ("soil_heat_flux",)
+
+# D138 of issue #77 (amends D124 for these two steps only, decided after the
+# results of a structural run were seen): one unit of the last printed digit
+# instead of half a unit.
+# https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727
+ONE_UNIT_STEPS = ("vapour_pressure_deficit", "net_shortwave_radiation")
 FINAL_STEP = "reference_evapotranspiration"
 
 # The parameter identifiers EP3 reads (engine/water/exposure.py), by field.
@@ -193,6 +201,18 @@ def half_unit_of_last_printed_digit(printed: str) -> float:
     return 0.5 * 10.0**-decimals
 
 
+def decided_tolerance(name: str, printed: str) -> float:
+    """The tolerance D124 and D138 give to a step printed as ``printed``.
+
+    D124: half a unit of the last printed digit, the soil heat flux exactly.
+    D138: one unit of the last printed digit for the steps of ONE_UNIT_STEPS.
+    """
+    if name in EXACT_STEPS:
+        return 0.0
+    half = half_unit_of_last_printed_digit(printed)
+    return 2 * half if name in ONE_UNIT_STEPS else half
+
+
 def _parameter(record: dict, where: str) -> float:
     problems = check_record(record)
     assert not problems, f"{where}: " + "; ".join(problems)
@@ -280,17 +300,15 @@ def load_case(fixture: dict) -> H2Case:
 
 
 def tolerance_problems(case: H2Case) -> list[str]:
-    """Each tolerance of the fixture that is not the one D124 gives."""
+    """Each tolerance of the fixture that is not the one D124 and D138 give."""
     problems = []
     for name, given in case.tolerance.items():
-        if name in EXACT_STEPS:
-            rule = 0.0
-        else:
-            rule = half_unit_of_last_printed_digit(case.printed[name])
+        rule = decided_tolerance(name, case.printed[name])
         if not isinstance(given, (int, float)) or abs(given - rule) > FLOAT_NOISE:
+            decision = "D138" if name in ONE_UNIT_STEPS else "D124"
             problems.append(
-                f"tolerance.{name} is {given!r}; D124 gives {rule!r} for the printed "
-                f"'{case.printed[name]}'"
+                f"tolerance.{name} is {given!r}; {decision} gives {rule!r} for the "
+                f"printed '{case.printed[name]}'"
             )
     return problems
 
@@ -383,7 +401,14 @@ def placeholder_fixture(*, checked: bool = True) -> dict:
     computed = reference_evapotranspiration_day(
         **DAY, constants=PLACEHOLDER_CONSTANTS, bounds=PLACEHOLDER_BOUNDS
     )
-    names = ("mean_temperature", "slope", "net_radiation", "soil_heat_flux", FINAL_STEP)
+    names = (
+        "mean_temperature",
+        "slope",
+        "net_radiation",
+        "soil_heat_flux",
+        FINAL_STEP,
+        *ONE_UNIT_STEPS,
+    )
     steps, tolerance = {}, {}
     for decimals, name in enumerate(names):
         printed = _printed(
@@ -394,9 +419,7 @@ def placeholder_fixture(*, checked: bool = True) -> dict:
             "unit": "PLACEHOLDER",
             "printed": printed,
         }
-        tolerance[name] = (
-            0.0 if name in EXACT_STEPS else half_unit_of_last_printed_digit(printed)
-        )
+        tolerance[name] = decided_tolerance(name, printed)
     constants = [
         _placeholder_record(
             identifier,
@@ -551,3 +574,41 @@ def test_h2_half_unit_of_the_last_printed_digit():
     assert half_unit_of_last_printed_digit("77.777") == pytest.approx(0.0005)
     with pytest.raises(AssertionError):
         half_unit_of_last_printed_digit("7,7")
+
+
+def test_h2_the_two_steps_of_d138_take_one_unit_of_the_last_printed_digit():
+    fixture = placeholder_fixture()
+    for name in ONE_UNIT_STEPS:
+        printed = fixture["steps"][name]["printed"]
+        assert fixture["tolerance"][name] == pytest.approx(
+            2 * half_unit_of_last_printed_digit(printed), abs=FLOAT_NOISE
+        )
+    case = load_case(fixture)
+    assert tolerance_problems(case) == []
+    computed = reference_evapotranspiration_day(
+        **case.inputs, constants=case.constants, bounds=case.bounds
+    )
+    steps = dict(case.steps)
+    for name in ONE_UNIT_STEPS:
+        # Beyond half a unit, within one unit: passes for these two steps only.
+        steps[name] = getattr(computed, name) + 0.9 * case.tolerance[name]
+    assert comparison_failures(dataclasses.replace(case, steps=steps)) == []
+
+
+def test_h2_a_d138_step_with_half_a_unit_fails():
+    fixture = placeholder_fixture()
+    name = ONE_UNIT_STEPS[0]
+    fixture["tolerance"][name] /= 2
+    problems = tolerance_problems(load_case(fixture))
+    assert len(problems) == 1
+    assert problems[0].startswith(f"tolerance.{name}")
+    assert "D138" in problems[0]
+
+
+def test_h2_a_third_step_with_one_unit_still_fails():
+    fixture = placeholder_fixture()
+    fixture["tolerance"]["slope"] *= 2
+    problems = tolerance_problems(load_case(fixture))
+    assert len(problems) == 1
+    assert problems[0].startswith("tolerance.slope")
+    assert "D124" in problems[0]
