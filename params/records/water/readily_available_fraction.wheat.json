@@ -1,0 +1,18 @@
+{
+  "id": "readily_available_fraction",
+  "scope": {
+    "crop": "wheat"
+  },
+  "value": 0.55,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 8, Table 22",
+    "url": "https://www.fao.org/4/X0490E/x0490e0e.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Spring Wheat | 1.0-1.5 | 0.55»; «Winter Wheat | 1.5-1.8 | 0.55». Footnote 2: «The values for p apply for ET c » 5 mm/day.» Decision USER-AR. The text gives the adjustment «p = p Table 22 + 0.04 (5 - ET c )» limited to 0.1 ≤ p ≤ 0.8; whether EP3 applies it daily is OPEN (no part does today). UPDATED on 2026-11-15 by an AI session to follow D202 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D202: the constant of Table 22 is kept and the correction of footnote 2 is not applied. The source offers it and does not require it: «Often, a constant value is used for p for a specific growing period». LIMIT D202 DECLARES (for the label): the value holds for an ETc of about 5 mm a day. Arithmetic of the form, not a run: with the constant, stress starts later than the corrected p would give on days with ETc above 5 mm, and earlier on days below it. The daily correction is a lane L1 unit for after the event. SIGNED on 2026-11-15: checked_by gbarbozamar, row T1 of section 3.1 of the water signing sheet. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}
