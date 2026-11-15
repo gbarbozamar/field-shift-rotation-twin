@@ -692,3 +692,53 @@ def test_the_engines_of_the_repository_through_the_route():
         first["rotation_id"],
         second["rotation_id"],
     }
+
+
+def test_the_default_decision_layer_serves_a_document_through_the_route():
+    """With nothing injected, the route finds ``decision.output`` by name and
+    answers 200 with a document that validates as ``DecisionOutput``, marked
+    example data since its inputs are (the engines of the repository on the
+    PLACEHOLDER chain examples). No value of the science is asserted."""
+    from contracts.decision_output.models import STATE_NAMES
+
+    found = discover_engine_functions()
+    if found.build_rotation_calendar is None or found.compute_soil_loss is None:
+        pytest.skip("the calendar or the soil-loss engine is not built")
+    if found.phase_calendar is None or found.list_phases is None:
+        pytest.skip("the phase functions of engine.calendar.repeat are not built")
+    examples = ROOT / "contracts" / "inputs" / "examples"
+    climate = SiteClimate.model_validate_json(
+        (examples / "PLACEHOLDER_chain_site_climate.json").read_text(encoding="utf-8")
+    )
+    series = climate.daily_series[0]
+    first = copy.deepcopy(ROTATION)
+    second = _two_years(copy.deepcopy(ROTATION))
+    second["rotation_id"] = "PLACEHOLDER_rotation_two_years"
+    app = create_app(
+        [],
+        climate=ChainClimate(climate),
+        soil_slope=ExampleSoilSlopeSource(
+            examples / "PLACEHOLDER_chain_site_soil_slope.json"
+        ),
+        settings=RunSettings(start_date=series.start_date, end_date=series.end_date),
+    )
+    site = {
+        "case_id": first["case_id"],
+        "field_id": first["field_id"],
+        "latitude": climate.point.latitude.value,
+        "longitude": climate.point.longitude.value,
+    }
+    response = TestClient(app).post(
+        ROUTE, json={"site": site, "rotations": [first, second]}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["decision_missing"] is None, body["decision_missing"]
+    document = DecisionOutput.model_validate_json(json.dumps(body["decision"]))
+    assert document.example_data is True
+    assert document.rotations == [first["rotation_id"], second["rotation_id"]]
+    assert sorted(document.scenarios) == [s["scenario_id"] for s in body["scenarios"]]
+    (state,) = document.pair_states
+    assert state.value in STATE_NAMES or (
+        state.value is None and state.missing is not None
+    )
