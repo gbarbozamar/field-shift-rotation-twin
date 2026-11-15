@@ -199,18 +199,18 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 ### H0
 
 - What it checks (blueprint wording): "trivial comparators [E0, H0, D0]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the trivial comparator of the water-deficit exposure, and the statement of whether it gives the same order as the full `water_deficit_exposure`. PROPOSED by a research AI session; DECIDED under D161 (D212 of issue #77, 15 November 2026)
 - Lane: L0 Core
 - Block: "Block 4 — Sunday until CP4"
 - Unit it gates: "trivial comparators [E0, H0, D0]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
+- Definition (PROPOSED by a research AI session; logic DECIDED under D161, D212 of issue #77, 15 November 2026): Input: hand-made daily series of precipitation and of demanded transpiration (the basal crop coefficient times the reference evapotranspiration, the denominator of D157), the days of living crop of a hand-made rotation calendar (D105, D106, D136), given as a demanded transpiration that is `NOT_APPLICABLE` on every other day, as the daily balance of EP3 gives it, and a hand-made `ResultsTable` of `water_deficit_exposure`; all labelled example data. For each rotation, scenario, phase and agricultural year, the trivial comparator computes the sum of precipitation over the sum of demanded transpiration, both over the same days with a living crop that D157 uses: a day counts when its demanded transpiration is a number, and a day with no crop or of the tail after maturity (demanded transpiration `NOT_APPLICABLE`) is left out, as EP3 does. It is not bounded at one. Higher is better. A year with no day with a living crop is `NOT_APPLICABLE` and a year whose demanded sum is not above zero is `NOT_COMPUTABLE`, as EP3 gives the full indicator; a missing precipitation or demand on a counted day makes the year missing with its reason, and nothing is filled or read as zero. It orders the rotations by the mean of that ratio over agricultural years. It keeps the window and the denominator of D157 and removes the daily soil water balance (storage carried between crops, runoff, soil evaporation and the stress coefficient): a different order says that the balance changes the order. Using precipitation as the supply is a modelling choice, not stated by a source. The test checks that (a) on the hand-made inputs the comparator returns the order counted by hand, and (b) the report states, per scenario and phase, whether that order equals the order of the full `water_deficit_exposure` values by their mean over agricultural years, read in the direction of the row (C1.1), ignoring ranges (the reading of D0, taken from `validation/trivial_comparator.py`). Ties, missing years, `NOT_APPLICABLE` years and a single rotation give no order, with the reason, as in D0. The report also states how many rotations were ordered. Pass: (a) and (b) hold. What it does not do: it is not a water-deficit exposure and is never shown as one; it carries the label "whole cycle, not critical period" (D157, D162) wherever it is reported; it validates neither method. Known limit: D212 was taken before any water value existed; the comparator reports nothing on real data until EP3 gives numbers with the signed water records and a run on real climate. With two rotations the same order happens by chance half of the time: a different order is informative, the same order is weak evidence (D212). OPEN for the lead developer, in `validation/trivial_comparator_water.py`: how a phase reaches the inputs (a `ResultsTableRow` has no field for it; a phase is read as its own `scenario_id`); a year the comparator computes and EP3 does not; two sides that order different sets of rotations.
+- Expected value: the outcome stated as logic in the definition. Any ratio, mean or order that a test compares is read off the hand-made inputs by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: states and ranks are compared exactly; the means are compared as the stored values, as in D0.
+- Source: D157 for the window and the denominator (decision of issue #77), as read by AI sessions
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED under D161 (D212); acceptance by a science reviewer pending
 
 ### H1
 
