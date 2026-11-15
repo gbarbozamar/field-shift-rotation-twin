@@ -26,7 +26,10 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    ``CarbonForcing`` that ``api.carbon_forcing`` builds from the calendar and
    the site data (PROPOSED), the same object for both (D65). When the forcing
    cannot be laid out, neither is called and their rows are missing with
-   that reason;
+   that reason. The daily reference evapotranspiration the forcing needs
+   (D220, D181) is the answer of lane L1's public function
+   ``engine.water.daily_reference_evapotranspiration`` (D256), found by name
+   like the entry points and called once per request;
 5. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend``: the three rows of the
    ``CarbonBalance`` of EP5 unchanged for ``amg``, then those of EP6 for
@@ -70,14 +73,13 @@ import importlib
 import inspect
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, get_args, get_type_hints
+from typing import Any, get_args
 
 from adapters.ports import ClimateResult, SoilSlopeResult
 from api.carbon_forcing import (
     STOCK_UNIT,
     build_carbon_forcing,
     crops_left_out,
-    record_period,
 )
 from api.phases import (
     REPEAT_MODULE,
@@ -131,6 +133,11 @@ AMG = EntryPoint("EP5", "amg", "engine.amg", "run_amg")
 RESIDUES = EntryPoint("EP4", "residues", "engine.residues", "build_residue_ledger")
 ROTHC = EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")
 DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, RESIDUES, AMG, ROTHC)
+# Beside EP3 (D256 of #77; contracts/ENTRYPOINTS.md): not a numbered entry
+# point, found by name the same way; its series goes to the carbon forcing.
+REFERENCE_ET0 = EntryPoint(
+    "D256", "water", "engine.water", "daily_reference_evapotranspiration"
+)
 
 # The contract EP4 returns (contracts/residue_ledger/, lane L1). Imported only
 # when EP4 has answered, never at module load: the runner must work before the
@@ -222,6 +229,11 @@ class EngineFunctions:
     # Optional: the components lane L1 names as crossing into a phase's first
     # year, only counted for the calendar module's note.
     components_crossing_phase: Callable[..., list[str]] | None = None
+    # Beside EP3 (D256): the daily FAO-56 reference evapotranspiration of D44,
+    # for the carbon forcing (D220, D181). Not an entry point.
+    daily_reference_evapotranspiration: (
+        Callable[..., dict[dt.date, float | ResultsMissing]] | None
+    ) = None
 
 
 def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
@@ -261,11 +273,14 @@ def discover_engine_functions() -> EngineFunctions:
 
     Also the two phase functions of issue #221; either one absent leaves both
     ``None`` in effect (the runner then runs phase 1 only); and
-    ``components_crossing_phase``, optional (without it no count is written).
+    ``components_crossing_phase``, optional (without it no count is written);
+    and ``daily_reference_evapotranspiration`` beside EP3 (D256), by the same
+    rule.
     """
     return EngineFunctions(
         **{point.function: _import_function(point) for point in DISCOVERED},
         **{point.function: _import_function(point) for point in PHASE_FUNCTIONS},
+        daily_reference_evapotranspiration=_import_function(REFERENCE_ET0),
     )
 
 
@@ -709,98 +724,51 @@ def ledger_inputs_detail(forcing: CarbonForcing) -> str:
 
 # --- the daily reference evapotranspiration for the carbon forcing (D220) -------
 
-# The modules of engine/water/ the daily FAO-56 reference evapotranspiration of
-# D44 is read from, found by name like the entry points, so that the service
-# starts and answers without them.
-ET0_MODULE = "engine.water.et0"
-EP3_MODULE = "engine.water.exposure"
-EP3_PARAMETERS_MODULE = "engine.water._parameters"
+# Type of the daily series the runner hands to the producer of the forcing:
+# the answer of the public function of D256, or why there is none.
+DailyReferenceEvapotranspiration = dict[dt.date, float | ResultsMissing]
 
 
-def daily_reference_evapotranspiration(
-    climate: SiteClimate, parameters: Mapping[str, dict]
-) -> dict[dt.date, float | ResultsMissing] | ResultsMissing:
-    """The daily FAO-56 reference evapotranspiration of D44, as EP3 computes it.
+def reference_evapotranspiration_for_forcing(
+    function: Callable[..., Any] | None,
+    climate: SiteClimate,
+    parameters: dict[str, dict],
+) -> DailyReferenceEvapotranspiration | ResultsMissing:
+    """The daily FAO-56 reference evapotranspiration of D44 (D256 of #77).
 
-    For the monthly potential evapotranspiration of RothC (D220 of #77). It is
-    the call EP3 makes (``engine/water/exposure.py``):
-    ``reference_evapotranspiration_from_climate_with_bounds`` with the
-    constants and the two bounds of D82 read from the catalogue under the
-    identifiers EP3 reads (``ET0_PARAMETERS``, ``ET0_BOUND_PARAMETERS``, scope
-    ``SITE``, on the first day of the record), the point units and the
-    unit-guard reason of EP3. No constant is written here. A record that is
-    absent makes the ET0 of every day missing with the reason the catalogue
-    gives (it is passed on, never replaced). ``engine/water/`` not built (one
-    of its three modules absent): a ``Missing`` ``NOT_AVAILABLE``; any other
-    import error propagates. PROPOSED; the unit of D181 brings the same
-    daily ET0 to the producer for the annual water balance.
+    For the monthly potential evapotranspiration of RothC (D220) and the
+    annual water balance of D181. ``function`` is the public function of lane
+    L1, ``engine.water.daily_reference_evapotranspiration``, found by name
+    (``REFERENCE_ET0``), called as ``function(climate, parameters=...)`` with
+    the catalogue unchanged. Its answer is passed on unchanged: a missing day
+    stays missing with its reason. ``None`` (not built): a ``Missing``
+    ``NOT_AVAILABLE`` naming the function; the producer then writes every
+    month and year that needs it missing with that reason. What the function
+    raises is not caught. An answer that is not a mapping of dates to a
+    number or a results ``Missing`` is a defect (``TypeError``).
     """
-    try:
-        et0 = importlib.import_module(ET0_MODULE)
-        ep3 = importlib.import_module(EP3_MODULE)
-        records = importlib.import_module(EP3_PARAMETERS_MODULE)
-    except ModuleNotFoundError as error:
-        # Only the absence of these modules (or of a package above them) is
-        # "not built", the rule of ``_import_function``; any other import
-        # error is a defect and propagates.
-        own = {
-            ".".join(parts[: i + 1])
-            for module in (ET0_MODULE, EP3_MODULE, EP3_PARAMETERS_MODULE)
-            for parts in [module.split(".")]
-            for i in range(len(parts))
-        }
-        if error.name not in own:
-            raise
+    if function is None:
         return ResultsMissing(
             reason="NOT_AVAILABLE",
             detail=(
                 "the daily reference evapotranspiration of D44 is not built: "
-                f"module {error.name!r} is absent"
+                f"{_name(REFERENCE_ET0)}"
             ),
         )
-    period = record_period(climate)
-    if period is None:
-        return ResultsMissing(
-            reason="MISSING_INPUT",
-            detail=(
-                "the daily reference evapotranspiration of D44: site data: climate "
-                "has no daily series"
-            ),
+    answer = function(climate, parameters=parameters)
+    if not isinstance(answer, dict) or not all(
+        isinstance(day, dt.date)
+        and (
+            isinstance(value, ResultsMissing)
+            or (isinstance(value, int | float) and not isinstance(value, bool))
         )
-    first_day = period[0]
-    catalogue = records.Catalogue(parameters)
-    constant_groups = get_type_hints(et0.Et0Constants)
-    bound_groups = get_type_hints(et0.Et0Bounds)
-    constants = et0.Et0Constants(
-        **{
-            group: constant_groups[group](
-                **{
-                    name: catalogue.value(f"{group}_{name}", ep3.SITE, first_day)
-                    for name in names
-                }
-            )
-            for group, names in ep3.ET0_PARAMETERS.items()
-        }
-    )
-    bounds = et0.Et0Bounds(
-        **{
-            group: bound_groups[group](
-                **{
-                    field: catalogue.value(parameter_id, ep3.SITE, first_day)
-                    for field, parameter_id in names.items()
-                }
-            )
-            for group, names in ep3.ET0_BOUND_PARAMETERS.items()
-        }
-    )
-    days = et0.reference_evapotranspiration_from_climate_with_bounds(
-        climate,
-        point_units=ep3.POINT_UNITS,
-        constants=constants,
-        bounds=bounds,
-        unit_guard_reason=ep3._UNIT_GUARD_REASON,
-    )
-    return {item.date: item.value for item in days}
+        for day, value in answer.items()
+    ):
+        raise TypeError(
+            f"{_name(REFERENCE_ET0)} returned {type(answer).__name__}, not a "
+            "mapping of dates to a number or a Missing"
+        )
+    return answer
 
 
 class EntryPointEngines:
@@ -965,7 +933,11 @@ class EntryPointEngines:
         # the climate and the catalogue, not on the phase; only when a forcing
         # is built.
         reference_evapotranspiration = (
-            daily_reference_evapotranspiration(climate.data, self._parameters)
+            reference_evapotranspiration_for_forcing(
+                functions.daily_reference_evapotranspiration,
+                climate.data,
+                self._parameters,
+            )
             if self._builds_a_forcing()
             else None
         )
@@ -1002,7 +974,7 @@ class EntryPointEngines:
         climate: ClimateResult,
         soil_slope: SoilSlopeResult,
         reference_evapotranspiration: (
-            dict[dt.date, float | ResultsMissing] | ResultsMissing | None
+            DailyReferenceEvapotranspiration | ResultsMissing | None
         ) = None,
     ) -> EnginesResult:
         """EP1, EP3, EP4, EP5 and EP6 on the calendar of one phase; the same inputs every phase."""
