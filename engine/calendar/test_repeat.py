@@ -133,6 +133,12 @@ def run(calendar: RotationCalendar, record=RECORD) -> repeat.RepeatedRotation:
     return result
 
 
+def cycle_of(result: repeat.RepeatedRotation, index: int) -> repeat.Cycle:
+    """The cycle of an index (the lead-in is ``LEAD_IN``, point 13)."""
+    (cycle,) = [c for c in result.cycles if c.index == index]
+    return cycle
+
+
 def ag_year_of(day: dt.date, month: int) -> int:
     return day.year if day.month >= month else day.year - 1
 
@@ -158,8 +164,14 @@ def test_one_year_rotation_repeats_once_per_agricultural_year():
     years = ag_years(RECORD, JULY)
     assert result.ag_years == tuple(years)
     assert result.cycle_length == 1
-    assert len(result.cycles) == len(years) == len(result.components)
-    for year, item, cycle in zip(years, result.components, result.cycles):
+    # D188 (2): the first sowing comes after the first day of the record's
+    # years, so the cycle before the first is laid out; its crop ends before
+    # that day and is listed, not laid out (points 6 and 13).
+    lead, *cycles = result.cycles
+    assert lead.index == repeat.LEAD_IN and lead.components_not_laid_out == ("c1",)
+    assert lead.last_day == cycles[0].start - dt.timedelta(days=1)
+    assert len(cycles) == len(years) == len(result.components)
+    for year, item, cycle in zip(years, result.components, cycles):
         assert item.component_id == "c1" and item.crop_id == CROP_A
         assert item.start == dt.date(year, 11, 15)
         assert item.end == dt.date(year + 1, 5, 5)
@@ -174,7 +186,13 @@ def test_three_year_rotation_cycles_and_marks_the_partial_last_cycle():
     years = ag_years(RECORD, JULY)  # 2000 to 2024: 25 years
     assert result.cycle_length == 3
     starts = list(range(years[0], years[-1] + 1, 3))
-    assert [c.shift_years for c in result.cycles] == [y - 2027 for y in starts]
+    # D188 (2): the cycle before the first is laid out (the first sowing
+    # comes after the first day of the record's years); every one of its
+    # components ends before that day, so none is laid out.
+    lead, *cycles = result.cycles
+    assert lead.index == repeat.LEAD_IN and lead.shift_years == starts[0] - 2030
+    assert lead.components_not_laid_out == ("a", "b", "c")
+    assert [c.shift_years for c in cycles] == [y - 2027 for y in starts]
     ids = [item.component_id for item in result.components]
     assert ids[:6] == ["a", "b", "c", "a", "b", "c"]
     # The last cycle starts in the last agricultural year of the record:
@@ -187,7 +205,7 @@ def test_three_year_rotation_cycles_and_marks_the_partial_last_cycle():
     assert ids[-1] == "a" and result.components[-1].cycle == partial.index
     assert all(c.complete for c in result.cycles[:-1])
     for item in result.components:
-        cycle = result.cycles[item.cycle]
+        cycle = cycle_of(result, item.cycle)
         original = {c.component_id: c for c in three_years().components}[
             item.component_id
         ]
@@ -251,8 +269,15 @@ def test_start_month_cuts_the_years_and_the_first_cycle():
     assert (lead.start, lead.end) == (d("2000-11-15"), d("2001-05-05"))
     assert january.cycles[0].index == repeat.LEAD_IN
     assert january.described_from == d("2000-11-15") < january.first_day
-    # With a July start that crop ends before the record's years: no lead-in.
-    assert run(one_year(JULY)).cycles[0].index == 0
+    # With a July start that crop ends before the record's years. D188 (2):
+    # the cycle before the first is laid out all the same, with no component,
+    # so the days from the first day to the first sowing are days with no
+    # crop, not days the calendar does not describe.
+    july = run(one_year(JULY))
+    assert july.cycles[0].index == repeat.LEAD_IN
+    assert july.cycles[0].components_not_laid_out == ("c1",)
+    assert not [c for c in july.components if c.cycle == repeat.LEAD_IN]
+    assert july.described_from == d("1999-11-15") < july.first_day
 
 
 def test_leap_years_keep_month_and_day_and_29_february_becomes_28():
@@ -372,10 +397,20 @@ def test_component_without_end_date_is_bounded_by_the_next_cycle_not_the_calenda
     assert result.cycle_length == 1
     for item in result.components:
         if item.component_id == "c3":
-            cycle = result.cycles[item.cycle]
+            cycle = cycle_of(result, item.cycle)
             assert item.end is None and item.calendar_end == item.start
             assert item.cycle_last_day == moved(cycle.start, 1) - dt.timedelta(days=1)
             assert item.cycle_last_day > item.calendar_end
+    # D188 (2) lays out the cycle before the first: c1 ends before the first
+    # day of the record's years and is listed; c3 can reach that day by the
+    # bound of point 7, so it is laid out with its end still missing (its
+    # days are not known, never days with no crop).
+    lead = cycle_of(result, repeat.LEAD_IN)
+    assert lead.components_not_laid_out == ("c1",)
+    (c3,) = [c for c in result.components if c.cycle == repeat.LEAD_IN]
+    assert c3.component_id == "c3" and c3.end is None
+    assert result.first_day < c3.start < c3.cycle_last_day
+    assert c3.cycle_last_day == cycle_of(result, 0).start - dt.timedelta(days=1)
 
 
 def test_start_month_missing_returns_missing_input():
@@ -414,8 +449,14 @@ def test_short_record_inside_one_cycle():
     record = (d("2010-03-01"), d("2010-09-30"))
     result = run(three_years(), record)
     assert result.ag_years == (2009, 2010)
-    assert len(result.cycles) == 1 and result.partial_cycle is result.cycles[0]
-    assert result.cycles[0].components_not_laid_out == ("c",)
+    # D188 (2): the first cycle starts on 2009-09-01, after the first day of
+    # the record's years, so the cycle before it is laid out; its components
+    # all end before that day.
+    lead, cycle = result.cycles
+    assert lead.index == repeat.LEAD_IN
+    assert lead.components_not_laid_out == ("a", "b", "c")
+    assert result.partial_cycle is cycle and cycle.index == 0
+    assert cycle.components_not_laid_out == ("c",)
 
 
 def test_module_imports_no_clock_and_only_the_input_contracts():
@@ -761,7 +802,10 @@ def test_start_of_a_phase_is_capped_at_the_last_day_of_year_p():
     assert moved_calendar.start_date == d("2029-06-30")
     assert ag_year_of(moved_calendar.start_date, JULY) == 2028
     laid = run(moved_calendar)
-    assert ag_year_of(laid.cycles[0].start, JULY) == laid.ag_years[0]
+    assert ag_year_of(cycle_of(laid, 0).start, JULY) == laid.ag_years[0]
+    # The first cycle starts after the first day of the record's years, so
+    # the cycle before it is laid out (D188 (2)).
+    assert laid.cycles[0].index == repeat.LEAD_IN
 
 
 def e1() -> RotationCalendar:
@@ -851,12 +895,14 @@ def soy_wheat_maize() -> RotationCalendar:
     )
 
 
-def true_crop(calendar: RotationCalendar, phase: int, day: dt.date) -> str | None:
+def true_crop(
+    calendar: RotationCalendar, phase: int, day: dt.date, record=RECORD
+) -> str | None:
     """The crop on a day of the record by D109 and D141, computed again from
     the calendar's own dates: every component in every cycle (before the
     record too), the calendar's year ``phase`` on the record's first year."""
     length = repeat.cycle_length_years(calendar)
-    shift = phase_shift(calendar, phase)
+    shift = phase_shift(calendar, phase, record)
     found = None
     for k in range(-2, 30):
         for item in calendar.components:
@@ -930,4 +976,161 @@ def test_e1_phase_2_lays_out_long_from_the_first_day():
         expected = true_crop(e1(), 2, day)
         scope = _crop_scope(laid, day)
         assert scope == (NO_CROP_SCOPE if expected is None else {"crop": expected})
+        day += dt.timedelta(days=1)
+
+
+# ---------------------------------------------------------------------------
+# Unit l1/calendar-lead-in-d188-part2 (issue #372): the cycle before the
+# first is laid out whenever the first cycle starts after the first day of
+# the record's years, in every phase (decision D188 of issue #77, part (2);
+# points 6 and 13 of ``repeat.py``). Calendars and records are PLACEHOLDER
+# test values. The crop of each day is computed again with ``true_crop``
+# from the calendar's own dates, and read through EP1 as above.
+# ---------------------------------------------------------------------------
+
+# A PLACEHOLDER record whose first day is the first day of its years (July).
+RECORD_FROM_ITS_FIRST_DAY = (d("2001-07-01"), d("2024-06-30"))
+BOTH_RECORDS = pytest.mark.parametrize(
+    "record",
+    [RECORD, RECORD_FROM_ITS_FIRST_DAY],
+    ids=["D29", "from-its-first-day"],
+)
+
+
+def described_to_the_end_of_the_first_cycle(
+    calendar: RotationCalendar, phase: int, record
+) -> repeat.RepeatedRotation:
+    """The phase laid out over the record, after checking that every day from
+    the first day of the record's years to the last day of the first cycle
+    reads, through EP1, the crop the rotation has on it or no crop, and none
+    reads missing. A cross-lane check of engine/erosion/soil_loss.py."""
+    from engine.erosion.soil_loss import NO_CROP_SCOPE, _crop_scope
+
+    laid = run(repeat.phase_calendar(calendar, phase), record)
+    assert laid.described_from <= laid.first_day
+    day = laid.first_day
+    while day <= cycle_of(laid, 0).last_day:
+        expected = true_crop(calendar, phase, day, record)
+        scope = _crop_scope(laid, day)
+        crop = NO_CROP_SCOPE if expected is None else {"crop": expected}
+        assert scope == crop, (phase, day)
+        day += dt.timedelta(days=1)
+    return laid
+
+
+@BOTH_RECORDS
+def test_first_sowing_after_the_first_day_lays_out_the_cycle_before(record):
+    # D188 (2), with no component crossing the start month: in every phase
+    # the first sowing comes after the first day of the record's years and
+    # every component of the cycle before ends before that day. That cycle is
+    # laid out all the same, with none of them, so the days from the first
+    # day to the first sowing are days with no crop, not days the calendar
+    # does not describe.
+    calendar = three_years()
+    for phase in repeat.list_phases(calendar):
+        assert repeat.components_crossing_phase(calendar, phase) == []
+        laid = described_to_the_end_of_the_first_cycle(calendar, phase, record)
+        lead, first = laid.cycles[:2]
+        assert (lead.index, first.index) == (repeat.LEAD_IN, 0)
+        assert lead.start < laid.first_day < first.start
+        assert lead.last_day == first.start - dt.timedelta(days=1)
+        assert sorted(lead.components_not_laid_out) == ["a", "b", "c"]
+        assert not [c for c in laid.components if c.cycle == repeat.LEAD_IN]
+        assert laid.described_from == lead.start
+
+
+@BOTH_RECORDS
+def test_first_sowing_after_the_first_day_with_a_crossing_component(record):
+    # D188 (2), with x crossing the July start month: in phase 0 the x of the
+    # cycle before ends before the first day of the record's years, so that
+    # cycle is laid out with no component (part (2)); in phase 1 it ends
+    # inside the record's years and is laid out with its dates (part (1),
+    # D141). In both phases every day is described.
+    calendar = two_years(component("x", CROP_C, "2028-05-01", "2028-09-30"))
+    assert repeat.components_crossing_phase(calendar, 1) == ["x"]
+    for phase, laid_in_the_lead_in in ((0, []), (1, ["x"])):
+        laid = described_to_the_end_of_the_first_cycle(calendar, phase, record)
+        assert laid.cycles[0].index == repeat.LEAD_IN
+        assert laid.first_day < cycle_of(laid, 0).start
+        assert [
+            c.component_id for c in laid.components if c.cycle == repeat.LEAD_IN
+        ] == laid_in_the_lead_in
+
+
+@BOTH_RECORDS
+def test_first_cycle_that_starts_on_the_first_day_is_unchanged(record):
+    # The calendar starts on 1 July, the first day of its agricultural year,
+    # in both phases: its first cycle starts on the first day of the record's
+    # years, so nothing is laid out before it (point 6) and every day lies in
+    # a cycle already; the days before its first sowing are days with no
+    # crop of the first cycle.
+    calendar = build(
+        "2027-07-01",
+        "2029-06-30",
+        [
+            component("a", CROP_A, "2027-09-01", "2028-03-31"),
+            component("b", CROP_B, "2028-10-01", "2029-04-30"),
+        ],
+    )
+    for phase in repeat.list_phases(calendar):
+        laid = described_to_the_end_of_the_first_cycle(calendar, phase, record)
+        assert cycle_of(laid, 0).start == laid.first_day == laid.described_from
+        assert [c.index for c in laid.cycles] == list(range(len(laid.cycles)))
+        assert all(c.cycle >= 0 for c in laid.components)
+
+
+@BOTH_RECORDS
+def test_first_cycle_that_starts_on_the_second_day_gets_a_lead_in(record):
+    # The boundary of point 6 (verifier of #403): the first cycle starts on
+    # the second day of the record's years, so the cycle before it is laid
+    # out and holds that first day alone; its crop ends before that day, so
+    # the day is a day with no crop, not a day the calendar does not describe.
+    calendar = build(
+        "2027-07-02",
+        "2028-06-30",
+        [component("c1", CROP_A, "2027-09-01", "2028-03-31")],
+    )
+    laid = described_to_the_end_of_the_first_cycle(calendar, 0, record)
+    lead, first = laid.cycles[:2]
+    assert (lead.index, first.index) == (repeat.LEAD_IN, 0)
+    assert first.start == laid.first_day + dt.timedelta(days=1)
+    assert lead.last_day == laid.first_day
+    assert lead.components_not_laid_out == ("c1",)
+    assert laid.described_from == lead.start < laid.first_day
+
+
+def soybean_winter_fallow() -> RotationCalendar:
+    """A PLACEHOLDER one-year rotation shaped as the D128 rotation soybean -
+    winter fallow: a soybean sown after the July start month and harvested
+    before it, and a winter fallow, the days no component holds. Dates and
+    years are test values, not the demonstration's."""
+    return build(
+        "2027-11-15",
+        "2028-05-05",
+        [component("soybean", CROP_A, "2027-11-15", "2028-05-05")],
+    )
+
+
+@BOTH_RECORDS
+def test_soybean_winter_fallow_describes_its_first_agricultural_year(record):
+    # D188 (2) on the D128 rotation soybean - winter fallow: the first
+    # agricultural year of the record is fully described. The cycle before
+    # holds no component (its soybean is harvested before the first day of
+    # the record's years), so the days to the first sowing are days with no
+    # crop; then the soybean; then the winter fallow, days with no crop.
+    from engine.erosion.soil_loss import NO_CROP_SCOPE, _crop_scope
+
+    calendar = soybean_winter_fallow()
+    assert repeat.list_phases(calendar) == [0]
+    laid = described_to_the_end_of_the_first_cycle(calendar, 0, record)
+    lead = laid.cycles[0]
+    assert lead.index == repeat.LEAD_IN
+    assert lead.components_not_laid_out == ("soybean",)
+    first_year = laid.ag_years[0]
+    sowing = dt.date(first_year, 11, 15)
+    harvest = dt.date(first_year + 1, 5, 5)
+    day = laid.first_day
+    while day < dt.date(first_year + 1, JULY, 1):
+        crop = {"crop": CROP_A} if sowing <= day <= harvest else NO_CROP_SCOPE
+        assert _crop_scope(laid, day) == crop, day
         day += dt.timedelta(days=1)

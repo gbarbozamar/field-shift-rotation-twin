@@ -97,9 +97,11 @@ NO_RANGE = Missing(
     detail="no uncertainty range is propagated (Q6 of contracts/ENTRYPOINTS.md)",
 )
 LEAD_IN = (
-    "nothing is laid out before the first cycle of the rotation repeated over "
-    "the record (point 6 of engine/calendar/repeat.py), so a harvest on those "
-    "days is not known"
+    "the days lie before the first day the rotation repeated over the record "
+    "describes, before the first cycle and the cycle laid out ahead of it "
+    "(points 6 and 13 of engine/calendar/repeat.py, decision D188 of issue "
+    "#77), so a harvest on those days is not known; since D188 (2) no day of "
+    "the record's years lies there"
 )
 
 
@@ -546,7 +548,15 @@ def _month_value(
 ) -> MonthlyValue:
     """D221: the carbon of every component of ``group`` harvested in this
     calendar month, the parts of one origin summed; zero when none is
-    harvested in it; missing, never zero, when one may be or cannot be read."""
+    harvested in it; missing, never zero, when one may be or cannot be read.
+
+    A month before ``described_from``, or the month of that day when it is
+    not the 1st, is missing, never zero (``LEAD_IN``). Since D188 (2) the
+    rotation repeated over the record lays out the cycle before the first
+    whenever the first cycle starts late (points 6 and 13 of
+    engine/calendar/repeat.py), so ``described_from`` never comes after the
+    first day of the record's years and no month of them meets this rule;
+    it stays as a guard."""
     here = month.year * MONTHS_IN_A_YEAR + (month.month - 1)
     label = f"{month.year}-{month.month:02d}"
     if infeasible is not None:
