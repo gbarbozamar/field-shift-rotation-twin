@@ -69,6 +69,9 @@ CLIMATE_END_DATE = "CLIMATE_END_DATE"
 SOIL_SLOPE_EXAMPLE_FILE = "SOIL_SLOPE_EXAMPLE_FILE"
 SOIL_TABLE_FILES = "SOIL_TABLE_FILES"
 SOIL_GROUPS_FILE = "SOIL_GROUPS_FILE"
+# PROPOSED (review of #310, point 1): the ONI record of the plant route. No
+# default: the record waits for a person's signature (D34, D66).
+KINDS_OF_YEAR_RECORD_FILE = "KINDS_OF_YEAR_RECORD_FILE"
 
 VARIABLES: tuple[str, ...] = (
     CORS_ORIGINS,
@@ -79,6 +82,7 @@ VARIABLES: tuple[str, ...] = (
     SOIL_SLOPE_EXAMPLE_FILE,
     SOIL_TABLE_FILES,
     SOIL_GROUPS_FILE,
+    KINDS_OF_YEAR_RECORD_FILE,
 )
 
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -121,6 +125,8 @@ class AppConfig:
     soil_tables: SoilTablesConfig | None = None
     # The parameter catalogue as loaded and checked; ``{}`` when it is empty.
     parameters: dict[str, dict] = field(default_factory=dict)
+    # The ONI record of the plant route, as read; ``None``: not configured.
+    kinds_of_year_record: dict[str, Any] | None = None
 
 
 # --- reading the variables ----------------------------------------------------
@@ -224,6 +230,33 @@ def _soil_slope_example(environ: Mapping[str, str]) -> Path | None:
     return path
 
 
+def _kinds_of_year_record(environ: Mapping[str, str]) -> dict[str, Any] | None:
+    """The ONI record ``KINDS_OF_YEAR_RECORD_FILE`` names, read once here.
+
+    Unset: ``None``, and the plant route gives every kind of year missing
+    with its reason. Set but not a JSON object with an ``id`` and ``seasons``:
+    a ``ConfigError`` naming the variable. Only the shape is checked here; the
+    classification is ``kinds_of_year``'s, on each request.
+    """
+    value = _value(environ, KINDS_OF_YEAR_RECORD_FILE)
+    if value is None:
+        return None
+    path = Path(value)
+    text = _read_file(KINDS_OF_YEAR_RECORD_FILE, path)
+    try:
+        data = json.loads(text)
+    except ValueError:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE}: the file '{path}' is not JSON"
+        ) from None
+    if not isinstance(data, dict) or "id" not in data or "seasons" not in data:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE}: the file '{path}' is not an ONI record "
+            "(a JSON object with an id and seasons)"
+        )
+    return data
+
+
 def _soil_tables(environ: Mapping[str, str]) -> SoilTablesConfig | None:
     """``SOIL_TABLE_FILES`` and ``SOIL_GROUPS_FILE``: both or neither. PROPOSED.
 
@@ -312,6 +345,7 @@ def load_config(
         soil_slope_example_file=_soil_slope_example(environ),
         soil_tables=_soil_tables(environ),
         parameters=load_parameters(parameters_folder),
+        kinds_of_year_record=_kinds_of_year_record(environ),
     )
 
 
@@ -373,6 +407,7 @@ def build_app(
         soil_slope=soil_slope,
         settings=config.run_settings,
         parameters=config.parameters,
+        kinds_of_year_record=config.kinds_of_year_record,
     )
     if client is not None:
         _close_on_shutdown(app, client)
