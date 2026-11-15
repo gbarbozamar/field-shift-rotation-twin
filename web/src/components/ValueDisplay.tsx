@@ -19,6 +19,14 @@
  * All user-visible wording lives in strings.ts; the placeholders of its
  * templates are filled by the pure helper in lib/format.ts. The unit
  * string is rendered as plain text, exactly as it travels (C1.1).
+ *
+ * Two display-only rules of the display-polish unit complete the render,
+ * and neither touches a value that travels: the source of a value is the
+ * engine's derivation trace, often a full paragraph, so its line renders
+ * collapsed to one clipped line inside a disclosure that carries the exact
+ * trace unchanged; and a measured value displays rounded to three decimals,
+ * with the exact value kept in the element for inspection (D80: formatting
+ * of the display only, never of the computation).
  */
 import { formatString } from '../lib/format'
 import { REASON_PHRASE_PLACEHOLDER, strings } from '../strings'
@@ -97,14 +105,22 @@ export interface ValueDisplayProps {
 /**
  * The reason phrase of a missing part, from the strings file. The detail of
  * MISSING_INPUT fills its place in the phrase; a detail that is absent
- * stays visible as its placeholder, exactly as written.
+ * stays visible as its placeholder, exactly as written. A detail that
+ * travels with any other reason code is shown too, appended in parentheses
+ * after the phrase, so an absence keeps naming its cause in full (for
+ * example the NOT_APPLICABLE harvest of a cover crop).
  */
 function reasonPhrase(missing: MissingPart): string {
   const params: Record<string, string> = {}
   if (missing.detail !== undefined) {
     params.detail = missing.detail
   }
-  return formatString(strings[`missing.${missing.reason}`], params)
+  const template = strings[`missing.${missing.reason}`]
+  const phrase = formatString(template, params)
+  if (missing.detail !== undefined && !template.includes('{detail}')) {
+    return `${phrase} ${formatString(strings['missing.detail_suffix'], params)}`
+  }
+  return phrase
 }
 
 /**
@@ -132,6 +148,19 @@ export function missingPattern(what: string, missing: MissingPart): string {
   })
 }
 
+/**
+ * The displayed form of a measured value: rounded to three decimals, with
+ * no forced trailing zeros (2.1 renders "2.1", not "2.100"). Display-only
+ * (D80): the value that travels is never rounded — the exact number stays
+ * in the item and in the element, for inspection.
+ */
+function displayNumber(value: number): string {
+  return value
+    .toFixed(3)
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '')
+}
+
 export function ValueDisplay({ what, item }: ValueDisplayProps) {
   if (item.missing) {
     return (
@@ -146,8 +175,8 @@ export function ValueDisplay({ what, item }: ValueDisplayProps) {
   return (
     <div className="text-sm leading-5">
       <p data-testid="value-line">
-        <span data-testid="value-number" className="font-medium">
-          {item.value}
+        <span data-testid="value-number" className="font-medium" title={String(item.value)}>
+          {displayNumber(item.value)}
         </span>{' '}
         <span data-testid="value-unit" className="text-slate-500">
           {item.unit}
@@ -157,9 +186,14 @@ export function ValueDisplay({ what, item }: ValueDisplayProps) {
         </span>
       </p>
       {item.source !== undefined ? (
-        <p data-testid="source-line" className="text-slate-500">
-          {formatString(strings['value.source'], { source: item.source })}
-        </p>
+        <details data-testid="source-details" className="text-slate-500">
+          <summary data-testid="source-line" className="truncate">
+            {formatString(strings['value.source'], { source: item.source })}
+          </summary>
+          <p data-testid="source-full" className="mt-1 whitespace-normal break-words">
+            {item.source}
+          </p>
+        </details>
       ) : null}
       {item.assumption === true ? (
         <p data-testid="assumption-line" className="text-slate-500">
