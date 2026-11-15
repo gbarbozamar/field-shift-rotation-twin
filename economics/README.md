@@ -97,3 +97,52 @@ def assess_limit(
 1. **Uncertainty.** The limit's `range` and the levels' ranges are not used: a level whose range straddles the limit is judged on its value only. How a range turns into "not resolved" is for the lead developer.
 2. **A level with `value` `None` and no `reason`.** Treated as missing, its detail saying "no reason given"; whether that should be a `ValueError` is open.
 3. **A negative soil-loss level.** Not refused; whether a soil-loss level can be negative is for the erosion lane.
+
+# economics: the rotation to plant
+
+Status: **PROPOSED** (blueprint section 3.7). Built by unit `l2/decision-rule` (S-015).
+
+`economics/decide.py` holds one public pure function, `choose_rotation`, that answers "What should I plant?" for the rotations given (the story speaks of three to five): the most margin per hectare and year among the rotations that meet the soil-loss limit under the chosen strictness, what meeting the limit costs against the best rotation that does not meet it, the case where none meets, and "not resolved" when the data cannot separate the answer. Erosion is a limit, not a cost: it never enters the margin.
+
+No network call, no parameter value, no limit, price or threshold, and no numeric literal in the module. Every number in `test_decide.py` is invented test data, from no source; every expected answer there is PROPOSED.
+
+## Signature (PROPOSED)
+
+```python
+Strictness = Literal["on_average", "every_kind"]
+Answer = Literal["chosen", "none_meets", "not_resolved"]
+OptionState = Literal["chosen", "meets", "does_not_meet", "not_resolved"]
+
+def choose_rotation(
+    options: Sequence[RotationOption],
+    strictness: Strictness,
+) -> Decision
+```
+
+- `RotationOption` (frozen dataclass): `rotation_id`, `margin` (a `MarginResult`, the margin to rank by: the caller picks the average or a kind of year), `limit` (a `LimitAssessment` of `assess_limit`).
+- `OptionVerdict` (frozen dataclass): `rotation_id`, `state`, `margin`, `limit_check` (the `LimitCheck` of the strictness).
+- `LimitCost` (frozen dataclass): `value` (float or `None`), `against` (the `rotation_id` of the best rotation that does not meet the limit, or `None`), `costs_nothing`, `reason` (a `ReasonCode` of C3.2 or `None`), `detail`, `unit` (`"USD ha-1 yr-1"`).
+- `Decision` (frozen dataclass): `answer`, `strictness`, `chosen` (a `rotation_id` or `None`), `reason`, `detail`, `tied` (the rotations the data cannot separate, else `()`), `options` (one `OptionVerdict` per option, in input order), `limit_cost`.
+
+## Rules (PROPOSED)
+
+- The check of an option is `limit.on_average` or `limit.every_kind` by the strictness.
+- Candidates are the options whose check is `meets`, ranked by `margin.value`, larger is better, compared as given without rounding.
+- `not_resolved` (`chosen` `None`), checked in this order:
+  1. a candidate whose margin is missing: reason `MISSING_INPUT`, the detail naming it and the reason and detail its margin carries;
+  2. an option whose check is `not_resolved` and whose margin is missing or at or above the best candidate margin (it could be the answer): reason `MISSING_INPUT`, the detail naming it and its check's detail. One with a known margin below the best candidate does not change the answer and does not block it;
+  3. two or more candidates sharing the best margin exactly: reason `NOT_COMPUTABLE` (no new reason code is added to C3.2), `tied` listing them in input order, the detail saying the data cannot separate them.
+- No candidate and some option `not_resolved`: `not_resolved`, reason `MISSING_INPUT`, the detail naming those options.
+- No candidate and none `not_resolved`: `none_meets`, `chosen` `None`, reason `NOT_APPLICABLE`, detail "every rotation loses more soil than the limit".
+- `chosen`: the single best candidate. Its state is `chosen`; the other candidates are `meets`; the rest carry their check's verdict.
+- `LimitCost`, only when the answer is `chosen`. Among the options whose check is `does_not_meet` and whose margin is known, the best one (the first in input order on an exact tie). If its margin is above the chosen margin: `value` is its margin minus the chosen margin, `against` its id. Otherwise, if an option that does not meet has a missing margin: `value` `None`, `costs_nothing` False, reason `MISSING_INPUT`, the detail naming it. Otherwise (none, or none with more margin): `value` `None`, `costs_nothing` True, `against` `None` (meeting the limit costs nothing here). Never a default zero.
+- When the answer is not `chosen`, `LimitCost` has `value` `None` and `costs_nothing` False: reason `NOT_APPLICABLE` for `none_meets`, `NOT_COMPUTABLE` for `not_resolved`, with a detail saying why.
+- `ValueError` on structural misuse, before any comparison: a strictness outside `Strictness`; no option; a `rotation_id` that is not a non-empty text; a duplicate `rotation_id`; a margin whose unit is not `"USD ha-1 yr-1"`; a margin value that is a boolean, not a real number, NaN or infinite. The count of options is not refused (the route, S-018, checks it).
+- Inputs are not mutated; the results are frozen.
+
+## OPEN
+
+1. **A range on the margin.** `MarginResult` carries no range, so the rule of `decision/` ("a difference whose range touches or crosses zero is not separated") cannot be applied; only an exact tie or a missing value is unseparable. Once a margin carries a range, two candidates whose difference range touches zero should be `not_resolved` too.
+2. **A cost of the limit when a non-meeting margin is missing.** When a non-meeting rotation with a known margin beats the chosen one, the cost is given against it even if another non-meeting rotation has a missing margin that could be larger; the value is then a lower bound and nothing says so. Whether that should carry a detail, or be missing, is for the lead developer.
+3. **Reason codes.** `NOT_COMPUTABLE` for an exact tie and `NOT_APPLICABLE` for `none_meets` reuse C3.2 codes; whether a dedicated code is wanted is for the lead developer.
+4. **Which margin ranks.** The caller picks the average or a kind of year; the rule for "every kind" strictness does not change the margin used.
