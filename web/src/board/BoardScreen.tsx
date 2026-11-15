@@ -24,9 +24,17 @@ import { buildRotationStrip, cropOrder, plantRotations, readPlantRotations } fro
 import type { PlantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { boardColumns, optionLetter } from './boardModel'
+import { answerChanges, boardColumns, optionLetter } from './boardModel'
 import type { SortKey } from './boardModel'
-import { AnswerBanner, AnswerLimits, BoardControls, PriceTrackPanel, RainEcho, RecordRibbon } from './BoardParts'
+import {
+  AnswerBanner,
+  AnswerLimits,
+  BoardControls,
+  ChangesNote,
+  PriceTrackPanel,
+  RainEcho,
+  RecordRibbon,
+} from './BoardParts'
 import { CompareTable, SortPicker, cropsText } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
@@ -151,12 +159,15 @@ function Answered({
   rainStress,
   rotations,
   firstStep,
+  previous,
 }: {
   answer: PlantAnswer
   rainStress: RainStressPart | null
   rotations: PlantRotations
   /** The number of the first step of the answer: the steps before it are numbered by the view. */
   firstStep: number
+  /** The answer shown before this one, when there was one: what changed is said. */
+  previous: PlantAnswer | null
 }) {
   const { info, order, scales } = useBoardInfo(answer, rotations)
   const [sort, setSort] = useState<SortKey>('rule')
@@ -185,6 +196,9 @@ function Answered({
           showWhy={!lacksSources}
           against={againstText}
         />
+        {previous !== null ? (
+          <ChangesNote changes={answerChanges(previous, answer)} nameOf={nameOf} />
+        ) : null}
         {rainStress !== null ? (
           <RainEcho part={rainStress} />
         ) : null}
@@ -239,12 +253,14 @@ function BoardSide({
   service,
   rotations,
   firstStep,
+  previous,
 }: {
   selectedFieldId: string | null
   apiBase: string | null
   service: ServicePhase | null
   rotations: PlantRotations
   firstStep: number
+  previous: PlantAnswer | null
 }) {
   if (selectedFieldId === null) {
     return (
@@ -284,6 +300,7 @@ function BoardSide({
       rainStress={service.answer.rainStress}
       rotations={rotations}
       firstStep={firstStep}
+      previous={previous}
     />
   )
 }
@@ -304,6 +321,7 @@ export function BoardView({
   onToggleMap,
   rotations = plantRotations,
   builder = null,
+  previous = null,
 }: {
   selectedFieldId: string | null
   state: PlantScreenState
@@ -319,6 +337,8 @@ export function BoardView({
   rotations?: PlantRotations
   /** The step of the candidates (the rotation builder), when the rotations can be edited. */
   builder?: ReactNode
+  /** The answer shown before the one of the service now, when there was one. */
+  previous?: PlantAnswer | null
 }) {
   // The steps are numbered as shown: the candidates are a step only for the
   // field whose rotations can be edited.
@@ -408,6 +428,7 @@ export function BoardView({
         service={service}
         rotations={rotations}
         firstStep={scenarioStep + 1}
+        previous={previous}
       />
 
       <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
@@ -442,6 +463,18 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   )
   // The map opens the screen and steps aside once a field is picked, unless
   // the user shows or hides it: then their choice stays.
+  // The answer shown and the one before it, so the board can say what a
+  // control changed. Kept as the answers arrive (state derived while
+  // rendering, the pattern React documents for it).
+  const phase = request === null ? null : servicePhaseOf(query)
+  const answerNow = phase !== null && phase.phase === 'answered' ? phase.answer.answer : null
+  const [seen, setSeen] = useState<{ current: PlantAnswer | null; previous: PlantAnswer | null }>({
+    current: null,
+    previous: null,
+  })
+  if (answerNow !== null && answerNow !== seen.current) {
+    setSeen({ current: answerNow, previous: seen.current })
+  }
   const [mapChoice, setMapChoice] = useState<boolean | null>(null)
   const mapOpen = mapChoice ?? selectedFieldId === null
   return (
@@ -449,7 +482,8 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       selectedFieldId={selectedFieldId}
       state={state}
       apiBase={apiBase}
-      service={request === null ? null : servicePhaseOf(query)}
+      service={phase}
+      previous={answerNow !== null && answerNow === seen.current ? seen.previous : null}
       dispatch={dispatch}
       map={<FieldsMap />}
       mapOpen={mapOpen}

@@ -11,7 +11,7 @@ import type { PlantAnswer, RainStressPart, TippingPrice } from '../plant/plantDa
 import type { ServicePhase } from '../plant/PlantScreen'
 import { buildRotationStrip, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
-import { SORT_KEYS, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
+import { SORT_KEYS, answerChanges, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
 import { CompareTable, cropsText } from './CompareTable'
 import { BoardView, initialBoardState } from './BoardScreen'
 
@@ -607,5 +607,49 @@ describe('the steps of the plan (8)', () => {
     const html = view(FIELD, answered(example))
     expect(after(html, 'board-print').split('>')[0]).toContain('href="#/print"')
     expect(after(html, 'board-report').split('>')[0]).toContain('href="#/plant"')
+  })
+})
+
+describe('what changed between two answers (9)', () => {
+  const open = answerOf('every_kind', 'average')
+
+  it('the same answer: no change', () => {
+    expect(answerChanges(example, example)).toEqual([])
+  })
+
+  it('names the change of the answer first, then each option whose state is another', () => {
+    const changes = answerChanges(example, open)
+    expect(changes[0]).toEqual({
+      kind: 'answer',
+      before: { answer: example.answer, chosen: example.chosen },
+      after: { answer: open.answer, chosen: open.chosen },
+    })
+    const expected = open.options
+      .map((option) => ({ option, was: example.options.find((o) => o.rotation_id === option.rotation_id)! }))
+      .filter(({ option, was }) => was.state !== option.state)
+      .map(({ option, was }) => ({ kind: 'state', rotation_id: option.rotation_id, before: was.state, after: option.state }))
+    expect(changes.slice(1)).toEqual(expected)
+    expect(expected.length).toBeGreaterThan(0)
+  })
+
+  it('an option that is in one answer only is not a change of state', () => {
+    const fewer: PlantAnswer = { ...open, options: open.options.slice(0, 1) }
+    expect(answerChanges(example, fewer).filter((c) => c.kind === 'state').length).toBeLessThanOrEqual(1)
+  })
+
+  it('the board says it once there is an answer before, and says nothing changed when nothing did', () => {
+    const render = (previous: PlantAnswer | null) =>
+      renderToString(
+        <BoardView
+          selectedFieldId={FIELD}
+          state={initialBoardState()}
+          apiBase={BASE}
+          service={answered(open)}
+          previous={previous}
+        />,
+      )
+    expect(count(render(null), 'data-testid="board-changes"')).toBe(0)
+    expect(count(render(example), 'data-testid="board-change"')).toBe(answerChanges(example, open).length)
+    expect(visibleText(after(render(open), 'board-changes-none').split('</p>')[0])).toContain(strings['board.changed.none'])
   })
 })

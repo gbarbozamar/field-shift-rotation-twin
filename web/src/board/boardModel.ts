@@ -1,5 +1,13 @@
 import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
-import type { KindOfYear, PlantAnswer, PlantOption, TippingPoint, TippingPrice } from '../plant/plantData'
+import type {
+  AnswerKind,
+  KindOfYear,
+  OptionState,
+  PlantAnswer,
+  PlantOption,
+  TippingPoint,
+  TippingPrice,
+} from '../plant/plantData'
 
 /**
  * The layout rules of the rotation board (PROPOSED, l3/board). Display only:
@@ -238,4 +246,36 @@ export function isExampleCrop(cropId: string): boolean {
  */
 export function cropName(cropId: string): string {
   return cropId.replace(PLACEHOLDER_PREFIX, '').replaceAll('_', ' ')
+}
+
+/** What differs between two answers of the service, as the user would name it. */
+export type AnswerChange =
+  /** The rotation chosen, or the answer when none is, is another. */
+  | { kind: 'answer'; before: { answer: AnswerKind; chosen: string | null }; after: { answer: AnswerKind; chosen: string | null } }
+  /** An option is in another state. */
+  | { kind: 'state'; rotation_id: string; before: OptionState; after: OptionState }
+
+/**
+ * What changed from one answer to the next (PROPOSED): the answer itself,
+ * then each option whose state is another, in the order of the new answer.
+ * Only what the service said is compared (its answer, its chosen rotation,
+ * the state of each option); no number is compared and none is computed. An
+ * option that is in one answer only is not a change of state.
+ */
+export function answerChanges(before: PlantAnswer, after: PlantAnswer): AnswerChange[] {
+  const changes: AnswerChange[] = []
+  if (before.answer !== after.answer || before.chosen !== after.chosen) {
+    changes.push({
+      kind: 'answer',
+      before: { answer: before.answer, chosen: before.chosen },
+      after: { answer: after.answer, chosen: after.chosen },
+    })
+  }
+  for (const option of after.options) {
+    const was = before.options.find((each) => each.rotation_id === option.rotation_id)
+    if (was !== undefined && was.state !== option.state) {
+      changes.push({ kind: 'state', rotation_id: option.rotation_id, before: was.state, after: option.state })
+    }
+  }
+  return changes
 }

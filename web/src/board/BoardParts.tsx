@@ -17,7 +17,7 @@ import type {
   TippingPrice,
 } from '../plant/plantData'
 import { priceTrack } from './boardModel'
-import type { TrackSide } from './boardModel'
+import type { AnswerChange, TrackSide } from './boardModel'
 
 /**
  * The parts of the rotation board (PROPOSED, l3/board): the controls of the
@@ -509,6 +509,53 @@ export function AnswerLimits({ answer }: { answer: PlantAnswer }) {
           <li data-testid="board-soil-label">{strings['soil_loss.headline_label']}</li>
         ) : null}
       </ul>
+    </section>
+  )
+}
+
+/**
+ * What changed since the answer before: said in words after a control is
+ * moved, so the effect of a scenario is read without comparing two screens.
+ */
+export function ChangesNote({
+  changes,
+  nameOf,
+}: {
+  changes: AnswerChange[]
+  /** How the board names a rotation. */
+  nameOf: (rotationId: string) => string
+}) {
+  const answerText = (side: { answer: PlantAnswer['answer']; chosen: string | null }) =>
+    side.answer === 'chosen' && side.chosen !== null
+      ? nameOf(side.chosen)
+      : strings[`plant.answer.${side.answer === 'none_meets' ? 'none_meets' : 'not_resolved'}`]
+  return (
+    <section data-testid="board-changes" role="status" className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-sm">
+      <h3 className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.changed.title']}</h3>
+      {changes.length === 0 ? (
+        <p data-testid="board-changes-none">{strings['board.changed.none']}</p>
+      ) : (
+        <ul className="mt-0.5 space-y-0.5">
+          {changes.map((change) =>
+            change.kind === 'answer' ? (
+              <li key={change.kind} data-testid="board-change" className="font-semibold">
+                {formatString(strings['board.changed.answer'], {
+                  before: answerText(change.before),
+                  after: answerText(change.after),
+                })}
+              </li>
+            ) : (
+              <li key={change.rotation_id} data-testid="board-change">
+                {formatString(strings['board.changed.state'], {
+                  rotation: nameOf(change.rotation_id),
+                  before: strings[`plant.pill.${change.before}`],
+                  after: strings[`plant.pill.${change.after}`],
+                })}
+              </li>
+            ),
+          )}
+        </ul>
+      )}
     </section>
   )
 }
