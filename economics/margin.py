@@ -168,6 +168,14 @@ def _check_years(years: Sequence[Sequence[str]], crops: Mapping[str, object]) ->
             raise ValueError(
                 f"years[{index}]: an agricultural year holds at least one crop_id"
             )
+        # PROPOSED (S-027 F4): every item of an entry is a crop_id text; an
+        # int, None or list is refused before it is looked up in the facts.
+        for position, crop_id in enumerate(entry):
+            if not isinstance(crop_id, str):
+                raise ValueError(  # noqa: TRY004
+                    f"years[{index}][{position}]: a crop_id is a text, not "
+                    f"{type(crop_id).__name__}"
+                )
         # PROPOSED: a declared margin covers a whole agricultural year, so it
         # does not share its year with another crop (README.md, OPEN).
         if len(entry) > 1 and any(
@@ -179,8 +187,14 @@ def _check_years(years: Sequence[Sequence[str]], crops: Mapping[str, object]) ->
             )
 
 
-def _check_year_counts(year_counts: Mapping[str, int]) -> dict[str, int]:
-    """Check ``year_counts`` and give it back as plain integers."""
+def _check_year_counts(year_counts: Mapping[str, int | None]) -> dict[str, int] | None:
+    """Check ``year_counts`` and give it back as plain integers.
+
+    None when every count is None: that is what
+    ``kinds_of_year.count_kinds`` gives when a year of the record is missing,
+    and it means the counts are not known, exactly like ``year_counts=None``
+    (PROPOSED, S-027 F1). Some counts None and some integers is a ValueError.
+    """
     unknown = sorted(set(year_counts) - set(KINDS_OF_YEAR))
     if unknown:
         raise ValueError(
@@ -189,6 +203,8 @@ def _check_year_counts(year_counts: Mapping[str, int]) -> dict[str, int]:
     absent = [kind for kind in KINDS_OF_YEAR if kind not in year_counts]
     if absent:
         raise ValueError(f"year_counts: no count for {absent}")
+    if all(year_counts[kind] is None for kind in KINDS_OF_YEAR):
+        return None
     counts: dict[str, int] = {}
     for kind in KINDS_OF_YEAR:
         count = year_counts[kind]
@@ -234,14 +250,15 @@ def _average(
 def compute_rotation_margin(
     years: Sequence[Sequence[str]],
     facts: EconomicFacts,
-    year_counts: Mapping[str, int] | None,
+    year_counts: Mapping[str, int | None] | None,
 ) -> RotationMargin:
     """The simple margin per hectare and agricultural year of one rotation. PROPOSED.
 
     ``years`` holds one entry per agricultural year of one cycle of the
     rotation, each entry the crop_ids sown in that year. ``year_counts`` is
     how many agricultural years of the record fall in each kind of year, or
-    None when that is not known. Raises ``ValueError`` on structural misuse
+    None when that is not known (a mapping whose every count is None, as
+    ``kinds_of_year.count_kinds`` gives it, means the same). Raises ``ValueError`` on structural misuse
     (see README.md); a missing fact is never an exception but a missing
     margin with its reason.
     """

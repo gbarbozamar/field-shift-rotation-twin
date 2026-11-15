@@ -51,6 +51,27 @@ class KindOfYear:
     season: str | None
     season_year: int | None
 
+    def __post_init__(self) -> None:
+        # PROPOSED (S-027 F5), as MarginResult: a kind or a reason, never both
+        # or neither.
+        if (self.kind is None) == (self.missing_reason is None):
+            raise ValueError(
+                "a kind of year holds a kind or a missing_reason, never both or neither"
+            )
+
+
+def _is_int(value: object) -> bool:
+    """An int that is not a bool."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _check_years(first_year: int, last_year: int) -> None:
+    # PROPOSED (S-027 F3): checked like start_month; a bool or a float is not
+    # a year.
+    for name, value in (("first_year", first_year), ("last_year", last_year)):
+        if not _is_int(value):
+            raise ValueError(f"{name} must be an integer")
+
 
 def _check_month(start_month: int) -> None:
     if (
@@ -84,16 +105,45 @@ def _check_rule(record: Mapping[str, Any]) -> tuple[float, int]:
 
 
 def _season_map(record: Mapping[str, Any]) -> dict[int, float]:
-    """Season ordinal -> ANOM; a duplicated or unknown season is a ValueError."""
+    """Season ordinal -> ANOM, every row checked (PROPOSED, S-027 F2).
+
+    A ValueError naming the row index and the field when the record has no
+    ``seasons`` list, a row is not a mapping or lacks ``season``, ``year`` or
+    ``anom``, the season is unknown, the year is not an int (a bool is
+    refused), the anom is not a finite real number (a bool, None, NaN or an
+    infinity is refused), or a (season, year) row is duplicated.
+    """
+    rows = record.get("seasons")
+    if not isinstance(rows, list):
+        # ValueError, not TypeError: one exception type for every structural
+        # misuse of the record (README.md).
+        raise ValueError("record field 'seasons' must be a list of rows")  # noqa: TRY004
     values: dict[int, float] = {}
-    for index, row in enumerate(record["seasons"]):
-        season, year = row["season"], row["year"]
-        if season not in SEASONS:
-            raise ValueError(f"seasons row {index}: unknown season name {season!r}")
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise ValueError(f"seasons row {index}: a row is a mapping")  # noqa: TRY004
+        for field in ("season", "year", "anom"):
+            if field not in row:
+                raise ValueError(f"seasons row {index}: field {field!r} is missing")
+        season, year, anom = row["season"], row["year"], row["anom"]
+        if not isinstance(season, str) or season not in SEASONS:
+            raise ValueError(
+                f"seasons row {index}: unknown season name {season!r} in field 'season'"
+            )
+        if not _is_int(year):
+            raise ValueError(f"seasons row {index}: field 'year' must be an integer")
+        if (
+            isinstance(anom, bool)
+            or not isinstance(anom, (int, float))
+            or not math.isfinite(anom)
+        ):
+            raise ValueError(
+                f"seasons row {index}: field 'anom' must be a finite real number"
+            )
         position = _ordinal(season, year)
         if position in values:
             raise ValueError(f"seasons row {index}: duplicated season {season} {year}")
-        values[position] = float(row["anom"])
+        values[position] = float(anom)
     return values
 
 
@@ -157,6 +207,7 @@ def classify_agricultural_years(
     of its deciding season; a year that cannot be judged from the record is
     missing ``NO_COVERAGE``.
     """
+    _check_years(first_year, last_year)
     if first_year > last_year:
         raise ValueError("first_year must not be after last_year")
     _check_month(start_month)
