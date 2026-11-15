@@ -15,8 +15,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-fs-bg text-fs-text">
       <header className="border-b border-slate-200 px-6 py-4">
-        <h1 className="text-xl font-semibold">{strings['app.title']}</h1>
-        <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
+        <div className="mx-auto max-w-6xl">
+          <h1 className="text-xl font-semibold">{strings['app.title']}</h1>
+          <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
+        </div>
       </header>
       <main className="px-6 py-8">
         {route === '/' ? (

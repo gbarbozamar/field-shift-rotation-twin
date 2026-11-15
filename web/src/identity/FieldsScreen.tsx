@@ -122,7 +122,17 @@ export default function FieldsScreen() {
           )}
         </div>
 
-        <div className="min-[1100px]:w-[380px]">
+        {/* The inspector column of issue #454, corrected after the
+            developer's screen check of 15 Nov 2026: a grid item is as
+            wide as its widest unbreakable content unless it may shrink
+            (min-w-0 on the item and on every child, long words may
+            break), and the six stacked pieces are far taller than the
+            map-and-list column, so from 1100px the inspector stays
+            beside the map as a panel with its own scroll (sticky, at
+            most the viewport minus the main padding), instead of
+            leaving the left column as empty space on the way down.
+            Under 1100px this wrapper is plain block flow, unchanged. */}
+        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[380px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
           <RotationRun />
 
           <SiteSheet />

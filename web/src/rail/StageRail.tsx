@@ -91,10 +91,9 @@ export default function StageRail() {
             aria-current={isCurrent ? 'step' : undefined}
             className={[
               'flex',
-              'flex-wrap',
-              'items-baseline',
-              'gap-x-2',
-              'gap-y-0.5',
+              'flex-col',
+              'items-start',
+              'gap-0.5',
               'rounded-lg',
               'border',
               'border-fs-border',
@@ -105,19 +104,21 @@ export default function StageRail() {
             ].join(' ')}
           >
             <span className={nameClass}>{stage.name}</span>
-            {stage.done ? (
-              <span className="text-fs-muted">{strings['rail.state.done']}</span>
-            ) : (
-              <>
-                <span className="text-fs-muted">{strings['rail.state.waiting']}</span>
-                <span className="text-fs-muted">{stage.reason}</span>
-              </>
-            )}
-            {isCurrent ? (
-              <span className={['font-semibold', 'text-fs-primary'].join(' ')}>
-                {strings['rail.state.current']}
-              </span>
-            ) : null}
+            <span className="flex flex-wrap items-baseline gap-x-2 text-fs-muted">
+              {stage.done ? (
+                <span>{strings['rail.state.done']}</span>
+              ) : (
+                <>
+                  <span>{strings['rail.state.waiting']}</span>
+                  <span>{stage.reason}</span>
+                </>
+              )}
+              {isCurrent ? (
+                <span className={['font-semibold', 'text-fs-primary'].join(' ')}>
+                  {strings['rail.state.current']}
+                </span>
+              ) : null}
+            </span>
           </li>
         )
       })}

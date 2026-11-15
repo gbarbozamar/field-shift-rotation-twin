@@ -24,7 +24,7 @@ export default function EntryScreen() {
   const selectedFieldId = useSelectedFieldId()
 
   return (
-    <section aria-labelledby="entry-screen-title" className="max-w-2xl">
+    <section aria-labelledby="entry-screen-title" className="mx-auto max-w-2xl">
       <h2 id="entry-screen-title" className="text-lg font-semibold">
         {strings['entry.title']}
       </h2>
