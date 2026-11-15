@@ -6,6 +6,7 @@ import { ApiError } from '../seam/runRotationApi'
 import type { ApiErrorCode } from '../seam/runRotationApi'
 import type { ProvenanceLabel } from '../components/ValueDisplay'
 import {
+  PlantNotAvailableError,
   configuredApiBase,
   plantRequestFor,
   plantScreenQueryOptions,
@@ -80,9 +81,10 @@ import type {
  * having no stress test) that sends the example request's own declared
  * factor, shown with its unit and its provenance; a factor the request
  * declares missing keeps it disabled with the declared reason. The answer's
- * rain-stress part is shown. While the call is on its way a pending line, and when it
- * fails an error panel with its code in plain words, are shown in place of an
- * answer: no example answer is rendered then. "Back to the saved example"
+ * rain-stress part is shown. While the call is on its way a pending line, when
+ * the service has no answer the reason it gave (the plant layer not built),
+ * and when it fails an error panel with its code in plain words, are shown in
+ * place of an answer: no example answer is rendered then. "Back to the saved example"
  * goes back. A line says where the answer shown comes from.
  *
  * Each option is a row (S-020, PROPOSED): its rotation label from the
@@ -698,6 +700,8 @@ export type ServiceStatus =
   | { kind: 'not_asked' }
   | { kind: 'pending' }
   | { kind: 'failed'; code: ApiErrorCode }
+  /** The service answered that it has no answer, with the reason (not a failure). */
+  | { kind: 'not_available'; missing: MissingPart }
 
 function ignore() {}
 
@@ -742,8 +746,21 @@ function OriginLine({
   )
 }
 
-/** The pending line, or the error panel with the code in plain words and the raw code. */
+/**
+ * The pending line, the answer not available with the reason the service
+ * gave, or the error panel with the code in plain words and the raw code.
+ */
 function StatusPanel({ status }: { status: ServiceStatus }) {
+  if (status.kind === 'not_available') {
+    return (
+      <div
+        data-testid="plant-answer-not-available"
+        className="rounded-lg border border-slate-200 bg-white px-4 py-3"
+      >
+        <MissingLine what={strings['plant.answer.missing_what']} missing={status.missing} />
+      </div>
+    )
+  }
   if (status.kind === 'not_asked') {
     return (
       <p data-testid="plant-service-not-asked" className="text-sm text-slate-500">
@@ -1200,15 +1217,23 @@ function rainControlOf(
 export type ServicePhase =
   | { phase: 'pending' }
   | { phase: 'failed'; code: ApiErrorCode }
+  | { phase: 'not_available'; missing: MissingPart }
   | { phase: 'answered'; answer: PlantServiceAnswer }
 
-/** The phase of the call, from the query. An error that is not an ApiError is UNEXPECTED. */
+/**
+ * The phase of the call, from the query. A service that has no answer and
+ * says why is not_available with that reason; any other error that is not an
+ * ApiError is UNEXPECTED.
+ */
 export function servicePhaseOf(query: {
   isPending: boolean
   isError: boolean
   error: unknown
   data: PlantServiceAnswer | undefined
 }): ServicePhase {
+  if (query.isError && query.error instanceof PlantNotAvailableError) {
+    return { phase: 'not_available', missing: query.error.missing }
+  }
   if (query.isError) {
     return { phase: 'failed', code: query.error instanceof ApiError ? query.error.code : 'UNEXPECTED' }
   }
@@ -1297,7 +1322,11 @@ export function PlantScreenView({
     // No answer to show: the request itself says whether it is example data.
     const set: PlantAnswerSet = { example_data: rawPlantRequest.example_data, answers: [] }
     const status: ServiceStatus =
-      service.phase === 'pending' ? { kind: 'pending' } : { kind: 'failed', code: service.code }
+      service.phase === 'pending'
+        ? { kind: 'pending' }
+        : service.phase === 'not_available'
+          ? { kind: 'not_available', missing: service.missing }
+          : { kind: 'failed', code: service.code }
     return (
       <PlantView set={set} price={null} status={status} {...common} />
     )

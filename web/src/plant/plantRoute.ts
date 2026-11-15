@@ -20,6 +20,8 @@ import type { MarginOf, PlantAnswer, RainStressPart, Strictness } from './plantD
  * - The call goes through postToRoute of the run seam; a 2xx body that the
  *   parser refuses, or an answer to other questions than those asked, is
  *   ApiError UNEXPECTED, never shown as an answer.
+ * - A 2xx body with no answer and its reason (the plant layer not built) is
+ *   PlantNotAvailableError: the screen shows the reason, not an error.
  *
  * No number: pure functions and the fetch boundary only; the one wording
  * used (the detail of an unreadable request) comes from strings.ts.
@@ -286,9 +288,54 @@ export function readPlantServiceAnswer(body: unknown, request: unknown): PlantSe
   }
 }
 
-/** Call the route with one request; resolves with the answer read, rejects with an ApiError. */
+/**
+ * The service answered 200 with no answer and the reason why (PROPOSED):
+ * the route's `{answer: null, answer_missing}` form of api/app.py, sent when
+ * the plant layer is not built. A typed absence, not a failure: the screen
+ * shows the reason, never an error code.
+ */
+export class PlantNotAvailableError extends Error {
+  readonly missing: MissingPart
+
+  constructor(missing: MissingPart) {
+    super('plant-answer-not-available')
+    this.name = 'PlantNotAvailableError'
+    this.missing = missing
+  }
+}
+
+/**
+ * The reason of a 2xx body that carries no answer, or null when the body is
+ * not of that form (it is then read as an answer). A body whose answer is
+ * null without a readable reason (a reason code of the conventions, an
+ * optional non-empty detail) is ApiError UNEXPECTED: no reason is invented.
+ */
+export function readAnswerMissing(body: unknown): MissingPart | null {
+  if (!isRecord(body) || body.answer !== null) {
+    return null
+  }
+  const missing = body.answer_missing
+  if (!isRecord(missing)) {
+    throw new ApiError('UNEXPECTED')
+  }
+  try {
+    return missingPart(missing.reason, missing.detail, 'invalid-plant-answer-missing')
+  } catch {
+    throw new ApiError('UNEXPECTED')
+  }
+}
+
+/**
+ * Call the route with one request; resolves with the answer read, rejects
+ * with PlantNotAvailableError when the service has no answer and says why,
+ * and with an ApiError otherwise.
+ */
 export async function runPlant(base: string, request: Record<string, unknown>): Promise<PlantServiceAnswer> {
   const body = await postToRoute(plantRunUrl(base), request)
+  const missing = readAnswerMissing(body)
+  if (missing !== null) {
+    throw new PlantNotAvailableError(missing)
+  }
   return readPlantServiceAnswer(body, request)
 }
 
