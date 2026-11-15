@@ -20,7 +20,15 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from .economic_facts import KINDS_OF_YEAR, EconomicFacts, MarginByYear, YieldByYear
+from contracts.inputs.common import Value
+
+from .economic_facts import (
+    KINDS_OF_YEAR,
+    EconomicFacts,
+    GrainCrop,
+    MarginByYear,
+    YieldByYear,
+)
 
 HERE = Path(__file__).parent
 EXAMPLES = HERE / "examples"
@@ -129,6 +137,11 @@ INVALID: list[tuple[str, Mutation, str]] = [
         "share one crop_id",
     ),
     ("crop-id-blank", put([*GRAIN, "crop_id"], " "), f"{AT_GRAIN}.crop_id"),
+    (
+        "crop-id-with-surrounding-white-space",
+        put([*COVER, "crop_id"], " PLACEHOLDER_soybean "),
+        "no leading or trailing white space",
+    ),
     # --- Units ----------------------------------------------------------------
     ("price-in-another-unit", put([*PRICE, "unit"], "USD kg-1"), "USD t-1"),
     ("cost-in-another-unit", put([*COST, "unit"], "USD/ha"), "USD ha-1"),
@@ -170,11 +183,35 @@ INVALID: list[tuple[str, Mutation, str]] = [
         drop([*PRICE, "provenance"]),
         "carries a provenance label (C4.1)",
     ),
+    (
+        "price-with-provenance-other-than-declared",
+        put([*PRICE, "provenance"], "OBSERVED"),
+        "its provenance is DECLARED",
+    ),
     # --- Signs ----------------------------------------------------------------
-    ("price-negative", put([*PRICE, "value"], -1.0), "not negative"),
-    ("yield-negative", put([*YIELD, "el_nino", "value"], -0.5), "not negative"),
-    ("cost-negative", put([*COST, "value"], -1.0), "not negative"),
-    ("cover-cost-negative", put([*COVER, "cost", "value"], -1.0), "not negative"),
+    ("price-negative", put([*PRICE, "value"], -1.0), "must not be negative"),
+    (
+        "yield-negative",
+        put([*YIELD, "el_nino", "value"], -0.5),
+        "must not be negative",
+    ),
+    ("cost-negative", put([*COST, "value"], -1.0), "must not be negative"),
+    (
+        "cover-cost-negative",
+        put([*COVER, "cost", "value"], -1.0),
+        "must not be negative",
+    ),
+    (
+        "price-range-below-zero",
+        both(
+            drop([*PRICE, "range_missing"]),
+            put(
+                [*PRICE, "range"],
+                {"low": -10.0, "high": 500.0, "kind": "PLACEHOLDER_kind"},
+            ),
+        ),
+        "its low bound is below zero",
+    ),
     # --- Members by kind of crop ----------------------------------------------
     ("grain-without-price", drop(PRICE), f"{AT_GRAIN}.price"),
     ("grain-without-yield", drop(YIELD), f"{AT_GRAIN}.yield"),
@@ -248,6 +285,31 @@ def test_example_loads_into_its_model() -> None:
     # Nothing is added, dropped or changed on the way through the model.
     assert json.loads(loaded.model_dump_json(exclude_unset=True)) == json.loads(text)
     assert EconomicFacts.model_validate(json.loads(text)) == loaded
+
+
+def test_json_dump_of_the_example_validates_back_into_an_equal_model() -> None:
+    loaded = EconomicFacts.model_validate_json(
+        (EXAMPLES / EXAMPLE).read_text(encoding="utf-8")
+    )
+    dumped = loaded.model_dump(mode="json")
+    assert EconomicFacts.model_validate(dumped) == loaded
+    assert EconomicFacts.model_validate_json(json.dumps(dumped)) == loaded
+
+
+def test_grain_crop_is_built_by_its_python_name_and_writes_yield() -> None:
+    grain = load()["crops"][0]
+    built = GrainCrop(
+        crop_id=grain["crop_id"],
+        kind="grain",
+        price=Value.model_validate(grain["price"]),
+        cost=Value.model_validate(grain["cost"]),
+        yield_=YieldByYear.model_validate(grain["yield"]),
+    )
+    dumped = built.model_dump(mode="json")
+    assert "yield" in dumped
+    assert "yield_" not in dumped
+    # By the contract's name too, and both give the same crop.
+    assert GrainCrop.model_validate(grain) == built
 
 
 def test_example_is_marked_as_example_data() -> None:

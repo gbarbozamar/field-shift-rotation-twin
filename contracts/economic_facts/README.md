@@ -64,7 +64,15 @@ Each value is a `Value` of `contracts/inputs/common.py`: a number with its unit,
 | `yield.<kind of year>` | `t ha-1` | Not negative |
 | `declared_margin.<kind of year>` | `USD ha-1 yr-1` | Any: a declared margin may be negative |
 
-The sign rule applies to the number of a present value only; the bounds of a range are not checked against it (OPEN, question 4).
+The sign rule applies to the number of a present value and to the low bound of its range (PROPOSED; OPEN, question 4).
+
+**Provenance (PROPOSED).** Every present value of this contract is declared by the user: its provenance is `DECLARED`, and any other label is rejected.
+
+**Time basis (PROPOSED).** `cost` (grain and cover) is per hectare for one crop cycle, that is one sowing of that crop; a grain `yield` is per hectare for that cycle. A `declared_margin` is per hectare and agricultural year. The margin engine of a later unit adds the cycles that fall in one agricultural year. The unit strings stay as above.
+
+**`crop_id`.** Not blank, with no leading or trailing white space; unique in the list, compared after removing surrounding white space.
+
+**`yield` in Python.** `yield` is a Python keyword, so `GrainCrop` names the member `yield_`. The model takes either `yield` or `yield_` on the way in and always writes `yield`.
 
 ### Kinds of year
 
@@ -87,6 +95,7 @@ Every case below is a change to the example, made in memory. The invalid ones mu
 | `record-without-a-crop` | `crops` is an empty list |
 | `two-crops-share-one-identifier` | The cover crop has the `crop_id` of the grain crop |
 | `crop-id-blank` | A `crop_id` is only white space |
+| `crop-id-with-surrounding-white-space` | The cover crop's `crop_id` is the grain crop's with a space before and after |
 
 ### Rejected: units
 
@@ -112,6 +121,7 @@ Every case below is a change to the example, made in memory. The invalid ones mu
 |---|---|
 | `value-null-without-missing-part` | The price is null with no `missing` part (C3.1) |
 | `value-present-without-provenance` | The price has a number and no provenance (C4.1) |
+| `price-with-provenance-other-than-declared` | The price is labelled `OBSERVED`: every present value here is declared by the user |
 
 ### Rejected: signs
 
@@ -121,6 +131,7 @@ Every case below is a change to the example, made in memory. The invalid ones mu
 | `yield-negative` | A yield is negative |
 | `cost-negative` | The grain cost is negative |
 | `cover-cost-negative` | The cover cost is negative |
+| `price-range-below-zero` | The price carries a range whose low bound is negative |
 
 ### Rejected: members by kind of crop
 
@@ -153,6 +164,8 @@ Every case below is a change to the example, made in memory. The invalid ones mu
 
 - No required member can be left out: the test leaves out each member of the record, of each kind of crop, and each kind of year of `yield` and of `declared_margin`, in turn, and each variant is rejected at that member.
 - The example holds exactly the members listed above, one crop of each kind, and `PLACEHOLDER` in every `crop_id`.
+- The example dumped with `model_dump(mode="json")` validates back into an equal model.
+- `GrainCrop` built with `yield_=` in Python is accepted and its JSON dump writes `yield`.
 - `KINDS_OF_YEAR` is `("el_nino", "neutral", "la_nina")` and is the member list of `YieldByYear` and of `MarginByYear`.
 
 ## OPEN
@@ -162,7 +175,7 @@ Each item is a question a person has to answer.
 1. **How is a year assigned to a kind of year?** The contract names `el_nino`, `neutral` and `la_nina` and nothing else: which index, which threshold and which source classify a year are not decided here. CITATION NEEDED. For the science reviewers.
 2. **Other currencies.** `currency` accepts `"USD"` only, and the unit strings are written in `USD`. C1.1 lists `t`, `ha` and `yr` and does not list a currency; whether C1.1 gains `USD` (and others) is for the lead developer.
 3. **Which crop's price is swept for the tipping price.** Not in this contract: it belongs to the route request of a later unit. For the platform developer.
-4. **Signs and ranges.** A present price, cost or yield is rejected when negative and zero is accepted; a range's bounds are not checked against that rule. Whether a zero price or yield is meaningful, and whether a range of a non-negative fact must stay non-negative, is for the lead developer.
+4. **Signs and ranges.** A present price, cost or yield is rejected when negative, and so is a range of one whose low bound is negative; zero is accepted. Whether a zero price or yield is meaningful, and whether the non-negative rule on range bounds stands, is for the lead developer.
 5. **Does a pasture carry a cost?** A `declared_margin` crop carries its margin only and rejects a `cost`, read as a margin net of cost. For the interface developer.
 6. **Which `source` text marks a value the user declared?** The example writes `"user"`, as the brief of this unit proposes. For the lead developer.
 7. **Relationship to the saved case and to the rotation definition.** Whether `crop_id` here must match a `crop_id` of the rotation definition of the same field is not checked. For the lead developer.
