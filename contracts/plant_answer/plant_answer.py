@@ -78,6 +78,21 @@ MAX_ROTATIONS = 5
 DECLARED = "DECLARED"
 
 
+def _repeated_indices(items: list[str]) -> list[int]:
+    """The list indices (0-based) of the items that repeat an earlier one.
+
+    PROPOSED (S-034): an index of the list, not the ``position`` field of a
+    rotation component.
+    """
+    seen: set[str] = set()
+    indices: list[int] = []
+    for index, item in enumerate(items):
+        if item in seen:
+            indices.append(index)
+        seen.add(item)
+    return indices
+
+
 def _duplicates(items: list[str]) -> list[str]:
     seen: set[str] = set()
     repeated: list[str] = []
@@ -165,9 +180,13 @@ class Questions(ContractModel):
 
     @model_validator(mode="after")
     def _distinct(self) -> Self:
-        repeated = _duplicates(self.soybean_crop_ids)
+        # PROPOSED (S-034, F2): a message names list indices, never a submitted id.
+        repeated = _repeated_indices(self.soybean_crop_ids)
         if repeated:
-            raise ValueError(f"soybean_crop_ids: repeated {repeated}")
+            raise ValueError(
+                "soybean_crop_ids: a crop_id is repeated at list index(es) "
+                f"{repeated} (0-based)"
+            )
         return self
 
 
@@ -190,10 +209,13 @@ class PlantRequest(ContractModel):
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
-        repeated = _duplicates([r.rotation_id for r in self.rotations])
+        # PROPOSED (S-034, F2): the messages of this validator name list
+        # indices (0-based), never a submitted id (one OPEN exception below).
+        repeated = _repeated_indices([r.rotation_id for r in self.rotations])
         if repeated:
             raise ValueError(
-                f"rotations: two rotations share the rotation_id {repeated}"
+                "rotations: two rotations share the rotation_id; repeated at "
+                f"list index(es) {repeated} (0-based)"
             )
         field = (self.site.case_id, self.site.field_id)
         if (self.economic_facts.case_id, self.economic_facts.field_id) != field:
@@ -201,6 +223,11 @@ class PlantRequest(ContractModel):
                 "economic_facts: the case_id and field_id are those of the site"
             )
         # PROPOSED: every rotation is a rotation of the field of the site.
+        # OPEN (S-034, F2 not applied here): this message still quotes the
+        # rotation_id. Naming the list index instead makes the route stop
+        # redacting it, which changes the expected value of
+        # api/test_plant.py::test_an_error_does_not_repeat_a_submitted_value
+        # (REDACTED_MESSAGE); a person decides whether that value may change.
         for rotation in self.rotations:
             if (rotation.case_id, rotation.field_id) != field:
                 raise ValueError(
@@ -250,19 +277,27 @@ class PlantRequest(ContractModel):
             for rotation in self.rotations
             for component in rotation.components
         }
-        undeclared = sorted(sown - declared)
+        undeclared = [
+            f"rotations.{i}.components.{j}"
+            for i, rotation in enumerate(self.rotations)
+            for j, component in enumerate(rotation.components)
+            if component.crop_id not in declared
+        ]
         if undeclared:
             raise ValueError(
                 "rotations: every crop sown is declared in economic_facts; "
-                f"not declared: {undeclared}"
+                "a crop_id is not declared at (list indices, 0-based) "
+                f"{', '.join(undeclared)}"
             )
         # PROPOSED (fix round 1): a soybean crop that no rotation sows makes
         # the tipping price a question about nothing.
-        not_sown = [c for c in self.questions.soybean_crop_ids if c not in sown]
+        not_sown = [
+            i for i, c in enumerate(self.questions.soybean_crop_ids) if c not in sown
+        ]
         if not_sown:
             raise ValueError(
                 "questions.soybean_crop_ids: each is sown by at least one "
-                f"rotation; not sown: {not_sown}"
+                f"rotation; not sown at list index(es) {not_sown} (0-based)"
             )
         return self
 

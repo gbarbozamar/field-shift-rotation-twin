@@ -74,7 +74,17 @@ from api.rain_stress import (
     scales_to_finite,
 )
 from api.rotation_validator import field_names, safe_message, submitted_texts
-from api.rotations import PERIOD_NOT_CONFIGURED, get_climate, source_out
+from api.rotations import (
+    PERIOD_NOT_CONFIGURED,
+    get_climate,
+    source_out,
+)
+
+# PROPOSED (S-034, F3): the reason code (C3.2) of an absent period, the one
+# ``api.rotations.get_climate`` writes on the climate source row.
+from api.rotations import (
+    PERIOD_NOT_CONFIGURED_REASON as PERIOD_REASON,
+)
 from contracts.plant_answer import PlantRequest
 from contracts.rotation_definition import RotationDefinition
 
@@ -243,14 +253,22 @@ def classify_years(
     PROPOSED (S-030): this reads the period of the settings and picks the
     text of why the years are not known; the classification itself is
     ``economics.plant.classify_years``.
+
+    PROPOSED (S-034, F3): without a period the reason is the one
+    ``api.rotations.get_climate`` gives an absent period (``PERIOD_REASON``),
+    so the soil-loss means carry it, not ``NO_COVERAGE``.
     """
     years = None
     why = PERIOD_NOT_CONFIGURED
+    reason: str | None = PERIOD_REASON
     if settings.has_period:
         assert settings.start_date is not None and settings.end_date is not None
         years = whole_ag_years(start_month, settings.start_date, settings.end_date)
         why = NO_WHOLE_YEAR
-    return classify_record_years(record, years, why, start_month, rotations)
+        reason = None
+    return classify_record_years(
+        record, years, why, start_month, rotations, reason=reason
+    )
 
 
 # --- the sources and the rain stress ------------------------------------------

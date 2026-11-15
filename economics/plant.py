@@ -55,6 +55,7 @@ from economics.tipping import PriceRange, TippingOption, find_tipping_price
 from kinds_of_year import (
     KindMean,
     KindOfYear,
+    YearValue,
     classify_agricultural_years,
     count_kinds,
     mean_by_kind,
@@ -80,6 +81,10 @@ IGNORED_YEARS = (
 NO_YEAR_READ = (
     "the soil-loss result holds no whole agricultural year of the record period"
 )
+# PROPOSED (S-034, F1): the detail of a year of the record that the soil-loss
+# result does not list (its reason is NO_COVERAGE, C3.2: no data for this
+# period). mean_by_kind writes the year itself before it.
+ABSENT_YEAR = "the soil-loss result lists no value for this year of the record"
 
 
 # --- what a run is ------------------------------------------------------------
@@ -140,11 +145,19 @@ class Classified:
     years were classified with, or ``None`` when not known (a ``Classified``
     built by hand, positionally, with two fields). ``assemble_answer``
     refuses one that differs from the start month of the request.
+
+    PROPOSED (S-034, F3): ``reason`` and ``why`` are, when the caller gave a
+    reason code (C3.2) for why the years are not years of the record, that
+    code and its text. ``soil_loss_means`` then gives every soil-loss mean
+    missing with them, in place of ``NO_COVERAGE``. ``None``: no such reason
+    (years of the record, or a period without a whole agricultural year).
     """
 
     kinds: dict[int, KindOfYear]
     of_record: bool
     start_month: int | None = None
+    reason: str | None = None
+    why: str | None = None
 
 
 def classify_years(
@@ -153,6 +166,8 @@ def classify_years(
     why: str,
     start_month: int,
     rotations: Sequence[RotationDefinition],
+    *,
+    reason: str | None = None,
 ) -> Classified:
     """PROPOSED: the whole agricultural years of the record, ``record_years``
     (first and last, as the caller computed them), classified on the ONI
@@ -171,8 +186,18 @@ def classify_years(
 
     PROPOSED (S-030, code review): ``record_years`` whose first year is after
     its last is a ``ValueError``, a defect of the caller, not an absence.
+
+    PROPOSED (S-034, F3): ``reason`` is the reason code (C3.2) of ``why``,
+    when the caller has one (the route gives the one of an absent period);
+    with ``record_years`` ``None`` it is kept in the ``Classified`` with
+    ``why``, so the soil-loss means carry it. Given with ``record_years`` it
+    is a ``ValueError`` (years of the record have no reason to be missing).
     """
     if record_years is not None:
+        if reason is not None:
+            raise ValueError(
+                "classify_years: a reason is given for record years that are known"
+            )
         first, last = record_years
         if first > last:
             raise ValueError(
@@ -208,6 +233,8 @@ def classify_years(
         },
         False,
         start_month,
+        reason,
+        None if reason is None else why,
     )
 
 
@@ -331,6 +358,19 @@ def _with_note(mean: KindMean, note: str) -> KindMean:
     return dataclasses.replace(mean, detail=detail)
 
 
+def _series_of_the_record(kept: Sequence[Any], read: set[int]) -> dict[int, YearValue]:
+    """PROPOSED (S-034, F1): the series of the years of the result that are
+    years of the record, plus every year of the record the result does not
+    list, as a missing value ``NO_COVERAGE`` (C3.2: no data for this period)
+    with ``ABSENT_YEAR`` as its detail. ``mean_by_kind`` then treats such a
+    year as it treats a listed year without a value: the record mean, and
+    the mean of the kind of that year, are missing and name it."""
+    series = series_from_results(kept)
+    for year in sorted(read - set(series)):
+        series[year] = YearValue(None, "NO_COVERAGE", ABSENT_YEAR)
+    return series
+
+
 def soil_loss_means(
     run: EngineRun, classified: Classified
 ) -> tuple[KindMean, dict[str, KindMean]]:
@@ -346,6 +386,15 @@ def soil_loss_means(
     no year of the result in the list, as when the period holds no whole
     agricultural year) gives every mean missing ``NO_COVERAGE`` (C3.2: no data
     for this period), never a zero.
+
+    PROPOSED (S-034, F1): a year of the record the annual list lacks enters
+    the series as a missing value ``NO_COVERAGE`` (``_series_of_the_record``),
+    so the record mean and the mean of its kind are missing and name it, as
+    for a listed year without a value; a kind without such a year is
+    unaffected. PROPOSED (S-034, F3): years that are not years of the record
+    for a reason of the caller (``Classified.reason``, as for an absent
+    period) give every mean missing with that reason and its text, plus the
+    note naming the years of the result set aside.
 
     PROPOSED (S-030, code review): a run with neither a result nor
     ``result_missing``, or a soil loss of another type, is a ``ValueError``
@@ -373,11 +422,18 @@ def soil_loss_means(
             if not ignored
             else IGNORED_YEARS.format(years=", ".join(str(y) for y in ignored))
         )
-        if kept:
+        if not classified.of_record and classified.reason is not None:
+            # PROPOSED (S-034, F3): the years are not years of the record for
+            # a reason the caller named (no period): that reason, not
+            # NO_COVERAGE, with the note of the years set aside.
+            reason = classified.reason
+            parts = [text for text in (classified.why, note) if text is not None]
+            detail = "; ".join(parts) if parts else None
+        elif kept:
             means = mean_by_kind(
                 INDICATOR,
                 UNIT_SOIL_LOSS_ANNUAL,
-                series_from_results(kept),
+                _series_of_the_record(kept, read),
                 classified.kinds,
             )
             if note is None:
@@ -385,8 +441,9 @@ def soil_loss_means(
             return _with_note(means.record, note), {
                 kind: _with_note(mean, note) for kind, mean in means.by_kind.items()
             }
-        reason = "NO_COVERAGE"
-        detail = NO_YEAR_READ if note is None else f"{NO_YEAR_READ}; {note}"
+        else:
+            reason = "NO_COVERAGE"
+            detail = NO_YEAR_READ if note is None else f"{NO_YEAR_READ}; {note}"
     mean = _missing_mean(reason, NO_SOIL_LOSS.format(why=_why(reason, detail)))
     return mean, {kind: mean for kind in KINDS_OF_YEAR}
 

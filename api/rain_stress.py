@@ -238,10 +238,39 @@ def _why_not_read(parameters: dict[str, dict]) -> str | None:
 # --- scaling ---------------------------------------------------------------------
 
 
-def _finite(product: float) -> float:
-    if not math.isfinite(product):
-        raise ValueError(f"the record '{R_ID}' times the factor is not a finite number")
-    return product
+def _finite_product(number: float, factor: float) -> float | None:
+    """``number * factor``, or ``None`` when it is not a finite number.
+
+    PROPOSED (S-034, F4): a product that cannot be held as a float (an
+    ``int`` too large, as a ``RainStress`` built by hand with an ``int``
+    factor gives) raises ``OverflowError`` in the product or in
+    ``math.isfinite``: not finite, never an exception.
+    """
+    try:
+        product = number * factor
+        return product if math.isfinite(product) else None
+    except OverflowError:
+        return None
+
+
+def _scales(record: dict) -> bool:
+    """Whether ``_scaled_record`` multiplies this record: not a placeholder,
+    and ``read_value`` reads its value as a number. ``read_value`` checks the
+    whole record (check_record): a bound that is not a number raises
+    ``ValueError`` here, before anything is multiplied."""
+    if is_placeholder(record):
+        return False
+    return not isinstance(read_value(record), CatalogueMissing)
+
+
+def _products(record: dict, factor: float) -> dict[str, float | None]:
+    """The value and, for a range that is not null, both bounds, each times
+    the factor (``None`` where not finite). PROPOSED (S-034)."""
+    numbers = {"value": record["value"]}
+    if record["range"] is not None:
+        numbers["low"] = record["range"]["low"]
+        numbers["high"] = record["range"]["high"]
+    return {name: _finite_product(n, factor) for name, n in numbers.items()}
 
 
 def _scaled_record(record: dict, factor: float) -> dict:
@@ -253,17 +282,16 @@ def _scaled_record(record: dict, factor: float) -> dict:
     scaled record.
     """
     scaled = copy.deepcopy(record)
-    if is_placeholder(record):
+    if not _scales(record):
         return scaled
-    # read_value checks the whole record (check_record): a bound that is not a
-    # number raises ValueError here, before anything is multiplied.
-    if isinstance(read_value(record), CatalogueMissing):
-        return scaled
-    scaled["value"] = _finite(record["value"] * factor)
+    products = _products(record, factor)
+    if any(product is None for product in products.values()):
+        raise ValueError(f"the record '{R_ID}' times the factor is not a finite number")
+    scaled["value"] = products["value"]
     range_ = scaled["range"]
     if range_ is not None:
-        range_["low"] = _finite(range_["low"] * factor)
-        range_["high"] = _finite(range_["high"] * factor)
+        range_["low"] = products["low"]
+        range_["high"] = products["high"]
     note = scaled.get("note")
     added = _note(factor)
     scaled["note"] = f"{note}{NOTE_SEPARATOR}{added}" if note else added
@@ -327,14 +355,10 @@ def scales_to_finite(
     if isinstance(stress, RainStressMissing):
         return True
     for record in parameters.values():
-        if not _is_ep1_record(record) or is_placeholder(record):
+        if not _is_ep1_record(record) or not _scales(record):
             continue
-        if isinstance(read_value(record), CatalogueMissing):
-            continue
-        numbers = [record["value"]]
-        if record["range"] is not None:
-            numbers += [record["range"]["low"], record["range"]["high"]]
-        if not all(math.isfinite(number * stress.factor) for number in numbers):
+        products = _products(record, stress.factor)
+        if any(product is None for product in products.values()):
             return False
     return True
 

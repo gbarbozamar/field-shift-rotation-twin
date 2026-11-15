@@ -1267,3 +1267,93 @@ def _example_soybean_price() -> float:
     soy = REQUEST["questions"]["soybean_crop_ids"][0]
     (crop,) = [c for c in REQUEST["economic_facts"]["crops"] if c["crop_id"] == soy]
     return crop["price"]["value"]
+
+
+# --- review of the whole 4 (brief S-034), PROPOSED test cases ---------------------------
+
+# Test data: identifiers shorter than the three characters the redaction of
+# api/rotation_validator.py looks for, so only the message itself can keep
+# them out of an error.
+SHORT_ID = "q7"
+
+
+def _short_rotation_ids(request: dict[str, Any]) -> None:
+    request["rotations"][0]["rotation_id"] = SHORT_ID
+    request["rotations"][1]["rotation_id"] = SHORT_ID
+
+
+def _short_rotation_of_another_field(request: dict[str, Any]) -> None:
+    request["rotations"][2]["rotation_id"] = SHORT_ID
+    request["rotations"][2]["field_id"] = "example-field-2"
+
+
+def _short_undeclared_crop(request: dict[str, Any]) -> None:
+    request["rotations"][2]["components"][0]["crop_id"] = SHORT_ID
+
+
+def _short_repeated_soybean(request: dict[str, Any]) -> None:
+    request["questions"]["soybean_crop_ids"] = [SHORT_ID, SHORT_ID]
+
+
+def _short_soybean_not_sown(request: dict[str, Any]) -> None:
+    soy = request["questions"]["soybean_crop_ids"][0]
+    (crop,) = [c for c in request["economic_facts"]["crops"] if c["crop_id"] == soy]
+    request["economic_facts"]["crops"].append(dict(crop, crop_id=SHORT_ID))
+    request["questions"]["soybean_crop_ids"] = [SHORT_ID]
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        _short_rotation_ids,
+        pytest.param(
+            _short_rotation_of_another_field,
+            # OPEN (S-034): this message still quotes the rotation_id; see the
+            # comment at the message in contracts/plant_answer/plant_answer.py.
+            marks=pytest.mark.xfail(strict=True, reason="OPEN: S-034 F2"),
+        ),
+        _short_undeclared_crop,
+        _short_repeated_soybean,
+        _short_soybean_not_sown,
+    ],
+)
+def test_f2_an_error_never_repeats_a_short_submitted_id(mutate):
+    """F2: the messages of PlantRequest name positions, never a submitted id,
+    so redaction by length is not the only guard."""
+    request = copy.deepcopy(REQUEST)
+    mutate(request)
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    response = client(climate=climate, soil_slope=soil, engines=engines).post(
+        ROUTE, json=request
+    )
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert error["details"]
+    for detail in error["details"]:
+        assert SHORT_ID not in detail["message"].casefold()
+    _nothing_called(climate, soil, engines)
+
+
+def test_f3_without_a_period_the_soil_loss_is_missing_with_the_period_reason():
+    """F3: no period, engines that answer with a soil loss: every mean is
+    missing with the reason of the absent period, not NO_COVERAGE."""
+    from api.plant import PERIOD_REASON
+
+    data = answered(client(settings=RunSettings()).post(ROUTE, json=REQUEST))
+    checked(REQUEST, data)
+    for mean in _all_soil_means(data):
+        assert mean["value"] is None
+        assert mean["reason"] == PERIOD_REASON
+        assert "not configured" in mean["detail"]
+    assert 0 not in list(_numbers(data))
+
+
+def test_f3_the_period_reason_is_the_one_of_the_climate_source_row():
+    """F3: the route's reason of an absent period is the one get_climate
+    writes on the climate source row (api/rotations.py)."""
+    from api.plant import PERIOD_REASON
+    from api.rotations import SiteReference, get_climate
+
+    site = SiteReference.model_validate(REQUEST["site"])
+    result = get_climate(FakeClimate(), site, RunSettings())
+    assert result.source.missing_reason == PERIOD_REASON
