@@ -75,6 +75,25 @@ START, END = "1900-01-01", "1900-01-03"
 SECRET = "PLACEHOLDER_FILE_CONTENT_MARKER"
 
 
+# --- the parameter catalogue of the tests -------------------------------------
+# The repository catalogue (``params/records/``) fills up as the lead developer
+# signs records (D66). Tests about configuration must not depend on it, so
+# ``load_config`` reads an empty folder by default here; a test that wants the
+# real catalogue, or its own, passes ``parameters_folder`` itself.
+
+
+@pytest.fixture(autouse=True)
+def empty_catalogue_by_default(monkeypatch, tmp_path_factory):
+    empty = tmp_path_factory.mktemp("empty_catalogue")
+    real = config_module.load_config
+
+    def load_config_with_empty_catalogue(environ, **kwargs):
+        kwargs.setdefault("parameters_folder", empty)
+        return real(environ, **kwargs)
+
+    monkeypatch.setitem(globals(), "load_config", load_config_with_empty_catalogue)
+
+
 # --- helpers ------------------------------------------------------------------
 
 
@@ -513,9 +532,12 @@ def test_the_catalogue_folder_is_params_records_of_the_repository():
     assert config_module.PARAMETERS_FOLDER == (PARAMS / "records").resolve()
 
 
-def test_the_repository_catalogue_starts_the_app_with_an_empty_catalogue():
-    config = load_config({})
-    assert config.parameters == {}
+def test_the_repository_catalogue_loads_and_starts_the_app():
+    """The records committed in ``params/records/`` load and pass the check."""
+    records, problems = config_module.load_folder(config_module.PARAMETERS_FOLDER)
+    assert problems == []
+    config = config_module.load_config({})
+    assert config.parameters == records
     response = TestClient(build_app(config)).get("/health")
     assert response.status_code == 200
 
