@@ -223,6 +223,21 @@ def test_daylength_polar_day_and_polar_night():
     assert astronomical_daylength_hours(-90.0, 172) == 0.0
 
 
+def test_daylength_matches_math_reference_across_latitudes_and_days():
+    for lat in (-89.5, -66.5, -45.0, -34.0, -10.0, 0.0, 10.0, 34.0, 45.0, 66.5, 89.5):
+        for doy in range(1, 367, 15):
+            decl = 0.409 * math.sin(math.tau * doy / 365.0 - 1.39)
+            cos_ws = -math.tan(math.radians(lat)) * math.tan(decl)
+            if cos_ws <= -1.0:
+                expected = 24.0
+            elif cos_ws >= 1.0:
+                expected = 0.0
+            else:
+                expected = (24.0 / math.pi) * math.acos(cos_ws)
+            actual = astronomical_daylength_hours(lat, doy)
+            assert math.isclose(actual, expected, abs_tol=1e-12)
+
+
 def test_daylength_rejects_invalid_inputs():
     with pytest.raises(TypeError):
         astronomical_daylength_hours(True, 100)  # type: ignore[arg-type]
@@ -740,14 +755,7 @@ def test_ast_hygiene_pure_stdlib_and_contracts_only():
     path = Path(thermal_phenology.__file__)
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    allowed_prefixes = (
-        "__future__",
-        "collections.abc",
-        "dataclasses",
-        "math",
-        "typing",
-        "contracts.",
-    )
+    allowed_prefixes = ("__future__", "collections.abc", "dataclasses", "contracts.")
     forbidden_calls = {"open", "print", "eval", "exec", "input"}
 
     for node in ast.walk(tree):

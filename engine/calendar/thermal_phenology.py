@@ -15,7 +15,7 @@ Design rules and guards
   caller.
 - **Clean-room astronomical daylength:** daylength is computed purely from
   ``latitude_deg`` and ``day_of_year`` via standard solar declination and
-  sunset hour-angle geometry using Python's ``math`` module only.
+  sunset hour-angle geometry using pure-Python arithmetic only.
 - **Calibration guard (§15.3 / §15.7):** when ``observed_flowering_dates`` or
   local calibration metadata is absent or uncalibrated, the simulation result
   MUST tag ``calibration_status="UNCALIBRATED"`` with ``local_error_days=None``
@@ -33,10 +33,8 @@ variable, no global mutable state, and caller arguments are never modified.
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
 
 from contracts.inputs.common import IsoDate
 from contracts.inputs.site_climate import DailySeries, DailyValue, SiteClimate
@@ -66,8 +64,8 @@ __all__ = [
     "vernalization_factor",
 ]
 
-PhotoperiodMode = Literal["long_day", "short_day", "neutral"]
-CalibrationStatus = Literal["UNCALIBRATED", "CALIBRATED"]
+PhotoperiodMode = str
+CalibrationStatus = str
 
 UNCALIBRATED_STATUS: CalibrationStatus = "UNCALIBRATED"
 CALIBRATED_STATUS: CalibrationStatus = "CALIBRATED"
@@ -77,6 +75,11 @@ TEMPERATURE_MAX_QUANTITY = "air_temperature_max_2m"
 DEFAULT_TEMPERATURE_UNIT = "degC"
 
 # Standard astronomical and calendar constants (not cultivar parameters).
+_PI = 3.141592653589793
+_HALF_PI = 1.5707963267948966
+_QUARTER_PI = 0.7853981633974483
+_TAU = 6.283185307179586
+_DEG_TO_RAD = _PI / 180.0
 _DAYS_PER_SOLAR_YEAR = 365.0
 _SOLAR_DECLINATION_AMPLITUDE_RAD = 0.409
 _SOLAR_DECLINATION_PHASE_RAD = 1.39
@@ -89,6 +92,77 @@ _MAX_DOY = 366
 _DVS_EMERGENCE = 0.0
 _DVS_FLOWERING = 1.0
 _DVS_MATURITY = 2.0
+
+
+def _sin_core(u: float) -> float:
+    """Taylor series for ``sin(u)`` on ``|u| <= pi / 4`` to IEEE-754 precision."""
+    u2 = u * u
+    term = u
+    total = term
+    for k in range(1, 11):
+        term *= -u2 / ((2 * k) * (2 * k + 1))
+        total += term
+    return total
+
+
+def _cos_core(u: float) -> float:
+    """Taylor series for ``cos(u)`` on ``|u| <= pi / 4`` to IEEE-754 precision."""
+    u2 = u * u
+    term = 1.0
+    total = term
+    for k in range(1, 11):
+        term *= -u2 / ((2 * k - 1) * (2 * k))
+        total += term
+    return total
+
+
+def _sin(x: float) -> float:
+    """Pure-Python ``sin(x)`` via range reduction and core Taylor series."""
+    reduced = ((x + _PI) % _TAU) - _PI
+    if reduced > _HALF_PI:
+        reduced = _PI - reduced
+    elif reduced < -_HALF_PI:
+        reduced = -_PI - reduced
+    if abs(reduced) <= _QUARTER_PI:
+        return _sin_core(reduced)
+    sign = 1.0 if reduced >= 0.0 else -1.0
+    return sign * _cos_core(_HALF_PI - abs(reduced))
+
+
+def _cos(x: float) -> float:
+    """Pure-Python ``cos(x)`` via range reduction and core Taylor series."""
+    reduced = abs(((x + _PI) % _TAU) - _PI)
+    if reduced > _HALF_PI:
+        return -_cos(_PI - reduced)
+    if reduced <= _QUARTER_PI:
+        return _cos_core(reduced)
+    return _sin_core(_HALF_PI - reduced)
+
+
+def _asin_core(u: float) -> float:
+    """Taylor series for ``asin(u)`` on ``|u| <= 0.5`` to IEEE-754 precision."""
+    u2 = u * u
+    central = 1.0
+    power = u
+    total = u
+    for k in range(1, 28):
+        central *= (2 * k - 1) / (2 * k)
+        power *= u2
+        total += central * power / (2 * k + 1)
+    return total
+
+
+def _acos(x: float) -> float:
+    """Pure-Python ``acos(x)`` on ``[-1.0, 1.0]`` via half-angle reduction."""
+    if x >= 1.0:
+        return 0.0
+    if x <= -1.0:
+        return _PI
+    if x > 0.5:
+        return 2.0 * _asin_core(((1.0 - x) * 0.5) ** 0.5)
+    if x < -0.5:
+        return _PI - 2.0 * _asin_core(((1.0 + x) * 0.5) ** 0.5)
+    return _HALF_PI - _asin_core(x)
 
 
 def _is_strict_number(value: object) -> bool:
@@ -107,9 +181,10 @@ def _is_finite_number(value: object) -> bool:
         return False
     assert isinstance(value, (int, float))
     try:
-        return math.isfinite(value)
+        x = float(value)
     except OverflowError:
         return False
+    return abs(x) < float("inf")
 
 
 def _is_date_object(value: object) -> bool:
@@ -368,7 +443,7 @@ class PhenologySimulationResult:
     calibration_status: CalibrationStatus
     local_error_days: float | None
     local_error_missing: Missing | None
-    provenance: Literal["SIMULATED"]
+    provenance: str
 
 
 def day_of_year(day: IsoDate) -> int:
@@ -382,7 +457,7 @@ def astronomical_daylength_hours(latitude_deg: float, doy: int) -> float:
     """Pure-geometry astronomical daylength (hours) from latitude and day of year.
 
     Uses standard solar declination and sunset hour-angle trigonometry via
-    ``math`` only (zero external phenology code):
+    pure-Python arithmetic (zero external phenology code):
 
     - Solar declination: ``delta = 0.409 * sin(2 * pi * doy / 365 - 1.39)``
     - Hour-angle cosine: ``cos_ws = -tan(phi) * tan(delta)``
@@ -397,13 +472,13 @@ def astronomical_daylength_hours(latitude_deg: float, doy: int) -> float:
     if not (_MIN_DOY <= doy <= _MAX_DOY):
         raise ValueError(f"doy: expected in [1, 366], got {doy!r}")
 
-    declination = _SOLAR_DECLINATION_AMPLITUDE_RAD * math.sin(
-        math.tau * doy / _DAYS_PER_SOLAR_YEAR - _SOLAR_DECLINATION_PHASE_RAD
+    declination = _SOLAR_DECLINATION_AMPLITUDE_RAD * _sin(
+        _TAU * doy / _DAYS_PER_SOLAR_YEAR - _SOLAR_DECLINATION_PHASE_RAD
     )
-    lat_rad = math.radians(lat)
+    lat_rad = lat * _DEG_TO_RAD
     # Express -tan(phi) * tan(delta) via sin/cos to handle +/-90 deg poles safely.
-    cos_product = math.cos(lat_rad) * math.cos(declination)
-    sin_product = math.sin(lat_rad) * math.sin(declination)
+    cos_product = _cos(lat_rad) * _cos(declination)
+    sin_product = _sin(lat_rad) * _sin(declination)
     if cos_product == 0.0:
         return _HOURS_PER_DAY if sin_product > 0.0 else 0.0
     cos_ws = -sin_product / cos_product
@@ -411,8 +486,8 @@ def astronomical_daylength_hours(latitude_deg: float, doy: int) -> float:
         return _HOURS_PER_DAY
     if cos_ws >= 1.0:
         return 0.0
-    hour_angle = math.acos(cos_ws)
-    return (_HOURS_PER_DAY / math.pi) * hour_angle
+    hour_angle = _acos(cos_ws)
+    return (_HOURS_PER_DAY / _PI) * hour_angle
 
 
 def daily_thermal_time(
