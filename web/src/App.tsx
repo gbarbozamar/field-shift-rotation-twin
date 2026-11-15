@@ -13,7 +13,7 @@ export default function App() {
   // is at "/plant" (S-019, PROPOSED). Other routes keep the placeholder page.
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-fs-bg text-fs-text">
       <header className="border-b border-slate-200 px-6 py-4">
         <h1 className="text-xl font-semibold">{strings['app.title']}</h1>
         <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
