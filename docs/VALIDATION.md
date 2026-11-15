@@ -127,13 +127,17 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "order between systems [E2]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
+- Definition (PROPOSED by a research AI session; logic DECIDED under D161 by [D225](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893024804), 15 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`) of `soil_loss` for two or more rotations, and a hand-made expected order of those rotations, best first; all labelled example data. The function orders the rotations, per scenario and phase (D166), by the mean over agricultural years of `soil_loss`, read in the direction of the row (C1.1), ignoring ranges (the reading of D0, `trivial_orders` of `validation/trivial_comparator.py`, called), and reports whether that order equals the expected order. Ties, missing years and a single rotation give no order, with the reason, as in D0; nothing is filled and nothing is read as zero. The report states how many rotations were ordered. The test checks that (a) on the hand-made inputs the function returns the order counted by hand, and (b) the report states, per scenario and phase, whether it equals the expected order. Pass: (a) and (b) hold.
+- What it does not do: it does not say which order is right on real data; the expected order on real data is OPEN.
+- Known limit: with the single declared `C` of D125 every rotation has the same `soil_loss` (D158), so on real data the report can only state that the full method gives no order. D213 found no per-rotation `C`; the published comparison it cites is for other rotations and soils and is usable only as text.
+- OPEN, for the lead developer: the expected order on real data and its source (a person transcribes and signs it, D34, D66); which systems it covers. Also, listed with their options in `validation/order_between_systems.py`: an expected order that does not name the same rotations as the table for a scenario (as built, that scenario is not compared, with the reason); one expected order for every scenario and phase (as built), or one per scenario or phase.
+- Test: `validation/test_order_between_systems.py`, on example data written by hand: the order counted by hand, which is the order of `trivial_orders`; an equal and a different expected order; each scenario and phase compared on its own; the D158 tie (every rotation the same `soil_loss`); a missing year; a single rotation; a scenario without `soil_loss`; other indicators not read; an expected order naming a rotation the table lacks, and one lacking a rotation the table holds, not compared; a malformed expected order or table refused.
+- Expected value: the outcome stated as logic in the definition. Any order that a test compares is read off the hand-made inputs by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: orders and counts are compared exactly.
+- Source: CITATION NEEDED (for the expected order on real data)
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED under D161 (D225); acceptance by a science reviewer pending
 
 ### E3
 
@@ -619,3 +623,35 @@ The two context blocks of this section (soil loss measured with ¹³⁷Cs, and t
   - Two seasons only.
   - No value of EP4 is compared with it here: EP4 gives none while its records are unsigned.
 - Transcribed by an AI session (D34), from the pages cited, on 15 November 2026. Checked by: OPEN.
+
+### AMG against LEELP1 (exploratory contrast)
+
+- What it is: an exploratory contrast of the project's AMG functions (EP5, `engine/amg/`) against the soil organic carbon (SOC) measured in the long-term experiment LEELP1 at La Estanzuela. [D234 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893292145) records it here with no code, no tolerance and no pass rule, reported as an observation. **It is not a validation of the project.**
+- How it came about, per D234: another AI session, outside this repository, ran the project's AMG functions against the published data of LEELP1. An independent AI session then reproduced every figure with its own code on `main` and read the article raw. **The results were seen before D234 was taken.** That is why this entry has no pass rule and is called exploratory.
+- Lane: L0 Core (EP5); the run was made outside this repository, and reproduced by an AI session, read-only.
+- Class (blueprint section 3.6): Science — PROPOSED
+- Source, as D234 gives it (read raw on 15 November 2026):
+  - González-Sosa et al. (2024), SOIL 10:467, https://doi.org/10.5194/soil-10-467-2024, CC BY 4.0: section 2.1 (site, soil survey of 1985, mean rainfall), and the methods for residue, root inputs and sampling depth;
+  - the data on Zenodo, record 11116986, https://doi.org/10.5281/zenodo.11116986, CC BY 4.0: the file `CODE_AND_DATA.zip`, whose data workbook is `CODE_AND_DATA_v2/DATA.xlsx` ([correction to D234](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893619285)). The run used a copy named `LEELP1_DATA.xlsx`, with the sheets of SOC, yields, `precip_68_2022` and CLIMATE; whether that copy is identical to `DATA.xlsx` is OPEN;
+  - Clivot et al. (2019) and the AMGv2 parameter dataset (Clivot et al. 2023), as cited in D184 and D199.
+  - The data are not redistributed: no data file, fixture or parameter value from them is in this repository (D234).
+- What is source and what is a modelling choice, per D234:
+  - Source: the measured SOC, yields and climate of the file; the article's description of the experiment.
+  - Modelling choice: the rainfall series; the matching of years; reference ET in place of AMG's PET; the yearly exponential step; the exclusions; the unsigned AMG defaults.
+- **Tolerance: none was fixed before the run.** The result is therefore reported as an observation. No pass rule was chosen after the results were seen (D138), and none is chosen in this file.
+- What D234 records:
+  1. The data were explored before any rule, so they cannot later serve as an untouched external test.
+  2. The AMG parameters are the AMGv2 defaults and are not signed for this project (D34).
+  3. The stable fraction 65% is the one of D184, posted before the run; 40% was also run.
+  4. The root-mean-square error of SOC (t C/ha) is given for every configuration that was run, not only the favourable ones:
+     - with SOC held fixed at its 1976 value: 6.11 (continuous cropping, n = 86) and 5.89 (crop–pasture, n = 129);
+     - with 65% stable, in the same order: 4.12–4.23 and 5.73–5.88;
+     - with 40% stable, in the same order: 7.49–7.81 and 10.08–10.52.
+  5. With the other rainfall series of the same file (sheet CLIMATE in place of `precip_68_2022`), 65% gives 4.40–4.55 and 5.95–6.09. The improvement in crop–pasture is therefore null or fragile, and depends on the rainfall series and on how the years are matched.
+  6. The exclusion of plot 5 and of 2020–2021, and the end in 2019, were chosen by the session that ran the contrast, with no dated record before the run.
+  7. The input pH 5.6 is not confirmed against Table A1, and the carbonate value 0 is an assumption.
+  8. 38 yearly SOC increases larger than the inputs were flagged in the measured series and are not explained.
+- Options not taken, per D234: a pass rule now, because the results were already seen (D138); leaving the contrast out, because it shows what fails as well as what works, which is the purpose of section 8; reporting only the favourable configuration.
+- Transcribed by: an AI session (D34), on 15 November 2026. The numbers are restated from D234, not read again from the file or the article.
+- Checked by: OPEN.
+- Status: DECIDED under D161 (D234); results seen before the decision. No test, code or fixture is written. Open to review: the lead developer or a science reviewer may change it or remove the entry.
