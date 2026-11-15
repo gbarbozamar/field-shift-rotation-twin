@@ -72,7 +72,11 @@ export default function StageRail() {
   const currentIndex = firstNotDone === -1 ? stages.length - 1 : firstNotDone
 
   return (
-    <ol data-testid="stage-rail" aria-label={strings['rail.label']} className="mt-4 space-y-2">
+    <ol
+      data-testid="stage-rail"
+      aria-label={strings['rail.label']}
+      className="mt-4 space-y-2 min-[1100px]:flex min-[1100px]:flex-row min-[1100px]:flex-wrap min-[1100px]:gap-2 min-[1100px]:space-y-0"
+    >
       {stages.map((stage, index) => {
         const isCurrent = index === currentIndex
         const nameClass = isCurrent
@@ -84,12 +88,12 @@ export default function StageRail() {
           <li
             key={stage.name}
             data-testid={`stage-rail-item-${index + 1}`}
+            aria-current={isCurrent ? 'step' : undefined}
             className={[
               'flex',
-              'flex-wrap',
-              'items-baseline',
-              'gap-x-2',
-              'gap-y-0.5',
+              'flex-col',
+              'items-start',
+              'gap-0.5',
               'rounded-lg',
               'border',
               'border-fs-border',
@@ -100,19 +104,21 @@ export default function StageRail() {
             ].join(' ')}
           >
             <span className={nameClass}>{stage.name}</span>
-            {stage.done ? (
-              <span className="text-fs-muted">{strings['rail.state.done']}</span>
-            ) : (
-              <>
-                <span className="text-fs-muted">{strings['rail.state.waiting']}</span>
-                <span className="text-fs-muted">{stage.reason}</span>
-              </>
-            )}
-            {isCurrent ? (
-              <span className={['font-semibold', 'text-fs-primary'].join(' ')}>
-                {strings['rail.state.current']}
-              </span>
-            ) : null}
+            <span className="flex flex-wrap items-baseline gap-x-2 text-fs-muted">
+              {stage.done ? (
+                <span>{strings['rail.state.done']}</span>
+              ) : (
+                <>
+                  <span>{strings['rail.state.waiting']}</span>
+                  <span>{stage.reason}</span>
+                </>
+              )}
+              {isCurrent ? (
+                <span className={['font-semibold', 'text-fs-primary'].join(' ')}>
+                  {strings['rail.state.current']}
+                </span>
+              ) : null}
+            </span>
           </li>
         )
       })}

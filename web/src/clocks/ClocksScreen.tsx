@@ -51,7 +51,7 @@ function YearColumn({ row }: { row: ClockRow }) {
 /** One value the indicator carries for the whole rotation, on no year column. */
 function RotationBasisItem({ row }: { row: ClockRow }) {
   return (
-    <div data-testid="clock-item" className={['mt-2', 'max-w-44'].join(' ')}>
+    <div data-testid="clock-item" className="mt-2">
       <ValueDisplay what={row.indicator} item={row} />
     </div>
   )
