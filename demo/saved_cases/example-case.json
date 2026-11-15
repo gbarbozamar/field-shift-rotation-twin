@@ -3069,6 +3069,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3087,6 +3089,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 2,
           "deterioration": 0,
@@ -3107,6 +3111,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3125,6 +3131,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3143,6 +3151,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 2,
           "deterioration": 0,
@@ -3163,6 +3173,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3181,6 +3193,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3199,6 +3213,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3219,6 +3235,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3237,6 +3255,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3255,6 +3275,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 2,
           "deterioration": 0,
@@ -3275,6 +3297,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3293,6 +3317,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3311,6 +3337,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 2,
           "deterioration": 0,
@@ -3331,6 +3359,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3349,6 +3379,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3367,6 +3399,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 1,
           "deterioration": 0,
@@ -3387,6 +3421,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3405,6 +3441,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3423,6 +3461,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3443,6 +3483,8 @@
         ],
         "scenario_id": "s1",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3461,6 +3503,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3479,6 +3523,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3499,6 +3545,8 @@
         ],
         "scenario_id": "s2",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3517,6 +3565,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3535,6 +3585,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
@@ -3555,6 +3607,8 @@
         ],
         "scenario_id": "s3",
         "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
         "by_difference_range": {
           "strict_improvement": 0,
           "deterioration": 0,
