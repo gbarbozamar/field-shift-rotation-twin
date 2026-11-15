@@ -81,6 +81,15 @@ NOT_THE_SITE = "not_the_site"
 REPEATED = "repeated"
 NOT_THE_SITE_MESSAGE = "the {field} of this rotation is not the {field} of site"
 REPEATED_MESSAGE = "this rotation_id is the rotation_id of an earlier rotation"
+# D255 of #77: the two rotations of a pair share one start month of the
+# agricultural year (C5.3, C5.4); a pair whose months differ is an invalid
+# request. The code and the message are PROPOSED; the message names the field,
+# never its value.
+NOT_THE_START_MONTH = "not_the_start_month"
+NOT_THE_START_MONTH_MESSAGE = (
+    "the ag_year_start.month of this rotation is not that of the first rotation: "
+    "the rotations of a pair share one start month of the agricultural year (D255)"
+)
 
 # --- request ------------------------------------------------------------------
 
@@ -214,8 +223,9 @@ def _under_rotation(index: int, problem: ErrorDetail) -> ErrorDetail:
 def identity_problems(
     site: SiteReference, rotations: Sequence[Mapping[str, Any]]
 ) -> list[ErrorDetail]:
-    """Rotations of another case or field than ``site``, and a ``rotation_id``
-    given twice. The details name the field, never its value. PROPOSED."""
+    """Rotations of another case or field than ``site``, a ``rotation_id``
+    given twice, and a start month that is not the first rotation's (D255).
+    The details name the field, never its value. PROPOSED."""
     problems: list[ErrorDetail] = []
     seen: list[Any] = []
     for index, rotation in enumerate(rotations):
@@ -238,7 +248,33 @@ def identity_problems(
                 )
             )
         seen.append(rotation_id)
+    problems.extend(_start_month_problems(rotations))
     return problems
+
+
+def _start_month(rotation: Mapping[str, Any]) -> Any:
+    start = rotation.get("ag_year_start")
+    return start.get("month") if isinstance(start, Mapping) else None
+
+
+def _start_month_problems(
+    rotations: Sequence[Mapping[str, Any]],
+) -> list[ErrorDetail]:
+    """D255 of #77: every rotation of the pair has the start month of the
+    first. The rotations were already loaded into ``RotationDefinition``, where
+    ``ag_year_start`` is required (D7, D8). PROPOSED."""
+    if not rotations:
+        return []
+    first = _start_month(rotations[0])
+    return [
+        ErrorDetail(
+            path=join_path(["rotations", index, "ag_year_start", "month"]),
+            code=NOT_THE_START_MONTH,
+            message=NOT_THE_START_MONTH_MESSAGE,
+        )
+        for index, rotation in enumerate(rotations)
+        if index > 0 and _start_month(rotation) != first
+    ]
 
 
 # --- route --------------------------------------------------------------------

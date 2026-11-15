@@ -70,7 +70,7 @@ NO_FOLLOWING_CROP = (
     "the record, so the record of its surface residue cover cannot be named: "
     "the cover of a fallow is read by the crop sown after it (decisions D110 "
     "and D115 of issue #77, scope PROPOSED, OPEN 31 and OPEN 41 of "
-    "engine/water/EXPOSURE.md)"
+    "engine/water/EXPOSURE.md, OPEN 41 decided by D187 of issue #77)"
 )
 SOWING_NOT_KNOWN = (
     "the crop that follows the fallow of the day is not known: a component of "

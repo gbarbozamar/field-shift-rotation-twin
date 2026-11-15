@@ -53,8 +53,10 @@ redefined here:
      precipitation where EP3 reads transpiration;
   4. a demanded sum that is not above zero, or a ratio that is not finite:
      ``NOT_COMPUTABLE`` (``_computed``, lines 1436 to 1440;
-     ``_nothing_demanded``, line 1352). EP3 marks that reason code PROPOSED
-     (OPEN 43 of ``engine/water/EXPOSURE.md``), and so is it here.
+     ``_nothing_demanded``, line 1352). Decision D214 of issue #77 takes
+     that reason code as built, for EP3 and for the denominator of H0
+     (it answers OPEN 43 of ``engine/water/EXPOSURE.md``), and so is it
+     here.
 
   Nothing is filled and nothing is read as zero.
 - The sums: ``math.fsum`` of each series over the counted days, the first
@@ -239,8 +241,9 @@ def year_ratio(
             f"the ratio of entry H0 is not computed for agricultural year {ag_year}: "
             "the demanded transpiration summed over its "
             f"{len(living)} day(s) with a living crop is not above zero, so it has "
-            "no denominator, as EP3 gives the full indicator (reason code PROPOSED, "
-            "OPEN 43 of engine/water/EXPOSURE.md)"
+            "no denominator, as EP3 gives the full indicator (reason code of "
+            "decision D214 of issue #77, which answers OPEN 43 of "
+            "engine/water/EXPOSURE.md)"
         ),
     )
     if not demanded_sum > 0:
