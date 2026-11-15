@@ -372,8 +372,8 @@ only its path and the reason.
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
-| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED. Path of the ONI record `POST /api/plant/run` classifies the kinds of year on; read once at start-up (a JSON object with an `id` and `seasons`) and passed to `create_app` | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE` |
-| `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` does not set it | Off: a declared rain-stress factor is echoed `applied: false` with `NOT_SWITCHED_ON`, and the engines run unchanged |
+| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED. Path of the ONI record `POST /api/plant/run` classifies the kinds of year on; read once at start-up (a JSON object with an `id` and `seasons`) and passed to `create_app`. `compose.yaml` passes it through from the host shell, blank by default, so it is unset unless a person sets it (PROPOSED, R35) | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE` |
+| `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` passes it through from the host shell, blank by default, so it is unset (off) unless a person sets it (PROPOSED, R35) | Off: a declared rain-stress factor is echoed `applied: false` with `NOT_SWITCHED_ON`, and the engines run unchanged |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -448,7 +448,7 @@ SOIL_SLOPE_EXAMPLE_FILE=<the soil-and-slope example> \
 uv run uvicorn api.main:app --reload
 ```
 
-**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on.
+**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` switches real climate data on by default; `POWER_SETTINGS_FILE= CLIMATE_START_DATE= CLIMATE_END_DATE= docker compose watch` (or `up`) switches it off, as its comments say.
 
 ## Interfaces and their implementations
 
