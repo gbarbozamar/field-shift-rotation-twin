@@ -12,7 +12,9 @@
  * - assumption   the "assumption" mark required by the conventions (C4.5)
  * - value.*      wording of the value display (source line, range line)
  * - provenance.* the four labels of the conventions (C4.1)
- * - missing.*    missing-value pattern and the reason codes of C3.2
+ * - missing.*    missing-value pattern, the reason codes of C3.2 and the
+ *                parenthesised detail suffix that follows any reason phrase
+ *                whose code does not name the detail itself
  * - api.*        messages for the error codes defined by api/errors.py,
  *                plus api.code.shown for the raw code
  * - home.*       the shell page (heading, intro, placeholder, diagnostics)
@@ -56,6 +58,7 @@ export const strings = {
   'missing.CONTROL_FAILED': 'a control failed and the value is withheld',
   'missing.NOT_AVAILABLE': 'module not built or not enabled',
   'missing.NOT_APPLICABLE': 'not applicable',
+  'missing.detail_suffix': '({detail})',
   'api.MALFORMED_JSON': 'The request was not valid JSON.',
   'api.INVALID_REQUEST': 'The request is missing something it needs.',
   'api.SITE_INVALID': 'The site as declared cannot be used. Check the location.',
@@ -102,7 +105,9 @@ export const strings = {
   'ribbon.title': 'Rotation timeline',
   'ribbon.rotation_of': 'Rotation: {label}',
   'ribbon.ag_year_start': 'Agricultural year starts in month {month}',
+  'ribbon.provisional': 'Provisional',
   'ribbon.repeats': 'Repeats',
+  'ribbon.not_repeating': 'Does not repeat',
   'ribbon.component': 'Component {position}',
   'ribbon.crop': 'Crop',
   'ribbon.purpose': 'Purpose',
