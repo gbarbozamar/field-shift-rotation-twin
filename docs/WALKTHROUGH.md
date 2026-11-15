@@ -2,7 +2,7 @@
 
 What to type, in order, and what you should see: clone, install, run the tests, start the backend without Docker, send the example rotation, read the answer, build and open the interface.
 
-**Checked against commit `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` of `main`, on 15 November 2026.** The full test suite, the contract suite, the frontend tests and build, and the module states of steps 7 and 8 (in process in configurations A and B) were re-run and checked at `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730`; the interactive clone-to-browser walk was originally run in order in fresh clones at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9` and `2e5caf99086080a36a13d5972b493708258393a9` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
+**Checked against commit `35d5b2689bb597eae2010633e59d0c9de642f250` of `main`, on 15 November 2026.** At `35d5b2689bb597eae2010633e59d0c9de642f250`, test collection (`--collect-only`, `7642` total / `7609` non-`ci/`) and `validation/` + `kinds_of_year/` (`464 passed`) were executed directly; `contracts/` (`1665 passed, 1 xfailed`) and `web/` (`npm ci`, `npm test`, `npm run build`) were verified at `540095f86c1b39f1dc29bad225e006a9aa39018a` (neither folder changed between `540095f` and `35d5b26`, which merged `PR #510` in `kinds_of_year/records/oni_v6.json` and `PR #511` in `validation/` and `docs/VALIDATION.md`), and the full non-`ci/` test suite was executed at `540095f` in Validation Run #5 (`PR #511`); the interactive clone-to-browser walk and the in-process module states of steps 7 and 8 were previously run at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9`, `2e5caf99086080a36a13d5972b493708258393a9`, and `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
 
 The commands are written for a POSIX shell (bash); the `NAME=value command` form sets a variable for one command. They come from `CLAUDE.md`, `api/README.md`, `web/README.md` and `.github/workflows/ci.yml`.
 
@@ -37,13 +37,13 @@ uv creates `.venv` from `uv.lock`, the development tools included, and lists eac
 uv run pytest
 ```
 
-At the checked commit, on a machine where the Docker command is installed but Docker itself was not running, the last line read:
+At `35d5b2689bb597eae2010633e59d0c9de642f250`, the full suite was not re-run locally (collection finds `7642` tests total, or `7609` with `--ignore=ci` excluding the `33` tests in `ci/`; GitHub Actions runs the full suite on pull requests, and `validation/` + `kinds_of_year/` passed locally with `464 passed` at `35d5b26`). The latest recorded full non-`ci/` run on `main` is Validation Run #5 at `540095f` (`validation/runs/run-20261115T194950Z-540095f.json`, `PR #511`), which took `493.03s` and reported:
 
 ```text
-1 failed, 6545 passed, 16 skipped, 3 xfailed
+7584 passed, 16 skipped, 3 xfailed (7603 items, --ignore=ci)
 ```
 
-The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (the skipped count can go down as well as up, and the `xfailed` items are open tests marked expected failure). What you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). The run took about seven minutes at the checked commit (and between ten and twenty minutes on earlier machines); how long depends on the machine.
+The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (the skipped count can go down as well as up, and the `xfailed` items are open tests marked expected failure). When running the full suite including `ci/`, what you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine").
 
 The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml`):
 
@@ -51,10 +51,10 @@ The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml
 uv run pytest contracts/
 ```
 
-At the checked commit the last line read (it also grows with new tests; what matters is no failure, and the `xfailed` item is an open contract test):
+Observed at `540095f` (`contracts/` was unchanged in `540095f..35d5b26`; it also grows with new tests; what matters is no failure, and the `xfailed` item is an open contract test):
 
 ```text
-1465 passed, 1 xfailed
+1665 passed, 1 xfailed
 ```
 
 ## 4. Start the backend (no Docker)
@@ -99,10 +99,10 @@ npm test
 npm run build
 ```
 
-Seen at the checked commit:
+Observed at `540095f` (`web/` was unchanged in `540095f..35d5b26`):
 
 - `npm ci` ends with `found 0 vulnerabilities`;
-- `npm test`: `Test Files  22 passed (22)`, `Tests  404 passed (404)`;
+- `npm test`: `Test Files  24 passed (24)`, `Tests  416 passed (416)`;
 - `npm run build` writes `dist/` and ends with `✓ built in` and a time.
 
 ## 6. Open the interface and send the example rotation
@@ -120,7 +120,7 @@ npm run dev
 Open that address (the path `/field-shift-rotation-twin/` is part of it). On the very first load the page can stay blank while the dev server prepares its files; reload it. Then:
 
 1. The first screen, **Case**, shows "Example case · 3 fields" under the label "Example data — synthetic, not a real field". Click **North field** (identifier `example-field-1`), then **Open field**.
-2. The **Fields** screen opens. Below the list of fields, press the button **Live data — NASA POWER through the platform route**. It sends the example rotation of the repository (`contracts/rotation_definition/examples/PLACEHOLDER_rotation_definition.json`, copied into `web/src/data/`) to `POST /api/rotations/run` of the backend of step 4, with the point that stands for the field. Despite its label, the button calls only your local backend; whether the backend then asks the climate service depends on its configuration.
+2. The **Fields** screen opens. Above the workbench sits the six-stage rail (`The case in six stages`: `Open the case`, `Read the field`, `Set the rotations`, `Compare the runs`, `Read the decision`, `Take the case with you`), showing which stage is done, current (`you are here`), or waiting (`#451`). From `1100px` wide (`#462`), the screen uses a two-pane workbench: the flexible left column holds the `Example data` banner, the restyled Leaflet map (`#464`) and the field list below it, while the right column (`520px`, sticky) holds the inspector sections (stacking in the same order under `1100px`). In the inspector column (at the top of the right pane on desktop, or below the field list on narrower screens), press the button **Live data — NASA POWER through the platform route**. It sends the example rotation of the repository (`contracts/rotation_definition/examples/PLACEHOLDER_rotation_definition.json`, copied into `web/src/data/`) to `POST /api/rotations/run` of the backend of step 4, with the point that stands for the field. Despite its label, the button calls only your local backend; whether the backend then asks the climate service depends on its configuration.
 3. Under the button you see the answer:
 
 ```text
