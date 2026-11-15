@@ -370,11 +370,6 @@ def get_climate(
     )
 
 
-# The old private names, kept so that nothing that imports them breaks (S-029).
-_source_out = source_out
-_get_climate = get_climate
-
-
 def _under_rotation(problem: ErrorDetail) -> ErrorDetail:
     path = join_path(["rotation", problem.path]) if problem.path else "rotation"
     return ErrorDetail(path=path, code=problem.code, message=problem.message)

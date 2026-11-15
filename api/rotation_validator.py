@@ -85,12 +85,6 @@ def field_names(model: type[BaseModel], seen: set[type] | None = None) -> set[st
     return names
 
 
-# The old private names, kept so that nothing that imports them breaks (S-029).
-_submitted_texts = submitted_texts
-_safe_message = safe_message
-_field_names = field_names
-
-
 def _nested_models(annotation: Any) -> list[type[BaseModel]]:
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         return [annotation]

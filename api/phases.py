@@ -127,10 +127,6 @@ def ag_year_of(day: dt.date, start_month: int) -> int:
     return day.year if day.month >= start_month else day.year - 1
 
 
-# The old private name, kept so that nothing that imports it breaks (S-029).
-_ag_year_of = ag_year_of
-
-
 def first_phase(calendar: RotationCalendar, notes: tuple[str, ...] = ()) -> Phase:
     """Phase 0 alone: the calendar itself, unchanged.
 
@@ -139,7 +135,7 @@ def first_phase(calendar: RotationCalendar, notes: tuple[str, ...] = ()) -> Phas
     """
     start_month = calendar.ag_year_start.month
     first_ag_year = (
-        None if start_month is None else _ag_year_of(calendar.start_date, start_month)
+        None if start_month is None else ag_year_of(calendar.start_date, start_month)
     )
     return Phase(0, scenario_id(0), first_ag_year, calendar, notes)
 
@@ -225,7 +221,7 @@ def _checked_phase(
         raise TypeError(f"{function} changed more than the dates of the calendar")
     if _fills_a_missing_date(calendar, moved):
         raise TypeError(f"{function} gave a date the calendar has missing")
-    year = _ag_year_of(moved.start_date, start_month)
+    year = ag_year_of(moved.start_date, start_month)
     if year != first_ag_year + p:
         raise TypeError(
             f"{function} returned a calendar for phase {p} that does not start "

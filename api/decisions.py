@@ -62,8 +62,8 @@ from api.rotations import (
     Outcome,
     SiteReference,
     SourceOut,
-    _get_climate,
     build_envelope,
+    get_climate,
 )
 
 logger = logging.getLogger(__name__)
@@ -285,7 +285,7 @@ def make_decision_router(
             if problems:
                 return error_response(ErrorCode.ROTATION_INVALID, problems)
 
-            climate_result = _get_climate(climate, body.site, settings)
+            climate_result = get_climate(climate, body.site, settings)
             soil_result = soil_slope.get_soil_slope(
                 body.site.case_id, body.site.field_id
             )

@@ -68,6 +68,7 @@ from api.rain_stress import (
     not_applied_detail,
     rain_stress,
     scale_erosivity,
+    scales_to_finite,
 )
 from api.rotation_validator import field_names, safe_message, submitted_texts
 from api.rotations import PERIOD_NOT_CONFIGURED, get_climate, source_out
@@ -338,15 +339,26 @@ def cycle_years(rotation: RotationDefinition, crops: Mapping[str, Any]) -> Cycle
     another crop (both ``NOT_COMPUTABLE``: ``compute_rotation_margin`` takes
     neither) gives no years, with the reason.
 
-    PROPOSED (S-029, review finding F1): a declared-margin crop kept past its
-    sowing year counts from its sowing year up to the year before the sowing
-    year of the next component (by position), and in its harvest year only
-    when no crop follows it in that year. So a pasture that ends in year Y
-    with the next crop sown later in Y gives Y to that crop. A next crop sown
-    in an earlier year of the pasture (before its harvest year) is not moved:
-    the two still share that year (``NOT_COMPUTABLE``). The last component
-    has no next component inside the definition, so it counts through its
-    harvest year.
+    PROPOSED (S-029, review finding F1, and remark R2 of its review): a
+    declared-margin crop kept past its sowing year counts from its sowing
+    year up to its harvest year; the harvest year goes to the next component
+    by position instead only when that component is sown in the harvest year
+    on or after the harvest date. So a pasture that ends in year Y with the
+    next crop sown later in Y gives Y to that crop. A next crop sown before
+    the harvest date (in the harvest year or in an earlier year of the
+    pasture) overlaps the pasture and is not moved: the two still share that
+    year (``NOT_COMPUTABLE``), so the trimming never hides an overlap.
+
+    OPEN (remark R1 of the S-029 review): the last component has no next
+    component inside the definition, so it counts through its harvest year,
+    even when the first component of the next cycle is sown in that year
+    after the harvest date (the cycle is then one year longer than the
+    calendar's cycle of point 3 of engine/calendar/repeat.py). Applying the
+    rule above to the next cycle's first component changes the expected
+    cycle of ``test_a_pasture_kept_several_years_counts_in_each_year_until_its_harvest``
+    in api/test_plant.py, which a person decides;
+    ``test_r1_the_last_pasture_gives_its_harvest_year_to_the_next_cycle``
+    records the case (strict xfail).
     """
     month = rotation.ag_year_start.month
     ordered = sorted(rotation.components, key=lambda c: c.position)
@@ -358,17 +370,21 @@ def cycle_years(rotation: RotationDefinition, crops: Mapping[str, Any]) -> Cycle
                 f"the sowing date of component {component.component_id!r} is "
                 "missing, so the crops of each agricultural year are not known",
             )
-    sown = [ag_year_of(c.sowing.date, month) for c in ordered]
+    sowings = [c.sowing.date for c in ordered]
+    followers: list[Any] = [*sowings[1:], None]
     by_year: dict[int, list[str]] = {}
-    for index, component in enumerate(ordered):
-        first = last = sown[index]
+    for component, sowing, follower in zip(ordered, sowings, followers, strict=True):
+        first = last = ag_year_of(sowing, month)
         harvest = component.harvest.date
         if harvest is not None and isinstance(
             crops.get(component.crop_id), DeclaredMarginCrop
         ):
             last = ag_year_of(harvest, month)
-            follows = sown[index + 1] if index + 1 < len(ordered) else None
-            if follows is not None and first < last == follows:
+            if (
+                follower is not None
+                and first < last == ag_year_of(follower, month)
+                and follower >= harvest
+            ):
                 last -= 1
         for year in range(first, last + 1):
             by_year.setdefault(year, []).append(component.crop_id)
@@ -581,17 +597,18 @@ def stressed_run(
     ``scale_erosivity(catalogue, stress)``, the echo of ``applied_echo``. A
     factor and no factory, or a factory but no catalogue (``None``: the
     engines were injected, so the catalogue they use is not known): the
-    engines unchanged and the echo ``applied`` false, with the reason in its
-    detail; never a silent run.
+    engines unchanged and the echo ``applied`` false, with the sentence that
+    says why in its detail; never a silent run.
 
-    PROPOSED (S-029, review findings F2 and F3): the echo is computed first.
-    When it says the factor is not applied (EP1 would not read the erosivity
-    of the catalogue as a number), the factory is not called and the engines
-    are unchanged: a run on a copy EP1 reads as unscaled would only repeat the
-    plain run. When the scaled erosivity is not a finite number
-    (``scale_erosivity`` raises ``ValueError``; every other case in which it
-    raises one is already a reason of the echo), the factor is not applied
-    either, with ``NOT_FINITE`` as the reason, never a ``500``.
+    PROPOSED (S-029, review findings F2 and F3, remark R3): the echo is
+    computed first. When it says the factor is not applied (EP1 would not
+    read the erosivity of the catalogue as a number), the factory is not
+    called and the engines are unchanged: a run on a copy EP1 reads as
+    unscaled would only repeat the plain run. When the scaled erosivity is
+    not a finite number (``scales_to_finite``, checked before scaling), the
+    factor is not applied either, with ``NOT_FINITE`` in the detail, never a
+    ``500``. Any ``ValueError`` of ``scale_erosivity`` still surfaces (the
+    route's ``500``): it is a defect, not a reason of the echo.
     """
     factor = request.questions.rain_stress_factor
     if factor is None:
@@ -603,13 +620,13 @@ def stressed_run(
         why = NO_FACTORY if factory is None else NO_CATALOGUE
         return StressedRun(engines, _not_applied(stress, why))
     echo = applied_echo(catalogue, stress)
+    # ``applied_echo`` is typed to return either kind; for a ``RainStress`` it
+    # returns one, so this check narrows the type, it is not redundant.
     if isinstance(echo, RainStress) and not echo.applied:
         return StressedRun(engines, echo)
-    try:
-        scaled = scale_erosivity(catalogue, stress)
-    except ValueError:
+    if not scales_to_finite(catalogue, stress):
         return StressedRun(engines, _not_applied(stress, NOT_FINITE))
-    return StressedRun(factory(scaled), echo)
+    return StressedRun(factory(scale_erosivity(catalogue, stress)), echo)
 
 
 def _not_applied(stress: RainStress, why: str) -> RainStress:

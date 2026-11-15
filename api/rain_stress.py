@@ -114,10 +114,6 @@ def not_applied_detail(factor: float, why: str) -> str:
     )
 
 
-# The old private name, kept so that nothing that imports it breaks (S-029).
-_not_applied_detail = not_applied_detail
-
-
 def _missing_detail(missing: Missing) -> str:
     why = f"reason {missing.reason}"
     if missing.detail is not None:
@@ -311,6 +307,36 @@ def scale_erosivity(
         )
         for key, record in parameters.items()
     }
+
+
+def scales_to_finite(
+    parameters: dict[str, dict], stress: RainStress | RainStressMissing
+) -> bool:
+    """Whether every number ``scale_erosivity`` multiplies stays finite.
+
+    PROPOSED (S-029, remark R3): the same records as ``_scaled_record`` scales
+    (EP1's ``R_ID`` records that are not placeholders and whose value
+    ``read_value`` reads as a number), and the same products (the value and
+    both bounds of a range that is not null), each checked with
+    ``math.isfinite``. A ``RainStressMissing`` multiplies nothing: true.
+    Raises ``TypeError`` for an argument of another type and ``ValueError``
+    where ``read_value`` refuses a record, as ``scale_erosivity`` does.
+    """
+    _check_parameters(parameters)
+    _check_stress(stress)
+    if isinstance(stress, RainStressMissing):
+        return True
+    for record in parameters.values():
+        if not _is_ep1_record(record) or is_placeholder(record):
+            continue
+        if isinstance(read_value(record), CatalogueMissing):
+            continue
+        numbers = [record["value"]]
+        if record["range"] is not None:
+            numbers += [record["range"]["low"], record["range"]["high"]]
+        if not all(math.isfinite(number * stress.factor) for number in numbers):
+            return False
+    return True
 
 
 def applied_echo(
