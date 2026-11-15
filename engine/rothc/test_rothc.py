@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from contracts.inputs.common import Missing as InputMissing
+from engine.rothc._numbers import numbers_or_missing
 from contracts.results.models import DEFAULT_TREND_COMPUTATION, TREND_COMPUTATIONS
 from contracts.results.models import Missing as ResultMissing
 from engine.rothc import (
@@ -892,3 +893,26 @@ def test_readme_lists_the_cases_of_this_file():
         if name.startswith("test_") and inspect.isfunction(item)
     }
     assert listed == written, sorted(listed ^ written)
+
+
+def test_a_uniform_run_of_missing_arguments_is_summarized_not_enumerated():
+    # The lead coordinator's request: hundreds of missing monthly stocks name
+    # their count, first and last, and the reason — not each one by name (the
+    # enumerated form of 277 stocks measured ~550k characters and travelled
+    # twice in the route's response). Mixed reasons keep the enumeration.
+    one_reason = InputMissing(reason="NOT_AVAILABLE", detail="the month is missing")
+    many = {f"stocks[{i}]": one_reason for i in range(277)}
+    many.update({f"times[{i}]": float(i) for i in range(277)})
+    summarized = numbers_or_missing(many)
+    assert summarized.reason == "MISSING_INPUT"
+    assert summarized.detail == (
+        "277 arguments are missing (from stocks[0] to stocks[276]), "
+        "reason NOT_AVAILABLE: the month is missing"
+    )
+    other = InputMissing(reason="NOT_DECLARED")
+    mixed = {"a": one_reason, "b": other}
+    enumerated = numbers_or_missing(mixed)
+    assert enumerated.detail == (
+        "a is missing, reason NOT_AVAILABLE: the month is missing; "
+        "b is missing, reason NOT_DECLARED"
+    )
