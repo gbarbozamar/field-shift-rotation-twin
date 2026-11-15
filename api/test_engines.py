@@ -2156,3 +2156,59 @@ def test_the_real_run_rothc_gets_the_forcing_of_ep5_and_its_rows_pass_unchanged(
         expected.reason,
     )
     assert runner.NOT_BUILT not in json.dumps(modules["rothc"])
+
+
+# --- D220: the daily reference evapotranspiration reaches the forcing ------------
+#
+# The runner computes the daily FAO-56 reference evapotranspiration of D44 once
+# per request, as EP3 computes it, and passes it to the producer of the
+# forcing, which sums it by month into the potential evapotranspiration of
+# RothC. Inputs: the PLACEHOLDER chain climate and the catalogue of the
+# repository; no number of the science is asserted, only that the monthly
+# value is the sum of the daily ones the runner computed, or missing.
+
+
+def test_d220_ep6_receives_the_monthly_climate_with_the_daily_et0_summed():
+    pytest.importorskip("engine.water.et0")
+    import math
+
+    from api.config import PARAMETERS_FOLDER, load_parameters
+
+    parameters = load_parameters(PARAMETERS_FOLDER)
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    engines = EntryPointEngines(
+        with_carbon(amg, rothc), carbon_models=CARBON_MODELS, parameters=parameters
+    )
+    response = client(engines, climate=ChainClimate()).post(ROUTE, json=BODY)
+    assert response.status_code == 200, response.text
+    forcing = rothc.calls[0][0][0]
+    assert forcing is amg.calls[0][0][0]  # one forcing for both models (D65)
+    by_quantity = {series.quantity: series for series in forcing.climate}
+    assert set(by_quantity) == {
+        "rainfall",
+        "potential_evapotranspiration",
+        "mean_temperature",
+    }
+    daily = runner.daily_reference_evapotranspiration(chain_climate(), parameters)
+    assert isinstance(daily, dict) and daily
+    pet = by_quantity["potential_evapotranspiration"]
+    assert pet.unit == "mm"
+    for item in pet.months:
+        first = dt.date(item.year, item.month, 1)
+        days = [
+            daily.get(first + dt.timedelta(days=n))
+            for n in range(31)
+            if (first + dt.timedelta(days=n)).month == item.month
+        ]
+        if all(isinstance(value, float) for value in days):
+            assert item.value == math.fsum(days)
+        else:
+            assert item.value is None and item.missing is not None
+            assert "did not pass" not in item.missing.detail
+
+
+def test_d220_without_engine_water_the_daily_et0_is_not_available(monkeypatch):
+    monkeypatch.setattr(runner, "ET0_MODULE", "placeholder_absent_package.et0")
+    answer = runner.daily_reference_evapotranspiration(chain_climate(), {})
+    assert answer.reason == "NOT_AVAILABLE"
+    assert "placeholder_absent_package" in answer.detail

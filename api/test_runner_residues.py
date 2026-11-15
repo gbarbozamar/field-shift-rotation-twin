@@ -53,7 +53,11 @@ from api.test_phases import (
     _post,
     _rotation,
 )
-from contracts.carbon_forcing import AnnualCarbonInputSeries, CarbonForcing
+from contracts.carbon_forcing import (
+    AnnualCarbonInputSeries,
+    CarbonForcing,
+    CarbonInputSeries,
+)
 from contracts.inputs.common import Missing as InputMissing
 from contracts.inputs.common import Value
 from contracts.rotation_definition import RotationDefinition
@@ -76,6 +80,7 @@ class FakeLedger:
     years_missing: InputMissing | None = None
     components: list[Any] = field(default_factory=list)
     annual_carbon_inputs: list[AnnualCarbonInputSeries] = field(default_factory=list)
+    monthly_carbon_inputs: list[CarbonInputSeries] = field(default_factory=list)
 
 
 class FakeComponent(BaseModel):
@@ -914,3 +919,58 @@ def test_demo_rotations_answer_as_before_the_origin_split(monkeypatch):
         )
         assert _post_demo(name) == split
         assert len(previous_calls) == len(phases)  # the previous rule did run
+
+
+# --- D221: the monthly carbon inputs reach the forcing unchanged -----------------
+
+
+def monthly_series(origin: str) -> CarbonInputSeries:
+    """One monthly series over the months of the forcing horizon, every month
+    the example's value (PLACEHOLDER)."""
+    start = calendar().ag_year_start.month
+    horizon = producer.horizon_of(start, horizon_years())
+    months = []
+    year, month = horizon.start.year, horizon.start.month
+    while (year, month) <= (horizon.end.year, horizon.end.month):
+        months.append(
+            {"year": year, "month": month, "value": TEMPLATE["years"][0]["value"]}
+        )
+        year, month = (year, month + 1) if month < 12 else (year + 1, 1)
+    return CarbonInputSeries.model_validate(
+        {
+            "origin": origin,
+            "quantity": f"{origin}_carbon_input",
+            "unit": LEDGER_UNIT,
+            "provenance": TEMPLATE["provenance"],
+            "source": TEMPLATE["source"],
+            "range_missing": TEMPLATE["range_missing"],
+            "start": {"year": horizon.start.year, "month": horizon.start.month},
+            "end": {"year": horizon.end.year, "month": horizon.end.month},
+            "months": months,
+        }
+    )
+
+
+def test_d221_the_monthly_series_reach_the_forcing_unchanged():
+    monthly = [
+        monthly_series("placeholder_crop_aboveground"),
+        monthly_series("placeholder_crop_belowground"),
+    ]
+    amg = Fake(balance())
+    run(
+        engine_functions(
+            Fake(ledger(series("placeholder_input_a"), monthly_carbon_inputs=monthly)),
+            amg,
+        )
+    )
+    ((forcing,), _) = amg.calls[0]
+    assert forcing.carbon_inputs == monthly
+    assert all(a is b for a, b in zip(forcing.carbon_inputs, monthly))
+
+
+def test_d221_a_ledger_without_years_gives_no_monthly_series():
+    missing = InputMissing(reason="NOT_COMPUTABLE", detail="PLACEHOLDER")
+    amg = Fake(balance())
+    run(engine_functions(Fake(ledger(years_missing=missing)), amg))
+    ((forcing,), _) = amg.calls[0]
+    assert forcing.carbon_inputs == []
