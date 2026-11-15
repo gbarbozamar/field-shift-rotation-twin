@@ -4,6 +4,8 @@
 
 Status: **PROPOSED** (blueprint section 3.7), unit `l2/plant-answer-contract` (brief S-018a). Nothing here is in force until people approve the pull request.
 
+**Current status on `main` (`49504ac`):** Merged in `#424` (`6a34ba7`), with mutant-killing boundary tests added in `test_plant_answer_mutants.py` (`#458` `2395d1a`) and OPEN 5 synced in `#434` (`dfb31e0`). The D236–D254 plant and economics layer (D235–D251 and D258–D259 in `docs/METHODS.md`) is now live on `main`: `economics/` (`#392` `9a2e313`, `economics/plant.py` `#427` `da016c6`), `kinds_of_year/` (`#422` `b09402e`), `POST /api/plant/run` (`api/plant.py` and `api/rain_stress.py`, `#427` `da016c6`), and the `#/plant` screen (`web/`, `#426` `4dc7cb9`). No ONI record is shipped in `kinds_of_year/` until checked and signed (D240 (5), D34, D66). The contract remains `PROPOSED` until formal pull-request approval.
+
 This folder holds the Pydantic models of the request and of the answer of "What should I plant?" (one field, three to five rotations), one example of each, and the acceptance test. The route (S-018, `api/plant.py`) and the screen (S-019, `web/`) are built against it.
 
 | Contract | Producer → consumer | Model | Example |
@@ -17,7 +19,7 @@ Acceptance test, from the repository root:
 uv run pytest contracts/plant_answer/
 ```
 
-Models and pure validation only: no network call, no parameter value, no computation. The contract imports contracts only (`contracts.inputs.common`, `contracts.economic_facts`, `contracts.rotation_definition`, `contracts.results.models`); a test checks that it imports neither `kinds_of_year` nor `api` (#387). The tests that read `kinds_of_year/` or `api/rain_stress.py` are skipped (`pytest.importorskip`) while those modules are not on `main`. The answer is the JSON form of the dataclasses of `economics/` (`decide.py`, `limit.py`, `margin.py`, `tipping.py`), `kinds_of_year/` (`aggregate.py`, `classify.py`) and `api/rain_stress.py`, field for field where it can be; it does not import them. The literals it needs (`Strictness`, `Answer`, `OptionState`, `Verdict`, `Direction`, `MARGINS_OF`, the unit `dimensionless`, the label `stress test`) are defined here, and the test checks with `typing.get_args` that they equal the originals, and that the field names of each mirrored model equal those of its dataclass.
+Models and pure validation only: no network call, no parameter value, no computation. The contract imports contracts only (`contracts.inputs.common`, `contracts.economic_facts`, `contracts.rotation_definition`, `contracts.results.models`); a test checks that it imports neither `kinds_of_year` nor `api` (#387). Both `kinds_of_year/` (`#422` `b09402e`) and `api/rain_stress.py` (`#427` `da016c6`) are now on `main` (`49504ac`), so the tests in `test_examples.py` that guard on `pytest.importorskip` for those modules run and pass. The answer is the JSON form of the dataclasses of `economics/` (`decide.py`, `limit.py`, `margin.py`, `tipping.py`), `kinds_of_year/` (`aggregate.py`, `classify.py`) and `api/rain_stress.py`, field for field where it can be; it does not import them. The literals it needs (`Strictness`, `Answer`, `OptionState`, `Verdict`, `Direction`, `MARGINS_OF`, the unit `dimensionless`, the label `stress test`) are defined here, and the test checks with `typing.get_args` that they equal the originals, and that the field names of each mirrored model equal those of its dataclass.
 
 ## How the example answer was made
 
@@ -25,7 +27,7 @@ A scratch script (not committed) ran the real pure functions on the example requ
 
 - **From the script (computed by the real functions, on example inputs):** every margin (for example 312.0, 222.0 and 193.8 USD ha-1 yr-1 on average), every soil-loss mean, `n_years` and `ag_years`, every limit check, the answer, the chosen rotation, the option states, the limit cost (90.0 USD ha-1 yr-1 against `example-rotation-soybean`), the tipping price (down: 375.26... USD t-1, -6.18... percent, the answer becomes not resolved; up: missing `NOT_APPLICABLE`), the rain-stress echo text, the kind of each year and the counts (4 `el_nino`, 2 `neutral`, 4 `la_nina`).
 - **Example data (typed in the script, no source):** the soil loss per kind of year of each rotation (14.0, 11.0, 8.0; 6.5, 5.0, 4.0; 4.0, 3.0, 2.5 t ha-1 yr-1), the one soil-loss year left missing (2022 of `example-rotation-soybean-cover-pasture`, reason `MISSING_INPUT`), the limit, the factor, the price range, the period, which crops each rotation sows in each agricultural year, and the two source rows.
-- The kinds of year come from the transcribed ONI record (reference and signature state in `kinds_of_year/README.md`; `checked_by` `UNSIGNED_AI_PRECHECK`).
+- The kinds of year come from the transcribed ONI record (reference and signature state in `kinds_of_year/README.md`; `checked_by` `UNSIGNED_AI_PRECHECK`; on `main` at `49504ac`, no ONI record is committed in `kinds_of_year/` until checked and signed under D240 (5), D34 and D66, `#422` `b09402e`).
 
 The example answer shows one chosen rotation (`example-rotation-soybean-cover`), one that does not meet the limit (`example-rotation-soybean`), one not resolved because a soil-loss year is missing, missing values with their reasons, and a tipping price.
 
@@ -247,7 +249,7 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 
 - Both examples load, dump and load back unchanged, and the answer example answers the request example.
 - Both examples say `example_data: true`; a test shows the check refuses `false`.
-- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses, plus the labels of D249 (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`; `SiteReference` that of `api/rotations.py`). The checks against `kinds_of_year/` and `api/rain_stress.py` are skipped while those modules are not on `main`.
+- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses, plus the labels of D249 (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`; `SiteReference` that of `api/rotations.py`). With `kinds_of_year/` (`#422` `b09402e`) and `api/rain_stress.py` (`#427` `da016c6`) now on `main` (`49504ac`), the checks against both modules run and pass.
 - The contract imports neither `kinds_of_year` nor `api` (read from its source).
 - The example answer says `scope` and `PHASE_ONE_ONLY`, never "Plant this rotation"; every present number in it carries its labels, and every present margin its source.
 - `retrieved_at` is written in UTC with a `Z`, exactly as `SourceOut` of `api/rotations.py` writes it, and reads back.
