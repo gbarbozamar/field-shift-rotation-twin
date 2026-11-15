@@ -176,7 +176,7 @@ def test_run_that_cannot_be_judged_at_the_record_edge_is_missing(record, thresho
     # start_month 6: the season centred on December, NDJ of the same year.
     result = classify_agricultural_years(rec, 2014, 2014, 6)[2014]
     assert result.kind is None
-    assert result.missing_reason == "NOT_AVAILABLE"
+    assert result.missing_reason == "NO_COVERAGE"
     assert result.detail
 
 
@@ -216,7 +216,7 @@ def test_year_outside_the_record_is_missing(record):
     result = classify_agricultural_years(record, 1990, 1990, 7)[1990]
     assert isinstance(result, KindOfYear)
     assert result.kind is None
-    assert result.missing_reason == "NOT_AVAILABLE"
+    assert result.missing_reason == "NO_COVERAGE"
     assert result.missing_reason in get_args(ReasonCode)
     assert result.detail
 
@@ -261,3 +261,48 @@ def test_value_errors(record, first, last, month):
 def test_deciding_season_rejects_a_bad_month():
     with pytest.raises(ValueError):
         deciding_season(2000, 13)
+
+
+@pytest.mark.parametrize("month", [True, False])
+def test_start_month_rejects_a_bool(record, month):
+    with pytest.raises(ValueError, match="start_month"):
+        classify_agricultural_years(record, 2005, 2005, month)
+    with pytest.raises(ValueError, match="start_month"):
+        deciding_season(2000, month)
+
+
+@pytest.mark.parametrize(
+    ("field", "bad"),
+    [
+        ("threshold", 0),
+        ("threshold", -0.5),
+        ("threshold", float("nan")),
+        ("threshold", float("inf")),
+        ("threshold", True),
+        ("threshold", "0.5"),
+        ("threshold", None),
+        ("min_consecutive_seasons", 0),
+        ("min_consecutive_seasons", True),
+        ("min_consecutive_seasons", 2.0),
+        ("min_consecutive_seasons", None),
+    ],
+)
+def test_invalid_rule_fields_are_rejected(record, field, bad):
+    rec = synthetic(record, {})
+    rec[field] = bad
+    with pytest.raises(ValueError, match=field):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+def test_duplicated_season_row_is_rejected(record):
+    rec = synthetic(record, {})
+    rec["seasons"].append({"season": "JJA", "year": 2012, "anom": 0.0})
+    with pytest.raises(ValueError, match="duplicated season JJA 2012"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+def test_unknown_season_name_is_rejected(record):
+    rec = synthetic(record, {})
+    rec["seasons"][3] = {"season": "XYZ", "year": 2010, "anom": 0.0}
+    with pytest.raises(ValueError, match="row 3.*XYZ"):
+        classify_agricultural_years(rec, 2011, 2011, 7)

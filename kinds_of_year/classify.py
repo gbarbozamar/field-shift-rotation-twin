@@ -7,6 +7,7 @@ never written here.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -35,7 +36,9 @@ SEASONS: tuple[str, ...] = (
     "NDJ",
 )
 
-_NOT_AVAILABLE: ReasonCode = "NOT_AVAILABLE"
+# C3.2: "NO_COVERAGE | The data source has no data for this place or this
+# period" (and C5.5 for a year the series does not cover).
+_NO_COVERAGE: ReasonCode = "NO_COVERAGE"
 
 
 @dataclass(frozen=True)
@@ -50,8 +53,48 @@ class KindOfYear:
 
 
 def _check_month(start_month: int) -> None:
-    if not isinstance(start_month, int) or not 1 <= start_month <= 12:
+    if (
+        isinstance(start_month, bool)
+        or not isinstance(start_month, int)
+        or not 1 <= start_month <= 12
+    ):
         raise ValueError("start_month must be an integer from 1 to 12")
+
+
+def _check_rule(record: Mapping[str, Any]) -> tuple[float, int]:
+    """The threshold and run length of the record, checked."""
+    threshold = record.get("threshold")
+    if (
+        isinstance(threshold, bool)
+        or not isinstance(threshold, (int, float))
+        or not math.isfinite(threshold)
+        or threshold <= 0
+    ):
+        raise ValueError("record field 'threshold' must be a finite number > 0")
+    run_length = record.get("min_consecutive_seasons")
+    if (
+        isinstance(run_length, bool)
+        or not isinstance(run_length, int)
+        or run_length < 1
+    ):
+        raise ValueError(
+            "record field 'min_consecutive_seasons' must be an integer >= 1"
+        )
+    return float(threshold), run_length
+
+
+def _season_map(record: Mapping[str, Any]) -> dict[int, float]:
+    """Season ordinal -> ANOM; a duplicated or unknown season is a ValueError."""
+    values: dict[int, float] = {}
+    for index, row in enumerate(record["seasons"]):
+        season, year = row["season"], row["year"]
+        if season not in SEASONS:
+            raise ValueError(f"seasons row {index}: unknown season name {season!r}")
+        position = _ordinal(season, year)
+        if position in values:
+            raise ValueError(f"seasons row {index}: duplicated season {season} {year}")
+        values[position] = float(row["anom"])
+    return values
 
 
 def deciding_season(ag_year: int, start_month: int) -> tuple[str, int]:
@@ -112,16 +155,13 @@ def classify_agricultural_years(
     whose anomaly meets ``+threshold`` (``-threshold``); "met" is read as at or
     beyond the threshold (PROPOSED). The kind of the year is the episode state
     of its deciding season; a year that cannot be judged from the record is
-    missing ``NOT_AVAILABLE``.
+    missing ``NO_COVERAGE``.
     """
     if first_year > last_year:
         raise ValueError("first_year must not be after last_year")
     _check_month(start_month)
-    threshold = float(record["threshold"])
-    run_length = int(record["min_consecutive_seasons"])
-    values = {
-        _ordinal(s["season"], s["year"]): float(s["anom"]) for s in record["seasons"]
-    }
+    threshold, run_length = _check_rule(record)
+    values = _season_map(record)
 
     result: dict[int, KindOfYear] = {}
     for ag_year in range(first_year, last_year + 1):
@@ -139,7 +179,7 @@ def classify_agricultural_years(
             )
         result[ag_year] = KindOfYear(
             kind=kind,
-            missing_reason=None if kind is not None else _NOT_AVAILABLE,
+            missing_reason=None if kind is not None else _NO_COVERAGE,
             detail=detail,
             season=season,
             season_year=season_year,

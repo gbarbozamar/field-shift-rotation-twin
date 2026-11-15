@@ -1,6 +1,6 @@
 # kinds_of_year
 
-PROPOSED (unit `l2/kinds-of-year`, brief S-012). Classifies each agricultural year of a period as one of the kinds of year of `contracts.economic_facts.KINDS_OF_YEAR` (`el_nino`, `neutral`, `la_nina`) from the Oceanic Nino Index (ONI), or leaves it missing with its reason (`NOT_AVAILABLE`, C3.2). Pure functions; no network. Not wired into the service or the margin engine yet.
+PROPOSED (unit `l2/kinds-of-year`, brief S-012). Classifies each agricultural year of a period as one of the kinds of year of `contracts.economic_facts.KINDS_OF_YEAR` (`el_nino`, `neutral`, `la_nina`) from the Oceanic Nino Index (ONI), or leaves it missing with its reason (`NO_COVERAGE`, C3.2: "The data source has no data for this place or this period"). Pure functions; no network. Not wired into the service or the margin engine yet.
 
 | File | What it holds |
 |---|---|
@@ -29,7 +29,8 @@ The record's `threshold` and `min_consecutive_seasons` are taken from this text,
 
 - A season is in an El Nino (La Nina) episode when it belongs to a run of at least `min_consecutive_seasons` consecutive overlapping seasons whose ANOM is at or above `+threshold` (at or below `-threshold`). "Met" is read as at or beyond the threshold, on the two-decimal ANOM of the data file.
 - Agricultural year Y begins at the declared start month of calendar year Y (C5.3). The season that decides it is the three-month season centred on the month six months after the start month (R6 of the loop decisions; for start month 7 that is DJF of Y+1). Its episode state is the kind of the year: `el_nino`, `la_nina`, else `neutral`. The season used is in the result.
-- A year whose deciding season, or a season needed to judge its run, is not in the record is missing `NOT_AVAILABLE` with a detail. Nothing is guessed.
+- A year whose deciding season, or a season needed to judge its run, is not in the record is missing `NO_COVERAGE` with a detail (C3.2, C5.5). Nothing is guessed.
+- The record is checked when classifying: `threshold` a finite number > 0, `min_consecutive_seasons` an integer >= 1, no duplicated (season, year) row and no unknown season name; otherwise `ValueError` naming the field or row. `start_month` must be an integer 1..12 (not a bool).
 - `count_kinds` gives the number of years of each kind, or `None` for every kind when any year is missing.
 
 ## Signature
