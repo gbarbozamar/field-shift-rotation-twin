@@ -468,7 +468,8 @@ class PairCellCount(ContractModel):
 
 # PROPOSED: the state names of D88, with the name D97 adds. "Not evaluated" is
 # not among them: by D85 a pair whose differences all lack a value has no
-# state (README.md, OPEN, K1).
+# state. D151 of issue #77 decides that "Not evaluated" is the absence of a
+# state, not a state name (README.md, K1, resolved).
 StateName = Literal[
     "Identical",
     "Not separated: uncertainty missing",
