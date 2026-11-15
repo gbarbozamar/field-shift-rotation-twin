@@ -127,13 +127,17 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "order between systems [E2]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
+- Definition (PROPOSED by a research AI session; logic DECIDED under D161 by [D225](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893024804), 15 November 2026): Input: a hand-made `ResultsTable` (`contracts/results/`) of `soil_loss` for two or more rotations, and a hand-made expected order of those rotations, best first; all labelled example data. The function orders the rotations, per scenario and phase (D166), by the mean over agricultural years of `soil_loss`, read in the direction of the row (C1.1), ignoring ranges (the reading of D0, `trivial_orders` of `validation/trivial_comparator.py`, called), and reports whether that order equals the expected order. Ties, missing years and a single rotation give no order, with the reason, as in D0; nothing is filled and nothing is read as zero. The report states how many rotations were ordered. The test checks that (a) on the hand-made inputs the function returns the order counted by hand, and (b) the report states, per scenario and phase, whether it equals the expected order. Pass: (a) and (b) hold.
+- What it does not do: it does not say which order is right on real data; the expected order on real data is OPEN.
+- Known limit: with the single declared `C` of D125 every rotation has the same `soil_loss` (D158), so on real data the report can only state that the full method gives no order. D213 found no per-rotation `C`; the published comparison it cites is for other rotations and soils and is usable only as text.
+- OPEN, for the lead developer: the expected order on real data and its source (a person transcribes and signs it, D34, D66); which systems it covers. Also, listed with their options in `validation/order_between_systems.py`: an expected order that does not name the same rotations as the table for a scenario (as built, that scenario is not compared, with the reason); one expected order for every scenario and phase (as built), or one per scenario or phase.
+- Test: `validation/test_order_between_systems.py`, on example data written by hand: the order counted by hand, which is the order of `trivial_orders`; an equal and a different expected order; each scenario and phase compared on its own; the D158 tie (every rotation the same `soil_loss`); a missing year; a single rotation; a scenario without `soil_loss`; other indicators not read; an expected order naming a rotation the table lacks, and one lacking a rotation the table holds, not compared; a malformed expected order or table refused.
+- Expected value: the outcome stated as logic in the definition. Any order that a test compares is read off the hand-made inputs by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: orders and counts are compared exactly.
+- Source: CITATION NEEDED (for the expected order on real data)
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED under D161 (D225); acceptance by a science reviewer pending
 
 ### E3
 
