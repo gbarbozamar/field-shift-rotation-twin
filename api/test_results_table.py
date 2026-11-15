@@ -220,12 +220,14 @@ def test_a_part_whose_engine_is_not_built_gives_no_table(part):
 
 
 def test_runs_that_do_not_hold_the_same_cells_give_no_table():
+    # The example carries water by agricultural year (D157, D163); the other
+    # run carries it as one value for the whole rotation, so the cells differ.
     other = copy.deepcopy(EXAMPLE)
-    template = other["water_deficit_exposure"][0]
-    other["water_deficit_exposure"] = [
-        {**template, "time_basis": "ag_year", "ag_year": year["ag_year"]}
-        for year in other["soil_loss"]["annual"]
-    ]
+    assert {i["time_basis"] for i in other["water_deficit_exposure"]} == {"ag_year"}
+    template = {
+        k: v for k, v in other["water_deficit_exposure"][0].items() if k != "ag_year"
+    }
+    other["water_deficit_exposure"] = [{**template, "time_basis": "rotation"}]
     answer = build(run_of(result(FIRST)), run_of(result(SECOND, other)))
     assert answer.table is None
     assert answer.missing.reason == "NOT_COMPUTABLE"
