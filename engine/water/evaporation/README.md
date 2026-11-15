@@ -39,8 +39,9 @@ The cases in which FAO-56 allows the omission are not transcribed here (OPEN 4).
 | File | What it holds |
 |---|---|
 | `__init__.py` | Exports the public names below |
-| `surface_layer.py` | The intermediate quantities, `step`, `run_surface_layer`, and the records `DayInput`, `DayResult`, `UpperLimitClimateConstants` |
-| `test_surface_layer.py` | The PROPOSED cases below |
+| `surface_layer.py` | The intermediate quantities, `step`, `run_surface_layer`, `early_wetting_step`, and the records `DayInput`, `DayResult`, `EarlyWettingResult`, `UpperLimitClimateConstants` |
+| `test_surface_layer.py` | The PROPOSED cases below and `test_fao56_chapter_7_worked_example` |
+| `test_early_wetting.py` | Unit, boundary, `Missing`, fixture-gate, ledger closure, and sensitivity tests for `early_wetting_step` |
 
 The only contract model used is `Missing`, imported as `contracts.results.models.Missing`, the class `engine/water/balance/` uses. No new missing shape is defined.
 
@@ -59,13 +60,25 @@ Each function returns a number, or a `Missing` with its reason (C3.1). All are p
 | `evaporation_coefficient` | `Ke` | `min(Kr · (Kc_max − Kcb), few · Kc_max)` | OPEN |
 | `step` | One day of the surface-layer balance | rules R1 to R6 below | OPEN |
 | `run_surface_layer` | `step` over consecutive days, never resetting the depletion | | |
+| `early_wetting_step` | One day with early wetting (`de_after_wetting`) before `Kr` | net rain + `irrigation_field / fw` refills `depletion_carried` before `step` (`day.precipitation = day.runoff = 0`) | Example 35 accepted surface-layer method |
 
 ```text
 step(depletion_start, day, *, total_evaporable_water, readily_evaporable_water,
      wetted_fraction, margin_above_basal) -> DayResult
 run_surface_layer(days, *, initial_depletion, total_evaporable_water,
      readily_evaporable_water, wetted_fraction, margin_above_basal) -> list[DayResult]
+early_wetting_step(depletion_carried, day, *, net_rain, irrigation_field,
+     total_evaporable_water, readily_evaporable_water, wetted_fraction,
+     margin_above_basal) -> EarlyWettingResult
 ```
+
+#### Early wetting (`early_wetting_step` and `EarlyWettingResult`)
+
+`early_wetting_step` implements the `de_after_wetting` daily ordering accepted by `gbarbozamar` (`2026-11-15T19:29:54.249639+00:00`, `results_seen_before_acceptance: true`, `full_ep3_reproduction: false`) for FAO-56 Chapter 7 Example 35, while preserving existing `step`, `run_surface_layer`, and `D185` in `engine/water/exposure.py` untouched:
+
+1. `net_rain` and `irrigation_field` (divided by `wetted_fraction`, which must lie in `(0, 1]`) refill `depletion_carried` (`[0, TEW]`; out-of-range `D185` carry-over above `TEW` raises `ValueError`), producing `depletion_after_wetting` and `deep_percolation_early`.
+2. `step` is called as an evaporation-only substep (`day.precipitation == 0`, `day.runoff == 0`), evaluating `Kr` on `depletion_after_wetting`.
+3. `EarlyWettingResult` returns `depletion_carried`, `depletion_after_wetting`, `irrigation_field`, `irrigation_wetted`, `net_rain`, `deep_percolation_early`, and `evaporation_substep` (`DayResult`), closing `(evaporation_substep.depletion_end - depletion_carried) = -(net_rain + irrigation_wetted) + deep_percolation_early + evaporation_substep.deep_percolation + evaporation_substep.evaporation_from_exposed_fraction`.
 
 ### Inputs of a day (`DayInput`)
 
@@ -207,11 +220,11 @@ The identifier of a case is the name of its test function without `test_`, with 
 | `same-arguments-give-the-same-result-and-are-not-changed` | G1 |
 | `the-module-holds-no-number-other-than-zero-and-one` | `surface_layer.py` holds no constant of the method |
 
-### Skipped, waiting for people
+### Reference worked example (FAO-56 Chapter 7, Example 35)
 
-| Case | What it waits for |
+| Case | Status |
 |---|---|
-| `fao56-chapter-7-worked-example` | The worked example of FAO-56 chapter 7 on soil evaporation (example number OPEN): its inputs, intermediate results (`Kr`, `Kc_max`, `few`, `Ke`, the depletion of each day), final value and tolerance, transcribed from the manual with reference, locator, verbatim text and date read, and checked by a person (D34) |
+| `fao56-chapter-7-worked-example` | Unskipped and active against `validation/fixtures/fao56_example35_surface_layer.json` (Example 35 corrected Feb 2006; signed by `gbarbozamar` and accepted for surface-only scope with `results_seen_before_acceptance: true`, `full_ep3_reproduction: false`). Verifies all 120/120 cells (12 columns × 10 days) within half-last-digit tolerance and daily ledger closure `<= 1e-12` via `early_wetting_step`. Existing `step`, `run_surface_layer`, and EP3 (`exposure.py`) remain preserved unchanged. |
 
 ## OPEN
 
@@ -219,7 +232,7 @@ Each question names the role that answers it.
 
 1. **The forms and their source.** Every form in the table of functions, and the equation numbers, are to be checked against FAO-56 chapter 7 and cited (CITATION NEEDED). *Science reviewers; lead developer (D44).* **On `main`:** `ATTRIBUTIONS.md` has the row for Allen et al. (1998), FAO-56 (#308), and #417 signed parameter records with FAO-56 chapter 7 locators (e.g. Eq. 72 for the upper limit) under D34; checking every form and equation number in `surface_layer.py` against chapter 7, and deciding reuse terms in `ATTRIBUTIONS.md`, remain open.
 2. **Which `Ke` goes to the balance when the surface layer runs short.** `evaporation_coefficient` is `Ke` of the method. On a day with `evaporation_shortfall > 0` the balance, taking that `Ke`, asks for `Ke · ET0`, more than the surface layer supplied, and takes it from the whole column. Pass `Ke` as here, pass `evaporation / ET0` (undefined when `ET0` is zero), or have the balance take the evaporation itself? This changes `balance/` or EP3, out of this unit. *Lead developer; science reviewers.* **On `main`:** EP3 (#165) passes `Ke` unchanged on crop days and on fallow days below `TEW`; on a day with no crop whose step starts at reduced `TEW` (D185, #301), `exposure.py` passes the coefficient of the evaporation the layer supplied (zero while the layer stays at its limit). The general rule on crop days with `evaporation_shortfall > 0` remains open.
-3. **Order within a day (R3) and the depletion `Kr` follows (R4).** Here `Kr` uses the depletion before the day's rain, so a storm on a dry day does not raise that day's `Kr`. *Science reviewers.*
+3. **Order within a day (R3) and the depletion `Kr` follows (R4).** Here `step` uses the depletion before the day's rain, so a storm on a dry day does not raise that day's `Kr`. *Science reviewers.* **On this branch:** `early_wetting_step` provides the `de_after_wetting` ordering accepted for FAO-56 Example 35 (`results_seen_before_acceptance: true`, `full_ep3_reproduction: false`), while `step`, `run_surface_layer`, and EP3 (`exposure.py`, including D185) remain preserved unchanged.
 4. **Transpiration from the surface layer.** Decided by D82 (PC-5): `Tew` is left out and the omission is a declared limit ([Declared limit: `Tew` left out](#declared-limit-tew-left-out)). Still open: the cases in which FAO-56 allows the omission, read at the locator of Eq. 77 and checked by a person (D34); whether the full Eq. 77 is built later (the other option of finding 6), which would need the transpiration split between the surface layer and the rest of the root zone, and so a change to `balance/` or EP3; and whether the omission changes a comparison of rotations, for instance in a sensitivity run. *Science reviewers; lead developer.*
 5. **How the cover-fraction exponent follows the crop height**, and whether `fc` comes observed or from `Kcb`. The caller supplies the exponent and the cover fraction. *Science reviewers; lead developer.* **On `main`:** EP3 computes `fc` from `Kcb` on crop days using `cover_fraction_exponent` (signed for `soybean` in #417; unsigned for `wheat` and `maize`) and reads `cover_fraction` directly from a `no_crop` record on fallow and tail days (D110, #226, #236, #417). Whether the exponent should follow crop height or `fc` be observed remains open.
 6. **Limits the method may set** on `fc`, on `1 − fc`, on a `Kcb` below `Kc_min`, or on `TEW` (R8). The module clips nothing and reports `NOT_COMPUTABLE` instead. *Science reviewers.*

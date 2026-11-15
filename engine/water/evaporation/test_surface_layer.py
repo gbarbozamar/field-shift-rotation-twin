@@ -14,8 +14,10 @@ import ast
 import dataclasses
 import datetime
 import inspect
+import json
 import math
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -30,9 +32,11 @@ from engine.water.evaporation import (
     RESULT_QUANTITIES,
     DayInput,
     DayResult,
+    EarlyWettingResult,
     UpperLimitClimateConstants,
     climate_adjusted_upper_limit,
     cover_fraction_from_basal_coefficient,
+    early_wetting_step,
     evaporation_coefficient,
     evaporation_reduction_coefficient,
     exposed_and_wetted_fraction,
@@ -41,6 +45,7 @@ from engine.water.evaporation import (
     total_evaporable_water,
     upper_limit_of_crop_coefficient,
 )
+from engine.water.evaporation.surface_layer import Number
 
 # PLACEHOLDER values, plainly not real. Depths of water carry no unit here.
 TEW = 100.0  # PLACEHOLDER total evaporable water
@@ -882,17 +887,355 @@ def test_the_module_holds_no_number_other_than_zero_and_one():
 
 
 # ---------------------------------------------------------------------------
-# Skipped, waiting for people.
+# Reference worked example: FAO-56 chapter 7, Example 35 (corrected Feb 2006).
 
-
-@pytest.mark.skip(
-    reason=(
-        "Waits for the worked example of FAO-56 chapter 7 on soil evaporation "
-        "(example number OPEN): its inputs, its intermediate results (Kr, "
-        "Kc_max, few, Ke, the depletion of each day), its final value and the "
-        "tolerance, transcribed from the manual with reference, locator, "
-        "verbatim text and date read, and checked by a person (D34)."
-    )
+E35_FIXTURE_NAME = "fao56_example35_surface_layer.json"
+E35_FIXTURE = (
+    Path(__file__).resolve().parents[3] / "validation" / "fixtures" / E35_FIXTURE_NAME
 )
+E35_WAITS_FOR = (
+    f"Waits for signed and accepted FAO-56 chapter 7 Example 35 fixture "
+    f"({E35_FIXTURE_NAME}) checked by a person (D34)"
+)
+E35_CONSTANTS = (
+    "theta_fc",
+    "theta_wp",
+    "ze_m",
+    "rew_mm",
+    "initial_de_mm",
+    "h_m",
+    "u2_m_s",
+    "rhmin_percent",
+    "base",
+    "wind_coefficient",
+    "reference_wind_speed",
+    "humidity_coefficient",
+    "reference_minimum_relative_humidity",
+    "reference_crop_height",
+    "height_exponent",
+    "margin_above_basal",
+    "unit_factor",
+    "wilting_point_weight",
+)
+E35_INPUT_COLUMNS = (
+    "eto",
+    "rain_minus_runoff",
+    "irrigation_div_fw",
+    "fw",
+)
+E35_COMPARED_COLUMNS = (
+    "uncovered",
+    "few",
+    "kcb",
+    "de_start",
+    "kr",
+    "ke",
+    "evap_div_few",
+    "deep_percolation",
+    "de_end",
+    "evap",
+    "kc",
+    "etc",
+)
+E35_INTERPOLATION_KEYS = (
+    "kcb_start",
+    "kcb_end",
+    "uncovered_start",
+    "uncovered_end",
+    "days",
+)
+E35_PRINTED = re.compile(r"-?\d+(\.\d+)?")
+E35_LEDGER_TOLERANCE = 1e-12
+
+
+@dataclasses.dataclass(frozen=True)
+class E35Case:
+    """What the Example 35 check needs, read from a signed, accepted fixture."""
+
+    constants: dict[str, float]
+    interpolation: dict[str, float]
+    rows: list[dict[str, float]]
+    printed: list[dict[str, str]]
+    tolerance: dict[str, float]
+
+
+def e35_read_fixture(path: Path) -> dict:
+    fixture = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(fixture, dict), f"{path.name}: the fixture is one JSON object"
+    return fixture
+
+
+def e35_skip_reason(path: Path) -> str | None:
+    """Why the Example 35 check cannot run on ``path``, or ``None`` when it can."""
+    if not path.is_file():
+        return (
+            f"{E35_WAITS_FOR}. The file is absent, so nothing is signed (no checked_by)"
+        )
+    fixture = e35_read_fixture(path)
+    signature = fixture.get("checked_by")
+    if not (isinstance(signature, str) and signature.strip()):
+        return f"{E35_WAITS_FOR}. Not signed yet: checked_by of the file"
+    acceptance = fixture.get("method_acceptance")
+    if not isinstance(acceptance, dict):
+        return (
+            f"{E35_WAITS_FOR}. Not accepted yet: method_acceptance is absent "
+            "(no accepted_by)"
+        )
+    accepted_by = acceptance.get("accepted_by")
+    if not (isinstance(accepted_by, str) and accepted_by.strip()):
+        return (
+            f"{E35_WAITS_FOR}. Not accepted yet: method_acceptance.accepted_by "
+            "is missing"
+        )
+    if acceptance.get("early_wetting_option") != "ACCEPTED_BY_USER":
+        return (
+            f"{E35_WAITS_FOR}. Not accepted yet: method_acceptance."
+            "early_wetting_option is not ACCEPTED_BY_USER"
+        )
+    return None
+
+
+def e35_half_unit(printed: str) -> float:
+    """Half a unit of the last digit the example prints."""
+    assert E35_PRINTED.fullmatch(printed), f"'{printed}' is not a printed number"
+    return 0.5 * 10.0 ** -len(printed.partition(".")[2])
+
+
+def _e35_number(entry: object, where: str) -> tuple[float, str | None]:
+    assert isinstance(entry, dict), f"{where}: expected an object with 'value'"
+    value = entry.get("value")
+    assert isinstance(value, (int, float)) and not isinstance(value, bool), (
+        f"{where}: 'value' must be a number"
+    )
+    assert math.isfinite(value), f"{where}: 'value' must be finite"
+    printed = entry.get("printed")
+    if printed is not None:
+        assert isinstance(printed, str), f"{where}: 'printed' is text"
+        assert float(printed) == value, (
+            f"{where}: 'value' is not the number of 'printed'"
+        )
+    return float(value), printed
+
+
+def e35_load_case(fixture: dict) -> E35Case:
+    """Load a signed Example 35 fixture; a malformed fixture fails, never skips."""
+    const_entry = fixture.get("constants")
+    assert isinstance(const_entry, dict), "'constants' must be an object"
+    assert set(const_entry) == set(E35_CONSTANTS), (
+        f"'constants' must hold exactly {E35_CONSTANTS}"
+    )
+    constants = {
+        name: _e35_number(const_entry[name], f"constants.{name}")[0]
+        for name in E35_CONSTANTS
+    }
+
+    interp_entry = fixture.get("interpolation")
+    assert isinstance(interp_entry, dict), "'interpolation' must be an object"
+    assert set(interp_entry) == set(E35_INTERPOLATION_KEYS), (
+        f"'interpolation' must hold exactly {E35_INTERPOLATION_KEYS}"
+    )
+    interpolation = {}
+    for key in E35_INTERPOLATION_KEYS:
+        val = interp_entry[key]
+        assert isinstance(val, (int, float)) and not isinstance(val, bool), (
+            f"interpolation.{key}: must be a number"
+        )
+        assert math.isfinite(val), f"interpolation.{key}: must be finite"
+        interpolation[key] = float(val)
+
+    rows_entry = fixture.get("rows")
+    assert isinstance(rows_entry, list) and rows_entry, "'rows' must be a list of days"
+    assert int(interpolation["days"]) == len(rows_entry), (
+        "interpolation.days must match len(rows)"
+    )
+    assert len(rows_entry) >= 2, "Example 35 requires at least 2 days for interpolation"
+
+    all_cols = (*E35_INPUT_COLUMNS, *E35_COMPARED_COLUMNS)
+    rows, printed = [], []
+    for index, row in enumerate(rows_entry, start=1):
+        assert isinstance(row, dict), f"rows[{index}]: every row is an object"
+        assert row.get("day") == index, f"rows[{index}]: days are 1, 2, 3 ... in order"
+        assert set(row) == {"day", *all_cols}, f"rows[{index}]: must hold {all_cols}"
+        values, texts = {}, {}
+        for name in all_cols:
+            values[name], texts[name] = _e35_number(row[name], f"rows[{index}].{name}")
+            assert texts[name] is not None, (
+                f"rows[{index}].{name}: 'printed' is required"
+            )
+        rows.append(values)
+        printed.append(texts)
+
+    tolerance = fixture.get("tolerance")
+    assert isinstance(tolerance, dict), "'tolerance' must be an object"
+    assert set(tolerance) == set(E35_COMPARED_COLUMNS), (
+        f"'tolerance' needs one entry per {E35_COMPARED_COLUMNS}"
+    )
+    return E35Case(
+        constants=constants,
+        interpolation=interpolation,
+        rows=rows,
+        printed=printed,
+        tolerance=tolerance,
+    )
+
+
+def e35_tolerance_problems(case: E35Case) -> list[str]:
+    """Each tolerance of the fixture that is not the half-last-digit rule."""
+    problems = []
+    for name, given in case.tolerance.items():
+        for day_num, texts in enumerate(case.printed, start=1):
+            rule = e35_half_unit(texts[name])
+            if (
+                not isinstance(given, (int, float))
+                or isinstance(given, bool)
+                or abs(given - rule) > E35_LEDGER_TOLERANCE
+            ):
+                problems.append(
+                    f"tolerance.{name} is {given!r}; half-last-digit gives {rule!r} "
+                    f"for the printed '{texts[name]}' of day {day_num}"
+                )
+    return problems
+
+
+def e35_run(case: E35Case) -> tuple[list[EarlyWettingResult], list[dict[str, Number]]]:
+    """Run Example 35 through ``early_wetting_step`` with full-precision interpolation."""
+    c = case.constants
+    interp = case.interpolation
+    climate = climate_adjusted_upper_limit(
+        c["u2_m_s"],
+        c["rhmin_percent"],
+        c["h_m"],
+        constants=UpperLimitClimateConstants(
+            base=c["base"],
+            wind_coefficient=c["wind_coefficient"],
+            reference_wind_speed=c["reference_wind_speed"],
+            humidity_coefficient=c["humidity_coefficient"],
+            reference_minimum_relative_humidity=c[
+                "reference_minimum_relative_humidity"
+            ],
+            reference_crop_height=c["reference_crop_height"],
+            height_exponent=c["height_exponent"],
+        ),
+    )
+    tew = total_evaporable_water(
+        c["theta_fc"],
+        c["theta_wp"],
+        c["ze_m"],
+        wilting_point_weight=c["wilting_point_weight"],
+        unit_factor=c["unit_factor"],
+    )
+
+    step_results: list[EarlyWettingResult] = []
+    computed_rows: list[dict[str, Number]] = []
+    carried = c["initial_de_mm"]
+    span = interp["days"] - 1.0
+    for day_index, row in enumerate(case.rows):
+        ratio = day_index / span
+        kcb = interp["kcb_start"] + ratio * (interp["kcb_end"] - interp["kcb_start"])
+        uncovered = interp["uncovered_start"] + ratio * (
+            interp["uncovered_end"] - interp["uncovered_start"]
+        )
+        fw = row["fw"]
+        irrigation_field = row["irrigation_div_fw"] * fw
+        day_input = DayInput(
+            date=START + datetime.timedelta(days=day_index),
+            precipitation=0.0,
+            runoff=0.0,
+            reference_evapotranspiration=row["eto"],
+            basal_crop_coefficient=kcb,
+            cover_fraction=1.0 - uncovered,
+            climate_adjusted_upper_limit=climate,
+        )
+        res = early_wetting_step(
+            carried,
+            day_input,
+            net_rain=row["rain_minus_runoff"],
+            irrigation_field=irrigation_field,
+            total_evaporable_water=tew,
+            readily_evaporable_water=c["rew_mm"],
+            wetted_fraction=fw,
+            margin_above_basal=c["margin_above_basal"],
+        )
+        sub = res.evaporation_substep
+        step_results.append(res)
+        if isinstance(sub.evaporation_coefficient, Missing):
+            kc: Number = sub.evaporation_coefficient
+            etc: Number = sub.evaporation_coefficient
+        else:
+            kc = kcb + sub.evaporation_coefficient
+            etc = kc * row["eto"]
+        if isinstance(res.deep_percolation_early, Missing) or isinstance(
+            sub.deep_percolation, Missing
+        ):
+            deep_perc: Number = res.deep_percolation_early
+        else:
+            deep_perc = res.deep_percolation_early + sub.deep_percolation
+        computed_rows.append(
+            {
+                "uncovered": uncovered,
+                "few": sub.exposed_and_wetted_fraction,
+                "kcb": kcb,
+                "de_start": res.depletion_after_wetting,
+                "kr": sub.reduction_coefficient,
+                "ke": sub.evaporation_coefficient,
+                "evap_div_few": sub.evaporation_from_exposed_fraction,
+                "deep_percolation": deep_perc,
+                "de_end": sub.depletion_end,
+                "evap": sub.evaporation,
+                "kc": kc,
+                "etc": etc,
+            }
+        )
+        carried = sub.depletion_end
+    return step_results, computed_rows
+
+
+def e35_comparison_failures(case: E35Case) -> list[str]:
+    """Each printed cell missed by more than its half-last-digit tolerance or ledger failure."""
+    step_results, computed_rows = e35_run(case)
+    failures: list[str] = []
+    for day_num, (res, computed, expected, texts) in enumerate(
+        zip(step_results, computed_rows, case.rows, case.printed), start=1
+    ):
+        sub = res.evaporation_substep
+        for name in E35_COMPARED_COLUMNS:
+            value = computed[name]
+            if isinstance(value, Missing):
+                failures.append(f"day {day_num}, {name}: not computed ({value.reason})")
+                continue
+            tolerance = e35_half_unit(texts[name])
+            if value != pytest.approx(expected[name], abs=tolerance, rel=0):
+                failures.append(
+                    f"day {day_num}, {name}: computed {value!r}, expected "
+                    f"{expected[name]!r} within {tolerance!r}"
+                )
+        if not isinstance(sub.depletion_end, Missing) and not isinstance(
+            res.depletion_carried, Missing
+        ):
+            ledger_residual = (
+                (sub.depletion_end - res.depletion_carried)
+                + res.net_rain
+                + res.irrigation_wetted
+                - (res.deep_percolation_early + sub.deep_percolation)
+                - sub.evaporation_from_exposed_fraction
+            )
+            if abs(ledger_residual) > E35_LEDGER_TOLERANCE:
+                failures.append(
+                    f"day {day_num}, ledger: residual {ledger_residual!r} exceeds "
+                    f"{E35_LEDGER_TOLERANCE!r}"
+                )
+    return failures
+
+
+def run_e35(path: Path) -> list[str]:
+    """Every problem of the Example 35 check on the signed, accepted fixture."""
+    case = e35_load_case(e35_read_fixture(path))
+    return e35_tolerance_problems(case) + e35_comparison_failures(case)
+
+
 def test_fao56_chapter_7_worked_example():
-    raise AssertionError("not written until the values exist")
+    reason = e35_skip_reason(E35_FIXTURE)
+    if reason is not None:
+        pytest.skip(reason)
+    problems = run_e35(E35_FIXTURE)
+    assert not problems, "\n".join(problems)
