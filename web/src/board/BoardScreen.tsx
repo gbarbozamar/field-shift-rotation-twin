@@ -2,7 +2,7 @@ import { useMemo, useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
 import { QueryClient, useQuery } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
-import { missingPatternText } from '../components/ValueDisplay'
+import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import type { ExampleField } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
@@ -70,9 +70,24 @@ export function initialBoardState(): PlantScreenState {
 
 function ignore() {}
 
+/** The heading of a step of the plan: its number and what it is. */
+function StepTitle({ n, title, children = null }: { n: number; title: string; children?: ReactNode }) {
+  return (
+    <div className="mb-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+      <h3 data-testid="board-step" className="flex items-center gap-2 text-xl font-bold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fs-text font-mono text-xs text-fs-surface">
+          {n}
+        </span>
+        {title}
+      </h3>
+      {children}
+    </div>
+  )
+}
+
 function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; selectedFieldId: string | null }) {
   return (
-    <ul data-testid="board-fields" className="mt-3 grid gap-2">
+    <ul data-testid="board-fields" className="grid gap-2 sm:grid-cols-3">
       {fields.map((field) => {
         const described = field.field_id === REQUEST_FIELD_ID
         return (
@@ -147,34 +162,56 @@ function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: Rai
   // The sources an answer lacks are its root reason: said once, in the notice.
   const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
   return (
-    <div className="space-y-4">
-      <AnswerBanner
-        answer={answer}
-        label={chosen !== null ? cropsText(info(chosen).strip) : null}
-        showWhy={!lacksSources}
-        against={againstText}
-      />
-      {rainStress !== null ? (
-        <RainEcho part={rainStress} />
-      ) : null}
-      {answer.chosen === null ? (
-        <SourcesNotice answer={answer} />
-      ) : null}
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h3 className="text-xl font-bold">{strings['board.compare.title']}</h3>
-        <SortPicker sort={sort} onSort={setSort} />
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <AnswerBanner
+          answer={answer}
+          label={chosen !== null ? cropsText(info(chosen).strip) : null}
+          showWhy={!lacksSources}
+          against={againstText}
+        />
+        {rainStress !== null ? (
+          <RainEcho part={rainStress} />
+        ) : null}
+        {answer.chosen === null ? (
+          <SourcesNotice answer={answer} />
+        ) : null}
       </div>
-      <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} />
-      <div className="grid gap-4 xl:grid-cols-2">
-        <PriceTrackPanel tipping={answer.tipping_price} nameOf={nameOf} />
-        <RecordRibbon record={answer.kinds_of_year} marginOf={answer.margin_of} />
+      <div>
+        <StepTitle n={3} title={strings['board.compare.title']}>
+          <SortPicker sort={sort} onSort={setSort} />
+        </StepTitle>
+        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} />
+        <div className="mt-2">
+          <CropLegend order={order} />
+        </div>
       </div>
-      <AnswerLimits answer={answer} />
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-        <CropLegend order={order} />
-        <a data-testid="board-report" href="#/plant" className="text-sm font-semibold text-fs-primary underline">
-          {strings['board.report']}
-        </a>
+      <div>
+        <StepTitle n={4} title={strings['board.step.holds']} />
+        <div className="grid gap-4 xl:grid-cols-2">
+          <PriceTrackPanel tipping={answer.tipping_price} nameOf={nameOf} />
+          <RecordRibbon record={answer.kinds_of_year} marginOf={answer.margin_of} />
+        </div>
+      </div>
+      <div>
+        <StepTitle n={5} title={strings['board.step.keep']} />
+        <AnswerLimits answer={answer} />
+        <div className="mt-3 flex flex-wrap gap-3">
+          <a
+            data-testid="board-print"
+            href="#/print"
+            className="inline-flex min-h-11 items-center rounded-lg bg-fs-primary px-4 font-semibold text-white"
+          >
+            {strings['print.open_link']}
+          </a>
+          <a
+            data-testid="board-report"
+            href="#/plant"
+            className="inline-flex min-h-11 items-center rounded-lg border border-fs-border bg-fs-surface px-4 font-semibold text-fs-primary"
+          >
+            {strings['board.report']}
+          </a>
+        </div>
       </div>
     </div>
   )
@@ -239,6 +276,8 @@ export function BoardView({
   service,
   dispatch = ignore,
   map = null,
+  mapOpen = true,
+  onToggleMap,
 }: {
   selectedFieldId: string | null
   state: PlantScreenState
@@ -246,9 +285,13 @@ export function BoardView({
   service: ServicePhase | null
   dispatch?: (action: PlantAction) => void
   map?: ReactNode
+  /** Whether the map is shown; the list of the fields is always shown. */
+  mapOpen?: boolean
+  /** Given when the map can be shown or hidden. */
+  onToggleMap?: () => void
 }) {
   return (
-    <section aria-labelledby="board-title" className="mx-auto max-w-[110rem]">
+    <section aria-labelledby="board-title" className="mx-auto max-w-[100rem] space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div>
           <h2 id="board-title" className="text-4xl font-extrabold leading-tight">
@@ -263,7 +306,42 @@ export function BoardView({
         ) : null}
       </div>
 
-      <div className="mt-4">
+      <div>
+        <StepTitle n={1} title={strings['board.step.field']}>
+          {onToggleMap !== undefined ? (
+            <button
+              type="button"
+              data-testid="board-map-toggle"
+              aria-expanded={mapOpen}
+              className="min-h-9 cursor-pointer rounded-lg border border-fs-border bg-fs-surface px-3 text-sm font-semibold"
+              onClick={onToggleMap}
+            >
+              {strings[mapOpen ? 'board.map.hide' : 'board.map.show']}
+            </button>
+          ) : null}
+        </StepTitle>
+        <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <FieldList fields={exampleCase.fields} selectedFieldId={selectedFieldId} />
+          {REQUEST_LIMIT !== null ? (
+            <div data-testid="board-your-limit" className="rounded-xl border-2 border-fs-text bg-fs-surface px-4 py-2">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.limit.yours']}</p>
+              <p className="tabular-nums">
+                <span className="font-fs-heading text-2xl font-extrabold leading-none">{displayNumber(REQUEST_LIMIT.value)}</span>{' '}
+                <span className="text-xs text-fs-muted">{REQUEST_LIMIT.unit}</span>
+              </p>
+              <p className="text-[11px] text-fs-muted">{strings['plant.declared']}</p>
+            </div>
+          ) : null}
+        </div>
+        {mapOpen && map !== null ? (
+          <div data-testid="board-map" className="mt-3">
+            {map}
+          </div>
+        ) : null}
+      </div>
+
+      <div>
+        <StepTitle n={2} title={strings['board.step.scenario']} />
         <BoardControls
           marginOf={state.marginOf}
           strictness={state.strictness}
@@ -277,18 +355,9 @@ export function BoardView({
         />
       </div>
 
-      <div className="mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="lg:sticky lg:top-4">
-          <h3 className="mb-2 text-xl font-bold">{strings['map.title']}</h3>
-          {map}
-          <FieldList fields={exampleCase.fields} selectedFieldId={selectedFieldId} />
-        </div>
-        <div className="min-w-0">
-          <BoardSide selectedFieldId={selectedFieldId} apiBase={apiBase} service={service} />
-        </div>
-      </div>
+      <BoardSide selectedFieldId={selectedFieldId} apiBase={apiBase} service={service} />
 
-      <p data-testid="board-disclaimer" className="mt-6 text-xs text-fs-muted">
+      <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
         {strings['disclaimer.full']}
       </p>
     </section>
@@ -311,6 +380,10 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
     plantScreenQueryOptions(apiBase, request),
     apiBase === null ? NO_SERVICE_CLIENT : undefined,
   )
+  // The map opens the screen and steps aside once a field is picked, unless
+  // the user shows or hides it: then their choice stays.
+  const [mapChoice, setMapChoice] = useState<boolean | null>(null)
+  const mapOpen = mapChoice ?? selectedFieldId === null
   return (
     <BoardView
       selectedFieldId={selectedFieldId}
@@ -319,6 +392,8 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       service={request === null ? null : servicePhaseOf(query)}
       dispatch={dispatch}
       map={<FieldsMap />}
+      mapOpen={mapOpen}
+      onToggleMap={() => setMapChoice(!mapOpen)}
     />
   )
 }

@@ -559,3 +559,53 @@ describe('the other orders, ties and the worst kind of year (7)', () => {
     }
   })
 })
+
+describe('the steps of the plan (8)', () => {
+  it('the limit the request declares is shown as the user\'s own, with its unit and its declared mark', () => {
+    const tile = after(view(null, null), 'board-your-limit').split('</div>')[0]
+    const limit = rawRequest.soil_loss_limit
+    expect(visibleText(`<${tile}`)).toContain(strings['board.limit.yours'])
+    expect(visibleText(`<${tile}`)).toContain(`${displayNumber(limit.value)} ${limit.unit}`)
+    expect(visibleText(`<${tile}`)).toContain(strings['plant.declared'])
+  })
+
+  it('before an answer: the steps of the field and of the scenario; with an answer, all five in order', () => {
+    const steps = (html: string) =>
+      html.split('data-testid="board-step"').slice(1).map((part) => visibleText(`<${part.split('</h3>')[0]}`))
+    expect(steps(view(null, null))).toEqual([`1 ${strings['board.step.field']}`, `2 ${strings['board.step.scenario']}`])
+    expect(steps(view(FIELD, answered(example)))).toEqual([
+      `1 ${strings['board.step.field']}`,
+      `2 ${strings['board.step.scenario']}`,
+      `3 ${strings['board.compare.title']}`,
+      `4 ${strings['board.step.holds']}`,
+      `5 ${strings['board.step.keep']}`,
+    ])
+  })
+
+  it('the map is shown when open and left out when hidden; the list of the fields stays', () => {
+    const map = <div data-testid="map-stand-in" />
+    const render = (mapOpen: boolean) =>
+      renderToString(
+        <BoardView
+          selectedFieldId={FIELD}
+          state={initialBoardState()}
+          apiBase={BASE}
+          service={answered(example)}
+          map={map}
+          mapOpen={mapOpen}
+          onToggleMap={() => {}}
+        />,
+      )
+    expect(count(render(true), 'data-testid="map-stand-in"')).toBe(1)
+    expect(count(render(false), 'data-testid="map-stand-in"')).toBe(0)
+    expect(count(render(false), 'data-testid="board-fields"')).toBe(1)
+    expect(visibleText(after(render(true), 'board-map-toggle').split('</button>')[0])).toContain(strings['board.map.hide'])
+    expect(visibleText(after(render(false), 'board-map-toggle').split('</button>')[0])).toContain(strings['board.map.show'])
+  })
+
+  it('keeping the plan links to the printable sheet and to the full report', () => {
+    const html = view(FIELD, answered(example))
+    expect(after(html, 'board-print').split('>')[0]).toContain('href="#/print"')
+    expect(after(html, 'board-report').split('>')[0]).toContain('href="#/plant"')
+  })
+})

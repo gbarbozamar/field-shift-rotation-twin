@@ -359,7 +359,14 @@ export const strings = {
   // banner of the answer, the soil loss of a kind of year, the price track
   // and the link to the screen with every detail line. Wording is a person's
   // decision; the operator approves it.
-  'board.title': 'Rotation board',
+  'board.title': 'Plan this field',
+  'board.step.field': 'Field',
+  'board.step.scenario': 'Scenario',
+  'board.step.holds': 'How far the answer holds',
+  'board.step.keep': 'Keep the plan',
+  'board.map.show': 'Show the map',
+  'board.map.hide': 'Hide the map',
+  'board.limit.yours': 'Your soil-loss limit',
   'board.rotations': 'Rotations',
   'board.field.ready': 'Rotations declared',
   'board.hud.year': 'Kind of year',
@@ -381,7 +388,7 @@ export const strings = {
   'board.price.holds_to': 'same answer all the way to {price} {unit}',
   'board.price.unknown': 'not computed',
   'board.report': 'Open the full report',
-  'board.compare.title': 'Options side by side',
+  'board.compare.title': 'The options, side by side',
   'board.option': 'Option {letter}',
   'board.cycle': '{n}-year cycle',
   'board.crops_join': ' → ',
