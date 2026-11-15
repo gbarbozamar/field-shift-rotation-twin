@@ -339,7 +339,7 @@ Each item is a question a person answers; the role that answers it is named. Non
 ## Not verified
 
 - **The forms against the source document.** The session read no RothC source, by rule; the forms are the person transcription of issue #176, checked under D63/D134.
-- **The runner calling EP6.** The runner does not discover EP6 yet (OPEN 9). With this unit, `api/test_engines.py::test_the_carbon_engines_written_not_built_do_not_exist_yet[EP6]` fails, as that test's own comment prescribes ("when one lands, this fails: the runner must then discover and call it, a unit of lane L2a"); the runner unit removes it, and this folder does not touch `api/`.
+- **The runner calling EP6.** The runner does not call EP6 yet (OPEN 9). The earlier by-design failure of `api/test_engines.py` was resolved by the tripwire of #272 (a lane exception of the lead developer), which replaced it with `test_the_carbon_engines_the_runner_does_not_call_say_so` — a test that holds whether or not `engine.rothc.run_rothc` exists and states that the runner does not call it yet. The wiring stays owed by lane L2a; this folder does not touch `api/`.
 - **The parameter records.** `params/records/` holds none; the tests build in-memory records from the transcribed values.
 - **Lint.** No ruff is installed in this session's environment; CI lints `api/`, `adapters/` and `ci/` only, and this session checked imports and line lengths by hand against the practice of `engine/amg/`.
 - **The names scan of CI** (the list of forbidden names is a secret).
