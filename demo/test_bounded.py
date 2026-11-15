@@ -2,41 +2,71 @@
 l2/bounded-matrix-decision, issue #269).
 
 The case under test is the one the producer approved on 15 November 2026:
-the three rotation templates of D72 at the two residue-cover levels of
-D115, every cell coming from the real-or-missing rule — a real engine
-result where an engine runs, missing with its reason where none does, and
-no hand-made value anywhere. The check that decided the cells (the brief
-asks for it) is part of what these tests pin: the repository holds no
-climate record of the demonstration point, the one committed recorded
-response is the ocean-point evidence of D17 and D32, and ``api/`` tests
-work through placeholders, so no real EP1, EP3 or EP5 output is
-obtainable in the demo and every cell is missing ``NOT_AVAILABLE``, "the
-engine's real outputs are not wired to the demo yet".
+the three rotation templates of D72 in the one admitted residue-cover
+level of D115 and D171, every cell coming from the real-or-missing rule -
+a real engine result where an engine runs, missing with its reason where
+none does, and no hand-made value anywhere. What the rule gives today is
+pinned as the truth it is: the six engines are built and the runner wires
+them (EP1 to EP6, api/engines.py), the demonstration holds no climate
+record of the point, so the runner calls none of them and every cell is
+missing MISSING_INPUT with the runner's own answer, "input not
+available: climate (site data: climate)". One test runs the real runner
+to pin that this reason is its answer, not a text this unit invented.
+
+The admitted set is the lower level of the block alone (D171): D115
+leaves the upper level missing for R2 and R3, so it is not run (no row
+of the table carries it), not admitted and not evaluated, and it is
+listed with its reason; under D176, condition 2, it is never read as a
+tipping point of the cover.
 
 Every count, state, rank and coverage below is what the machinery of
 ``decision/functions.py`` gives on that table, derived from the decided
 structure (D29 with D73 and D47 give the twenty-five agricultural years;
-D80 with C1.6 give the six carbon cells; D94, D95, D60, D85, D87, D91 and
-D99 give the counts and states over them). The arithmetic of D92 has no
-work here — no difference holds a value, so no range exists to widen by
-[b_low − a_high, b_high − a_low], and the rule of D165 has no range to
-read — and the tests assert exactly that: the honest state of the demo
-today, which the return path replaces with real values when the runner's
-outputs arrive. The decisions D165 to D176 of 15 November 2026 (unit
-l2/decision-rule-d165-d176, #309) changed two of these expectations and
-changed none of the missing values: D169 splits the carbon counts, one
-per carbon model and computation where this file once read one count of
-the six cells, and D166 with D175 reads each level of the block on its
-own, the state of each member now asserted beside the state of the set.
+D157 gives one water value per agricultural year; D80 with C1.6 give the
+six carbon cells; D94, D95, D60, D85, D87, D91 and D99 give the counts
+and states over them). The state of each pair comes from ``pair_state``
+and its coverage from ``dominance``; one test pins that on a hand-made
+filled variant of the table (test data only, never shown by the demo):
+with one soil cell filled on both sides the machinery gives "Not
+separated: uncertainty missing", and the document carries exactly that.
+The arithmetic of D92 has no work here - no difference holds a value, so
+no range exists to widen by [b_low - a_high, b_high - a_low], and the
+rule of D165 has no range to read - and the tests assert exactly that:
+the honest state of the demo today, which the return path replaces with
+real values when a climate record of the point is admitted.
 
 Run from the repository root: ``python -m pytest demo/``.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from adapters.ports import (
+    ClimateResult,
+    SoilSlopeResult,
+    SourceInfo,
+)
+from api.engines import (
+    AMG,
+    DEFAULT_CARBON_MODELS,
+    EROSION,
+    RESIDUES,
+    ROTHC,
+    WATER,
+    EntryPointEngines,
+    discover_engine_functions,
+)
 from contracts.decision_output import DecisionOutput
-from contracts.results.models import ResultsTable
+from contracts.inputs import SiteSoilSlope
+from contracts.results.models import (
+    Missing,
+    ResultsTable,
+    ResultsTableRow,
+)
 from decision.functions import (
+    NOT_SEPARATED_UNCERTAINTY_MISSING,
     indicator_ranking,
     measurement_priority,
     never_preferred_less,
@@ -47,15 +77,18 @@ from decision.functions import (
 
 from demo import bounded, run_bounded
 
+ROOT = Path(__file__).parent.parent
 TABLE = bounded.bounded_matrix()
 
 # The cells of one rotation in one scenario: the twenty-five soil-loss
-# years of the record, the one water value and the six carbon cells
-# (two mandatory models of D80 under the three computations of C1.6).
+# years of the record, the twenty-five water years of D157 and the six
+# carbon cells (two mandatory models of D80 under the three computations
+# of C1.6).
 SOIL_CELLS = len(bounded.AG_YEARS)  # 25
+WATER_CELLS = len(bounded.AG_YEARS)  # 25, D157
 CARBON_CELLS = len(bounded.CARBON_MODELS) * len(bounded.TREND_COMPUTATIONS)  # 6
-CELLS_OF_A_ROTATION = SOIL_CELLS + 1 + CARBON_CELLS  # 32
-CELLS_OF_A_PAIR = CELLS_OF_A_ROTATION * len(bounded.SCENARIOS)  # 64
+CELLS_OF_A_ROTATION = SOIL_CELLS + WATER_CELLS + CARBON_CELLS  # 56
+CELLS_OF_A_PAIR = CELLS_OF_A_ROTATION * len(bounded.SCENARIOS)  # 56
 
 
 def rows_of(table: ResultsTable, rotation_id: str, scenario_id: str) -> dict:
@@ -73,7 +106,9 @@ def rows_of(table: ResultsTable, rotation_id: str, scenario_id: str) -> dict:
 
 def test_the_table_is_the_bounded_skeleton() -> None:
     assert (TABLE.case_id, TABLE.field_id) == (bounded.CASE_ID, bounded.FIELD_ID)
-    assert len(TABLE.rows) == 192  # 3 rotations x 2 levels x 32 cells
+    # 3 rotations x 1 admitted level x 56 cells (D171 keeps the upper
+    # level out: see test_the_upper_level_is_not_run_nor_admitted).
+    assert len(TABLE.rows) == 168
     for scenario_id in bounded.SCENARIOS:
         for rotation_id in bounded.ROTATIONS:
             rows = rows_of(TABLE, rotation_id, scenario_id)
@@ -85,9 +120,17 @@ def test_the_table_is_the_bounded_skeleton() -> None:
                 assert row.provenance is None  # C4.1: no label when missing
                 assert row.source is None
                 assert row.range is None and row.range_missing is None
-            row = rows[("water_deficit_exposure", None, None, None)]
-            assert (row.unit, row.direction) == ("dimensionless", "higher_is_better")
-            assert row.time_basis == "rotation"
+                # D157: one water value per agricultural year, never one
+                # value for the whole rotation.
+                row = rows[("water_deficit_exposure", ag_year, None, None)]
+                assert (row.unit, row.direction) == (
+                    "dimensionless",
+                    "higher_is_better",
+                )
+                assert row.time_basis == "ag_year"
+                assert row.provenance is None
+                assert row.source is None
+                assert row.range is None and row.range_missing is None
             for carbon_model in bounded.CARBON_MODELS:
                 for computation in bounded.TREND_COMPUTATIONS:
                     row = rows[("soil_carbon_trend", None, carbon_model, computation)]
@@ -96,7 +139,9 @@ def test_the_table_is_the_bounded_skeleton() -> None:
                         row.direction,
                         row.computation,
                     ) == ("t C ha-1 yr-1", "higher_is_better", computation)
-                    assert row.time_basis == "rotation"
+                    assert row.time_basis == "rotation"  # C1.5
+                    assert row.provenance is None
+                    assert row.source is None
 
 
 def test_every_rotation_holds_the_same_cells() -> None:
@@ -129,43 +174,124 @@ def test_the_rotations_are_the_three_templates_of_d72() -> None:
     assert "alfalfa" in bounded.ROTATION_TEMPLATES["R3"]
 
 
-# --- the real-or-missing rule: no hand-made cell anywhere ------------------------
+# --- the real-or-missing rule: the runner's own reason, never zero ----------------
 
 
-def test_every_cell_is_missing_with_its_reason_and_never_zero() -> None:
+def test_every_cell_is_missing_with_the_runners_reason_and_never_zero() -> None:
     for row in TABLE.rows:
-        assert "not wired" in row.missing.detail
-        if row.indicator == "soil_carbon_trend" and row.carbon_model == "amg":
-            assert "D122" in row.missing.detail  # the annual carbon inputs
-        if row.indicator == "soil_carbon_trend" and row.carbon_model == "rothc":
-            assert "EP6" in row.missing.detail  # the engine is not built
+        assert row.value is None  # never zero
+        assert row.missing is not None
+        # The runner's own answer when the climate of the point is absent,
+        # the same for EP1, EP3, EP4, EP5 and EP6 (api/engines.py).
+        assert row.missing.reason == "MISSING_INPUT"
+        assert bounded.CLIMATE_MISSING_DETAIL in row.missing.detail
+        # The false claims this file once pinned are gone: no engine of
+        # the six is "not built", and nothing is "not wired".
+        assert "not built" not in row.missing.detail
+        assert "not wired" not in row.missing.detail
 
 
 def test_no_cell_of_any_rotation_differs_from_the_rule() -> None:
-    # One reason per indicator part (and per carbon model), the same for
-    # every rotation, level and year: the rule is the table's, not a cell's.
-    soil = {
-        row.missing
-        for row in TABLE.rows
-        if row.indicator == "soil_loss"
-    }
-    assert len(soil) == 1
-    water = {row.missing for row in TABLE.rows if row.indicator == "water_deficit_exposure"}
-    assert len(water) == 1
-    carbon = {
-        row.missing
-        for row in TABLE.rows
-        if row.indicator == "soil_carbon_trend"
-    }
-    assert len(carbon) == 2  # one for AMG (D122), one for RothC (EP6)
+    # One reason for every cell, the same for every rotation, year, carbon
+    # model and computation: the runner's answer is one, the climate of
+    # the point, for every part alike.
+    missing = {row.missing for row in TABLE.rows}
+    assert missing == {bounded.MISSING_CLIMATE}
 
 
-# --- the residue-cover block of D75 at its two levels of D115 --------------------
+def test_the_engines_are_built_and_the_reason_is_the_runners_own() -> None:
+    # The truth the reason pins, checked against the real registry and the
+    # real runner, not against this unit's own text.
+    functions = discover_engine_functions()
+    for name in (
+        "build_rotation_calendar",  # EP2
+        "compute_soil_loss",  # EP1
+        "compute_water_deficit_exposure",  # EP3
+        "build_residue_ledger",  # EP4
+        "run_amg",  # EP5
+        "run_rothc",  # EP6
+    ):
+        assert getattr(functions, name) is not None, name
+    # The real runner on the real inputs the demo has - the accepted soil
+    # and slope of the point, no climate record of it - calls no engine
+    # and answers MISSING_INPUT naming the climate for every part alike.
+    soil = json.loads(
+        (ROOT / "data/demo/la_estanzuela_soil_slope.json").read_text(encoding="utf-8")
+    )
+    unavailable = SourceInfo(
+        id="demo-test",
+        contract="site_data_climate",
+        state="unavailable",
+        missing_reason="SOURCE_UNAVAILABLE",
+    )
+    engines = EntryPointEngines(functions, carbon_models=DEFAULT_CARBON_MODELS)
+    answer = engines.run(
+        json.loads(
+            (
+                ROOT
+                / "contracts/rotation_definition/examples/"
+                "PLACEHOLDER_rotation_definition.json"
+            ).read_text(encoding="utf-8")
+        ),
+        ClimateResult(data=None, source=unavailable),
+        SoilSlopeResult(
+            data=SiteSoilSlope.model_validate(soil), source=unavailable
+        ),
+    )
+    by_id = {module.id: module for module in answer.modules}
+    for point in (EROSION, WATER, RESIDUES, AMG, ROTHC):
+        module = by_id[point.module_id]
+        assert module.state == "not_available", point.module_id
+        assert module.reason == "MISSING_INPUT", point.module_id
+        assert module.detail == bounded.CLIMATE_MISSING_DETAIL, point.module_id
+    # And the cells of the table carry exactly that reason.
+    assert bounded.MISSING_CLIMATE.reason == "MISSING_INPUT"
+    for row in TABLE.rows:
+        assert row.missing.reason == "MISSING_INPUT"
+        assert bounded.CLIMATE_MISSING_DETAIL in row.missing.detail
 
 
-def test_the_two_levels_are_the_scenarios_of_the_table() -> None:
-    assert bounded.SCENARIOS == ("residue-cover-upper", "residue-cover-lower")
-    assert set(bounded.SCENARIOS) == {row.scenario_id for row in TABLE.rows}
+# --- the residue-cover block of D75: the admitted set of D171 ---------------------
+
+
+def test_the_admitted_set_is_the_lower_level_alone() -> None:
+    # The two levels of the block as D115 decides them...
+    assert bounded.LEVELS == ("residue-cover-upper", "residue-cover-lower")
+    # ...and the admitted set of the table (D171: "a level that a decision
+    # leaves missing with its reason [...] is not run and is not
+    # admitted"): the lower level alone, the one scenario of the table.
+    assert bounded.SCENARIOS == ("residue-cover-lower",)
+    assert {row.scenario_id for row in TABLE.rows} == {"residue-cover-lower"}
+
+
+def test_the_upper_level_is_not_run_nor_admitted() -> None:
+    # D171 with D115: the upper level is missing for R2 and R3 (no cap
+    # before a winter cereal, no row after alfalfa), so it is not run -
+    # no row of the table carries it - and it is listed with its reason.
+    assert not any(
+        row.scenario_id == bounded.UPPER for row in TABLE.rows
+    )  # not run (D171)
+    missing_upper = [
+        cover
+        for cover in bounded.COVER_AT_THE_UPPER_LEVEL
+        if cover.upper_missing is not None
+    ]
+    assert sorted(cover.rotation_id for cover in missing_upper) == ["R2", "R3"]
+    for cover in missing_upper:
+        assert cover.upper_percent is None
+        assert cover.upper_missing is not None
+        assert cover.upper_missing.reason == "NO_COVERAGE"
+    # No pair is evaluated at it and it is never read as a tipping point
+    # of the cover (D176, condition 2): the document says so.
+    document = run_bounded.build_decision_output(TABLE)
+    listing = next(
+        reason for reason in document.state.reasons if "D171" in reason
+    )
+    assert "not run and not admitted" in listing
+    assert "R2, R3" in listing
+    assert "NO_COVERAGE" in listing
+    assert "D176" in listing
+    assert "never read as a tipping point" in listing
 
 
 def test_the_upper_level_is_the_cap_of_the_table_per_sequence() -> None:
@@ -180,7 +306,8 @@ def test_the_upper_level_is_the_cap_of_the_table_per_sequence() -> None:
         cover = covers[(rotation_id, "after second-crop soybean, before maize")]
         assert cover.upper_percent == 80.0 and cover.upper_missing is None
     # Where the table gives no cap (before a winter cereal) or has no row
-    # (after alfalfa), the upper level is missing with its reason (D115).
+    # (after alfalfa), the upper level is missing with its reason (D115)
+    # and, with it, for the whole of that rotation (D171).
     r2_wheat = covers[("R2", "after maize, before wheat")]
     assert r2_wheat.upper_percent is None
     assert r2_wheat.upper_missing is not None
@@ -198,7 +325,8 @@ def test_the_row_no_rotation_reads_and_the_lower_level() -> None:
     # data so the block shows the whole row of D115 it comes from.
     assert bounded.CAP_READ_BY_NO_ROTATION.upper_percent == 70.0
     assert bounded.CAP_READ_BY_NO_ROTATION.rotation_id == ""
-    # The lower level is 0%, bare soil, for every fallow (D115).
+    # The lower level is 0%, bare soil, for every fallow (D115); it is the
+    # one admitted level of the table (D171).
     assert bounded.LOWER_LEVEL_PERCENT == 0.0
 
 
@@ -207,28 +335,40 @@ def test_the_row_no_rotation_reads_and_the_lower_level() -> None:
 
 def test_the_counts_by_year() -> None:
     counts = run_bounded.counts_by_year(TABLE)
-    # D94: one count per rotation, level and indicator; D95: the two
-    # indicators on the rotation basis have no count of years at all.
+    # D94: one count per rotation, level and indicator; D95: D157 puts the
+    # water cells on the agricultural year, so both indicators of the
+    # ag_year basis are counted; only the soil carbon trend (one value per
+    # rotation, C1.5) has no count of years.
     assert set(counts) == {
-        (rotation, scenario, "soil_loss", None, None)
+        (rotation, scenario, indicator, None, None)
         for rotation in bounded.ROTATIONS
         for scenario in bounded.SCENARIOS
+        for indicator in ("soil_loss", "water_deficit_exposure")
     }
     for key, count in counts.items():
         # D60: no limit is declared, so no row is judged: nothing is
         # evaluated, the years within are null (never zero) and every row
         # is listed not evaluated with its reason.
         assert (count.evaluated, count.within, count.outside) == (0, None, None)
-        assert len(count.not_evaluated) == SOIL_CELLS
-        assert all(row.missing.reason == "NOT_AVAILABLE" for row in count.not_evaluated)
+        assert len(count.not_evaluated) == len(bounded.AG_YEARS)
+        assert all(
+            row.missing.reason == "MISSING_INPUT" for row in count.not_evaluated
+        )
         assert [row.ag_year for row in count.not_evaluated] == list(bounded.AG_YEARS)
         assert key[0] in bounded.ROTATIONS
 
 
 def test_the_ranges_across_scenarios_are_missing() -> None:
-    items = {item.rotation_id: item for item in run_bounded.ranges_across_scenarios()}
-    assert set(items) == set(bounded.ROTATIONS)
-    for item in items.values():
+    items = run_bounded.ranges_across_scenarios()
+    # One per rotation and indicator counted (soil loss and water, D157),
+    # each missing with its reason: no year is judged against a limit
+    # (D60), so no range across scenarios is given (D96).
+    assert {(item.rotation_id, item.indicator) for item in items} == {
+        (rotation, indicator)
+        for rotation in bounded.ROTATIONS
+        for indicator in ("soil_loss", "water_deficit_exposure")
+    }
+    for item in items:
         assert (item.minimum, item.maximum, item.scenario_of_the_minimum) == (
             None,
             None,
@@ -277,8 +417,8 @@ def test_the_counts_of_the_cells_of_each_pair() -> None:
         # computation, so that the cells of AMG and of RothC, which D155
         # never reads together, are never added in one count") resolves K10
         # the other way round from the comment this test once carried: the
-        # six carbon cells of a level are six counts of one cell each, not
-        # one count of six (the keys below re-derive it).
+        # six carbon cells of the level are six counts of one cell each,
+        # not one count of six (the keys below re-derive it).
         assert set(counts) == {
             (scenario, "soil_loss", None, None)
             for scenario in bounded.SCENARIOS
@@ -294,10 +434,17 @@ def test_the_counts_of_the_cells_of_each_pair() -> None:
         for scenario in bounded.SCENARIOS:
             count = counts[(scenario, "soil_loss", None, None)]
             assert count.by_point_sign.missing_side == SOIL_CELLS
-            assert (count.cells_compared, count.cells_of_the_pair) == (0, SOIL_CELLS)
+            assert (count.cells_compared, count.cells_of_the_pair) == (
+                0,
+                SOIL_CELLS,
+            )
+            # D157: twenty-five water cells, one per agricultural year.
             count = counts[(scenario, "water_deficit_exposure", None, None)]
-            assert count.by_point_sign.missing_side == 1
-            assert (count.cells_compared, count.cells_of_the_pair) == (0, 1)
+            assert count.by_point_sign.missing_side == WATER_CELLS
+            assert (count.cells_compared, count.cells_of_the_pair) == (
+                0,
+                WATER_CELLS,
+            )
             # D169: each carbon model and computation is a count of its
             # own, over its one cell.
             for carbon_model in bounded.CARBON_MODELS:
@@ -320,7 +467,7 @@ def test_the_counts_of_the_cells_of_each_pair() -> None:
                 ) == (0, 0, 0)
 
 
-# --- D7 with D85: the state of each pair ------------------------------------------
+# --- D7 with D85: the state of each pair, from the machinery ----------------------
 
 
 def test_the_states_of_the_pairs() -> None:
@@ -329,18 +476,86 @@ def test_the_states_of_the_pairs() -> None:
         # D85: no paired difference holds a value, so the pair is not
         # evaluated and has no state; nothing enters it (D6).
         assert state.state is None
-        # D166 with D175: the two levels of the block are read each on its
-        # own — the cells of different scenarios are never merged — and the
-        # state of each member is shown beside the state of the set. Every
-        # member is not evaluated, so the set is not evaluated either (a
-        # member without a state is never a robust preference, D175); no
-        # range exists for D165 to unblock and no computation choice of
-        # D173 changes anything, every carbon difference being missing.
-        assert state.by_scenario == tuple(
-            (scenario, None) for scenario in sorted(bounded.SCENARIOS)
-        )
+        # The admitted set holds one scenario (D171), so the table is read
+        # as one scenario and there is no member listing (D166 gives one
+        # only over several); no computation choice of D173 changes
+        # anything, every carbon difference being missing.
+        assert state.by_scenario == ()
         assert state.identical_rows is False
         assert state.indicators_not_resolved == ()
+
+
+def filled_variant(
+    table: ResultsTable, first: str, second: str, ag_year: int
+) -> ResultsTable:
+    """The table with one soil-loss cell of the pair filled on both sides.
+
+    Hand-made test data only (the demo itself shows no value): it exists
+    to pin that the pair states of the document are the machinery's
+    (``pair_state``), not a text this unit writes.
+    """
+
+    rows = []
+    for row in table.rows:
+        if (
+            row.rotation_id in (first, second)
+            and row.indicator == "soil_loss"
+            and row.ag_year == ag_year
+            and row.scenario_id in bounded.SCENARIOS
+        ):
+            rows.append(
+                ResultsTableRow(
+                    rotation_id=row.rotation_id,
+                    scenario_id=row.scenario_id,
+                    time_basis=row.time_basis,
+                    ag_year=row.ag_year,
+                    indicator=row.indicator,
+                    direction=row.direction,
+                    value=1.0 if row.rotation_id == first else 2.0,
+                    unit=row.unit,
+                    range_missing=Missing(
+                        reason="NOT_DECLARED",
+                        detail="hand-made test value: no range",
+                    ),
+                    provenance="DERIVED",  # C4.6
+                    source="hand-made test table of demo/test_bounded.py",
+                )
+            )
+        else:
+            rows.append(row)
+    return ResultsTable(case_id=table.case_id, field_id=table.field_id, rows=rows)
+
+
+def test_the_pair_states_of_the_document_come_from_the_machinery() -> None:
+    # On the honest table every pair is not evaluated (D85) and the
+    # coverage counts no cell compared (D91)...
+    items = {tuple(item.pair): item for item in run_bounded.pair_states_of_the_set(TABLE)}
+    for pair, item in items.items():
+        machinery = pair_state(TABLE, *pair)
+        assert item.value == machinery.state is None
+        assert item.missing is not None
+        assert item.missing.reason == "NOT_AVAILABLE"
+        assert (item.coverage.cells_compared, item.coverage.cells_of_the_pair) == (
+            0,
+            CELLS_OF_A_PAIR,
+        )
+    # ...and on a filled variant the document carries exactly what the
+    # machinery answers, not "not evaluated" regardless: one computed
+    # difference without a range gives "Not separated: uncertainty
+    # missing" (D92, D97).
+    filled = filled_variant(TABLE, "R1", "R2", ag_year=2001)
+    machinery = pair_state(filled, "R1", "R2")
+    assert machinery.state == NOT_SEPARATED_UNCERTAINTY_MISSING
+    item = {
+        tuple(state.pair): state
+        for state in run_bounded.pair_states_of_the_set(filled)
+    }[("R1", "R2")]
+    assert item.value == machinery.state == NOT_SEPARATED_UNCERTAINTY_MISSING
+    assert item.reason == "a difference without its range"  # D86
+    assert (item.coverage.cells_compared, item.coverage.cells_of_the_pair) == (
+        1,
+        CELLS_OF_A_PAIR,
+    )
 
 
 def test_dominance_between_the_rotations() -> None:
@@ -358,15 +573,15 @@ def test_no_indicator_is_evaluated_at_all() -> None:
     soil = indicator_ranking(TABLE, "soil_loss")
     assert soil.every_value_missing is True
     assert soil.rotations_with_a_value == frozenset()
-    assert len(soil.reasons) == 150  # 3 rotations x 2 levels x 25 years
+    assert len(soil.reasons) == 75  # 3 rotations x 1 level x 25 years
     assert {reason for _, reason in soil.reasons} == {soil.reasons[0][1]}
-    assert soil.reasons[0][1].reason == "NOT_AVAILABLE"
+    assert soil.reasons[0][1].reason == "MISSING_INPUT"
     water = indicator_ranking(TABLE, "water_deficit_exposure")
     assert water.every_value_missing is True
-    assert len(water.reasons) == 6  # 3 rotations x 2 levels
+    assert len(water.reasons) == 75  # 3 rotations x 1 level x 25 years (D157)
     carbon = indicator_ranking(TABLE, "soil_carbon_trend")
     assert carbon.every_value_missing is True
-    assert len(carbon.reasons) == 36  # 3 rotations x 2 levels x 6 cells
+    assert len(carbon.reasons) == 18  # 3 rotations x 1 level x 6 cells
 
 
 # --- D4 over no declared input -----------------------------------------------------
@@ -374,7 +589,7 @@ def test_no_indicator_is_evaluated_at_all() -> None:
 
 def test_the_measurement_priority_over_no_declared_input() -> None:
     # The residue-cover block drives no cell of this table and its upper
-    # level holds no single admitted value, so no mapping is declared: the
+    # level is not admitted at all (D171), so no mapping is declared: the
     # machinery's answer over no inputs is an empty list per pair (the
     # base state being that of a pair not evaluated).
     for pair, priority in run_bounded.measurement_priorities(TABLE).items():
@@ -396,7 +611,8 @@ def test_the_document_validates_and_roundtrips() -> None:
     assert again == document
     assert (document.case_id, document.field_id) == (bounded.CASE_ID, bounded.FIELD_ID)
     assert document.rotations == ["R1", "R2", "R3"]
-    assert document.scenarios == ["residue-cover-upper", "residue-cover-lower"]
+    # D171: the admitted set is the lower level alone.
+    assert document.scenarios == ["residue-cover-lower"]
     assert document.example_data is True
 
 
@@ -420,34 +636,46 @@ def test_the_document_carries_the_limits_and_tolerances() -> None:
 def test_the_document_carries_the_counts_and_their_ranges() -> None:
     document = run_bounded.build_decision_output(TABLE)
     counts = {count.key(): count for count in document.counts_by_year}
-    assert len(counts) == 6  # D94: 3 rotations x 2 levels, soil loss only
+    # D94 with D157: 3 rotations x 1 level x the two indicators of the
+    # ag_year basis (soil loss and water); the carbon trend has no count
+    # of years (D95, C1.5).
+    assert set(counts) == {
+        (rotation, scenario, indicator, None, None)
+        for rotation in bounded.ROTATIONS
+        for scenario in bounded.SCENARIOS
+        for indicator in ("soil_loss", "water_deficit_exposure")
+    }
     for (rotation, scenario, indicator, _, _), count in counts.items():
-        assert (rotation, scenario, indicator) in {
-            (r, s, "soil_loss")
-            for r in bounded.ROTATIONS
-            for s in bounded.SCENARIOS
-        }
         assert (count.years_evaluated, count.years_within_limits) == (0, None)
         assert [row.ag_year for row in count.not_evaluated] == list(bounded.AG_YEARS)
-    ranges = {item.rotation_id: item for item in document.range_across_scenarios}
-    assert set(ranges) == set(bounded.ROTATIONS)
-    for item in ranges.values():
+    ranges = {(item.rotation_id, item.indicator) for item in document.range_across_scenarios}
+    assert ranges == {
+        (rotation, indicator)
+        for rotation in bounded.ROTATIONS
+        for indicator in ("soil_loss", "water_deficit_exposure")
+    }
+    for item in document.range_across_scenarios:
         assert item.missing is not None
         assert item.missing.reason == "NOT_DECLARED"
 
 
 def test_the_document_carries_the_differences() -> None:
     document = run_bounded.build_decision_output(TABLE)
-    assert len(document.paired_differences) == 192  # 3 pairs x 64 cells
+    assert len(document.paired_differences) == 168  # 3 pairs x 56 cells
     items = {
         (tuple(item.pair), item.cell()): item for item in document.paired_differences
     }
-    assert len(items) == 192
+    assert len(items) == 168
     for item in items.values():
         assert item.difference.value is None  # never zero
         assert item.difference.missing is not None
         assert item.difference.missing.reason == "MISSING_INPUT"
         assert item.method == run_bounded.DIFFERENCE_METHOD
+        if item.indicator == "water_deficit_exposure":
+            # D157: the difference of a water cell is per agricultural
+            # year, on the ag_year basis.
+            assert item.time_basis == "ag_year"
+            assert item.ag_year in bounded.AG_YEARS
     carbon = items[
         (
             ("R2", "R3"),
@@ -470,10 +698,10 @@ def test_the_document_carries_the_counts_of_the_pairs_cells() -> None:
     counts = {
         item.key_with_the_carbon_model(): item for item in document.pair_cell_counts
     }
-    # D169: 3 pairs x 2 levels x (soil, water and the six carbon cells of
-    # two models under three computations, each a count of its own) — 48
-    # counts, where the key of D87 alone gave 18.
-    assert len(counts) == 48
+    # D169: 3 pairs x 1 level x (soil, water and the six carbon cells of
+    # two models under three computations, each a count of its own) - 24
+    # counts, where the key of D87 alone gave 9.
+    assert len(counts) == 24
     carbon_keys = {
         (carbon_model, computation)
         for carbon_model in bounded.CARBON_MODELS
@@ -516,24 +744,27 @@ def test_the_document_carries_the_states_and_their_coverage() -> None:
             CELLS_OF_A_PAIR,
         )
     # The document's one state: null with its reason (OPEN 5); nothing was
-    # evaluated, so no indicator is named (D6), and the reasons say so.
+    # evaluated, so no indicator is named (D6), and the reasons say so:
+    # one per pair, one per indicator, one for the level not admitted.
     assert document.state.value is None
     assert document.state.missing is not None
     assert document.state.indicators_not_resolved == []
-    assert len(document.state.reasons) == 7  # 3 pairs, 3 indicators, 1 block
+    assert len(document.state.reasons) == 7  # 3 pairs, 3 indicators, 1 level
     assert all(reason.strip() for reason in document.state.reasons)
-    # D166 with D152: the reason of a pair shows the state of each member
-    # beside the state of the set, and a member without a state is written
-    # with the label D151 gives that absence.
     for first, second in run_bounded.PAIRS:
         reason = next(
             reason
             for reason in document.state.reasons
             if f"('{first}', '{second}')" in reason
         )
-        assert "; in each scenario:" in reason
-        for scenario in bounded.SCENARIOS:
-            assert f"'{scenario}' 'Not evaluated'" in reason
+        assert "not evaluated" in reason
+    for indicator in run_bounded.INDICATORS:
+        reason = next(
+            reason
+            for reason in document.state.reasons
+            if f"'{indicator}' is not evaluated" in reason
+        )
+        assert bounded.CLIMATE_MISSING_DETAIL in reason
 
 
 def test_the_document_carries_no_measurement_priority() -> None:
@@ -545,11 +776,30 @@ def test_main_prints_the_document_the_block_and_the_gaps(capsys) -> None:
     run_bounded.main()
     printed = capsys.readouterr().out
     assert '"contract": "decision_output"' in printed
-    assert "residue-cover-upper" in printed
-    assert "the engine's real outputs are not wired to the demo yet" in printed
+    assert "residue-cover-lower" in printed
+    # The runner's own reason, not a "not built" or "not wired" story
+    # about the engines (the phases of D117, condition 1 of D176, are a
+    # gap the demo does report).
+    assert bounded.CLIMATE_MISSING_DETAIL in printed
+    assert "the six engines are built" in printed
+    assert "not wired" not in printed
+    # The false claims of the rejected first version are gone: no engine
+    # of the six is called not built ("EP1 to EP6" does appear, stating
+    # they are all registered), and D122 is not the reason anymore.
+    assert "not built" not in printed.replace(
+        "the phases of D117 are not built yet", ""
+    )
+    assert "D122" not in printed
+    # The admitted set and the level not admitted (D171, D176 condition 2).
     assert "D115" in printed
     assert "0% residue cover, bare soil" in printed
+    assert "not run, not admitted" in printed
+    assert "D171" in printed
+    # No tipping point, and the four conditions of D176 for the sweep of
+    # #267 (the phases of D117 not built is condition 1, a gap the demo
+    # reports rather than claims).
     assert "No tipping point of D3 is computed" in printed
-    # D176: the printed gap carries its conditions for the sweep of #267.
-    assert "D176 confirms the block" in printed
+    assert "D176" in printed
     assert "no tipping point" in printed
+    assert "condition 4" in printed
+    assert "not materialized" in printed

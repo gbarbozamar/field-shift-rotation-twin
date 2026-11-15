@@ -4,86 +4,109 @@ l2/bounded-matrix-decision, issue #269).
 The case was approved by the producer on 15 November 2026 with one designer
 call that governs every cell below: the real-or-missing rule. Every cell
 comes from a real engine result where an engine runs, and is missing with
-its reason where none does — no hand-made value exists in this table. The
+its reason where none does - no hand-made value exists in this table. The
 demonstration set is the one the decisions of issue #77 build:
 
-- the three rotation templates of D72, the identifiers R1, R2 and R3 of the
-  brief travelling as the rows' ``rotation_id`` (the templates themselves —
-  annual soybean; wheat / second-crop soybean, then maize; the same
-  sequence followed by two years of pure alfalfa — stay documentation, in
-  ``ROTATION_TEMPLATES``);
-- the demonstration point of D83 (La Estanzuela) with the soil of D112 and
-  the declared terrain of D100, whose accepted data file
+- the three rotation templates of D72, the identifiers R1, R2 and R3 of
+  the brief travelling as the rows' ``rotation_id`` (the templates
+  themselves - annual soybean; wheat / second-crop soybean, then maize;
+  the same sequence followed by two years of pure alfalfa - stay
+  documentation, in ``ROTATION_TEMPLATES``);
+- the demonstration point of D83 (La Estanzuela) with the soil of D112
+  and the declared terrain of D100, whose accepted data file
   ``data/demo/la_estanzuela_soil_slope.json`` carries the case identifier
   reused below;
 - the agricultural years of the climate record: D29 fixes the record
-  (2001-01-01 to 2024-12-31), D73 the start month of the year (July, month
-  7), and the agricultural years are every year with at least one day in
-  the record — 2000 to 2024, twenty-five of them (D47 and point 1 of
-  ``engine/calendar/repeat.py``; the two edge years are partial and their
-  real values will arrive as ``NO_COVERAGE`` when a real run covers them,
-  C5.5);
-- the one admitted uncertainty: the residue-cover block of D75 at its two
-  decided levels of D115 (``SCENARIOS``), carried beside the table as the
-  data of ``COVER_AT_THE_UPPER_LEVEL`` and ``LOWER_LEVEL``.
+  (2001-01-01 to 2024-12-31), D73 the start month of the year (July,
+  month 7), and the agricultural years are every year with at least one
+  day in the record - 2000 to 2024, twenty-five of them (D47 and point 1
+  of ``engine/calendar/repeat.py``; the two edge years are partial and
+  their real values will arrive as ``NO_COVERAGE`` when a real run covers
+  them, C5.5);
+- the one admitted uncertainty: the residue-cover block of D75, whose
+  admitted level (D115, D171) is the one scenario of the table, carried
+  beside it as the data of ``COVER_AT_THE_UPPER_LEVEL`` and
+  ``LOWER_LEVEL_PERCENT``.
 
-The real-or-missing rule, applied today. The check the brief asks for —
-whether ``demo/`` can build real EP1 cells — was made and the answer is no:
+The real-or-missing rule, applied today. The six engines are built and
+the runner wires them: EP1 to EP6 are registered in ``api/engines.py``
+(``DISCOVERED``; ``discover_engine_functions`` imports each one today,
+and the carbon models the app configures by default are AMG and RothC,
+``DEFAULT_CARBON_MODELS``), so no cell of this table is missing because
+an engine is not built. What the demonstration holds no source of is the
+climate of the point. The repository holds no climate record of La
+Estanzuela: the one recorded response ever committed is the evidence of
+D17 and D32 (``docs/evidence/nasa-power-2026-11-14/``), ten days at a
+made-up point in the ocean, committed exactly because it is no producer's
+field; a session never calls the real service; and the tests of ``api/``
+and ``adapters/`` work through ``httpx.MockTransport`` placeholders, so
+no recorded-response fixture shape exists for the demonstration point
+either. Committing a recorded response of the point is not allowed under
+D17 ("Yes, one"). The soil and slope of the point exist (the accepted
+data file above), so the one absent site input is the climate, and the
+runner's own answer then is what every cell of this table carries:
+reason ``MISSING_INPUT``, the runner's detail "input not available:
+climate (site data: climate)" (the text of ``_INPUT_NAMES`` of
+``api/engines.py``, the same answer for EP1, EP3, EP4, EP5 and EP6
+alike). No cell is ever zero and none is filled in (C3.1, C3.2).
 
-- EP1 (``engine.erosion.compute_soil_loss``) needs a ``SiteClimate`` of the
-  point over the record. The repository holds no climate record of La
-  Estanzuela: the one recorded response ever committed is the evidence of
-  D17 and D32 (``docs/evidence/nasa-power-2026-11-14/``), ten days at a
-  made-up point in the ocean, committed exactly because it is no producer's
-  field; a session never calls the real service; and the tests of ``api/``
-  and ``adapters/`` work through ``httpx.MockTransport`` placeholders, so
-  no recorded-response fixture shape exists for the demonstration point
-  either. Committing a recorded response of the point is not allowed under
-  D17 ("Yes, one"), so no real EP1 output is obtainable here.
-- Therefore every ``soil_loss`` cell is missing ``NOT_AVAILABLE``, "the
-  engine's real outputs are not wired to the demo yet", and so is every
-  ``water_deficit_exposure`` cell (EP3 needs the same climate). The carbon
-  cells are missing for their own decided reason: D122 (the annual carbon
-  inputs are missing in this release, EP4 not built, so AMG runs but its
-  values are missing with that reason) and, for RothC, EP6 not built. No
-  cell is ever zero and none is filled in (C3.1, C3.2).
+The admitted set of the table under D171. An admitted scenario is one
+value of each uncertain input that a person declared with its source -
+the levels of the blocks of D75 as decisions such as D115 fix them - and
+"a level that a decision leaves missing with its reason [...] is not run
+and is not admitted; it is listed with that reason" (D171). D115 leaves
+the upper level of the residue cover missing for R2 and R3 (the MGAP /
+Facultad de Agronomia table gives no cap before a winter cereal and has
+no row after alfalfa, ``COVER_AT_THE_UPPER_LEVEL``), so that level is not
+run for them: no row of this table carries it, no pair is evaluated at
+it, and it is never read as a tipping point of the cover (D176,
+condition 2). The lower level (0 percent, bare soil) is declared for
+every fallow of every rotation, so the admitted set of the table is the
+one scenario ``residue-cover-lower``. The upper level is admitted for R1
+alone - the cap of its one fallow, 40 percent - but the results contract
+gives every rotation of one table the same cells, ``scenario_id``
+included, and every pair of this demonstration holds R2 or R3; so no
+table of the three rotations can carry the upper level. It stays listed
+with its reason beside the table, a gap reported here and never
+silently dropped.
 
-The return path this unit documents: the row skeleton below is the one the
-engines will fill — the agricultural years of the record for soil loss,
-one water value per rotation, the trend of each mandatory carbon model
-(D80) under each of the three computations of C1.6 — so when the runner's
-outputs arrive the same cells carry real values and the same tests of
-``demo/test_bounded.py`` assert them.
+The return path this unit documents: the row skeleton below is the one
+the engines will fill - the agricultural years of the record for soil
+loss and for the water deficit exposure (one value per agricultural
+year, D157), the trend of each mandatory carbon model (D80) under each
+of the three computations of C1.6 - so when a climate record of the
+point is admitted the same cells carry real values and the same tests
+of ``demo/test_bounded.py`` assert them.
 
-Two structures the decisions ask for and this table cannot carry today,
-reported as gaps (never silently dropped):
+Two structures the decisions ask for and this table cannot carry
+today, reported as gaps (never silently dropped):
 
-- the phases of D109, nested inside each level by D117. R1 has one phase,
-  R2 two, R3 four (one per year of the cycle), but the results contract
-  requires every rotation of a table to hold the same cells, so per-phase
-  scenarios cannot be written for rotations with different phase counts
-  without inventing rows for phases a rotation does not have. The table
-  carries one scenario per level, and the state at a level is the state
-  over that scenario — the degenerate single-phase reading the machinery
-  of ``decision/functions.py`` accepts and names as such. When the phases
-  materialize, the scenarios of a pair are every combination of the
-  phases of the two rotations, N x M of them, each named by the two
-  phases it holds (D172).
+- the phases of D109, nested inside each level by D117. R1 has one
+  phase, R2 two, R3 four (one per year of the cycle), but the results
+  contract requires every rotation of a table to hold the same cells,
+  so per-phase scenarios cannot be written for rotations with different
+  phase counts without inventing rows for phases a rotation does not
+  have. The table carries one scenario, and the state at that level is
+  the state over that scenario - the degenerate single-phase reading
+  the machinery of ``decision/functions.py`` accepts and names as such.
+  When the phases materialize, the scenarios of a pair are every
+  combination of the phases of the two rotations, N x M of them, each
+  named by the two phases it holds (D172).
 - the uncertain input of the block, in the ``UncertainInput`` form of
   ``decision/functions.py``: the residue cover drives no cell of this
-  table directly (it feeds the engines, D116), and its upper level holds
-  no single admitted value — the caps of D115 are per sequence and missing
-  for the fallows before a winter cereal, so no honest ``(value,
-  scenario)`` mapping exists. The demo declares none and reports it; the
-  tipping point of D3 is not computed and the priority list of D4 is the
-  machinery's answer over no declared inputs.
+  table directly (it feeds the engines, D116), and its upper level is
+  not admitted at all for R2 and R3 (D171) and holds no single admitted
+  value for R1 either - the caps of D115 are per sequence - so no honest
+  ``(value, scenario)`` mapping exists. The demo declares none and
+  reports it; the tipping point of D3 is not computed and the priority
+  list of D4 is the machinery's answer over no declared inputs.
 
 One identifier is this unit's proposal, flagged for the designer of the
 case: the ``field_id``. The demonstration's own field identifier is not
 decided anywhere; the accepted data file names its field after the runoff
-plots of a separate experiment (D71 keeps it separate), an identifier this
-module does not copy into the demo's document. ``FIELD_ID`` below is
-PROPOSED (blueprint section 3.7).
+plots of a separate experiment (D71 keeps it separate), an identifier
+this module does not copy into the demo's document. ``FIELD_ID`` below
+is PROPOSED (blueprint section 3.7).
 
 Pure data and pure builders only: no network, no file access, no clock.
 """
@@ -144,13 +167,22 @@ TREND_COMPUTATIONS: tuple[str, ...] = (
     "mean_over_cycles",
 )
 
-# --- the residue-cover block of D75, at its two decided levels of D115 ----------
+# --- the residue-cover block of D75 at the levels of D115 -----------------------
 
-# The two levels are the two scenarios of the table: one set of values of
-# the uncertain inputs is one scenario (contracts/results/README.md).
-SCENARIOS: tuple[str, ...] = ("residue-cover-upper", "residue-cover-lower")
-UPPER = SCENARIOS[0]
-LOWER = SCENARIOS[1]
+# The two levels of the block as D115 decides them. The scenarios of the
+# table are the admitted set of D171, and that set is the lower level
+# alone: D115 leaves the upper level missing for R2 and R3 (no cap before
+# a winter cereal, no row after alfalfa), and "a level that a decision
+# leaves missing with its reason [...] is not run and is not admitted; it
+# is listed with that reason" (D171). The upper level is admitted for R1
+# alone, but every rotation of one table holds the same cells,
+# scenario_id included (the contract), and every pair of this
+# demonstration holds R2 or R3, so no table of the three rotations
+# carries it (see the module docstring).
+UPPER = "residue-cover-upper"
+LOWER = "residue-cover-lower"
+LEVELS: tuple[str, ...] = (UPPER, LOWER)
+SCENARIOS: tuple[str, ...] = (LOWER,)  # D171: the admitted set
 
 
 @dataclass(frozen=True)
@@ -158,11 +190,11 @@ class FallowCover:
     """The upper level of the residue-cover block for one kind of fallow of
     one rotation, as D115 decides it.
 
-    ``upper_percent`` is the cap of the MGAP / Facultad de Agronomía table
+    ``upper_percent`` is the cap of the MGAP / Facultad de Agronomia table
     (technical update of the Uruguayan USLE/RUSLE model, hosted on gub.uy
     in January 2020, Table 1) for the sequence the fallow reads; where the
     table gives no cap or has no row, ``upper_percent`` is None and
-    ``upper_missing`` carries the reason — only the 0 % level runs there
+    ``upper_missing`` carries the reason - only the 0 % level runs there
     (D115). The cover is constant over the fallow (D115, declared as a
     simplification: the table gives the cover at sowing). The lower level
     is 0 % for every fallow of every rotation and is not repeated here.
@@ -209,7 +241,7 @@ COVER_AT_THE_UPPER_LEVEL: tuple[FallowCover, ...] = (
         upper_missing=Missing(
             reason="NO_COVERAGE",
             detail=(
-                "the MGAP / Facultad de Agronomía table gives no cap before "
+                "the MGAP / Facultad de Agronomia table gives no cap before "
                 "a winter cereal, so the upper level of the residue-cover "
                 "block is missing for this fallow and only the 0 % level "
                 "runs (D115)"
@@ -223,7 +255,7 @@ COVER_AT_THE_UPPER_LEVEL: tuple[FallowCover, ...] = (
         upper_missing=Missing(
             reason="NO_COVERAGE",
             detail=(
-                "the MGAP / Facultad de Agronomía table has no row after "
+                "the MGAP / Facultad de Agronomia table has no row after "
                 "alfalfa, so the upper level of the residue-cover block is "
                 "missing for this fallow and only the 0 % level runs (D115)"
             ),
@@ -244,54 +276,23 @@ CAP_READ_BY_NO_ROTATION: FallowCover = FallowCover(
 # rotation (D115: 0 %, FAO-56 with no mulch).
 LOWER_LEVEL_PERCENT = 0.0
 
-# --- the missing parts every cell carries (the real-or-missing rule) ------------
+# --- the missing part every cell carries (the real-or-missing rule) -------------
 
-# The canonical reason text of the rule, as the approved case states it.
-NOT_WIRED = "the engine's real outputs are not wired to the demo yet"
+# The runner's own detail when the climate of the point is absent
+# (api/engines.py, ``_INPUT_NAMES``): the answer it gives for EP1, EP3,
+# EP4, EP5 and EP6 alike, all built and wired, none called.
+CLIMATE_MISSING_DETAIL = "input not available: climate (site data: climate)"
 
-MISSING_SOIL_LOSS = Missing(
-    reason="NOT_AVAILABLE",
+MISSING_CLIMATE = Missing(
+    reason="MISSING_INPUT",
     detail=(
-        f"{NOT_WIRED}: the demonstration holds no climate record of the "
-        "point (a session never calls the real service, and the one "
-        "recorded response committed in the repository is the evidence of "
-        "D17 and D32 of issue #77, a made-up point in the ocean, not the "
-        "record of the point), so no real erosion output is obtainable and "
-        "the real-or-missing rule forbids a hand-made value; when the "
-        "runner's outputs arrive this cell fills with the engine's value"
-    ),
-)
-
-MISSING_WATER = Missing(
-    reason="NOT_AVAILABLE",
-    detail=(
-        f"{NOT_WIRED}: the water engine needs the same climate record of "
-        "the point the erosion engine needs, none is obtainable in the "
-        "demo, and the real-or-missing rule forbids a hand-made value; "
-        "when the runner's outputs arrive this cell fills with the "
-        "engine's value"
-    ),
-)
-
-MISSING_CARBON_AMG = Missing(
-    reason="NOT_AVAILABLE",
-    detail=(
-        "the annual carbon inputs are missing in this release with "
-        "NOT_AVAILABLE (EP4 not built; D122 of issue #77), so the AMG "
-        "soil-carbon trend is missing with that reason, and the engine's "
-        "real outputs are not wired to the demo yet in any case; when the "
-        "inputs and the runner's outputs arrive this cell fills with the "
-        "engine's value"
-    ),
-)
-
-MISSING_CARBON_ROTHC = Missing(
-    reason="NOT_AVAILABLE",
-    detail=(
-        "the RothC engine (EP6) is not built, so its trend is missing "
-        "NOT_AVAILABLE, and the engine's real outputs are not wired to the "
-        "demo yet in any case; when the engine is built and the runner's "
-        "outputs arrive this cell fills with the engine's value"
+        "the engines are built and the runner wires them (EP1 to EP6, "
+        "api/engines.py), but the demonstration holds no climate record "
+        "of the point, so the runner calls none of them and every part "
+        f"is missing with its own answer, {CLIMATE_MISSING_DETAIL!r}; "
+        "the real-or-missing rule forbids a hand-made value, and when a "
+        "climate record of the point is admitted this cell fills with "
+        "the engine's value"
     ),
 )
 
@@ -311,21 +312,27 @@ def soil_row(rotation_id: str, scenario_id: str, ag_year: int) -> ResultsTableRo
         direction="lower_is_better",
         value=None,
         unit="t ha-1 yr-1",
-        missing=MISSING_SOIL_LOSS,
+        missing=MISSING_CLIMATE,
     )
 
 
-def water_row(rotation_id: str, scenario_id: str) -> ResultsTableRow:
-    """The water deficit exposure of one rotation: missing, with its reason."""
+def water_row(rotation_id: str, scenario_id: str, ag_year: int) -> ResultsTableRow:
+    """One agricultural year of the water deficit exposure of one rotation:
+    missing, with its reason.
+
+    D157: one value per agricultural year, the sums read over the
+    agricultural year - never one value for the whole rotation.
+    """
     return ResultsTableRow(
         rotation_id=rotation_id,
         scenario_id=scenario_id,
-        time_basis="rotation",
+        time_basis="ag_year",  # D157
+        ag_year=ag_year,
         indicator="water_deficit_exposure",
         direction="higher_is_better",
         value=None,
         unit="dimensionless",
-        missing=MISSING_WATER,
+        missing=MISSING_CLIMATE,
     )
 
 
@@ -333,7 +340,8 @@ def carbon_row(
     rotation_id: str, scenario_id: str, carbon_model: str, computation: str
 ) -> ResultsTableRow:
     """The soil carbon trend of one rotation under one carbon model and one
-    computation: missing, with its reason."""
+    computation: missing, with its reason (the same as every other part:
+    the engine is built, the climate of the point is not there)."""
     return ResultsTableRow(
         rotation_id=rotation_id,
         scenario_id=scenario_id,
@@ -344,25 +352,29 @@ def carbon_row(
         unit="t C ha-1 yr-1",
         carbon_model=carbon_model,
         computation=computation,
-        missing=MISSING_CARBON_AMG if carbon_model == "amg" else MISSING_CARBON_ROTHC,
+        missing=MISSING_CLIMATE,
     )
 
 
 def bounded_matrix() -> ResultsTable:
-    """The bounded matrix: 192 rows, one per rotation, level and cell, every
-    value missing with its reason.
+    """The bounded matrix: 168 rows, one per rotation and cell of the
+    admitted set, every value missing with its reason.
 
-    Every rotation holds the same cells in every scenario (the contract
-    asks for it): the twenty-five soil-loss years of the record, the one
-    water value of the rotation and the trend of each carbon model under
-    each computation.
+    Every rotation holds the same cells in the one admitted scenario (the
+    contract asks for it): the twenty-five soil-loss years of the record,
+    the twenty-five water years (D157) and the trend of each carbon model
+    under each computation. The upper level of the block is not among
+    them: D115 leaves it missing for R2 and R3, so it is not run and not
+    admitted (D171) and is listed with its reason in
+    ``COVER_AT_THE_UPPER_LEVEL``.
     """
     rows: list[ResultsTableRow] = []
     for scenario_id in SCENARIOS:
         for rotation_id in ROTATIONS:
             for ag_year in AG_YEARS:
                 rows.append(soil_row(rotation_id, scenario_id, ag_year))
-            rows.append(water_row(rotation_id, scenario_id))
+            for ag_year in AG_YEARS:
+                rows.append(water_row(rotation_id, scenario_id, ag_year))
             for carbon_model in CARBON_MODELS:
                 for computation in TREND_COMPUTATIONS:
                     rows.append(
