@@ -807,3 +807,150 @@ def run_surface_layer(
         else:
             depletion = result.depletion_end
     return results
+
+
+@dataclass(frozen=True)
+class EarlyWettingResult:
+    """One day of the surface layer with early wetting before evaporation.
+
+    Splits early wetting (``net_rain`` and ``irrigation_field`` converted to
+    depth over ``wetted_fraction``) from the evaporation-only substep
+    ``evaporation_substep``. Every quantity is a number or a ``Missing`` with
+    its reason (C3.1). On a day whose inputs are complete,
+
+        evaporation_substep.depletion_end - depletion_carried
+            = -(net_rain + irrigation_wetted)
+              + deep_percolation_early
+              + evaporation_substep.deep_percolation
+              + evaporation_substep.evaporation_from_exposed_fraction
+
+    holds to the precision of floating point.
+    """
+
+    depletion_carried: Number
+    depletion_after_wetting: Number
+    irrigation_field: Number
+    irrigation_wetted: Number
+    net_rain: Number
+    deep_percolation_early: Number
+    evaporation_substep: DayResult
+
+
+def _missing_early_wetting(date: datetime.date, missing: Missing) -> EarlyWettingResult:
+    return EarlyWettingResult(
+        depletion_carried=missing,
+        depletion_after_wetting=missing,
+        irrigation_field=missing,
+        irrigation_wetted=missing,
+        net_rain=missing,
+        deep_percolation_early=missing,
+        evaporation_substep=_missing_day(date, missing),
+    )
+
+
+def early_wetting_step(
+    depletion_carried: Number,
+    day: DayInput,
+    *,
+    net_rain: Number,
+    irrigation_field: Number,
+    total_evaporable_water: Number,
+    readily_evaporable_water: Number,
+    wetted_fraction: Number,
+    margin_above_basal: Number,
+) -> EarlyWettingResult:
+    """Move the surface layer forward by one day with early wetting before ``Kr``.
+
+    Unlike ``step`` (which evaluates ``Kr`` before the day's infiltration and
+    is preserved unchanged), this function applies ``net_rain`` and field
+    irrigation ``irrigation_field`` (expressed on the wetted fraction as
+    ``irrigation_field / wetted_fraction``) before ``Kr`` is evaluated on
+    ``depletion_after_wetting``.
+
+    ``day`` is the evaporation-only substep: its ``precipitation`` and
+    ``runoff`` must be zero (when not ``Missing``). ``wetted_fraction`` must
+    lie in ``(0, 1]``, and ``depletion_carried`` must lie in
+    ``[0, total_evaporable_water]`` (this function does not implement D185
+    carry-over above ``total_evaporable_water``).
+    """
+    constants = {
+        "total_evaporable_water": total_evaporable_water,
+        "readily_evaporable_water": readily_evaporable_water,
+        "wetted_fraction": wetted_fraction,
+        "margin_above_basal": margin_above_basal,
+    }
+    missing_constants = _check_constants(constants)
+    if _is_number(wetted_fraction) and wetted_fraction == 0:
+        raise ValueError("wetted_fraction must be greater than zero")
+    depletion_carried = _check_depletion(
+        "depletion_carried", depletion_carried, total_evaporable_water
+    )
+    missing_wetting = _missing_operands(
+        {"net_rain": net_rain, "irrigation_field": irrigation_field},
+        {},
+    )
+    if not isinstance(net_rain, Missing):
+        _non_negative("net_rain", net_rain)
+    if not isinstance(irrigation_field, Missing):
+        _non_negative("irrigation_field", irrigation_field)
+    _check_day(day)
+    if (not isinstance(day.precipitation, Missing) and day.precipitation != 0) or (
+        not isinstance(day.runoff, Missing) and day.runoff != 0
+    ):
+        raise ValueError(
+            "day is the evaporation-only substep: precipitation and runoff must be zero"
+        )
+
+    if missing_constants is not None:
+        return _missing_early_wetting(day.date, missing_constants)
+    if isinstance(depletion_carried, Missing):
+        detail = "depletion carried into the day"
+        if depletion_carried.detail is not None:
+            detail = f"{detail}: {depletion_carried.detail}"
+        return _missing_early_wetting(
+            day.date, Missing(reason="MISSING_INPUT", detail=detail)
+        )
+    if missing_wetting is not None:
+        return _missing_early_wetting(day.date, missing_wetting)
+    missing_names = [
+        f"{name} ({getattr(day, name).reason})"
+        for name in _DAY_NUMBERS
+        if isinstance(getattr(day, name), Missing)
+    ]
+    if missing_names:
+        detail = f"input of {day.date.isoformat()}: " + ", ".join(missing_names)
+        return _missing_early_wetting(
+            day.date, Missing(reason="MISSING_INPUT", detail=detail)
+        )
+
+    carried = float(depletion_carried)
+    rain = float(net_rain)
+    irrig_field = float(irrigation_field)
+    fw = float(wetted_fraction)
+
+    irrigation_wetted = irrig_field / fw
+    inflow = rain + irrigation_wetted
+    if inflow > carried:
+        deep_percolation_early = inflow - carried
+        depletion_after_wetting = 0.0
+    else:
+        deep_percolation_early = 0.0
+        depletion_after_wetting = carried - inflow
+
+    evaporation_substep = step(
+        depletion_after_wetting,
+        day,
+        total_evaporable_water=total_evaporable_water,
+        readily_evaporable_water=readily_evaporable_water,
+        wetted_fraction=wetted_fraction,
+        margin_above_basal=margin_above_basal,
+    )
+    return EarlyWettingResult(
+        depletion_carried=carried,
+        depletion_after_wetting=depletion_after_wetting,
+        irrigation_field=irrig_field,
+        irrigation_wetted=irrigation_wetted,
+        net_rain=rain,
+        deep_percolation_early=deep_percolation_early,
+        evaporation_substep=evaporation_substep,
+    )
