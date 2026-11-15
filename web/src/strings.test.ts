@@ -295,9 +295,6 @@ const WORDING_SHEET: Record<string, string> = {
   // mode, and a request that cannot be read.
   'plant.service.rain_next_answer': 'Applies to the next answer from the service.',
   'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
-  // PROPOSED (S-031, R28 of S-035): the service's plant layer is not built.
-  'plant.service.not_built_heading': 'The service has no plant answer yet',
-  'plant.service.not_built_what': 'Answer from the service',
 }
 
 /** Source of the shell page as it was before the strings unit. */
