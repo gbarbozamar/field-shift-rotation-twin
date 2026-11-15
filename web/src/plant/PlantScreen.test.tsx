@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import rawExample from '../data/PLACEHOLDER_plant_answer.json'
 import App from '../App'
-import PlantScreen, { PlantView } from './PlantScreen'
+import PlantScreen, { PlantNoServiceView, PlantView } from './PlantScreen'
 import { parsePlantAnswers, plantExamples } from './plantData'
 import type { MarginOf, PlantAnswerSet, Strictness } from './plantData'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
@@ -104,7 +104,7 @@ describe('PlantScreen: the chosen rotation (1)', () => {
     expect(card).toContain(
       valueLine(formatString(strings['plant.soil_loss_of'], { kind: kind('average') }), loss.value!, loss.unit),
     )
-    expect(card).toContain(valueLine(strings['plant.limit'], chosenOption.limit.limit, chosenOption.limit.unit))
+    expect(card).toContain(valueLine(strings['plant.limit'], chosenOption.limit.limit.value, chosenOption.limit.unit))
     expect(card).toContain(
       formatString(strings['plant.check_line'], {
         check: strings['plant.check.on_average'],
@@ -184,8 +184,8 @@ describe('PlantScreen: the chosen rotation (1)', () => {
     expect(rain).toMatch(/disabled=""/)
   })
 
-  it('the default screen renders the example answer of the questions it starts with', () => {
-    expect(renderToString(<PlantScreen />)).toBe(html)
+  it('without a configured service the screen is the not-available view only (D251)', () => {
+    expect(renderToString(<PlantScreen apiBase={null} />)).toBe(renderToString(<PlantNoServiceView />))
   })
 })
 
@@ -208,6 +208,9 @@ describe('PlantScreen: none meets the limit (2)', () => {
   raw.limit_cost = {
     ...raw.limit_cost,
     value: null,
+    // a missing cost carries no D249 labels
+    provenance: undefined,
+    range_missing: undefined,
     against: null,
     reason: 'NOT_APPLICABLE',
     detail: raw.detail,
@@ -349,7 +352,9 @@ describe('PlantScreen: the route #/plant', () => {
   it('renders the screen at #/plant', () => {
     vi.stubGlobal('window', { location: { hash: '#/plant' } })
     const html = renderToString(<App />)
-    expect(html).toContain('data-testid="plant-card"')
+    // No service is configured in the tests: the screen says it is not available (D251).
+    expect(html).toContain('data-testid="plant-service-not-available"')
+    expect(html).not.toContain('data-testid="plant-card"')
     expect(visibleText(html)).toContain(strings['plant.title'])
   })
 })
@@ -359,5 +364,19 @@ describe('PlantScreen: example data (6)', () => {
     const html = render()
     expect(visibleText(section(html, 'plant-example-banner'))).toContain(strings['example.banner'])
     expect(visibleText(html)).toContain(strings['disclaimer.full'])
+  })
+})
+
+describe('PlantScreen: the declared limits of the answer (D250)', () => {
+  it('shows every declared limit of the answer, the phase-1 limit included, for every answer', () => {
+    for (const answer of plantExamples.answers) {
+      const card = visibleText(
+        section(render(plantExamples, answer.strictness, answer.margin_of), 'plant-card'),
+      )
+      expect(answer.declared_limits.some((limit) => limit.startsWith('phase 1 only'))).toBe(true)
+      for (const limit of answer.declared_limits) {
+        expect(card).toContain(formatString(strings['plant.declared_limit'], { limit }))
+      }
+    }
   })
 })
