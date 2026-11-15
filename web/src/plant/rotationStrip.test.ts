@@ -12,10 +12,16 @@ import type { StringKey } from '../strings'
 import {
   buildRotationStrip,
   cropOrder,
+  cropText,
   parsePlantRequestRotations,
   plantRotations,
+  readPlantRotations,
   stripText,
 } from './rotationStrip'
+
+// Fix round 1 of S-020: plantRotations is now a typed read (definitions or a
+// missing part); the example request parses, so its definitions are here.
+const exampleRotations: RotationDefinition[] = plantRotations.rotations!
 
 /**
  * Acceptance test of the strip of crops of each option (S-020). PROPOSED,
@@ -70,7 +76,8 @@ describe('the copied request (7)', () => {
   })
 
   it('gives one rotation definition per rotation of the request, in request order', () => {
-    expect(plantRotations.map((r) => r.rotation_id)).toEqual(
+    expect(plantRotations.missing).toBeNull()
+    expect(exampleRotations.map((r) => r.rotation_id)).toEqual(
       rawRequest.rotations.map((r) => r.rotation_id),
     )
   })
@@ -78,6 +85,20 @@ describe('the copied request (7)', () => {
   it('refuses what is not a plant request', () => {
     expect(() => parsePlantRequestRotations({ contract: 'plant_answer', rotations: [] })).toThrow()
     expect(() => parsePlantRequestRotations({ contract: 'plant_request' })).toThrow()
+  })
+
+  // PROPOSED (fix round 1 of S-020): a request that does not parse is a typed
+  // absence, never an exception that would take down the route.
+  it('reads a request that does not parse as missing, with its reason, never throwing', () => {
+    const broken = JSON.parse(JSON.stringify(rawRequest))
+    broken.rotations[0].ag_year_start = null
+    for (const value of [broken, { contract: 'plant_answer', rotations: [] }, null]) {
+      expect(readPlantRotations(value)).toEqual({
+        rotations: null,
+        missing: { reason: 'MISSING_INPUT', detail: strings['plant.strip.request_invalid_detail'] },
+      })
+    }
+    expect(readPlantRotations(rawRequest)).toEqual({ rotations: exampleRotations, missing: null })
   })
 })
 
@@ -139,7 +160,13 @@ describe('the strip of each example rotation (1)', () => {
                     detail: harvest.missing!.detail,
                   }),
                 })
-          byYear.set(index, [...(byYear.get(index) ?? []), text])
+          // Fix round 1 of S-020: the text alternative reads each crop with
+          // its purpose, as the strip shows it.
+          const withPurpose = formatString(strings['plant.strip.crop_alt'], {
+            crop: text,
+            purpose: formatString(strings['plant.strip.purpose'], { purpose: component.purpose }),
+          })
+          byYear.set(index, [...(byYear.get(index) ?? []), withPurpose])
         }
         const expected = [...byYear.keys()]
           .sort((a, b) => a - b)
@@ -151,6 +178,24 @@ describe('the strip of each example rotation (1)', () => {
           )
           .join(strings['plant.strip.year_join'])
         expect(stripText(strip)).toBe(expected)
+      })
+
+      // PROPOSED (fix round 1 of S-020): the year numbers depend on the start
+      // month, so the strip keeps it with its provisional mark and provenance,
+      // and the provenance of the dates it places.
+      it('keeps the start of the agricultural year and the provenance of its dates', () => {
+        expect(strip.ag_year_start).toEqual(raw.ag_year_start)
+        const pairs: { provenance: string; source: string }[] = []
+        for (const component of sown) {
+          for (const part of [component.sowing, component.harvest]) {
+            if (part.date === null) continue
+            const mark = part as { provenance: string; source: string }
+            if (!pairs.some((p) => p.provenance === mark.provenance && p.source === mark.source)) {
+              pairs.push({ provenance: mark.provenance, source: mark.source })
+            }
+          }
+        }
+        expect(strip.date_marks).toEqual(pairs)
       })
     })
   }
@@ -199,6 +244,32 @@ describe('a pasture kept over years, and a sowing date missing (2)', () => {
     )
   })
 
+  // PROPOSED (fix round 1 of S-020): pins the rule of the module comment on
+  // the example itself, whose pasture travels with its harvest missing.
+  it('a crop whose harvest date is missing appears only in its sowing year, with the reason of the harvest', () => {
+    const raw = rawRequest.rotations[2]
+    const pasture = raw.components.find((c) => c.purpose === 'pasture')!
+    expect(pasture.harvest.date).toBeNull()
+    const missing = pasture.harvest.missing!
+    const start = raw.ag_year_start.month
+    const sown = raw.components.filter((c) => c.sowing.date !== null)
+    const first = Math.min(...sown.map((c) => agYearOf(c.sowing.date!, start)))
+    const from = agYearOf(pasture.sowing.date!, start) - first + 1
+    const strip = buildRotationStrip(parseRotationDefinition(raw))
+    const holding = strip.years
+      .filter((year) => year.crops.some((c) => c.component_id === pasture.component_id))
+      .map((year) => year.index)
+    expect(holding).toEqual([from])
+    const crop = strip.years
+      .find((year) => year.index === from)!
+      .crops.find((c) => c.component_id === pasture.component_id)!
+    expect(crop.harvest).toEqual({ kind: 'missing', missing })
+    expect(crop.kept).toBe(false)
+    expect(cropText(crop, from)).toContain(
+      missingPatternText(strings['plant.strip.harvest'], missing as { reason: 'NOT_APPLICABLE' }),
+    )
+  })
+
   it('a component whose sowing date is missing is listed with its reason and placed in no year', () => {
     const raw = rotationCopy(1)
     const cover = raw.components[1]
@@ -231,7 +302,7 @@ describe('a pasture kept over years, and a sowing date missing (2)', () => {
 
 describe('the crop colours: by order of first appearance', () => {
   it('lists each crop once, in the order it first appears in the strips shown', () => {
-    const strips = plantRotations.map(buildRotationStrip)
+    const strips = exampleRotations.map(buildRotationStrip)
     const seen: string[] = []
     for (const strip of strips) {
       for (const year of strip.years) {

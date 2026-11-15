@@ -250,6 +250,14 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.state.on_average_only': 'Meets the limit on average, but not in: {kinds}',
   'plant.state.out_by': 'Out, by this check: {check}',
   'plant.state.why': 'Why it is not resolved',
+  // PROPOSED (S-020 fix round 1): row verdicts, strip text and marks, bar marks.
+  'plant.verdict.not_resolved': 'not resolved',
+  'plant.strip.crop_alt': '{crop} ({purpose})',
+  'plant.strip.request_invalid_detail': 'the rotations of the request could not be read',
+  'plant.strip.dates_provenance': 'Dates of the strip: {provenance}',
+  'plant.bar.margin_loss': 'Below zero: a loss',
+  'plant.bar.soil_against': '{what} against the limit',
+  'plant.bar.not_in_record': 'this kind of year is not in the record, so there is no verdict',
 }
 
 /** Source of the shell page as it was before the strings unit. */

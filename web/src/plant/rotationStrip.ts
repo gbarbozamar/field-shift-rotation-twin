@@ -1,8 +1,8 @@
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
 import { parseRotationDefinition } from '../rotation/exampleRotation'
-import type { RotationDefinition } from '../rotation/exampleRotation'
+import type { AgYearStart, RotationDefinition } from '../rotation/exampleRotation'
 import { missingPatternText } from '../components/ValueDisplay'
-import type { MissingPart } from '../components/ValueDisplay'
+import type { MissingPart, ProvenanceLabel } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import type { StringKey } from '../strings'
@@ -35,7 +35,11 @@ import type { StringKey } from '../strings'
  * strip shows the months.
  *
  * Pure: a definition in, a strip out. The text alternative is built from the
- * wording of strings.ts; crop ids render as they travel (they are data).
+ * wording of strings.ts and reads each crop with its purpose; crop ids and
+ * purposes render as they travel (they are data). The strip keeps the start
+ * of the agricultural year (its month, provisional mark and provenance) and
+ * the provenance of its dates, which the screen shows beside it, since the
+ * year numbers depend on them.
  */
 
 /** A month of the strip, and the strip year (1, 2, ...) it lies in. */
@@ -73,14 +77,30 @@ export interface UnplacedCrop {
   missing: MissingPart
 }
 
+/** Where the dates of the strip come from: a provenance label and its source (C4.1). */
+export interface DateMark {
+  provenance: ProvenanceLabel
+  source: string
+}
+
 export interface RotationStrip {
   rotation_id: string
   label: string
   repeats: boolean
+  /**
+   * The start of the agricultural year the strip's years are numbered by
+   * (C5.3), with its provisional mark (C5.4) and its provenance.
+   */
+  ag_year_start: AgYearStart
+  /** The provenance of the dates placed in the strip, each pair once, in order of first use. */
+  date_marks: DateMark[]
   years: StripYear[]
   unplaced: UnplacedCrop[]
 }
 
+// Not imported (fix round 1 of S-020): no module of web/src exports an
+// equivalent guard; plantData.ts, exampleRotation.ts and the other parsers
+// each keep a private copy. Sharing one would change modules of other units.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -100,8 +120,36 @@ export function parsePlantRequestRotations(value: unknown): RotationDefinition[]
   return value.rotations.map(parseRotationDefinition)
 }
 
-/** The rotations of the example request (example data). */
-export const plantRotations: RotationDefinition[] = parsePlantRequestRotations(rawPlantRequest)
+/**
+ * The rotations of a request as the screen reads them: the definitions, or
+ * the reason they cannot be shown (fix round 1 of S-020, PROPOSED). A request
+ * that does not parse is a typed absence, never an exception at import: the
+ * strips say so and the rest of the screen still renders.
+ */
+export type PlantRotations =
+  | { rotations: RotationDefinition[]; missing: null }
+  | { rotations: null; missing: MissingPart }
+
+/**
+ * Reads the rotations of a plant request. Pure: value in, the definitions or
+ * the missing part out. PROPOSED: a request that does not parse is
+ * MISSING_INPUT with the detail of strings key
+ * plant.strip.request_invalid_detail (the technical code of the parser is not
+ * shown: it is not interface wording).
+ */
+export function readPlantRotations(value: unknown): PlantRotations {
+  try {
+    return { rotations: parsePlantRequestRotations(value), missing: null }
+  } catch {
+    return {
+      rotations: null,
+      missing: { reason: 'MISSING_INPUT', detail: strings['plant.strip.request_invalid_detail'] },
+    }
+  }
+}
+
+/** The rotations of the example request (example data), or why they cannot be read. */
+export const plantRotations: PlantRotations = readPlantRotations(rawPlantRequest)
 
 function parts(date: string): { year: number; month: number } {
   const [year, month] = date.split('-').map(Number)
@@ -140,8 +188,24 @@ export function buildRotationStrip(rotation: RotationDefinition): RotationStrip 
         ? -1
         : 1,
   )
+  const date_marks: DateMark[] = []
+  for (const { component } of sown) {
+    for (const part of [component.sowing, component.harvest]) {
+      if (part.date === null) continue
+      if (!date_marks.some((m) => m.provenance === part.provenance && m.source === part.source)) {
+        date_marks.push({ provenance: part.provenance, source: part.source })
+      }
+    }
+  }
+  const head = {
+    rotation_id: rotation.rotation_id,
+    label: rotation.label,
+    repeats: rotation.repeats,
+    ag_year_start: { ...rotation.ag_year_start },
+    date_marks,
+  }
   if (sown.length === 0) {
-    return { rotation_id: rotation.rotation_id, label: rotation.label, repeats: rotation.repeats, years: [], unplaced }
+    return { ...head, years: [], unplaced }
   }
   const first = Math.min(...sown.map((s) => agYearOf(s.sowing, start)))
   const indexOf = (date: string) => agYearOf(date, start) - first + 1
@@ -180,7 +244,7 @@ export function buildRotationStrip(rotation: RotationDefinition): RotationStrip 
         .map((p) => ({ ...p.crop, kept: index > p.from })),
     })
   }
-  return { rotation_id: rotation.rotation_id, label: rotation.label, repeats: rotation.repeats, years, unplaced }
+  return { ...head, years, unplaced }
 }
 
 /** The name of a calendar month (C5.1: month names are interface text). */
@@ -213,14 +277,25 @@ export function cropText(crop: StripCrop, inYear: number): string {
   })
 }
 
-/** How one year of the strip reads. */
+/**
+ * How one crop reads in the text alternative: as cropText, with its purpose,
+ * which the strip shows beside it (fix round 1 of S-020, PROPOSED).
+ */
+export function cropAltText(crop: StripCrop, inYear: number): string {
+  return formatString(strings['plant.strip.crop_alt'], {
+    crop: cropText(crop, inYear),
+    purpose: formatString(strings['plant.strip.purpose'], { purpose: crop.purpose }),
+  })
+}
+
+/** How one year of the strip reads in its text alternative. */
 export function yearText(year: StripYear): string {
   if (year.crops.length === 0) {
     return formatString(strings['plant.strip.year_empty'], { n: year.index })
   }
   return formatString(strings['plant.strip.year'], {
     n: year.index,
-    crops: year.crops.map((c) => cropText(c, year.index)).join(strings['plant.strip.crop_join']),
+    crops: year.crops.map((c) => cropAltText(c, year.index)).join(strings['plant.strip.crop_join']),
   })
 }
 

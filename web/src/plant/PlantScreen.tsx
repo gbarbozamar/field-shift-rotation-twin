@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { RotationDefinition } from '../rotation/exampleRotation'
-import { barScale } from './optionBars'
+import { barScale, drawnSoilVerdict } from './optionBars'
 import { MarginBar, SoilLossBar, StripBlock } from './PlantOptionParts'
 import { buildRotationStrip, cropOrder, plantRotations } from './rotationStrip'
-import type { RotationStrip } from './rotationStrip'
+import type { PlantRotations, RotationStrip } from './rotationStrip'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
@@ -158,9 +158,22 @@ function LimitLine({ option }: { option: PlantOption }) {
   )
 }
 
-function CheckLine({ strictness, check }: { strictness: Strictness; check: LimitCheck }) {
+function CheckLine({
+  strictness,
+  check,
+  reasonShown = false,
+}: {
+  strictness: Strictness
+  check: LimitCheck
+  /**
+   * True when the row already shows the reason of this check (an option not
+   * resolved: its state detail says why), so the line names the check and
+   * its verdict only and the reason is shown once (fix round 1 of S-020).
+   */
+  reasonShown?: boolean
+}) {
   const label = strings[`plant.check.${strictness}`]
-  if (check.verdict === 'not_resolved') {
+  if (check.verdict === 'not_resolved' && !reasonShown) {
     return <MissingLine what={label} missing={check.missing!} />
   }
   return (
@@ -388,7 +401,8 @@ function StateDetail({ answer, option }: { answer: PlantAnswer; option: PlantOpt
     }
   } else if (option.state === 'does_not_meet') {
     lines.push(formatString(strings['plant.state.out_by'], { check: strings[`plant.check.${answer.strictness}`] }))
-    if (option.kinds_not_met.length !== 0) {
+    // Under every kind of year the kinds lines of the row already name them.
+    if (answer.strictness === 'on_average' && option.kinds_not_met.length !== 0) {
       lines.push(formatString(strings['plant.kinds.not_met'], { kinds: kindsText(option.kinds_not_met) }))
     }
   } else if (option.limit_check.missing !== null) {
@@ -425,6 +439,7 @@ function OptionBlock({
   option,
   rotation,
   strip,
+  stripMissing,
   order,
   scales,
 }: {
@@ -432,18 +447,24 @@ function OptionBlock({
   option: PlantOption
   rotation: RotationDefinition | null
   strip: RotationStrip | null
+  stripMissing: MissingPart | null
   order: readonly string[]
   scales: BarScales
 }) {
   const margin = option.margin[answer.margin_of]
   const loss = option.soil_loss[answer.margin_of]
+  // The bar says what the answer says of the quantity it draws (PROPOSED,
+  // drawnSoilVerdict); its verdict is in text unless the check line of the
+  // row is the check of that same quantity (the average, on average).
   const lossBar =
     loss.value !== null && scales.soilLoss !== null ? (
       <SoilLossBar
         value={loss.value}
         scale={scales.soilLoss}
         limit={option.limit}
-        verdict={option.limit_check.verdict}
+        what={formatString(strings['plant.soil_loss_of'], { kind: kindLabel(answer.margin_of) })}
+        drawn={drawnSoilVerdict(option, answer.margin_of)}
+        verdictInText={!(answer.margin_of === 'average' && answer.strictness === 'on_average')}
         limitMissing={option.limit === null ? option.on_average.missing : null}
       />
     ) : null
@@ -459,7 +480,7 @@ function OptionBlock({
         {strings[`plant.state.${option.state}`]}
       </p>
       <StateDetail answer={answer} option={option} />
-      <StripBlock strip={strip} order={order} />
+      <StripBlock strip={strip} order={order} missing={stripMissing} />
       <MeasuredLine
         what={formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })}
         item={margin}
@@ -475,7 +496,11 @@ function OptionBlock({
       {answer.margin_of !== 'average' ? (
         <SoilLossLine kind={answer.margin_of} item={loss} bar={lossBar} />
       ) : null}
-      <CheckLine strictness={answer.strictness} check={option.limit_check} />
+      <CheckLine
+        strictness={answer.strictness}
+        check={option.limit_check}
+        reasonShown={option.state === 'not_resolved' && option.limit_check.missing !== null}
+      />
       {answer.strictness === 'every_kind' ? (
         <KindsLines option={option} />
       ) : null}
@@ -483,28 +508,53 @@ function OptionBlock({
   )
 }
 
+/** The rotations of the request as a typed read: a list given directly is read as present. */
+function asPlantRotations(rotations: RotationDefinition[] | PlantRotations): PlantRotations {
+  return Array.isArray(rotations) ? { rotations, missing: null } : rotations
+}
+
 /**
  * The rows of the options (S-020): each with the strip of its definition in
- * the request, or the strip not available when the request has none; the
- * crop colours by order of first appearance across the rows; the bar scales
- * shared by the rows.
+ * the request, or the strip not available, with its reason, when the request
+ * has none or cannot be read; the crop colours by order of first appearance
+ * across the rows; the bar scales shared by the rows. Built once per answer
+ * and rotations (useMemo), not at each step of the price slider.
  */
-function OptionRows({ answer, rotations }: { answer: PlantAnswer; rotations: RotationDefinition[] }) {
-  const rows = answer.options.map((option) => {
-    const rotation = rotations.find((r) => r.rotation_id === option.rotation_id) ?? null
-    return { option, rotation, strip: rotation !== null ? buildRotationStrip(rotation) : null }
-  })
-  const order = cropOrder(rows.flatMap((row) => (row.strip !== null ? [row.strip] : [])))
-  const scales = barScales(answer)
+function OptionRows({
+  answer,
+  rotations,
+}: {
+  answer: PlantAnswer
+  rotations: RotationDefinition[] | PlantRotations
+}) {
+  const { rows, order, scales } = useMemo(() => {
+    const read = asPlantRotations(rotations)
+    const built = answer.options.map((option) => {
+      const rotation = read.rotations?.find((r) => r.rotation_id === option.rotation_id) ?? null
+      return {
+        option,
+        rotation,
+        strip: rotation !== null ? buildRotationStrip(rotation) : null,
+        // null: the request holds no definition of it (StripBlock says so).
+        stripMissing: read.missing,
+      }
+    })
+    return {
+      rows: built,
+      order: cropOrder(built.flatMap((row) => (row.strip !== null ? [row.strip] : []))),
+      scales: barScales(answer),
+    }
+  }, [answer, rotations])
   return (
     <>
-      {rows.map(({ option, rotation, strip }) => (
+      {rows.map(({ option, rotation, strip, stripMissing }) => (
         <OptionBlock
           key={option.rotation_id}
           answer={answer}
           option={option}
           rotation={rotation}
           strip={strip}
+          stripMissing={stripMissing}
           order={order}
           scales={scales}
         />
@@ -554,8 +604,12 @@ export interface PlantViewProps {
   marginOf: MarginOf
   /** The soybean price looked at; null when the answer has no price of today. */
   price: number | null
-  /** The rotation definitions of the request (S-020); the example request's by default. */
-  rotations?: RotationDefinition[]
+  /**
+   * The rotation definitions of the request (S-020), or the typed read of
+   * them (readPlantRotations), which may be missing with its reason; the
+   * example request's by default.
+   */
+  rotations?: RotationDefinition[] | PlantRotations
   onStrictness?: (strictness: Strictness) => void
   onMarginOf?: (marginOf: MarginOf) => void
   onPrice?: (price: number) => void

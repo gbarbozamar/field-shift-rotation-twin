@@ -265,6 +265,19 @@ export const strings = {
   'plant.state.on_average_only': 'Meets the limit on average, but not in: {kinds}',
   'plant.state.out_by': 'Out, by this check: {check}',
   'plant.state.why': 'Why it is not resolved',
+  // PROPOSED (S-020 fix round 1): the verdict of a check not resolved, when
+  // its reason is shown once elsewhere in the row; the text alternative of a
+  // crop with its purpose; the strip not available when the request cannot be
+  // read; the provenance of the strip's dates; the text mark of a negative
+  // margin bar; the verdict of the soil-loss bar for the quantity it draws.
+  // Wording is a person's decision; the operator approves it.
+  'plant.verdict.not_resolved': 'not resolved',
+  'plant.strip.crop_alt': '{crop} ({purpose})',
+  'plant.strip.request_invalid_detail': 'the rotations of the request could not be read',
+  'plant.strip.dates_provenance': 'Dates of the strip: {provenance}',
+  'plant.bar.margin_loss': 'Below zero: a loss',
+  'plant.bar.soil_against': '{what} against the limit',
+  'plant.bar.not_in_record': 'this kind of year is not in the record, so there is no verdict',
 } as const
 
 /**
