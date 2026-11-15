@@ -2,7 +2,7 @@
 
 Where crop and rotation parameters are stored, each with its unit, its uncertainty range, its citation, who transcribed it and the person who checked it.
 
-It holds the layout, the record format, the check that rejects a malformed record, and in `records/` the first parameters: 138 records, all checked or declared by the lead developer under D34 and D66: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), in `records/computed_c/` the 67 records of the computed `C` (unit l0/c-records; D129, D131, D142 to D145), and in `records/water/` the 45 water records of FAO-56 (unit l0/water-records-signed): the 31 constants of the reference evapotranspiration, the two bounds of PC-4 (D82) and the 12 basal crop coefficients of Table 17.
+It holds the layout, the record format, the check that rejects a malformed record, and the first parameters: 138 records, all checked or declared by the lead developer under D34 and D66. In `records/`, the catalogue, 77 records: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), and in `records/water/` the 45 water records of FAO-56 (unit l0/water-records-signed): the 31 constants of the reference evapotranspiration, the two bounds of PC-4 (D82) and the 12 basal crop coefficients of Table 17. Also in the catalogue, in `records/residues/`, the six records the residue ledger (EP4) reads: the residue/yield ratio and the yield of soybean, wheat and maize (unit l0/c-records; D129 (c), D131, D142). In `withdrawn/computed_c/`, outside the catalogue, the 61 records that only the computed `C` reads (unit l0/c-records; D129, D142 to D145), moved there unchanged by unit l0/computed-c-out-of-catalogue: [D148](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) withdraws the computed `C` from the demonstration, and decision [D158](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6889049425) of issue #77 says where: in the catalogue the service loads. [D164](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6889521276) amends D158: the six records of the computed `C` that the residue ledger also reads stay in the catalogue, and the other 61 leave. See [withdrawn/README.md](withdrawn/README.md).
 
 > **Status: PROPOSED.** The record format, the scope keys and the test cases below were written by a builder session (blueprint section 3.7). They take effect only when a person approves the pull request. Items marked `OPEN` need an answer from a person.
 
@@ -12,10 +12,11 @@ Values, ranges and citations are science class (blueprint sections 3.5 and 3.6),
 
 | Path | Content |
 |---|---|
-| `records/` | The catalogue: one JSON file per parameter record. Today: the records of the demonstration point La Estanzuela, of the computed `C` (`computed_c/`) and of the water engine (`water/`) |
+| `records/` | The catalogue: one JSON file per parameter record. Today: the records of the demonstration point La Estanzuela, of the water engine (`water/`) and of the residue ledger (`residues/`) |
+| `withdrawn/` | Records taken out of the catalogue and kept: one JSON file per record, in the same format. Never loaded with `records/`. Today: the 61 records that only the computed `C` reads (`computed_c/`; D148, D158, D164) |
 | `examples/` | Two placeholder records that show the format. Never read as parameters |
 | `catalogue.py` | The record checks. Standard library only |
-| `test_layout.py` | The acceptance test. It also checks the whole folder: every file under `records/`, and that no record file lies anywhere else |
+| `test_layout.py` | The acceptance test. It also checks the whole folder: every file under `records/`, every file under `withdrawn/`, and that no record file lies anywhere else |
 
 Run the check from the repository root:
 
@@ -32,8 +33,17 @@ Provisional environment: Python 3.12 and pytest; standard library otherwise.
 - What identifies a record is its `id` and `scope`, not its path.
 - A file with a repeated key, or with `NaN` or `Infinity`, is rejected.
 - Nothing is skipped without a message. Every file under `records/` is read: a file that is not a `.json` file is reported, and so is a folder whose name ends in `.json`. The only exception is `records/README.md`.
-- A `.json` file anywhere else under `params/`, other than under `examples/`, is reported: it would never be checked or read.
+- A `.json` file anywhere else under `params/`, other than under `withdrawn/` or `examples/`, is reported: it would never be checked or read.
 - A file that cannot be read is one problem, and the rest of the folder still loads.
+
+### Files in `withdrawn/` (PROPOSED)
+
+- A record that is taken out of the catalogue and not deleted is moved to `withdrawn/`, unchanged: same file, same value, unit, range, citation, note and persons. A signed record is moved, never edited.
+- `withdrawn/` is not part of the catalogue. `load_folder` and `check_folder` on `records/` do not read it, so a service that loads `records/` never passes these records to an engine. Code that wants them loads the folder itself, by its path.
+- The files are still checked, by the same rules as the files of `records/`: one record per `.json` file, each a well-formed record, none a placeholder, no two with the same `id` and `scope`, and nothing skipped without a message except `withdrawn/README.md`. `check_layout` runs this check and names each file from `params/`, for example `withdrawn/computed_c/<file>.json`. Subfolders are allowed and carry no meaning.
+- `records/` and `withdrawn/` are two sets: a record of `withdrawn/` with the same `id` and `scope` as a record of `records/` is not reported as a duplicate.
+- The folder may be absent.
+- Why a record is there is written in `withdrawn/README.md`, with the decision of issue #77 that took it out.
 
 ## Record format (PROPOSED)
 
@@ -133,7 +143,7 @@ The reading functions refuse a placeholder (F5b). To reach their accepting path,
 | A6 | The same `id` with a different scope, or with the empty scope, is a different record |
 | A7 | The optional fields `note` and `citation.url` are accepted |
 | A8 | The files in `examples/` are well-formed, are all placeholders, and are rejected as a catalogue |
-| A9 | The whole `params/` folder of this repository passes the layout check (widened by F3a and F5c), records included |
+| A9 | The whole `params/` folder of this repository passes the layout check (widened by F3a, F5c and W1), the records of `records/` and of `withdrawn/` included |
 
 ### Rejected
 
@@ -169,7 +179,7 @@ One code per defect of issue 21. Each case failed on the code before the fix.
 | F1c | An integer too large for a float, as `value`, `range.low` or `range.high`, is a problem of the record; the checks and the reading functions do not fail on it |
 | F2 | An integer that cannot be read back unchanged is rejected: one that a float cannot hold exactly, as `value` or as a range bound. An integer that a float holds exactly, and ordinary number text, are accepted |
 | F2b | A decimal written with more digits than a float keeps is accepted and read as the nearest float, in the text of a file and in a whole record file that is loaded, checked and read |
-| F3a | A `.json` file directly in `params/`, or in a folder other than `records/` and `examples/`, in any letter case of the extension, is reported |
+| F3a | A `.json` file directly in `params/`, or in a folder other than `records/`, `withdrawn/` and `examples/`, in any letter case of the extension, is reported |
 | F3b | A file inside the catalogue that is not a `.json` file is reported: other extensions, an upper-case extension, no extension, a README in a subfolder. Only the README at the top of the folder is skipped |
 | F3c | The duplicate check reports a record it cannot compare (not an object, malformed `id`, malformed `scope`) instead of skipping it. The catalogue check reports such a record once, with the reason |
 | F4 | A record whose value is missing and whose citation is `null` is rejected when it carries a numeric range: a range needs a citation. The same record with a citation is accepted. When the range is not an object, only that problem is reported |
@@ -178,6 +188,14 @@ One code per defect of issue 21. Each case failed on the code before the fix.
 | F5c | The check run by the acceptance test reads every file under `records/`: a file that is not a record fails it; a `params/` folder without `records/` is a problem |
 | F6 | Every public function, given input it did not check (not an object, wrong types, keys that are not text, huge numbers, a record that contains itself, deep nesting, a path that is not a path), reports a problem or raises `ValueError`, and nothing else. The list of public functions in the test is complete |
 | F7 | In `test_layout.py`, every object literal with a field name of the format, every text holding such a field name in quotes, and every call passing a field name to anything but the placeholder builders, carries the word PLACEHOLDER. So does every file in `examples/` |
+
+### Withdrawn records (unit l0/computed-c-out-of-catalogue)
+
+| Code | Case |
+|---|---|
+| W1 | A `params/` folder without `withdrawn/` passes. A record file under `withdrawn/`, in a subfolder, is not reported as a file outside the known folders, is not in what `load_folder` returns for `records/`, and is still checked as a record: a record with the word PLACEHOLDER is reported once, named from `params/`. `withdrawn/README.md` is skipped |
+| W2 | Under `withdrawn/`, an unreadable file, a file that is not a `.json` file, a README in a subfolder, a malformed record and two records with the same `id` and `scope` are each reported, named from `params/`. The same `id` and `scope` once in `records/` and once in `withdrawn/` is not a duplicate |
+| W3 | In this repository, `records/` and `withdrawn/` each load without a problem and pass the catalogue check, and no record of `withdrawn/` has the `id` and `scope` of a record of `records/` |
 
 ## OPEN
 
