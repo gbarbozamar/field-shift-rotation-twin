@@ -25,14 +25,17 @@ the approved ranges, read by D93 and D98):
 
 1. A vs B, soil loss, 2021: the range [6.2 - 7.4, 6.8 - 6.6] =
    [-1.2, +0.2] crosses zero, so the cell blocks in EVERY scenario; the
-   pair is "Not separated: within uncertainty", not the brief's "Not
-   robust across scenarios", and the tipping point the brief reads
-   between s2 and s3 does not appear (the state never changes).
+   pair is "Not separated: within uncertainty" in each scenario, and the
+   tipping point the brief reads between s2 and s3 does not appear (the
+   state never changes). Over the set {s1, s2, s3} the pair is "Not
+   robust across scenarios", as the brief reads it (D166, unit
+   l2/decision-rule-d165-d176).
 2. B vs C, carbon: the range [0.4 - 0.4, 0.6 - 0.2] = [0.0, +0.4]
-   touches zero, so the cell is not a strict improvement and blocks; the
-   pair is "Not separated: within uncertainty", not the brief's "Robust
-   preference (C)". The brief's range [0.1, 0.3] is not what D92 gives
-   on the approved ranges [0.2, 0.4] and [0.4, 0.6].
+   touches zero from the side that is not worse, so the cell is not a
+   strict improvement and, under D165, does not block; the pair is still
+   not the brief's "Robust preference (C)", because its soil-loss cells
+   cross zero (3. below). The brief's range [0.1, 0.3] is not what D92
+   gives on the approved ranges [0.2, 0.4] and [0.4, 0.6].
 3. B vs C, soil loss: the differences are zero, but the ranges cross
    zero and the pair as a whole is never "Identical" (its carbon
    difference is +0.2); the brief's "Identical" is a per-indicator
@@ -53,6 +56,7 @@ import pytest
 from contracts.decision_output import DecisionOutput
 from contracts.results.models import ResultsTable
 from decision.functions import (
+    NOT_ROBUST_ACROSS_SCENARIOS,
     NOT_SEPARATED_WITHIN_UNCERTAINTY,
     indicator_ranking,
     measurement_priority,
@@ -513,21 +517,28 @@ def test_the_states_of_the_pairs_over_the_whole_set() -> None:
     for first, second in run.PAIRS:
         state = pair_state(TABLE, first, second)
         states[(first, second)] = state
-        # DIVERGENCE 1 (A vs B, A vs C) and 2 (B vs C): the brief reads
-        # "Not robust across scenarios" and "Robust preference (C)";
-        # under D92 the 2021 cell of A vs B crosses zero and the carbon
-        # cell of B vs C touches zero, and D98 makes both block, so every
-        # pair is "Not separated: within uncertainty" (D97).
-        assert state.state == NOT_SEPARATED_WITHIN_UNCERTAINTY
+        # D166: each scenario is read on its own and the set is "Not robust
+        # across scenarios" unless every member is a robust preference. In
+        # every scenario each pair is "Not separated: within uncertainty"
+        # (DIVERGENCE 1: the 2021 cell of A vs B crosses zero; B vs C: its
+        # soil-loss cells cross zero), so over {s1, s2, s3} the pair is "Not
+        # robust across scenarios", as the brief reads it for A vs B. The
+        # brief's "Robust preference (C)" stays a divergence (2.).
+        assert state.state == NOT_ROBUST_ACROSS_SCENARIOS
+        assert state.by_scenario == tuple(
+            (scenario_id, NOT_SEPARATED_WITHIN_UNCERTAINTY)
+            for scenario_id in matrix.SCENARIOS
+        )
         # DIVERGENCE 3: B vs C is never "Identical" (D85): its carbon
         # difference (+0.2) is not zero.
         assert state.identical_rows is False
     assert states[("A", "B")].indicators_not_resolved == ("soil_loss",)
     assert states[("A", "C")].indicators_not_resolved == ("soil_loss",)
-    assert states[("B", "C")].indicators_not_resolved == (
-        "soil_carbon_trend",
-        "soil_loss",
-    )
+    # D165: the carbon cell of B vs C, [0.0, +0.4], touches zero from the
+    # side that is not worse, so it does not block and its indicator is not
+    # named; "indicators_not_resolved names only indicators with a blocking
+    # cell".
+    assert states[("B", "C")].indicators_not_resolved == ("soil_loss",)
     # Water never enters a state (D6): it is not named anywhere.
     assert all(
         "water_deficit_exposure" not in state.indicators_not_resolved
@@ -551,7 +562,7 @@ def test_the_states_of_the_pairs_at_each_scenario() -> None:
 
 
 def test_dominance_between_the_rotations() -> None:
-    # Read on the point values (K7 is OPEN): B and C are never preferred
+    # Read on the point values (D156): B and C are never preferred
     # less than A (better at 2020, 2021, 2022 of every scenario and on
     # carbon), C is never preferred less than B (carbon), and no pair is
     # preferred the other way.
@@ -625,7 +636,9 @@ def test_the_measurement_priority() -> None:
         priority = measurement_priority(
             TABLE, first, second, matrix.UNCERTAIN_INPUTS
         )
-        assert priority.base_state == NOT_SEPARATED_WITHIN_UNCERTAINTY
+        # D103 and D166: the base state is the state over the whole admitted
+        # set, each scenario read on its own.
+        assert priority.base_state == NOT_ROBUST_ACROSS_SCENARIOS
         assert len(priority.items) == 1
         item = priority.items[0]
         # The values of u never change the state of any pair, so u holds
@@ -781,11 +794,11 @@ def test_the_document_carries_the_states_and_their_coverage() -> None:
         ("B", "C"): (15, 18),
     }
     for pair, item in states.items():
-        assert item.value == "Not separated: within uncertainty"
-        # D86 writes no reason for this state (K3): its missing part.
-        assert item.reason is None
-        assert item.reason_missing is not None
-        assert item.reason_missing.reason == "NOT_AVAILABLE"
+        # D166: over the set {s1, s2, s3}, "Not robust across scenarios",
+        # with the reason of D86 "not robust across the admitted scenarios".
+        assert item.value == "Not robust across scenarios"
+        assert item.reason == "not robust across the admitted scenarios"
+        assert item.reason_missing is None
         assert item.preferred_rotation_id is None
         assert (item.coverage.cells_compared, item.coverage.cells_of_the_pair) == (
             expected_coverage[pair]
@@ -795,7 +808,9 @@ def test_the_document_carries_the_states_and_their_coverage() -> None:
     # (D6: what was not evaluated does not enter the state).
     assert document.state.value is None
     assert document.state.missing is not None
-    assert document.state.indicators_not_resolved == ["soil_carbon_trend", "soil_loss"]
+    # D165: no pair has a blocking carbon cell (B vs C touches zero from the
+    # side that is not worse), so only soil loss is named.
+    assert document.state.indicators_not_resolved == ["soil_loss"]
     assert len(document.state.reasons) == 4  # one per pair, one for water
     assert all(reason.strip() for reason in document.state.reasons)
 
