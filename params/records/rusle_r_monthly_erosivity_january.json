@@ -1,0 +1,16 @@
+{
+  "id": "rusle_r_monthly_erosivity_january",
+  "scope": {},
+  "value": 323,
+  "unit": "GloREDa monthly raster value (no unit tag in the file)",
+  "range": null,
+  "range_missing_reason": "The raster gives one value per cell with no uncertainty range.",
+  "citation": {
+    "reference": "Panagos, P., et al. (2023). Global Rainfall Erosivity database (GloREDa), version 1.2. Zenodo, record 8036998, https://doi.org/10.5281/zenodo.8036998 (CC BY 4.0). Data paper: Panagos et al. (2023), Data in Brief 50:109482, https://doi.org/10.1016/j.dib.2023.109482.",
+    "locator": "GloREDa.zip, file Rfactor_January.tif, cell row 14604, column 14678 (EPSG:4326, 30 arc-second grid), at the point lat -34.33333, lon -57.68333 (lat. 34°20'S, long 57°41'W, Grahmann et al. 2022, p. 3)",
+    "url": "https://doi.org/10.5281/zenodo.8036998"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14 from the Zenodo zip (2,224,877,134 bytes, md5 82e545774cc96781f4623e3b98a60be4). Checked by the lead developer (gbarbozamar) on 2026-11-14 by running the cell read on the zip himself and comparing the twelve values (D34, D66). Monthly erosivity of the climatology at the demonstration point La Estanzuela (D69, D84); licence: CC BY 4.0 of the Zenodo record, with attribution (D101). Sum of the twelve values 3298 (DERIVED). The file declares no unit; the unit string is shared by the twelve records so that their fractions are defined (OPEN 11 of engine/erosion/SOIL_LOSS.md); which unit the layers are in is OPEN. Identifier PROPOSED in PR #187; scope {}."
+}
