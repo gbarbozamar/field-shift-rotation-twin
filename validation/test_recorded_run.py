@@ -12,6 +12,7 @@ for the tests that stand under a code of ``docs/VALIDATION.md``.
 
 from __future__ import annotations
 
+import ast
 import re
 from collections import Counter
 from pathlib import Path
@@ -20,7 +21,8 @@ import pytest
 
 from validation import records
 
-PROTOCOL_FILE = Path(__file__).resolve().parents[1] / "docs" / "VALIDATION.md"
+REPOSITORY = Path(__file__).resolve().parents[1]
+PROTOCOL_FILE = REPOSITORY / "docs" / "VALIDATION.md"
 
 # One entry per recorded run, by the id of its ``protocol_run`` record.
 #   outcomes: the counts of the JUnit report of that run over the tests that
@@ -40,6 +42,9 @@ RECORDED_RUNS = {
 
 _ENTRY_HEADING_RE = re.compile(r"^### ([EHD][0-9]+[a-z]?)\s*$")
 _COMMIT_RE = re.compile(r"[0-9a-f]{40}")
+_RESULT_TEST_RE = re.compile(r"Test (\S+\.py)::(test_\w+)(\[.*\])?\. Placed under ")
+_SKIPPED_LINE_RE = re.compile(r"- SKIPPED (\S+\.py)::(test_\w+): \S")
+_ENTRY_TEST_RE = re.compile(r"- Test: `(\S+\.py)::(test_\w+)`")
 
 
 @pytest.fixture(scope="module")
@@ -64,6 +69,34 @@ def codes_not_defined() -> set[str]:
         elif code is not None and line.strip() == "- Status: not defined":
             found.add(code)
     return found
+
+
+def top_level_tests_of(path: str) -> dict[str, ast.FunctionDef]:
+    """The test functions written at the top level of a file of the repository."""
+    file = REPOSITORY / path
+    assert file.is_file(), f"{path} is not a file of the repository"
+    tree = ast.parse(file.read_text(encoding="utf-8"))
+    return {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")}
+
+
+def named_by_the_entries() -> dict[str, tuple[str, str]]:
+    """By code, the file and the function that the entry of docs/VALIDATION.md names on its 'Test:' line."""
+    found: dict[str, tuple[str, str]] = {}
+    code = None
+    for line in PROTOCOL_FILE.read_text(encoding="utf-8").splitlines():
+        heading = _ENTRY_HEADING_RE.match(line)
+        if heading:
+            code = heading.group(1)
+        elif line.startswith("#"):
+            code = None
+        elif code is not None and _ENTRY_TEST_RE.match(line):
+            found[code] = _ENTRY_TEST_RE.match(line).groups()
+    return found
+
+
+def latest_run_id(store: records.Store) -> str:
+    # The time format of a run is fixed, so the texts sort as the times do.
+    return max(store.runs, key=lambda run_id: store.runs[run_id]["run_at"])
 
 
 def test_the_real_store_is_accepted_by_every_check_of_records(store):
@@ -133,14 +166,48 @@ def test_every_result_names_the_test_it_is_the_outcome_of(store, run_id):
     names = []
     for result_id, result in results_of(store, run_id).items():
         assert result_id.startswith(f"{short}-{result['test_code']}-test_")
-        name = re.match(r"Test (\S+\.py::test_.+?)\. Placed under ", result["notes"])
+        name = _RESULT_TEST_RE.match(result["notes"])
         assert name, result_id
-        names.append(name.group(1))
+        path, function, case = name.groups()
+        node = f"{path}::{function}{case or ''}"
+        names.append(node)
+        # The id is built from the commit, the code and the test function.
+        assert re.fullmatch(re.escape(f"{short}-{result['test_code']}-{function}-") + r"\d{3}", result_id)
         slot = result["observed"]
-        assert name.group(1) in (slot.get("text") or slot.get("missing_reason"))
+        assert node in (slot.get("text") or slot.get("missing_reason"))
         # No expected-value record is pointed to: the store holds none.
         assert set(result["expected"]) == {"missing_reason"}
     assert len(set(names)) == len(names), "a test has one outcome in a run"
+
+
+def test_the_latest_run_names_test_files_and_functions_that_exist(store):
+    """A record cannot name a test that is not there.
+
+    Only the latest run is held to this: an earlier run names the tests of its
+    own commit, which a later unit may rename. What this does not show: that
+    the named test is the check of its code, or that its outcome was the one
+    recorded. Only running the suite again shows that.
+    """
+    run_id = latest_run_id(store)
+    named_by_entry = named_by_the_entries()
+    functions: dict[str, dict[str, ast.FunctionDef]] = {}
+    checked = 0
+    for result_id, result in results_of(store, run_id).items():
+        path, function, case = _RESULT_TEST_RE.match(result["notes"]).groups()
+        found = functions.setdefault(path, top_level_tests_of(path))
+        assert function in found, f"{result_id} names {path}::{function}, which is not a test of that file"
+        if case:
+            assert found[function].decorator_list, f"{result_id} names a case of a test that has no cases"
+        if result["test_code"] in named_by_entry:
+            # Where the entry names its test, the result is the outcome of that test.
+            assert (path, function) == named_by_entry[result["test_code"]], result_id
+        checked += 1
+    assert checked == sum(RECORDED_RUNS[run_id]["outcomes"].values())
+    for line in store.runs[run_id]["notes"].splitlines():
+        if line.startswith("- SKIPPED "):
+            path, function = _SKIPPED_LINE_RE.match(line).groups()
+            found = functions.setdefault(path, top_level_tests_of(path))
+            assert function in found, f"the notes name {path}::{function}, which is not a test of that file"
 
 
 @pytest.mark.parametrize("run_id", sorted(RECORDED_RUNS))
@@ -158,8 +225,11 @@ def test_every_skipped_test_is_in_the_store_with_its_reason(store, run_id):
 @pytest.mark.parametrize("run_id", sorted(RECORDED_RUNS))
 def test_the_notes_of_a_run_hold_what_no_result_can(store, run_id):
     notes = store.runs[run_id]["notes"]
-    # The plot check has no code, so it has no result; it is not passed.
-    assert "PLOT CHECK WITHOUT A CODE: NOT PASSED" in notes
+    # The plot check has no code, so it has no result. Its entry gives it two
+    # statuses, one for each way of obtaining C, and the notes keep them apart.
+    assert "PLOT CHECK WITHOUT A CODE: NOT PASSED FOR THE COMPUTED C; A KNOWN OVERESTIMATE FOR THE DECLARED C" in notes
+    # The tests of the machinery of E3 and H2 ran and are not results.
+    assert re.search(r"TESTS OF THE MACHINERY OF E3 AND H2, NOT RECORDED AS RESULTS \(\d+ items\)", notes)
     # The structural cases under entries that are not defined are not results.
     assert "passing them does not make either entry pass" in notes
     for code in ("E8", "E9", "H7", "H8"):
