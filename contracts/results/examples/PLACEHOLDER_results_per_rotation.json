@@ -230,8 +230,8 @@
       "value": null,
       "unit": "dimensionless",
       "missing": {
-        "reason": "MISSING_INPUT",
-        "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2002, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"
+        "reason": "NO_COVERAGE",
+        "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does, so the daily water balance does not cover it; coverage is checked before any missing parameter"
       }
     }
   ],
