@@ -236,13 +236,15 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "Continuous daily water balance: mass closure [H7], invariants [H8], public reference case [H1]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
-- Transcribed by: OPEN
-- Checked by: OPEN
-- Status: not defined
+- Decision: [D228 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768), 15 November 2026, taken by the orchestrating AI session under the delegation of D161, after the source was read raw: H1 is "FAO-56 chapter 8, Example 37", ten days of drying with no precipitation or irrigation, run on the one-layer balance with three readings, "each a modelling choice the source does not state: Kc is read as the basal coefficient with Ke = 0; the column depth equals Zr; the initial state is the printed depletion." The stress coefficient uses the depletion at the start of the day, as note (5) of the example prints. Tolerance: "the rule of D124, half a unit of the last printed digit of each value". D228 says the engine had never been run on the example; a research AI session recomputed it by hand, and every printed value passes the rule, two of them near its edge (the adjusted ETc of day 4 and the depletion at the end of day 7). The published numbers are not written in this file.
+- Definition (PROPOSED by an AI session, unit `l0/validation-e8-e9-h7-h8-d226-d227`, [amendment to brief #347](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/347#issuecomment-6893083828)): `run_balance` of `engine/water/balance/` runs the days of the example with no precipitation and no runoff, the printed ETo each day, `Ke` zero, and every day a crop whose `Kcb` is the printed Kc, whose root depth is the printed Zr and whose readily available fraction is the printed p. The column depth is Zr, so the capacity of the column is the printed TAW, and the initial storage is TAW less the printed initial depletion. Each printed daily value is compared with the run: Ks with `stress_coefficient`; the adjusted ETc with the actual evapotranspiration of rule R3, `transpiration + evaporation`; the depletion at the end of the day with the capacity less `storage_end`. A value the run does not compute (a `Missing`) fails.
+- Expected value: the printed inputs and the ten printed rows of the example, in the signed fixture `validation/fixtures/h1_fao56_example37.json` (path PROPOSED; its format is in the test, and `validation/fixtures/README.md` does not list it yet). **Not on `main`:** a draft transcribed from the page on 15 November 2026, with `checked_by` empty, is kept outside the repository for the lead developer to check and sign (D34, D66). No fixture enters `validation/fixtures/` unsigned.
+- Tolerance: per value, half a unit of the last digit the example prints (D124, as D228 applies it): Ks is printed with two decimals, the depletions and the adjusted ETc with one. The test recomputes each tolerance from the printed number and fails if the fixture states another.
+- Source: named by D228 (FAO Irrigation and Drainage Paper 56, chapter 8, Example 37, https://www.fao.org/4/X0490E/x0490e0e.htm); the full reference and locators travel in the fixture (`source`, and a `locator` on each value) and are checked by the person who signs.
+- Transcribed by: the AI session of the definition, in the draft's `transcribed_by`.
+- Checked by: OPEN. The `checked_by` field of the fixture, empty in the draft; a session never fills it (D34, D66).
+- Test: `engine/water/balance/test_bucket.py::test_h1_public_reference_case`. **Skip rule**, as in [H2]: it skips, naming the file and the missing signature, while the fixture is absent or its `checked_by` is empty. Once signed, a malformed fixture, a value outside its tolerance, a value not computed, or a tolerance that is not the rule of D124 fails. The machinery of the check (the skip, the reading of the fixture and the comparison) is tested on a PLACEHOLDER fixture written to a temporary folder, whose rows are what the balance computes on PLACEHOLDER inputs: the tests named `test_h1_…` in the same file.
+- Status: written; waiting for the signed fixture. Until it is signed the test is skipped and records no outcome.
 
 ### H2
 
