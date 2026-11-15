@@ -825,6 +825,7 @@ def test_module_identifiers_follow_entrypoints():
         ("EP2", "engine.calendar", "build_rotation_calendar"),
         ("EP1", "engine.erosion", "compute_soil_loss"),
         ("EP3", "engine.water", "compute_water_deficit_exposure"),
+        ("EP4", "engine.residues", "build_residue_ledger"),
         ("EP5", "engine.amg", "run_amg"),
     ]
 
@@ -1846,9 +1847,7 @@ def test_the_rows_are_those_of_ep5_then_ep6_whatever_the_configured_order():
     assert rows[:3] == amg.answer.soil_carbon_trend
 
 
-@pytest.mark.parametrize(
-    "point", [runner.RESIDUES, runner.ROTHC], ids=lambda p: p.entry
-)
+@pytest.mark.parametrize("point", [runner.ROTHC], ids=lambda p: p.entry)
 def test_the_carbon_engines_written_not_built_do_not_exist_yet(point):
     # The runner names these not built without looking. When one lands, this
     # fails: the runner must then discover and call it (a unit of lane L2a).
