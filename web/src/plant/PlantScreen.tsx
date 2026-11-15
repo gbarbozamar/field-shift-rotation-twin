@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
+import type { RotationDefinition } from '../rotation/exampleRotation'
+import { barScale, drawnSoilVerdict } from './optionBars'
+import { MarginBar, SoilLossBar, StripBlock } from './PlantOptionParts'
+import { buildRotationStrip, cropOrder, plantRotations } from './rotationStrip'
+import type { PlantRotations, RotationStrip } from './rotationStrip'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
@@ -49,6 +55,12 @@ import type {
  * Heavier rain needs the service (S-021): without a backend the control is
  * disabled and the stress test is not available, with its reason.
  *
+ * Each option is a row (S-020, PROPOSED): its rotation label from the
+ * definition in the request, the strip of its crops year by year
+ * (rotationStrip.ts), a margin bar and a soil-loss bar with the limit line
+ * (widths only, optionBars.ts), and its state in plain words from the fields
+ * the answer carries.
+ *
  * A missing value shows its reason, never 0 or a blank. All wording lives in
  * strings.ts; rotation ids and the details of the answer render as data.
  */
@@ -94,11 +106,21 @@ function MeasuredLine({ what, item }: { what: string; item: Measured }) {
 }
 
 /** A soil-loss mean, with its sources or the assumption mark (C4.2). */
-function SoilLossLine({ kind, item }: { kind: MarginOf; item: SoilLossItem }) {
+function SoilLossLine({
+  kind,
+  item,
+  bar = null,
+}: {
+  kind: MarginOf
+  item: SoilLossItem
+  /** The soil-loss bar of an option row (S-020), drawn under the value line. */
+  bar?: ReactNode
+}) {
   const what = formatString(strings['plant.soil_loss_of'], { kind: kindLabel(kind) })
   return (
     <div>
       <MeasuredLine what={what} item={item} />
+      {bar}
       {item.value !== null && item.sources.length !== 0 ? (
         <p className="text-xs text-slate-500">
           {formatString(strings['value.source'], { source: item.sources.join('; ') })}
@@ -136,9 +158,22 @@ function LimitLine({ option }: { option: PlantOption }) {
   )
 }
 
-function CheckLine({ strictness, check }: { strictness: Strictness; check: LimitCheck }) {
+function CheckLine({
+  strictness,
+  check,
+  reasonShown = false,
+}: {
+  strictness: Strictness
+  check: LimitCheck
+  /**
+   * True when the row already shows the reason of this check (an option not
+   * resolved: its state detail says why), so the line names the check and
+   * its verdict only and the reason is shown once (fix round 1 of S-020).
+   */
+  reasonShown?: boolean
+}) {
   const label = strings[`plant.check.${strictness}`]
-  if (check.verdict === 'not_resolved') {
+  if (check.verdict === 'not_resolved' && !reasonShown) {
     return <MissingLine what={label} missing={check.missing!} />
   }
   return (
@@ -339,26 +374,192 @@ function PriceAnswer({ answer, price }: { answer: PlantAnswer; price: number | n
   )
 }
 
-function OptionBlock({ answer, option }: { answer: PlantAnswer; option: PlantOption }) {
+/**
+ * The state of an option in plain words (S-020, PROPOSED), from the fields
+ * the answer carries: never a verdict recomputed. Meets (or chosen): in every
+ * kind of year, or on average but not in the kinds the every-kind check
+ * names, or the every-kind check not resolved with its reason; the kinds not
+ * in the record beside it. Out: the check of the strictness used that failed,
+ * and the kinds over the limit. Not resolved: its reason.
+ */
+function StateDetail({ answer, option }: { answer: PlantAnswer; option: PlantOption }) {
+  const lines: string[] = []
+  if (option.state === 'chosen' || option.state === 'meets') {
+    const everyKind = option.every_kind
+    if (everyKind.verdict === 'meets') {
+      lines.push(strings['plant.state.every_kind_meets'])
+    } else if (everyKind.verdict === 'does_not_meet') {
+      lines.push(formatString(strings['plant.state.on_average_only'], { kinds: kindsText(option.kinds_not_met) }))
+    } else if (everyKind.missing !== null) {
+      lines.push(missingPatternText(strings['plant.check.every_kind'], everyKind.missing))
+    }
+    if (answer.strictness === 'on_average') {
+      // Under every kind of year the kinds lines of the row already name them.
+      lines.push(
+        formatString(strings['plant.kinds.not_in_record'], { kinds: kindsText(option.kinds_not_in_record) }),
+      )
+    }
+  } else if (option.state === 'does_not_meet') {
+    lines.push(formatString(strings['plant.state.out_by'], { check: strings[`plant.check.${answer.strictness}`] }))
+    // Under every kind of year the kinds lines of the row already name them.
+    if (answer.strictness === 'on_average' && option.kinds_not_met.length !== 0) {
+      lines.push(formatString(strings['plant.kinds.not_met'], { kinds: kindsText(option.kinds_not_met) }))
+    }
+  } else if (option.limit_check.missing !== null) {
+    lines.push(missingPatternText(strings['plant.state.why'], option.limit_check.missing))
+  }
+  return (
+    <div data-testid="plant-option-state-detail" className="text-xs text-slate-600">
+      {lines.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+    </div>
+  )
+}
+
+/** The scales of the bars of the options shown: one per bar kind, shared by the rows. */
+interface BarScales {
+  margin: number | null
+  soilLoss: number | null
+}
+
+function barScales(answer: PlantAnswer): BarScales {
+  const kind = answer.margin_of
+  return {
+    margin: barScale(answer.options.map((o) => o.margin[kind].value)),
+    soilLoss: barScale([
+      ...answer.options.map((o) => o.soil_loss[kind].value),
+      ...answer.options.map((o) => o.limit),
+    ]),
+  }
+}
+
+function OptionBlock({
+  answer,
+  option,
+  rotation,
+  strip,
+  stripMissing,
+  order,
+  scales,
+}: {
+  answer: PlantAnswer
+  option: PlantOption
+  rotation: RotationDefinition | null
+  strip: RotationStrip | null
+  stripMissing: MissingPart | null
+  order: readonly string[]
+  scales: BarScales
+}) {
+  const margin = option.margin[answer.margin_of]
+  const loss = option.soil_loss[answer.margin_of]
+  // The bar says what the answer says of the quantity it draws (PROPOSED,
+  // drawnSoilVerdict); its verdict is in text unless the check line of the
+  // row is the check of that same quantity (the average, on average).
+  const lossBar =
+    loss.value !== null && scales.soilLoss !== null ? (
+      <SoilLossBar
+        value={loss.value}
+        scale={scales.soilLoss}
+        limit={option.limit}
+        what={formatString(strings['plant.soil_loss_of'], { kind: kindLabel(answer.margin_of) })}
+        drawn={drawnSoilVerdict(option, answer.margin_of)}
+        verdictInText={!(answer.margin_of === 'average' && answer.strictness === 'on_average')}
+        limitMissing={option.limit === null ? option.on_average.missing : null}
+      />
+    ) : null
   return (
     <article data-testid="plant-option" className="border-t border-slate-200 py-3">
+      {rotation !== null ? (
+        <h4 data-testid="plant-option-label" className="text-sm font-semibold">
+          {rotation.label}
+        </h4>
+      ) : null}
       <p className="font-mono text-sm font-semibold">{option.rotation_id}</p>
       <p data-testid="plant-option-state" className="text-sm">
         {strings[`plant.state.${option.state}`]}
       </p>
+      <StateDetail answer={answer} option={option} />
+      <StripBlock strip={strip} order={order} missing={stripMissing} />
       <MeasuredLine
         what={formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })}
-        item={option.margin[answer.margin_of]}
+        item={margin}
       />
-      <SoilLossLine kind="average" item={option.soil_loss.average} />
-      {answer.margin_of !== 'average' ? (
-        <SoilLossLine kind={answer.margin_of} item={option.soil_loss[answer.margin_of]} />
+      {margin.value !== null && scales.margin !== null ? (
+        <MarginBar value={margin.value} scale={scales.margin} />
       ) : null}
-      <CheckLine strictness={answer.strictness} check={option.limit_check} />
+      <SoilLossLine
+        kind="average"
+        item={option.soil_loss.average}
+        bar={answer.margin_of === 'average' ? lossBar : null}
+      />
+      {answer.margin_of !== 'average' ? (
+        <SoilLossLine kind={answer.margin_of} item={loss} bar={lossBar} />
+      ) : null}
+      <CheckLine
+        strictness={answer.strictness}
+        check={option.limit_check}
+        reasonShown={option.state === 'not_resolved' && option.limit_check.missing !== null}
+      />
       {answer.strictness === 'every_kind' ? (
         <KindsLines option={option} />
       ) : null}
     </article>
+  )
+}
+
+/** The rotations of the request as a typed read: a list given directly is read as present. */
+function asPlantRotations(rotations: RotationDefinition[] | PlantRotations): PlantRotations {
+  return Array.isArray(rotations) ? { rotations, missing: null } : rotations
+}
+
+/**
+ * The rows of the options (S-020): each with the strip of its definition in
+ * the request, or the strip not available, with its reason, when the request
+ * has none or cannot be read; the crop colours by order of first appearance
+ * across the rows; the bar scales shared by the rows. Built once per answer
+ * and rotations (useMemo), not at each step of the price slider.
+ */
+function OptionRows({
+  answer,
+  rotations,
+}: {
+  answer: PlantAnswer
+  rotations: RotationDefinition[] | PlantRotations
+}) {
+  const { rows, order, scales } = useMemo(() => {
+    const read = asPlantRotations(rotations)
+    const built = answer.options.map((option) => {
+      const rotation = read.rotations?.find((r) => r.rotation_id === option.rotation_id) ?? null
+      return {
+        option,
+        rotation,
+        strip: rotation !== null ? buildRotationStrip(rotation) : null,
+        // null: the request holds no definition of it (StripBlock says so).
+        stripMissing: read.missing,
+      }
+    })
+    return {
+      rows: built,
+      order: cropOrder(built.flatMap((row) => (row.strip !== null ? [row.strip] : []))),
+      scales: barScales(answer),
+    }
+  }, [answer, rotations])
+  return (
+    <>
+      {rows.map(({ option, rotation, strip, stripMissing }) => (
+        <OptionBlock
+          key={option.rotation_id}
+          answer={answer}
+          option={option}
+          rotation={rotation}
+          strip={strip}
+          stripMissing={stripMissing}
+          order={order}
+          scales={scales}
+        />
+      ))}
+    </>
   )
 }
 
@@ -403,6 +604,12 @@ export interface PlantViewProps {
   marginOf: MarginOf
   /** The soybean price looked at; null when the answer has no price of today. */
   price: number | null
+  /**
+   * The rotation definitions of the request (S-020), or the typed read of
+   * them (readPlantRotations), which may be missing with its reason; the
+   * example request's by default.
+   */
+  rotations?: RotationDefinition[] | PlantRotations
   onStrictness?: (strictness: Strictness) => void
   onMarginOf?: (marginOf: MarginOf) => void
   onPrice?: (price: number) => void
@@ -515,7 +722,7 @@ function Questions({
 
 /** The screen for given questions: a pure function of the answers and the questions asked. */
 export function PlantView(props: PlantViewProps) {
-  const { set, strictness, marginOf, price } = props
+  const { set, strictness, marginOf, price, rotations = plantRotations } = props
   const answer = selectAnswer(set, strictness, marginOf)
   return (
     <section aria-labelledby="plant-title" className="mx-auto max-w-5xl">
@@ -546,9 +753,7 @@ export function PlantView(props: PlantViewProps) {
               <AnswerCard answer={answer} />
               <section data-testid="plant-options" className="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <h3 className="text-base font-semibold">{strings['plant.options.heading']}</h3>
-                {answer.options.map((option) => (
-                  <OptionBlock key={option.rotation_id} answer={answer} option={option} />
-                ))}
+                <OptionRows answer={answer} rotations={rotations} />
                 <EconomicsSource />
               </section>
               <Sources answer={answer} />
