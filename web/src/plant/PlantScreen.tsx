@@ -1272,7 +1272,7 @@ export function PlantScreenView({
   const rain = rainControlOf(state, apiBase, read, dispatch)
   if (state.mode === 'example' || service === null) {
     // D251 read strictly: no example answer is shown before the service has
-    // answered; the questions and "Ask the service" only. A request that
+    // answered; the questions and the ask button only. A request that
     // cannot be read is not offered to the service (fix round 1).
     const set: PlantAnswerSet = { example_data: rawPlantRequest.example_data, answers: [] }
     return (
