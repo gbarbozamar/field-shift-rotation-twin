@@ -1,0 +1,18 @@
+{
+  "id": "maximum_root_depth",
+  "scope": {
+    "crop": "wheat"
+  },
+  "value": 0.9,
+  "unit": "m",
+  "range": null,
+  "range_missing_reason": "Table 22 prints 1.0-1.5 m (Spring Wheat) and 1.5-1.8 m (Winter Wheat); the value of D201 lies below the printed range, so that range is not an interval of this value. No uncertainty interval is given: the value is the depth of the documented profile, declared as a ceiling.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 8, Table 22",
+    "url": "https://www.fao.org/4/X0490E/x0490e0e.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Spring Wheat | 1.0-1.5 | 0.55»; «Winter Wheat | 1.5-1.8 | 0.55». Footnote 1: «The larger values for Z r are for soils having no significant layering or other characteristics that can restrict rooting depth. The smaller values for Z r may be used for irrigation scheduling and the larger values for modeling soil water stress or for rainfed conditions.» Decision USER-AO (provisional FAO root growth). Identifier PROPOSED. Model access is capped at the documented 0.90 m of the profile (USER-AE, USER-AN). For soybean, USER-AK's local inferred curve applies. UPDATED on 2026-11-15 by an AI session to follow D201 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D201: 0.90 m for soybean, wheat, maize and alfalfa, the depth of the documented profile (column_depth 0.90 m; Capurro et al. 2017, Cuadro 1), declared as a ceiling and not as a measured root depth. EP3 refuses a root deeper than column_depth (it does not clip); the earlier wording of this note («Model access is capped …», «USER-AK's local inferred curve applies») states intentions, not the code: the root grows on a straight line during the development stage. The cap at the column with the upper end of the printed range is a lane L1 unit for after the event (D201, options not taken). Wheat has no local support: no published measurement of wheat rooting depth in Uruguay was found. LIMIT D201 DECLARES: the value is below the printed range, whose larger values footnote 1 gives «for modeling soil water stress or for rainfed conditions». SIGNED on 2026-11-15: checked_by gbarbozamar, row T2 of section 3.1 of the water signing sheet. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

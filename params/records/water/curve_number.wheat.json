@@ -1,0 +1,18 @@
+{
+  "id": "curve_number",
+  "scope": {
+    "crop": "wheat"
+  },
+  "value": 84,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "Table 9-1 prints one value per hydrologic soil group. D207 takes group C and declares group D (88) as the sensitivity; that is not an uncertainty interval.",
+  "citation": {
+    "reference": "USDA Natural Resources Conservation Service (2004). National Engineering Handbook, Part 630 Hydrology, Chapter 9: Hydrologic Soil-Cover Complexes.",
+    "locator": "Table 9-1 «Runoff curve numbers for agricultural lands», p. 9-2 (PDF p. 8), row «Small grain | SR | Poor», column of hydrologic soil group C; notes 1 to 3 on p. 9-3",
+    "url": "https://directives.nrcs.usda.gov/sites/default/files2/1712930607/7306.pdf#page=8"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15 in the official PDF by an AI session under D34 of issue #77, and re-opened by the orchestrating session for D207. Verbatim row to compare (text layer; curve numbers for groups A | B | C | D): «Small grain | SR | Poor | 65 | 76 | 84 | 88». Wheat is a small grain (NEH 630 chapter 8). New draft written on 2026-11-15 for the second rotation of D128. Note 1 of the table: «Average runoff condition, and Ia=0.2s.» (the drafted form initial_abstraction_ratio 0.2). UPDATED on 2026-11-15 by an AI session to follow D207 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D207: Table 9-1, average runoff condition, hydrologic soil group C, group D the sensitivity; the hydrologic condition is tied to the residue level of D115 of the catalogue. This catalogue is the no-residue level (D208). Group C: Durán, A. (1997). Clasificación hidrológica de los suelos del Uruguay. Agrociencia 1(1):15-29, Tabla 1 (p. 20): unit Ecilda Paullier – Las Brujas, Brunosol éutrico or subéutrico típico, GH C (read by an AI session in the scanned local copy fuentes_descargadas/agrociencia/tanda2_2026-11-15/); the station lies in that unit on the 1:1,000,000 soil map (point-in-polygon query to the DGRN ArcGIS server, layer SUELOS/SulosMillon, 2026-11-15). Group D as the sensitivity: 48.6 % clay in horizon B (Durán, Tabla 2, p. 23) against the 2009 texture guide of NEH 630 chapter 7 (above 40 % clay is typical of group D). Poor or good: chapter 8 of NEH 630 rates the rotation poor; note 3 of Table 9-1 gives good with more than 20 % residue; the source does not say which weighs more (D207). Straight row: the declared slope is 4.5 % (D100). LIMIT D207 DECLARES (for the label): NEH 630 chapter 10 (2004), p. 10-19: «Some of these applications are as an infiltration method for individual storm runoff events and as a loss function for continuous simulation. Such applications are not within the intended usage of curve number procedures.» (D82). One value for the whole cycle; no antecedent-moisture adjustment is built. The runoff measured on the plots of the station is not used to choose a value (D207). Residue level, the second catalogue: 80, row «Small grain | SR + CR | Good | 60 | 72 | 80 | 84». SIGNED on 2026-11-15: checked_by gbarbozamar, row T6 of section 3.1 of the water signing sheet. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}
