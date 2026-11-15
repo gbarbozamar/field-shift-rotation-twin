@@ -18,6 +18,7 @@ Where an expected value lives with its source, where a run of the validation pro
 | `validation/runs/<id>.json` | One file per **protocol run** |
 | `validation/results/<id>.json` | One file per **result** of one test in one run, whatever its outcome |
 | `validation/examples/` | A second, separate store with the same three folders, holding placeholder records only |
+| `validation/fixtures/` | Signed fixtures of whole checks, read by their tests, not by this store: `h2_example18.json` for [H2] and `e3_ah703_tables.json` for [E3] (unit l0/validation-h2-e3-ready, issue #225; paths PROPOSED). Format and skip rule in [`fixtures/README.md`](fixtures/README.md). Not committed yet: the signed files arrive in their own commit |
 
 `expected/`, `runs/` and `results/` do not exist yet: each is created by the first unit that stores a record in it. A folder that does not exist holds no record.
 
@@ -351,6 +352,13 @@ Raised by unit l0/chain-examples (issue #168). The builder session did not decid
 17. **No soil property in the chain soil example.** EP1 reads K from the catalogue, not from the soil data; whether K should come from the soil tables (D48) is OPEN 13 of `engine/erosion/SOIL_LOSS.md`. *Lead developer; platform developer.*
 18. ~~The point of the chain climate example keeps the placeholder unit.~~ `DECIDED`: the point carries the unit strings of D55 (`degree`, `degree`, `m`), unit l0/fix-chain-test, at the orchestrator's request with the lead developer's authorization. The numbers stay 1.0, 2.0 and 3.0, so they now name a point at sea; whether other illustrative numbers are wanted is still open. *Lead developer.*
 19. **Serving the chain soil example in the running app** (`SOIL_SLOPE_EXAMPLE_FILE`, D38) is not part of this unit; which file holds the demonstration values is a person's decision. *Platform developer; lead developer.*
+
+### Fixtures of H2 and E3
+
+Raised by unit l0/validation-h2-e3-ready (issue #225). The builder session did not decide them.
+
+20. **The store reports the fixtures.** `load_store` reports every `.json` file below `validation/` outside the three record folders, so a signed `validation/fixtures/*.json` would fail `test_S05_real_store_has_no_malformed_record`. Either `fixtures/` is left alone like `examples/`, or the fixtures move. Until one is chosen the signed files cannot be committed at the paths of `fixtures/README.md`. *Lead developer.*
+21. **Two formats for an expected value.** This store keeps one expected value per record; the fixtures keep a whole worked example or table per file, signed as a whole, with the parameter records the check needs. Whether both stay is not decided (`fixtures/README.md`, OPEN 2). *Lead developer; science reviewers.*
 
 ## Environment
 
