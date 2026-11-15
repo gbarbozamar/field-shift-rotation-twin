@@ -18,9 +18,9 @@ from typing import get_args
 
 import pytest
 
+import kinds_of_year
 from contracts.economic_facts import KINDS_OF_YEAR
 from contracts.inputs.common import ReasonCode
-import kinds_of_year
 from kinds_of_year import (
     SEASONS,
     KindOfYear,
