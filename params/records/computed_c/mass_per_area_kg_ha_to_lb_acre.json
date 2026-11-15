@@ -1,0 +1,16 @@
+{
+  "id": "mass_per_area_kg_ha_to_lb_acre",
+  "scope": {},
+  "value": 0.8921827,
+  "unit": "lb acre-1 per kg ha-1",
+  "range": null,
+  "range_missing_reason": "A unit conversion: no uncertainty range.",
+  "citation": {
+    "reference": "Thompson, A., Taylor, B.N. (2008). Guide for the Use of the International System of Units (SI). NIST Special Publication 811, 2008 edition. National Institute of Standards and Technology.",
+    "locator": "Appendix B.8, Factors for units listed alphabetically: 'acre (based on U.S. survey foot)', p. 45 (PDF p. 57); 'hectare (ha)', p. 50 (PDF p. 62); 'pound (avoirdupois) (lb)', p. 53 (PDF p. 65)",
+    "url": "https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication811e2008.pdf#page=57"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DERIVED from three printed factors: «acre (based on U.S. survey foot) ... square meter (m2) ... 4.046 873 E+03», «hectare (ha) ... square meter (m2) ... 1.0 E+04», «pound (avoirdupois) (lb) ... kilogram (kg) ... 4.535 924 E-01». 1 kg ha-1 = 4046.873 / 10000 / 0.4535924 lb acre-1 = 0.8921827 (rounded to 7 decimals). The factor uses the acre as printed, the one based on the U.S. survey foot. Converts residue mass (ratio x yield, kg ha-1) to the unit of the mass-cover coefficient (acre lb-1) of AH703 Table 5-1 (D129). Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-15 against crops of the three lines (D34, D66). Identifier PROPOSED in brief #218."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "rusle2_canopy_cover",
+  "scope": {
+    "management": "no_crop"
+  },
+  "value": 0,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "A declared value; no uncertainty range.",
+  "citation": {
+    "reference": "USDA Agricultural Research Service (2013). Science Documentation: Revised Universal Soil Loss Equation Version 2 (RUSLE2). Washington, D.C.",
+    "locator": "Section 6.1 Canopy subfactor, Eq. 6.2, p. 138 (PDF p. 163)",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/RUSLE2_Science_Doc.pdf#page=163"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15 for the days no crop covers (D143 of issue #77; OPEN 36 of engine/erosion/SOIL_LOSS.md): no canopy. With S1 Eq. 6.2, c_c = 1 − f_ec exp(−0.1 h_f), a canopy cover of 0 gives c_c = 1 whatever the fall height."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "rusle2_residue_decay_coefficient",
+  "scope": {
+    "crop": "soybean"
+  },
+  "value": 0.025,
+  "unit": "day-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Renard, K.G., Foster, G.R., Weesies, G.A., McCool, D.K., Yoder, D.C. (coord.) (1997). Predicting Soil Erosion by Water: A Guide to Conservation Planning With the Revised Universal Soil Loss Equation (RUSLE). U.S. Department of Agriculture, Agriculture Handbook No. 703.",
+    "locator": "Table 5-1 'Parameter values of typical crops', p. 169 (PDF p. 191; page printed sideways), row 'Soybeans', column 'Surface p' (footnote 3: 'A constant that controls the exponential decomposition rate of surface residue from this crop'). Unit from S1 Table 10.3, column 'Decomposition Coefficient Φ (day-1)', p. 254 (PDF p. 279)",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/AH_703%20-%20Predicting%20Soil%20Erosion%20by%20Water%20-%20A%20Guide%20to%20Conservation%20Planning%20With%20the%20RUSLE%20(RUSLE).pdf#page=191"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Table 5-1 prints 0.025; the same value is in S1 (USDA Agricultural Research Service (2013). Science Documentation: Revised Universal Soil Loss Equation Version 2 (RUSLE2). Washington, D.C.) Table 10.3, row Soybeans (Midwest US) 0.025, which gives the unit day-1. PC-2 (constant rate). Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-15 against the page image (D34, D66)."
+}
