@@ -172,22 +172,31 @@ def unmarked(item: Any) -> Any:
 
 
 # PLACEHOLDER base of the test numbers: plainly unreal, not a value of the
-# method. Each record gets the base plus its position in EP1's list of ids.
+# method. Each record gets the base plus its position in the list of the
+# identifiers EP1 reads on its main route.
 PLACEHOLDER_BASE = 98765.5
+
+# The identifiers of the main route of EP1: those of the annual value, then
+# the twelve monthly erosivity records of the climatology (D69, D84).
+CATALOGUE_IDS: tuple[str, ...] = (*ep1.PARAMETER_IDS, *ep1.MONTHLY_EROSIVITY_IDS)
+
+# One PLACEHOLDER unit string shared by the twelve monthly records: not a
+# real unit (which unit the climatology prints is OPEN 11 of SOIL_LOSS.md).
+MONTHLY_UNIT = "PLACEHOLDER_monthly_erosivity_unit"
 
 
 def placeholder_numbers() -> dict[str, float]:
     return {
-        pid: PLACEHOLDER_BASE + position
-        for position, pid in enumerate(ep1.PARAMETER_IDS)
+        pid: PLACEHOLDER_BASE + position for position, pid in enumerate(CATALOGUE_IDS)
     }
 
 
 def unit_of(pid: str) -> str:
     """The unit string of a test record.
 
-    R, K, C and P: the unit EP1 accepts. The break slope: the slope unit of
-    the soil-and-slope example. The unit length: the length unit of the
+    The level of R, K, C and P: the unit EP1 accepts. The twelve monthly
+    records: one PLACEHOLDER unit. The break slope: the slope unit of the
+    soil-and-slope example. The unit length: the length unit of the
     soil-and-slope example (ls.py compares the two strings). Every other
     coefficient: a PLACEHOLDER unit.
     """
@@ -198,6 +207,7 @@ def unit_of(pid: str) -> str:
         ep1.K_ID: accepted.k,
         ep1.C_ID: accepted.c,
         ep1.P_ID: accepted.p,
+        **dict.fromkeys(ep1.MONTHLY_EROSIVITY_IDS, MONTHLY_UNIT),
         ep1.S_BREAK_ID: example.slope_steepness.unit,
         ep1.LAMBDA_UNIT_ID: example.slope_length.unit,
     }.get(pid, "PLACEHOLDER_unit")
@@ -221,7 +231,8 @@ def placeholder_record(pid: str, value: float) -> dict[str, Any]:
 
 
 def marked_catalogue() -> dict[str, dict]:
-    """Every record EP1 reads, keyed by a file path, still marked PLACEHOLDER."""
+    """Every record the main route of EP1 reads, keyed by a file path, still
+    marked PLACEHOLDER."""
     return {
         f"{pid}.json": placeholder_record(pid, value)
         for pid, value in placeholder_numbers().items()
@@ -233,8 +244,8 @@ def complete_catalogue() -> dict[str, dict]:
     return unmarked(marked_catalogue())
 
 
-def expected_soil_loss(numbers: dict[str, float]) -> float:
-    """``equation.annual_soil_loss`` of the catalogue's factors, LS through ls.py."""
+def expected_ls(numbers: dict[str, float]) -> float:
+    """LS through ls.py, from the soil-and-slope example and the catalogue."""
     example = soil_slope()
     slope_unit = ls.SlopeUnit(example.slope_steepness.unit)
     steepness = ls.slope_steepness_factor(
@@ -254,11 +265,18 @@ def expected_soil_loss(numbers: dict[str, float]) -> float:
         **{name: numbers[pid] for name, pid in ep1.L_COEFFICIENTS.items()},
     )
     assert isinstance(steepness, float) and isinstance(length, float)
+    return length * steepness
+
+
+def expected_soil_loss(numbers: dict[str, float]) -> float:
+    """The annual value of the main route: ``equation.annual_soil_loss`` of the
+    mean annual level of R, K, LS through ls.py, the declared C and P (D69,
+    D84, USER-G)."""
     accepted = ep1.ACCEPTED_UNITS
     product = equation.annual_soil_loss(
         r=equation.Factor(numbers[ep1.R_ID], accepted.r),
         k=equation.Factor(numbers[ep1.K_ID], accepted.k),
-        ls=equation.Factor(length * steepness, accepted.ls),
+        ls=equation.Factor(expected_ls(numbers), accepted.ls),
         c=equation.Factor(numbers[ep1.C_ID], accepted.c),
         p=equation.Factor(numbers[ep1.P_ID], accepted.p),
         accepted_units=accepted,
@@ -266,6 +284,21 @@ def expected_soil_loss(numbers: dict[str, float]) -> float:
     )
     assert isinstance(product, float)
     return product
+
+
+def expected_month(numbers: dict[str, float], month: int) -> float:
+    """A monthly value of the main route, computed here: the level of R times
+    the share of the calendar month in the twelve monthly records (January
+    first), times K, LS, C and P."""
+    monthly = [numbers[pid] for pid in ep1.MONTHLY_EROSIVITY_IDS]
+    return (
+        numbers[ep1.R_ID]
+        * (monthly[month - 1] / sum(monthly))
+        * numbers[ep1.K_ID]
+        * expected_ls(numbers)
+        * numbers[ep1.C_ID]
+        * numbers[ep1.P_ID]
+    )
 
 
 # --- the chain through the real runner ----------------------------------------
@@ -500,6 +533,7 @@ def test_CH06_complete_placeholder_catalogue_gives_the_product_of_equation_py():
     assert check_catalogue(marked_catalogue()) != []
     catalogue = complete_catalogue()
     assert check_catalogue(catalogue) == []
+    numbers = placeholder_numbers()
 
     outcome, _ = run_chain(catalogue)
     result = outcome.result
@@ -508,24 +542,54 @@ def test_CH06_complete_placeholder_catalogue_gives_the_product_of_equation_py():
     soil_loss = result.soil_loss
     assert isinstance(soil_loss, SoilLossResults)
 
-    expected = expected_soil_loss(placeholder_numbers())
+    # The main route of EP1 (docs/METHODS.md M1.2; D69, D84, USER-G): the
+    # annual value is equation.py of the level of R, K, LS, the declared C and
+    # P, and each month is the level times the climatological fraction of the
+    # month, times K, LS, C and P; all computed again here.
+    expected = expected_soil_loss(numbers)
     years = covered()
-    numbers = 0
+    computed = 0
     for item in soil_loss.annual:
         if item.ag_year not in years:
             assert item.value is None and item.missing.reason == "NO_COVERAGE"
             continue
-        numbers += 1
+        computed += 1
         assert item.missing is None
-        assert item.value == expected
+        assert item.value == pytest.approx(expected, rel=1e-9)
         assert item.provenance == PROVENANCE_OF_SOIL_LOSS
         assert item.source is not None
-    assert numbers == len(years) >= 1
+        assert "DECLARED" in item.source
+        for pid in ep1.PARAMETER_IDS:
+            assert f"'{pid}'" in item.source
+    assert computed == len(years) >= 1
+    months = 0
     for item in soil_loss.monthly:
-        assert item.value is None
-        assert_not_an_identity_absence(item.missing)
-    assert outcome.values_present == numbers
-    assert module(outcome, EROSION.module_id).state == "degraded"
+        if item.ag_year not in years:
+            assert_not_an_identity_absence(item.missing)
+            continue
+        months += 1
+        assert item.missing is None
+        assert item.value == pytest.approx(
+            expected_month(numbers, item.month), rel=1e-9
+        )
+        assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+        for pid in ep1.MONTHLY_EROSIVITY_IDS:
+            assert f"'{pid}'" in item.source
+    assert months == 12 * len(years)
+    # The months of a covered year add up to its value (C1.2).
+    for year in years:
+        total = sum(i.value for i in soil_loss.monthly if i.ag_year == year)
+        assert total == pytest.approx(expected, rel=1e-9)
+    assert outcome.values_present == computed + months
+    # Every annual and monthly value is present, so the module is available.
+    assert module(outcome, EROSION.module_id).state == "available"
+    # The runner passes EP1's output unchanged.
+    assert soil_loss == ep1.compute_soil_loss(
+        calendar=outcome.calendar,
+        climate=climate(),
+        soil_slope=soil_slope(),
+        parameters=catalogue,
+    )
 
     assert_water_missing_for_every_covered_year(outcome, catalogue)
 

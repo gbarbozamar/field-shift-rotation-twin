@@ -2,14 +2,18 @@ import { exampleCase } from './exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from './selection'
 import FieldsMap from '../map/FieldsMap'
 import SiteSheet from '../site/SiteSheet'
+import { RotationRibbon } from '../rotation/RotationRibbon'
+import { exampleRotation } from '../rotation/exampleRotation'
 import { strings } from '../strings'
 
 /**
  * Multi-field identity screen on example data: the example-data banner on
- * every render, the map of the fields and the field list below it, and the
- * site sheet of the selected field after the list. The list, the map and the
- * sheet share the selected-field state through the selection module, so a
- * click on either selects the field on all three.
+ * every render, the map of the fields and the field list below it, the
+ * site sheet of the selected field after the list, and the rotation of the
+ * selected field as the display-only rotation ribbon when the example
+ * rotation belongs to that field. The list, the map and the sheet share the
+ * selected-field state through the selection module.
+>>>>>>> 2af2064 (web: rotation ribbon, display-only timeline of the contract example)
  */
 export default function FieldsScreen() {
   const selectedFieldId = useSelectedFieldId()
@@ -83,6 +87,12 @@ export default function FieldsScreen() {
       )}
 
       <SiteSheet />
+
+      {selectedFieldId === exampleRotation.field_id && (
+        <div className="mt-8">
+          <RotationRibbon rotation={exampleRotation} />
+        </div>
+      )}
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${strings['identity.selected']}: ${selectedField.name}` : ''}
