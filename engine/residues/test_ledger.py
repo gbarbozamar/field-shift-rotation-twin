@@ -495,6 +495,38 @@ def test_first_year_before_the_first_cycle_is_missing():
         assert all(item.value is not None for item in rest)
 
 
+def test_component_starting_before_the_start_month_gives_a_lead_in_entry():
+    """The lead-in of D141 (point 13 of engine/calendar/repeat.py).
+
+    The first component starts before the start month, so the calendar starts
+    in the agricultural year before, and the cycle before the first ends
+    inside the record. Its entries are written as cycle -1, which the ledger
+    contract admits (D160). Their harvests fall in the first agricultural
+    year, and that year is their value: it is not "before the first cycle".
+    """
+    early = calendar_data(start_date="2001-05-25", end_date="2002-05-20")
+    early["components"][0]["start"] = date_value("2001-05-25")
+    early["components"][1]["end"] = date_value("2002-05-20")
+    ledger = run(calendar=early)
+    assert ledger.first_ag_year == YEARS[0]
+    lead_in = [entry for entry in ledger.components if entry.cycle == -1]
+    assert [entry.component_id for entry in lead_in] == ["c1", "c2"]
+    assert min(entry.cycle for entry in ledger.components) == -1
+    for entry in lead_in:
+        assert RECORD_START <= entry.harvest.date <= RECORD_END
+        assert entry.ag_year == YEARS[0]
+        for part in PARTS:
+            # The only harvest of its crop in that year: the year is its
+            # value, from kg to t (D147).
+            first = series(ledger, f"{entry.crop_id}_grain_{part}").years[0]
+            assert first.ag_year == YEARS[0]
+            assert first.value == pytest.approx(
+                getattr(entry, part).value / KG_PER_TONNE
+            )
+    for found in ledger.annual_carbon_inputs:
+        assert all(item.value is not None for item in found.years)
+
+
 def test_undated_harvest_leaves_the_years_it_may_fall_in_missing():
     data = calendar_data()
     data["components"][0]["end"] = date_value(None)
