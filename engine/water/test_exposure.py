@@ -3563,9 +3563,10 @@ def test_year_whose_demanded_sum_is_zero_is_not_computable(monkeypatch):
     for item in result:
         assert item.value is None
         assert item.value != 0
-        assert item.missing.reason == "NOT_COMPUTABLE"  # PROPOSED, OPEN 43
+        assert item.missing.reason == "NOT_COMPUTABLE"  # D214
         assert "is not above zero" in item.missing.detail
-        assert "D157" in item.missing.detail and "OPEN 43" in item.missing.detail
+        assert "D157" in item.missing.detail and "D214" in item.missing.detail
+        assert "OPEN 43" not in item.missing.detail
         assert item.provenance is None and item.source is None
 
 
@@ -3582,6 +3583,60 @@ def test_label_of_d105_is_on_every_value_and_on_no_missing_item():
             numbers += 1
     assert numbers > 0
     assert module.WINDOW_LABEL == "whole cycle, not critical period"
+
+
+def test_source_ends_with_the_method_facts_of_d215():
+    # D215, option S-b: after the label of D162 and the wording built by #264,
+    # one clause of method facts, each a fact the code guarantees (choice 23
+    # b of EXPOSURE.md names where). D137 is named without saying which table
+    # the catalogue holds.
+    facts = module.METHOD_FACTS
+    assert facts.startswith("method facts of this engine: ")
+    for name in ("D111", "D135", "D137", "D189", "FAO-56 Eq. 70 is not applied"):
+        assert name in facts, name
+    for words in ("weed-free", "never stretched", "not adjusted for climate"):
+        assert words in facts, words
+    assert "initial_storage" in facts and "initial_depletion" in facts
+    assert "Table" not in facts
+    numbers = 0
+    for result in every_kind_of_result():
+        for item in result:
+            if item.value is None:
+                assert item.source is None
+                continue
+            assert item.source.endswith(f"; {facts}")
+            assert item.source.count(facts) == 1
+            assert item.source.index("engine/water/EXPOSURE.md") < item.source.index(
+                facts
+            )
+            numbers += 1
+    assert numbers > 0
+    # The last fact, on the chain itself: its first day starts from the two
+    # declared site states (the records of the test catalogue).
+    first, *_ = chain()
+    assert first.surface_layer.depletion_start == PLACEHOLDER_SITE["initial_depletion"]
+    assert first.balance.storage_start == PLACEHOLDER_SITE["initial_storage"]
+
+
+def test_exposure_md_names_the_decisions_and_reads_open_30_and_open_41_as_decided():
+    # Acceptance check 7 of #292, with the decisions of #333.
+    text = (HERE / "EXPOSURE.md").read_text("utf-8")
+    for number in (*range(185, 192), *range(214, 218)):
+        assert re.search(rf"\bD{number}\b", text), number
+    open_items = text.split("\n## OPEN", 1)[1]
+
+    def item(number: int) -> str:
+        (line,) = [
+            line for line in open_items.splitlines() if line.startswith(f"{number}. **")
+        ]
+        return line
+
+    assert "Closed by [D185]" in item(30)
+    assert "Decided by [D187]" in item(41) and "not decided" not in item(41)
+    assert "Closed by [D214]" in item(43)
+    assert "Closed by [D215 to D217]" in item(44)
+    assert "First part closed by [D186]" in item(32)
+    assert "CITATION NEEDED" not in item(32)
 
 
 # --- the caller (G3, G5) and purity (G1) --------------------------------------
