@@ -1090,7 +1090,7 @@ def test_d165_a_touching_cell_alone_gives_no_strict_improvement():
     # Only the cell [-1.0, 0.0]: nothing blocks, but no cell is a strict
     # improvement (D93, D153), so the pair is not a robust preference; it
     # takes the name of D97 ("touches or crosses zero"). No indicator has a
-    # blocking cell, so none is named (D165, follow-up).
+    # blocking cell, so none is named (the rule of brief #304).
     rows = [
         v21_soil_row("A", "s1", 2021, A_2021),
         v21_soil_row("B", "s1", 2021, (6.9, 6.8, 7.0)),
@@ -1330,3 +1330,113 @@ def test_d174_dominance_carries_its_basis_and_its_coverage():
     counts = pair_counts(table, "A", "B", equal_tolerance=TOLERANCE)
     assert record.cells_compared == sum(item.cells_compared for item in counts)
     assert record.cells_of_the_pair == sum(item.cells_of_the_pair for item in counts)
+
+
+# --- follow-ups of the verifier of #309 (unit l2/decision-rule-followups, #327) ---
+#
+# EXAMPLE DATA written by hand, as in the section above.
+
+
+def test_d166_identical_rows_over_a_set_needs_every_member_identical():
+    # s1: A and B hold the same value and range (identical); s2: B2020 is a
+    # strict improvement. Over the set the rows are not identical: one
+    # member is not (D85 read in each member; "all", not "any").
+    rows = [
+        v21_soil_row("A", "s1", 2020, B_2020),
+        v21_soil_row("B", "s1", 2020, B_2020),
+        v21_soil_row("A", "s2", 2020, A_2020),
+        v21_soil_row("B", "s2", 2020, B_2020),
+    ]
+    state = pair_state(hand_table(rows), "A", "B")
+    assert state.by_scenario == (("s1", IDENTICAL), ("s2", ROBUST_PREFERENCE))
+    assert state.identical_rows is False
+    assert state.state == NOT_ROBUST_ACROSS_SCENARIOS
+
+
+def computations_by_value_table():
+    # Two values of an input u, one scenario each. In both, soil loss
+    # (B2020 - A2020 = [-2.8, -1.3]) and the amg end_minus_start trend
+    # ([0.1, 0.5] for B) are strict improvements. The fitted slope is a
+    # strict improvement at u = 1 ([0.1, 0.5]) and crosses zero at u = 2
+    # ([-0.1, 0.2]). So with end_minus_start (the default, C1.6) the pair is
+    # a robust preference at both values; with fitted_slope only at u = 1.
+    rows = []
+    for scenario_id, slope_b in (("u=1", (0.4, 0.3, 0.5)), ("u=2", (0.15, 0.1, 0.2))):
+        rows.append(v21_soil_row("A", scenario_id, 2020, A_2020))
+        rows.append(v21_soil_row("B", scenario_id, 2020, B_2020))
+        rows.append(ranged_carbon("A", scenario_id, (0.0, -0.1, 0.1)))
+        rows.append(ranged_carbon("B", scenario_id, (0.3, 0.2, 0.4)))
+        rows.append(
+            ranged_carbon("A", scenario_id, (0.1, 0.0, 0.2), computation="fitted_slope")
+        )
+        rows.append(ranged_carbon("B", scenario_id, slope_b, computation="fitted_slope"))
+    return hand_table(rows)
+
+
+INPUT_U = UncertainInput(
+    name="u",
+    unit=models.UNIT_SOIL_LOSS_ANNUAL,
+    cell=("B", "soil_loss", "ag_year", 2020, None, None),
+    values=((1.0, "u=1"), (2.0, "u=2")),
+)
+
+
+def test_d173_tipping_point_passes_the_computation_on():
+    table = computations_by_value_table()
+    default = tipping_point(table, "A", "B", INPUT_U)
+    assert default.states == ((1.0, ROBUST_PREFERENCE), (2.0, ROBUST_PREFERENCE))
+    assert default.bracket is None
+    chosen = tipping_point(table, "A", "B", INPUT_U, trend_computation="fitted_slope")
+    assert chosen.states == (
+        (1.0, ROBUST_PREFERENCE),
+        (2.0, NOT_SEPARATED_WITHIN_UNCERTAINTY),
+    )
+    assert chosen.bracket == (1.0, 2.0)
+
+
+def test_d173_measurement_priority_passes_the_computation_on():
+    table = computations_by_value_table()
+    default = measurement_priority(table, "A", "B", (INPUT_U,))
+    assert default.base_state == ROBUST_PREFERENCE
+    assert default.items == ()
+    chosen = measurement_priority(
+        table, "A", "B", (INPUT_U,), trend_computation="fitted_slope"
+    )
+    assert chosen.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert [(item.input_name, item.rank) for item in chosen.items] == [("u", 1)]
+    assert chosen.items[0].states == (
+        (1.0, ROBUST_PREFERENCE),
+        (2.0, NOT_SEPARATED_WITHIN_UNCERTAINTY),
+    )
+
+
+def test_d173_measurement_consistency_passes_the_computation_on():
+    # The measured value of u's cell is the value already in the table (B2020
+    # 6.1 [5.8, 6.5]), so the recomputed table is the table itself; only the
+    # computation passed decides the state.
+    table = computations_by_value_table()
+    measured = Measurement(
+        input_name="u",
+        value=B_2020[0],
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        provenance="OBSERVED",
+        range=Range(low=B_2020[1], high=B_2020[2], kind=V21_RANGE_KIND),
+    )
+    default = measurement_consistency(
+        table, "A", "B", INPUT_U, measured, (1.0, 2.0), (INPUT_U,)
+    )
+    assert default.state_after_measurement == ROBUST_PREFERENCE
+    assert default.priority.items == ()
+    chosen = measurement_consistency(
+        table,
+        "A",
+        "B",
+        INPUT_U,
+        measured,
+        (1.0, 2.0),
+        (INPUT_U,),
+        trend_computation="fitted_slope",
+    )
+    assert chosen.state_after_measurement == NOT_ROBUST_ACROSS_SCENARIOS
+    assert chosen.priority.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert [item.rank for item in chosen.priority.items] == [1]
