@@ -704,3 +704,47 @@ def test_example_calendars_of_the_contracts():
     assert_valid_with_cycle(moved_calendar, 2)
     # Component 2 runs from April into October, across the July start month.
     assert repeat.components_crossing_phase(calendar, 1) == ["PLACEHOLDER-component-2"]
+
+
+def test_start_of_a_phase_stays_in_year_p_when_a_crossing_runs_past_it():
+    # Verifier's case on PR #228 (B1): "long" starts in year 0 and ends in
+    # year 2, so in phase 1 none of its dates is in year 1 and it does not
+    # move the start; phase 1 must not turn into phase 2.
+    calendar = build(
+        "2030-07-01",
+        "2033-06-30",
+        [
+            component("long", CROP_A, "2030-09-01", "2032-07-31"),
+            component("c", CROP_C, "2032-10-01", "2033-05-31"),
+        ],
+    )
+    assert repeat.list_phases(calendar) == [0, 1, 2]
+    starts = {}
+    for phase in (1, 2):
+        assert repeat.components_crossing_phase(calendar, phase) == ["long"]
+        moved_calendar = repeat.phase_calendar(calendar, phase)
+        assert_valid_with_cycle(moved_calendar, 3)
+        assert ag_year_of(moved_calendar.start_date, JULY) == 2030 + phase
+        starts[phase] = moved_calendar.start_date
+    assert starts == {1: d("2031-07-01"), 2: d("2032-08-01")}
+    assert repeat.phase_calendar(calendar, 1) != repeat.phase_calendar(calendar, 2)
+
+
+def test_start_of_a_phase_is_capped_at_the_last_day_of_year_p():
+    # x crosses into year 1 and ends on its last day: the day after would be
+    # year 2, so the start is the last day of year 1 (point 12).
+    calendar = build(
+        "2027-09-01",
+        "2029-06-30",
+        [
+            component("a", CROP_A, "2027-09-01", "2028-03-31"),
+            component("x", CROP_C, "2028-05-01", "2029-06-30"),
+        ],
+    )
+    assert repeat.list_phases(calendar) == [0, 1]
+    moved_calendar = repeat.phase_calendar(calendar, 1)
+    assert_valid_with_cycle(moved_calendar, 2)
+    assert moved_calendar.start_date == d("2029-06-30")
+    assert ag_year_of(moved_calendar.start_date, JULY) == 2028
+    laid = run(moved_calendar)
+    assert ag_year_of(laid.cycles[0].start, JULY) == laid.ag_years[0]

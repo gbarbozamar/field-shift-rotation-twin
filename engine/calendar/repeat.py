@@ -56,8 +56,10 @@ agricultural year of the record. Decision D133: a component that starts
 before the first agricultural year of the record and ends inside it gets no
 rule in this release; its days in the record are missing with their reason,
 never guessed. (D117, how the phases nest in the one-input sweep, and the
-``scenario_id`` of each phase are the runner's.) The form, PROPOSED (blueprint
-section 3.7):
+``scenario_id`` of each phase are the runner's.) A component that crosses into
+the first year of a phase comes back flagged, never raised: the crossing date
+is missing with its reason and ``components_crossing_phase`` names it (point
+11), so the phase still runs. The form, PROPOSED (blueprint section 3.7):
 
 8. The phases of a calendar are 0 to ``cycle_length_years - 1`` (point 3),
    so a one-year rotation has one phase (D109).
@@ -78,10 +80,12 @@ section 3.7):
     ``components_crossing_phase`` names the component. No error is raised:
     the phase runs, and the days that depend on that date are missing.
 12. The moved calendar's ``start_date`` is the calendar's ``start_date`` moved
-    ``p`` years, or the day after the last date of a crossing component in
-    year ``p`` if that is later (so those days lie before the first cycle in
+    ``p`` years, or the day after the last date in year ``p`` of a crossing
+    component if that is later (so those days lie before the first cycle in
     the record and between cycles inside the bound of point 7, never on days
     with no component), or the earliest date it places if that is earlier.
+    Only dates in year ``p`` count, and the start is never later than the
+    last day of year ``p``: phase ``p`` always starts in year ``p``.
     Its ``end_date`` is the latest date it places, or its ``start_date`` moved
     ``cycle length - 1`` years if that is later, so its cycle length is the
     calendar's (point 3). ``feasibility``, the identifiers and the start month
@@ -96,6 +100,12 @@ contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
 - Point 11, the rule for a component that crosses into year ``p``: none in
   this release (D133). Which date to cut, or a lead-in, stays for a later
   release (asked on #18).
+- Point 12, a crossing component whose dates skip year ``p`` entirely (it
+  runs through all of year ``p`` into a later year): it does not move the
+  start (its dates are not in year ``p``), so in the first cycle of the moved
+  calendar its days of year ``p`` lie on days no component holds. The
+  component is flagged (point 11) and named by ``components_crossing_phase``;
+  a consumer must not read those days as days with no crop.
 - Point 11, a component of a year before ``p`` whose end date is missing and
   that has no dated period on or after year ``p``: it may cross the boundary
   but cannot be shown to, so it is moved with its end still missing (point
@@ -383,6 +393,8 @@ def phase_calendar(calendar: RotationCalendar, p: int) -> RotationCalendar:
     first_year = _ag_year_of(calendar.start_date, calendar.ag_year_start.month)
     one_day = boundary.replace(day=_SECOND) - boundary
 
+    next_boundary = boundary.replace(year=boundary.year + _FIRST)
+    last_day_of_year_p = next_boundary - one_day
     kept: list[dict] = []
     moved: list[dict] = []
     floor = shifted_date(calendar.start_date, p)[0]
@@ -391,9 +403,13 @@ def phase_calendar(calendar: RotationCalendar, p: int) -> RotationCalendar:
         if year is None or year - first_year >= p:
             kept.append(component.model_dump())
             continue
-        crossing = [day for day in _known_dates(component) if day >= boundary]
-        if crossing:
-            floor = max(floor, max(crossing) + one_day)
+        # Point 12: only the crossing dates in year p move the start, and the
+        # start stays in year p, so phase p never becomes phase p + 1.
+        in_year_p = [
+            day for day in _known_dates(component) if boundary <= day < next_boundary
+        ]
+        if in_year_p:
+            floor = max(floor, min(max(in_year_p) + one_day, last_day_of_year_p))
         detail = _CROSSING_DETAIL.format(phase=p, component_id=component.component_id)
         moved.append(_moved(component, length, boundary, detail))
 
