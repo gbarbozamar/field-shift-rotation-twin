@@ -113,6 +113,12 @@ const WORDING_SHEET: Record<string, string> = {
   'clocks.years_hint': 'Each column is one agricultural year',
   'clocks.example_note': 'Example data — real years arrive with the seam',
   'seam.with_real_data': 'Live data — NASA POWER through the platform route',
+  // Science wording decided verbatim by D148 (issue #77) and the reason
+  // approved by the interface developer (15/11/2026); decided wording.
+  'soil_loss.headline_label':
+    'based on a Uruguayan no-till measurement; overestimates about 6 times the loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)',
+  'soil_loss.withdrawn_c':
+    'Not shown: the computed cover factor of this release overestimates the measured loss (see the check in docs/VALIDATION.md).',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
   'entry.title': 'Case',

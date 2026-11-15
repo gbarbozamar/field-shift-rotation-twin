@@ -30,6 +30,9 @@
  * - cards.*      the results cards (title, rotation heading, availability
  *                heading, carbon model and computation labels)
  * - seam.*       the platform-route seam (live-data label), Block 4 addendum
+ * - soil_loss.*  the D148 display rules of the soil-loss values of a run: the
+ *                science label beside the declared-C headline figure, the
+ *                not-shown reason of a withdrawn computed-C value
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -123,6 +126,13 @@ export const strings = {
   'clocks.years_hint': 'Each column is one agricultural year',
   'clocks.example_note': 'Example data — real years arrive with the seam',
   'seam.with_real_data': 'Live data — NASA POWER through the platform route',
+  // Science wording decided verbatim by D148 (issue #77); the interface
+  // renders it, it does not edit it.
+  'soil_loss.headline_label':
+    'based on a Uruguayan no-till measurement; overestimates about 6 times the loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)',
+  // Approved by Martín (interface developer), 15/11/2026.
+  'soil_loss.withdrawn_c':
+    'Not shown: the computed cover factor of this release overestimates the measured loss (see the check in docs/VALIDATION.md).',
 } as const
 
 /**

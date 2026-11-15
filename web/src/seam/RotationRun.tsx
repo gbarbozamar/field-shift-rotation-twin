@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { ValueDisplay, missingPattern } from '../components/ValueDisplay'
+import type { ValueItem } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import type { ExampleField } from '../identity/exampleCase'
 import { useSelectedFieldId } from '../identity/selection'
@@ -9,7 +10,7 @@ import { rotationDefinition } from './rotationDefinition'
 import { ApiError, runRotation } from './runRotationApi'
 import type { SiteReference } from './runRotationApi'
 import { parseRunRotation } from './runRotationResponse'
-import type { RunRotationView } from './runRotationResponse'
+import type { IndicatorRow, RunRotationView } from './runRotationResponse'
 
 /**
  * The CP1 seam (issue #119): the interface stops reading the site-data
@@ -29,6 +30,15 @@ import type { RunRotationView } from './runRotationResponse'
  * so its whole behaviour is its static markup in the tests; the container
  * holds the state in one TanStack Query mutation whose fetcher is the
  * platform-route call of runRotationApi.ts.
+ *
+ * One display rule completes it (D148 of issue #77, issue #249): the
+ * computed C is withdrawn from the demonstration. The source text of every
+ * soil-loss value of the run names the path C took, and the rule reads it —
+ * a value whose C was computed shows the decided not-shown reason instead
+ * of its number, and a run whose C is the declared record shows that figure
+ * as the headline, beside the label D148 words verbatim. Nothing else
+ * changes: every other value keeps the shared value display, and water and
+ * carbon stay missing with their reasons.
  */
 
 /**
@@ -95,6 +105,130 @@ function RotationRunError({ error }: { error: unknown }) {
   )
 }
 
+// --- the C routes of the source text, and the D148 display rule ----------------
+
+/**
+ * The C-route markers of EP1's source text (engine/erosion/soil_loss.py, the
+ * main route the platform route calls). The source of every soil-loss value
+ * of a run — annual and monthly alike, a monthly source carrying its annual
+ * one — embeds exactly one clause naming the path C took: C computed through
+ * engine/erosion/c_factor/ (the COMPUTED_C clause) or the single declared
+ * record by the fallback of brief #218 (the DECLARED_C clause). The declared
+ * clause itself contains the words "C computed through
+ * engine/erosion/c_factor/", so the computed marker is the full opening of
+ * the computed clause, which the declared clause never contains, and the
+ * declared marker is the opening of the declared clause. The two routes are
+ * told apart by these exact openings, never by a looser phrase.
+ */
+const COMPUTED_C_SOURCE_MARKER = [
+  'C',
+  'of',
+  'the',
+  'agricultural',
+  'year',
+  'computed',
+  'through',
+  'engine/erosion/c_factor/',
+].join(' ')
+const DECLARED_C_SOURCE_MARKER = [
+  'C',
+  'is',
+  'the',
+  'single',
+  'declared',
+  'value',
+  'of',
+  'the',
+  'record',
+].join(' ')
+
+/** True when the item's source says its C was computed (the D129 route). */
+function isComputedC(item: ValueItem): boolean {
+  return item.source !== undefined && item.source.includes(COMPUTED_C_SOURCE_MARKER)
+}
+
+/** True when the item's source says its C is the declared record (fallback). */
+function isDeclaredC(item: ValueItem): boolean {
+  return item.source !== undefined && item.source.includes(DECLARED_C_SOURCE_MARKER)
+}
+
+/**
+ * The La Estanzuela check D148 names (docs/VALIDATION.md, the EP1
+ * plausibility entry): the link target of the not-shown reason. A URL, not
+ * user-visible wording — the visible text of the link is the reason's own
+ * mention of the file.
+ */
+const VALIDATION_ENTRY_HREF =
+  'https://github.com/gbarbozamar/field-shift-rotation-twin/blob/main/docs/VALIDATION.md#ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019'
+
+/**
+ * A withdrawn computed-C soil-loss value (D148): the approved not-shown
+ * reason renders where the value would have shown, and the number does not.
+ * The reason's mention of the validation file is linked to the entry it
+ * names; the visible text stays the decided string exactly as written.
+ */
+function WithdrawnC() {
+  const reason = strings['soil_loss.withdrawn_c']
+  const mention = 'docs/VALIDATION.md'
+  const at = reason.indexOf(mention)
+  if (at === -1) {
+    return (
+      <p
+        data-testid="withdrawn-line"
+        className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+      >
+        {reason}
+      </p>
+    )
+  }
+  return (
+    <p
+      data-testid="withdrawn-line"
+      className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+    >
+      {reason.slice(0, at)}
+      <a
+        data-testid="withdrawn-validation-link"
+        href={VALIDATION_ENTRY_HREF}
+        target="_blank"
+        rel="noreferrer"
+        className="underline"
+      >
+        {mention}
+      </a>
+      {reason.slice(at + mention.length)}
+    </p>
+  )
+}
+
+/**
+ * The headline of D148: when the run's soil loss went through the declared C
+ * (the fallback of brief #218), its figure is the headline, with the decided
+ * science label beside it, verbatim. The figure is the first present value
+ * whose source says C is the declared record — the parser lists the annual
+ * values first, so it is the annual declared-C figure D148 headlines. The
+ * rows below stay as they were: every value keeps the shared value display,
+ * its unit, provenance, source and range. No declared-C figure, no headline.
+ */
+function DeclaredCHeadline({ rows }: { rows: IndicatorRow[] }) {
+  const headline = rows.find((row) => row.item.value !== null && isDeclaredC(row.item))
+  if (headline === undefined) return null
+  return (
+    <div
+      data-testid="soil-loss-headline"
+      className={['mt-2', 'space-y-1'].join(' ')}
+    >
+      <ValueDisplay what={headline.what} item={headline.item} />
+      <p
+        data-testid="headline-label"
+        className={['text-sm', 'text-slate-500'].join(' ')}
+      >
+        {strings['soil_loss.headline_label']}
+      </p>
+    </div>
+  )
+}
+
 /** The response below the action: the label of real data, then every value. */
 function RunResult({ view, runName }: { view: RunRotationView; runName: string }) {
   return (
@@ -127,10 +261,19 @@ function RunResult({ view, runName }: { view: RunRotationView; runName: string }
         view.parts.map((part) => (
           <div key={part.indicator} data-testid="rotation-run-part" className="mt-3">
             <h4 className="text-sm font-semibold">{part.indicator}</h4>
+            {part.indicator === 'soil_loss' ? (
+              <DeclaredCHeadline rows={part.rows} />
+            ) : null}
             <ul className="mt-2 space-y-2">
               {part.rows.map((row) => (
                 <li key={`${row.what}-${row.item.unit}`}>
-                  <ValueDisplay what={row.what} item={row.item} />
+                  {part.indicator === 'soil_loss' &&
+                  row.item.value !== null &&
+                  isComputedC(row.item) ? (
+                    <WithdrawnC />
+                  ) : (
+                    <ValueDisplay what={row.what} item={row.item} />
+                  )}
                 </li>
               ))}
             </ul>
