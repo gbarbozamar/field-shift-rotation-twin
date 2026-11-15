@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import math
 import numbers
-from collections.abc import Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal, get_args
 
 from contracts.economic_facts import MARGIN_UNIT
 from contracts.inputs.common import ReasonCode
 
-from .limit import LimitAssessment, LimitCheck
+from .limit import LimitAssessment, LimitCheck, _reason_text
 from .margin import MarginResult
 
 Strictness = Literal["on_average", "every_kind"]
@@ -74,6 +74,28 @@ class LimitCost:
     detail: str | None
     unit: str = MARGIN_UNIT
 
+    def __post_init__(self) -> None:
+        if self.unit != MARGIN_UNIT:
+            raise ValueError(f"unit: {MARGIN_UNIT!r}")
+        if self.reason is not None and self.reason not in get_args(ReasonCode):
+            raise ValueError("reason: a reason code of C3.2")
+        if (self.value is None) != (self.against is None):
+            raise ValueError(
+                "a cost value is set exactly with the rotation it is against"
+            )
+        if self.value is not None and (
+            self.costs_nothing or self.reason is not None or self.detail is not None
+        ):
+            raise ValueError("a cost value carries no costs_nothing, reason or detail")
+        if self.costs_nothing and (self.reason is not None or self.detail is not None):
+            raise ValueError("a cost of nothing carries no reason or detail")
+        if (
+            self.value is None
+            and not self.costs_nothing
+            and (self.reason is None or self.detail is None)
+        ):
+            raise ValueError("a missing cost carries a reason and a detail")
+
 
 @dataclass(frozen=True)
 class Decision:
@@ -92,21 +114,40 @@ class Decision:
     options: tuple[OptionVerdict, ...]
     limit_cost: LimitCost
 
+    def __post_init__(self) -> None:
+        if self.answer not in get_args(Answer):
+            raise ValueError(f"answer: one of {get_args(Answer)}")
+        if self.strictness not in get_args(Strictness):
+            raise ValueError(f"strictness: one of {get_args(Strictness)}")
+        if self.reason is not None and self.reason not in get_args(ReasonCode):
+            raise ValueError("reason: a reason code of C3.2")
+        is_chosen = self.answer == "chosen"
+        if is_chosen != (self.chosen is not None):
+            raise ValueError("a rotation is named exactly when the answer is chosen")
+        if is_chosen == (self.reason is not None) or is_chosen == (
+            self.detail is not None
+        ):
+            raise ValueError(
+                "a decision carries a reason and a detail exactly when nothing "
+                "is chosen"
+            )
+        if self.tied and self.answer != "not_resolved":
+            raise ValueError("tied rotations only when the answer is not resolved")
 
-def _reason_text(margin: MarginResult) -> str:
-    text = margin.reason if margin.reason is not None else "no reason given"
-    if margin.detail is not None:
-        text += f": {margin.detail}"
-    return text
+
+def _margin_text(margin: MarginResult) -> str:
+    return _reason_text(margin.reason, margin.detail)
 
 
-def _check_options(options: Sequence[RotationOption], strictness: object) -> None:
+def _check_options(options: tuple[RotationOption, ...], strictness: object) -> None:
     """Refuse structural misuse before any comparison."""
     if strictness not in get_args(Strictness):
         raise ValueError(f"strictness: one of {get_args(Strictness)}")
     if not options:
         raise ValueError("options: at least one rotation to choose from")
     seen: set[str] = set()
+    first, *_ = options
+    first_limit = (first.limit.limit, first.limit.unit)
     for option in options:
         rotation_id = option.rotation_id
         if not isinstance(rotation_id, str) or not rotation_id:
@@ -114,6 +155,12 @@ def _check_options(options: Sequence[RotationOption], strictness: object) -> Non
         if rotation_id in seen:
             raise ValueError(f"rotation_id: duplicate {rotation_id!r}")
         seen.add(rotation_id)
+        # PROPOSED: two missing limits (None) count as the same limit.
+        if (option.limit.limit, option.limit.unit) != first_limit:
+            raise ValueError(
+                f"{rotation_id}: judged against another soil-loss limit than "
+                f"{first.rotation_id}; every rotation is judged against one limit"
+            )
         margin = option.margin
         if margin.unit != MARGIN_UNIT:
             raise ValueError(
@@ -138,9 +185,7 @@ def _check_of(option: RotationOption, strictness: Strictness) -> LimitCheck:
 
 
 def _verdicts(
-    options: Sequence[RotationOption],
-    checks: Sequence[LimitCheck],
-    chosen: str | None,
+    pairs: list[tuple[RotationOption, LimitCheck]], chosen: str | None
 ) -> tuple[OptionVerdict, ...]:
     return tuple(
         OptionVerdict(
@@ -149,36 +194,18 @@ def _verdicts(
             margin=option.margin,
             limit_check=check,
         )
-        for option, check in zip(options, checks, strict=True)
+        for option, check in pairs
     )
 
 
 def _limit_cost(
-    chosen: RotationOption,
-    options: Sequence[RotationOption],
-    checks: Sequence[LimitCheck],
+    chosen: RotationOption, pairs: list[tuple[RotationOption, LimitCheck]]
 ) -> LimitCost:
-    outside = [
-        option
-        for option, check in zip(options, checks, strict=True)
-        if check.verdict == "does_not_meet"
-    ]
-    known = [o for o in outside if o.margin.value is not None]
+    outside = [o for o, c in pairs if c.verdict == "does_not_meet"]
     unknown = [o for o in outside if o.margin.value is None]
-    best: RotationOption | None = None
-    for option in known:
-        # PROPOSED: on an exact tie the first in input order is named.
-        if best is None or option.margin.value > best.margin.value:
-            best = option
-    if best is not None and best.margin.value > chosen.margin.value:
-        return LimitCost(
-            value=best.margin.value - chosen.margin.value,
-            against=best.rotation_id,
-            costs_nothing=False,
-            reason=None,
-            detail=None,
-        )
     if unknown:
+        # PROPOSED (fix round 1): a missing margin outside the limit could be
+        # the largest, so no cost is given rather than a silent lower bound.
         return LimitCost(
             value=None,
             against=None,
@@ -186,7 +213,17 @@ def _limit_cost(
             reason="MISSING_INPUT",
             detail="the margin of a rotation that does not meet the limit is "
             "missing, so the cost of meeting it is not known: "
-            + "; ".join(f"{o.rotation_id} ({_reason_text(o.margin)})" for o in unknown),
+            + "; ".join(f"{o.rotation_id} ({_margin_text(o.margin)})" for o in unknown),
+        )
+    # max keeps the first in input order on an exact tie (PROPOSED).
+    best = max(outside, key=lambda o: o.margin.value, default=None)
+    if best is not None and best.margin.value > chosen.margin.value:
+        return LimitCost(
+            value=best.margin.value - chosen.margin.value,
+            against=best.rotation_id,
+            costs_nothing=False,
+            reason=None,
+            detail=None,
         )
     return LimitCost(
         value=None, against=None, costs_nothing=True, reason=None, detail=None
@@ -199,21 +236,52 @@ def _no_cost(reason: ReasonCode, detail: str) -> LimitCost:
     )
 
 
+def _none_meets_detail(
+    pairs: list[tuple[RotationOption, LimitCheck]], strictness: Strictness
+) -> str:
+    if strictness == "on_average":
+        return "every rotation loses more soil than the limit on average"
+    named = []
+    for option, _ in pairs:
+        kinds = option.limit.kinds_not_met
+        named.append(
+            f"{option.rotation_id} ({', '.join(kinds)})"
+            if kinds
+            else option.rotation_id
+        )
+    return (
+        "every rotation loses more soil than the limit in at least one kind of "
+        "year: " + "; ".join(named)
+    )
+
+
+def _blocking_text(option: RotationOption, check: LimitCheck, top: float) -> str:
+    if option.margin.value is None:
+        why = f"its margin is missing ({_margin_text(option.margin)})"
+    else:
+        why = (
+            f"its margin {option.margin.value!r} is at least the best margin "
+            f"that meets the limit, {top!r}"
+        )
+    return f"{option.rotation_id}: {why}; the limit check: {check.detail}"
+
+
 def choose_rotation(
-    options: Sequence[RotationOption], strictness: Strictness
+    options: Iterable[RotationOption], strictness: Strictness
 ) -> Decision:
     """The rotation to plant: the most margin within the limit. PROPOSED.
 
+    ``options`` is any iterable of ``RotationOption`` (read once).
     ``strictness`` is ``"on_average"`` or ``"every_kind"`` and picks which
     check of each ``LimitAssessment`` counts. Raises ``ValueError`` on
     structural misuse (see README.md); a missing input is never an exception
     but an answer that is not resolved, with its reason.
     """
+    options = tuple(options)
     _check_options(options, strictness)
-    checks = [_check_of(option, strictness) for option in options]
-    pairs = list(zip(options, checks, strict=True))
+    pairs = [(option, _check_of(option, strictness)) for option in options]
     candidates = [o for o, c in pairs if c.verdict == "meets"]
-    unresolved = [o for o, c in pairs if c.verdict == "not_resolved"]
+    unresolved = [(o, c) for o, c in pairs if c.verdict == "not_resolved"]
 
     def not_resolved(
         reason: ReasonCode, detail: str, tied: tuple[str, ...] = ()
@@ -225,7 +293,7 @@ def choose_rotation(
             reason=reason,
             detail=detail,
             tied=tied,
-            options=_verdicts(options, checks, None),
+            options=_verdicts(pairs, None),
             limit_cost=_no_cost(
                 "NOT_COMPUTABLE",
                 "no rotation is chosen (the answer is not resolved), so the "
@@ -239,7 +307,7 @@ def choose_rotation(
         return not_resolved(
             "MISSING_INPUT",
             "the margin of a rotation that meets the limit is missing: "
-            + "; ".join(f"{o.rotation_id} ({_reason_text(o.margin)})" for o in missing),
+            + "; ".join(f"{o.rotation_id} ({_margin_text(o.margin)})" for o in missing),
         )
 
     if not candidates:
@@ -248,19 +316,16 @@ def choose_rotation(
                 "MISSING_INPUT",
                 "no rotation is known to meet the limit, and whether these "
                 "meet it is not resolved: "
-                + "; ".join(
-                    f"{o.rotation_id} ({_check_of(o, strictness).detail})"
-                    for o in unresolved
-                ),
+                + "; ".join(f"{o.rotation_id} ({c.detail})" for o, c in unresolved),
             )
         return Decision(
             answer="none_meets",
             strictness=strictness,
             chosen=None,
             reason="NOT_APPLICABLE",
-            detail="every rotation loses more soil than the limit",
+            detail=_none_meets_detail(pairs, strictness),
             tied=(),
-            options=_verdicts(options, checks, None),
+            options=_verdicts(pairs, None),
             limit_cost=_no_cost(
                 "NOT_APPLICABLE",
                 "no rotation meets the limit, so there is no cost of meeting it",
@@ -271,16 +336,14 @@ def choose_rotation(
 
     # (b) An option not resolved on the limit that could be the answer.
     blocking = [
-        o for o in unresolved if o.margin.value is None or o.margin.value >= top
+        (o, c) for o, c in unresolved if o.margin.value is None or o.margin.value >= top
     ]
     if blocking:
         return not_resolved(
             "MISSING_INPUT",
-            "whether these rotations meet the limit is not resolved, and their "
-            "margin is missing or not below the best rotation that meets it: "
-            + "; ".join(
-                f"{o.rotation_id} ({_check_of(o, strictness).detail})" for o in blocking
-            ),
+            "whether these rotations meet the limit is not resolved, and they "
+            "could be the answer: "
+            + " | ".join(_blocking_text(o, c, top) for o, c in blocking),
         )
 
     # (c) An exact tie at the best margin. PROPOSED: no new reason code (C3.2).
@@ -301,6 +364,6 @@ def choose_rotation(
         reason=None,
         detail=None,
         tied=(),
-        options=_verdicts(options, checks, chosen.rotation_id),
-        limit_cost=_limit_cost(chosen, options, checks),
+        options=_verdicts(pairs, chosen.rotation_id),
+        limit_cost=_limit_cost(chosen, pairs),
     )

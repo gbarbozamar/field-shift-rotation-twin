@@ -23,6 +23,7 @@ from economics import (
     Decision,
     LimitAssessment,
     LimitCheck,
+    LimitCost,
     MarginResult,
     RotationOption,
     choose_rotation,
@@ -146,7 +147,7 @@ def test_none_meets():
     assert decision.answer == "none_meets"
     assert decision.chosen is None
     assert decision.reason == "NOT_APPLICABLE"
-    assert "every rotation loses more soil than the limit" in decision.detail
+    assert decision.detail == "every rotation loses more soil than the limit on average"
     assert decision.tied == ()
     assert set(_states(decision).values()) == {"does_not_meet"}
     cost = decision.limit_cost
@@ -155,6 +156,19 @@ def test_none_meets():
     assert cost.costs_nothing is False
     assert cost.reason == "NOT_APPLICABLE"
     assert cost.detail
+
+
+def test_none_meets_in_every_kind_says_so():
+    # A meets on average but not in every kind; B fails both.
+    options = [_option("A", 300.0, MEETS, FAILS), _option("B", 250.0, FAILS)]
+    decision = choose_rotation(options, "every_kind")
+    # PROPOSED expected answer: none_meets; the detail names the kinds per option.
+    assert decision.answer == "none_meets"
+    kind = KINDS_OF_YEAR[0]
+    assert decision.detail == (
+        "every rotation loses more soil than the limit in at least one kind of "
+        f"year: A ({kind}); B ({kind})"
+    )
 
 
 def test_no_candidate_but_one_not_resolved_is_not_resolved():
@@ -240,6 +254,13 @@ def test_not_resolved_option_that_could_win_blocks(margin):
     assert decision.chosen is None
     assert decision.reason == "MISSING_INPUT"
     assert "X" in decision.detail
+    assert "the soil loss on average is missing" in decision.detail
+    if margin is None:
+        assert "its margin is missing" in decision.detail
+        assert "the price of wheat" in decision.detail
+    else:
+        assert f"its margin {margin!r} is at least" in decision.detail
+        assert "300.0" in decision.detail
     assert _states(decision)["X"] == "not_resolved"
     assert _states(decision)["A"] == "meets"
 
@@ -311,23 +332,120 @@ def test_non_meeting_option_with_missing_margin_leaves_the_cost_missing():
     assert "C" in cost.detail
 
 
-def test_known_better_non_meeting_option_gives_the_cost_despite_a_missing_one():
+def test_known_better_non_meeting_option_does_not_give_a_lower_bound():
     options = [
         _option("A", 300.0, MEETS),
         _option("B", 450.0, FAILS),
         _option("C", None, FAILS),
     ]
     decision = choose_rotation(options, "on_average")
-    # PROPOSED expected answer: 450 - 300 = 150 against B.
+    # PROPOSED expected answer (fix round 1): A; C's missing margin could be
+    # above B's, so no cost is given (no silent lower bound of 150).
+    assert decision.chosen == "A"
+    cost = decision.limit_cost
+    assert cost.value is None
+    assert cost.against is None
+    assert cost.costs_nothing is False
+    assert cost.reason == "MISSING_INPUT"
+    assert "C" in cost.detail
+    assert "B" not in cost.detail
+
+
+def test_tie_outside_the_limit_names_the_first():
+    options = [
+        _option("A", 300.0, MEETS),
+        _option("B", 450.0, FAILS),
+        _option("C", 450.0, FAILS),
+    ]
+    decision = choose_rotation(options, "on_average")
+    # PROPOSED expected answer: 450 - 300 = 150 against B, the first of the tie.
     assert decision.limit_cost.value == 150.0
     assert decision.limit_cost.against == "B"
-    assert decision.limit_cost.costs_nothing is False
 
 
 # 8. Misuse.
 def test_empty_is_refused():
     with pytest.raises(ValueError, match="at least one"):
         choose_rotation([], "on_average")
+
+
+def test_empty_generator_is_refused():
+    with pytest.raises(ValueError, match="at least one"):
+        choose_rotation((o for o in []), "on_average")
+
+
+def test_a_generator_is_read_once():
+    decision = choose_rotation((o for o in _table()), "on_average")
+    # PROPOSED expected answer: as test 1.
+    assert decision.chosen == "A"
+    assert decision.limit_cost.value == 200.0
+    assert len(decision.options) == len(_table())
+
+
+def test_different_limits_are_refused():
+    first, second, *rest = _table()
+    # Invented test data: two limits that differ.
+    second = dataclasses.replace(
+        second, limit=dataclasses.replace(second.limit, limit=5.0)
+    )
+    with pytest.raises(ValueError, match="another soil-loss limit"):
+        choose_rotation([first, second, *rest], "on_average")
+    other_unit = dataclasses.replace(
+        first, limit=dataclasses.replace(first.limit, unit="t ha-1")
+    )
+    with pytest.raises(ValueError, match="another soil-loss limit"):
+        choose_rotation([other_unit, second], "on_average")
+
+
+def test_two_missing_limits_count_as_the_same():
+    # _table() builds every assessment with limit None.
+    assert choose_rotation(_table(), "on_average").chosen == "A"
+
+
+def test_limit_cost_refuses_inconsistent_fields():
+    with pytest.raises(ValueError):
+        LimitCost(
+            value=1.0, against=None, costs_nothing=False, reason=None, detail=None
+        )
+    with pytest.raises(ValueError):
+        LimitCost(value=1.0, against="B", costs_nothing=True, reason=None, detail=None)
+    with pytest.raises(ValueError):
+        LimitCost(
+            value=None,
+            against=None,
+            costs_nothing=True,
+            reason="MISSING_INPUT",
+            detail="x",
+        )
+    with pytest.raises(ValueError):
+        LimitCost(
+            value=None, against=None, costs_nothing=False, reason=None, detail=None
+        )
+
+
+def test_decision_refuses_inconsistent_fields():
+    nothing = LimitCost(
+        value=None, against=None, costs_nothing=True, reason=None, detail=None
+    )
+    missing = LimitCost(
+        value=None,
+        against=None,
+        costs_nothing=False,
+        reason="NOT_COMPUTABLE",
+        detail="x",
+    )
+    with pytest.raises(ValueError):
+        Decision("chosen", "on_average", None, None, None, (), (), nothing)
+    with pytest.raises(ValueError):
+        Decision(
+            "not_resolved", "on_average", "A", "MISSING_INPUT", "x", (), (), missing
+        )
+    with pytest.raises(ValueError):
+        Decision("chosen", "on_average", "A", "MISSING_INPUT", "x", (), (), nothing)
+    with pytest.raises(ValueError):
+        Decision("none_meets", "on_average", None, None, None, (), (), missing)
+    with pytest.raises(ValueError):
+        Decision("chosen", "on_average", "A", None, None, ("A", "B"), (), nothing)
 
 
 def test_duplicate_id_is_refused():
