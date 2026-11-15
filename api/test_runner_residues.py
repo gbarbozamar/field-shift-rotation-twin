@@ -633,3 +633,131 @@ def test_ep4_is_not_called_when_phase_calendar_raises():
     with pytest.raises(ValueError):
         run(functions)
     assert residues.calls == soil_fn.calls == []
+
+
+# --- 7. a rotation with a lead-in cycle (D141), through the real engines ----------
+
+
+def test_wheat_soybean_maize_with_a_lead_in_answers_200(monkeypatch):
+    """Wheat / second-crop soybean, then maize, answers 200 in both phases.
+
+    The rotation definition example with three ``grain`` components, start
+    month 7 as in the example. Every date is a PLACEHOLDER: the years mean
+    nothing, and the month and day are those of the row USER-AP (D72) of
+    docs/SCIENCE_DECISIONS.md. The wheat is sown before the start month, so
+    each phase has a cycle before the first that ends inside the record: the
+    lead-in of D141 (point 13 of engine/calendar/repeat.py). EP4 writes its
+    component as cycle -1, which the ledger contract admits (D-LEAD-IN).
+
+    Site data: the PLACEHOLDER chain examples, posted as ``_post`` of
+    api/test_phases.py posts them. Catalogue: ``params/records/``, as the
+    service loads it. No number is asserted.
+    """
+    from fastapi.testclient import TestClient
+
+    from adapters.example_soil_slope import ExampleSoilSlopeSource
+    from api.config import PARAMETERS_FOLDER, load_parameters
+    from api.main import create_app
+    from api.ports import RunSettings
+    from api.test_phases import ROOT
+    from api.test_phases import ChainClimate as ChainExampleClimate
+    from contracts.inputs import SiteClimate
+
+    found = discover_engine_functions()
+    if found.build_residue_ledger is None:
+        pytest.skip("engine.residues is not built")
+    if found.phase_calendar is None or found.list_phases is None:
+        pytest.skip("the phase functions of engine.calendar.repeat are not built")
+    monkeypatch.undo()  # the real ResidueLedger
+    real = found.build_residue_ledger
+    ledgers: list[Any] = []
+
+    def recording(**kwargs: Any) -> Any:
+        answer = real(**kwargs)
+        ledgers.append(answer)
+        return answer
+
+    monkeypatch.setattr(
+        "api.app.discover_engine_functions",
+        lambda: replace(found, build_residue_ledger=recording),
+    )
+
+    # PLACEHOLDER years; month and day of USER-AP (D72). Crop words of the
+    # catalogue.
+    placeholder_dates = [
+        ("wheat", "2027-05-25", "2027-12-05"),
+        ("soybean", "2027-12-10", "2028-05-10"),
+        ("maize", "2028-09-20", "2029-04-20"),
+    ]
+    rotation = copy.deepcopy(ROTATION)
+    template = rotation["components"][0]
+    rotation["components"] = []
+    for position, (crop, sowing, harvest) in enumerate(placeholder_dates, start=1):
+        item = copy.deepcopy(template)
+        item.update(
+            component_id=f"c{position}",
+            position=position,
+            crop_id=crop,
+            purpose="grain",
+        )
+        item["sowing"]["date"], item["harvest"]["date"] = sowing, harvest
+        rotation["components"].append(item)
+
+    examples = ROOT / "contracts" / "inputs" / "examples"
+    climate = SiteClimate.model_validate_json(
+        (examples / "PLACEHOLDER_chain_site_climate.json").read_text(encoding="utf-8")
+    )
+    record = climate.daily_series[0]
+    app = create_app(
+        [],
+        climate=ChainExampleClimate(climate),
+        soil_slope=ExampleSoilSlopeSource(
+            examples / "PLACEHOLDER_chain_site_soil_slope.json"
+        ),
+        settings=RunSettings(start_date=record.start_date, end_date=record.end_date),
+        parameters=load_parameters(PARAMETERS_FOLDER),
+    )
+    body = {
+        "site": {
+            "case_id": rotation["case_id"],
+            "field_id": rotation["field_id"],
+            "latitude": climate.point.latitude.value,
+            "longitude": climate.point.longitude.value,
+        },
+        "rotation": rotation,
+    }
+    response = TestClient(app, raise_server_exceptions=False).post(ROUTE, json=body)
+    assert response.status_code == 200, response.text
+    scenarios = response.json()["scenarios"]
+    assert [item["scenario_id"] for item in scenarios] == ["phase_1", "phase_2"]
+    assert len(ledgers) == len(scenarios)  # EP4 once per phase
+
+    lead_in_crops = []
+    for scenario, ledger in zip(scenarios, ledgers, strict=True):
+        states = {m["id"]: m for m in scenario["modules"]}
+        assert runner.NOT_BUILT not in (states["residues"].get("detail") or "")
+        (lead_in,) = [item for item in ledger.components if item.cycle == -1]
+        lead_in_crops.append(lead_in.crop_id)
+        assert record.start_date <= lead_in.harvest.date <= record.end_date
+        assert lead_in.ag_year == ledger.first_ag_year
+        # Its harvest enters the first year of its crop's series: a number, or
+        # missing because a record is, never a zero and never "not laid out".
+        of_its_crop = [
+            series
+            for series in ledger.annual_carbon_inputs
+            if series.origin == lead_in.crop_id
+        ]
+        assert of_its_crop
+        for series in of_its_crop:
+            first = series.years[0]
+            assert first.ag_year == ledger.first_ag_year
+            if first.value is not None:
+                assert first.value != 0
+                continue
+            assert first.missing.reason == "MISSING_INPUT"
+            assert "before the first cycle" not in first.missing.detail
+            assert "parameter" in first.missing.detail  # it names a record
+            assert repr(lead_in.crop_id) in first.missing.detail
+    # Phase 1 starts with the wheat, so the cycle before it ends with the maize;
+    # phase 2 starts after the wheat, which then crosses into its first year.
+    assert lead_in_crops == ["maize", "wheat"]

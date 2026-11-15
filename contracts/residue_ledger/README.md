@@ -29,7 +29,7 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 | Field | Shape | Notes |
 |---|---|---|
 | `component_id`, `crop_id` | non-empty text | Those of the calendar |
-| `cycle` | integer, zero or more | The cycle of the repeated rotation; the first is 0 |
+| `cycle` | integer, -1 or more | The cycle of the repeated rotation: the first is 0; -1 is the lead-in of D141 (`engine/calendar/repeat.py` point 13), admitted by D-LEAD-IN |
 | `purpose` | `grain`, `cover` or `pasture`, or `NotGiven` | Copied from the rotation definition. It keeps a cover crop apart from a grain crop |
 | `residue_management` | `left_on_surface`, `incorporated` or `removed`, or `NotGiven` | The declared `management.residue` of the rotation definition, copied |
 | `harvest` | `DateValue` of `contracts/inputs/common.py` | The end date of the component in this cycle, or missing with its reason |
@@ -45,7 +45,8 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 ## Rules the model checks
 
 - The years are given, or `years_missing` is given, never both and never neither. Without years the ledger lists no component and no series. `first_ag_year` is not after `last_ag_year`.
-- A component appears at most once per cycle.
+- `cycle` is -1 or more. -1 is the lead-in of D141, the cycle before the first; nothing lower is a cycle (D-LEAD-IN).
+- A component appears at most once per cycle, the lead-in included.
 - Every mass value is in `mass_unit` and every carbon value in `carbon_unit`, including a value that is missing (C3.1).
 - `ag_year` is given exactly when the harvest date is given.
 - No quantity identifier appears twice in `annual_carbon_inputs`. Every series runs from `first_ag_year` to `last_ag_year`, is in `carbon_input_unit`, and has as its `origin` the crop of a component of the ledger.
@@ -69,6 +70,7 @@ Each case is a test function of `test_examples.py`. A test checks that this list
 | `test_ledger_without_years_listing_components_is_rejected` | No years, but components listed |
 | `test_years_out_of_order_are_rejected` | `first_ag_year` after `last_ag_year` |
 | `test_component_twice_in_one_cycle_is_rejected` | One component twice in one cycle |
+| `test_lead_in_cycle_is_admitted_and_nothing_lower` | An entry of cycle -1, the lead-in of D141, loads and round-trips; a component twice in cycle -1, and a cycle of -2, are rejected |
 | `test_value_in_another_unit_than_the_ledger_is_rejected` | A mass or a carbon value in another unit than the ledger states |
 | `test_agricultural_year_without_harvest_date_is_rejected` | `ag_year` without a harvest date, or a harvest date without `ag_year` |
 | `test_unknown_purpose_or_residue_word_is_rejected` | A word outside the closed lists of the rotation definition |

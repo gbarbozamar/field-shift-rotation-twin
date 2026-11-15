@@ -10,9 +10,9 @@ and retention, roots and cover kept apart. The ledger gives it per component
 of the rotation and per agricultural year (C5.3):
 
 - ``components``: one entry per component of the calendar in each cycle of
-  the rotation repeated over the record (D47), with the residue at harvest
-  produced, exported and retained, as mass and as carbon, and the roots and
-  the rhizodeposits apart from it;
+  the rotation repeated over the record (D47), the lead-in cycle of D141
+  included, with the residue at harvest produced, exported and retained, as
+  mass and as carbon, and the roots and the rhizodeposits apart from it;
 - ``annual_carbon_inputs``: per crop, purpose and part, one series with one
   value per agricultural year, in the shape of
   ``contracts.carbon_forcing.AnnualCarbonInputSeries``, so the platform copies
@@ -83,11 +83,17 @@ class LedgerComponent(ContractModel):
     definition, so a cover crop stays apart from a grain crop. ``harvest`` is
     the end date of the component in this cycle and ``ag_year`` the
     agricultural year it falls in (C5.3); both are missing together.
+
+    ``cycle`` is the index of the cycle: the first is 0. -1 is the lead-in,
+    the cycle before the first, laid out when one of its components ends
+    inside the record (D141 of #77; point 13 and ``LEAD_IN`` of
+    ``engine/calendar/repeat.py``). The ledger admits it by D-LEAD-IN, and
+    nothing lower: no cycle comes before the lead-in.
     """
 
     component_id: NonEmptyStr
     crop_id: NonEmptyStr
-    cycle: int = Field(ge=0)  # the first cycle is 0
+    cycle: int = Field(ge=-1)  # the first cycle is 0; -1 is the lead-in (D141)
     purpose: Purpose | NotGiven
     residue_management: Residue | NotGiven
     harvest: DateValue
