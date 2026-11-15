@@ -265,6 +265,24 @@ def test_a_tie_of_two_mean_shares_gives_no_order():
     assert "equal" in order.reason and "tie" in order.reason
 
 
+def test_a_trivial_tie_counts_no_rotation_ordered():
+    # A and B hold the same flags, so the trivial side ties: it has the means of
+    # both rotations but no order. The full soil loss orders them (A 2.0, B 4.0,
+    # lower is better). The count of the trivial side is that of its order, zero,
+    # never the number of its means.
+    months = {"A": LIVING_MONTHS["A"], "B": LIVING_MONTHS["A"]}
+    (item,) = compare_with_soil_loss(
+        living(("A", "B"), months=months),
+        MONTHLY_EROSIVITY,
+        soil_table({"A": 2.0, "B": 4.0}),
+        start_month=START_MONTH,
+    )
+    assert item.trivial.order is None and len(item.trivial.means) == 2
+    assert item.full.order == ("A", "B")
+    assert item.outcome == "no order from the trivial comparator"
+    assert (item.trivial_rotations_ordered, item.full_rotations_ordered) == (0, 2)
+
+
 def test_a_single_rotation_gives_no_order():
     (order,) = erosion_orders(
         living(("A",)), MONTHLY_EROSIVITY, start_month=START_MONTH

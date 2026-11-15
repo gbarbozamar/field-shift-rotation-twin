@@ -270,8 +270,9 @@ class ResidueLedger(ContractModel):
                 )
 
     def _check_monthly_series(self) -> None:
-        """D221 of #77: one series per origin of D194, over every month of the
-        agricultural years of the ledger, in ``carbon_input_unit``."""
+        """D221 of #77: one series per origin of D194, for exactly the origins
+        of ``annual_carbon_inputs``, over every month of the agricultural years
+        of the ledger, in ``carbon_input_unit``."""
         origins = Counter(series.origin for series in self.monthly_carbon_inputs)
         repeated = sorted(o for o, count in origins.items() if count > 1)
         if repeated:
@@ -311,4 +312,36 @@ class ResidueLedger(ContractModel):
                 raise ValueError(
                     f"{what}: it runs over every month of the agricultural years "
                     "of the ledger, from the start month of first_ag_year (C5.3)"
+                )
+        annual = {series.origin for series in self.annual_carbon_inputs}
+        if set(origins) != annual:
+            absent = sorted(annual - set(origins))
+            extra = sorted(set(origins) - annual)
+            raise ValueError(
+                "monthly_carbon_inputs: one series for every origin of "
+                "annual_carbon_inputs and for no other (D221 of #77); "
+                f"without a monthly series: {absent}; without an annual series: "
+                f"{extra}"
+            )
+        if self.monthly_carbon_inputs:
+            self._check_start_month(self.monthly_carbon_inputs[0].start.month)
+
+    def _check_start_month(self, start_month: int) -> None:
+        """The start month of the agricultural year is not a field of the
+        ledger (it is ``ag_year_start`` of the calendar). What the ledger does
+        hold bounds it: a dated harvest falls in one of the twelve months of its
+        ``ag_year`` counted from the start month of the series (C5.3)."""
+        for item in self.components:
+            if item.harvest.date is None or item.ag_year is None:
+                continue
+            day = item.harvest.date
+            offset = (day.year - item.ag_year) * MONTHS_IN_A_YEAR + (
+                day.month - start_month
+            )
+            if not 0 <= offset < MONTHS_IN_A_YEAR:
+                raise ValueError(
+                    f"monthly_carbon_inputs: they start in month {start_month}, "
+                    f"but the harvest of component {item.component_id!r} cycle "
+                    f"{item.cycle} on {day.isoformat()} is in ag_year "
+                    f"{item.ag_year}, which then does not hold that day (C5.3)"
                 )
