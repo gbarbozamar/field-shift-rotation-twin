@@ -52,9 +52,10 @@ and no uncertain input declared (what the route has today):
   indicators the pairs do not resolve (D7), and one reason text per pair and
   per scenario (D152: "The conditions that did not give the state are still
   shown").
-- ``measure_first``: empty. The priority list of D4 needs the person's
-  mapping of the uncertain inputs (``UncertainInput``), which the table does
-  not carry.
+- ``measure_first``: empty when ``uncertain_inputs`` is ``None`` (the table
+  carries no person's mapping of the uncertain inputs). When
+  ``uncertain_inputs`` is given, each pair is ranked by
+  ``measurement_priority`` (D4) and the items are emitted in rank order.
 
 **The state of a pair is ``pair_state``'s, unchanged** (D152, D165, D166,
 D173, D175): over the scenarios of the table it reads each scenario on its
@@ -92,7 +93,9 @@ Pure: no network, no file access, no clock.
 from __future__ import annotations
 
 import itertools
-from collections.abc import Hashable, Iterable
+import math
+from collections.abc import Hashable, Iterable, Mapping, Sequence
+from typing import Any
 
 from contracts.decision_output import (
     CountByDifferenceRange,
@@ -101,6 +104,7 @@ from contracts.decision_output import (
     DecisionOutput,
     EqualToleranceItem,
     LimitItem,
+    MeasureFirstItem,
     NotEvaluated,
     PairCellCount,
     PairedDifferenceItem,
@@ -116,8 +120,10 @@ from decision.functions import (
 )
 from decision.functions import (
     ROBUST_PREFERENCE,
+    UncertainInput,
     dominance,
     limit_counts,
+    measurement_priority,
     pair_counts,
     pair_state,
     paired_differences,
@@ -190,6 +196,145 @@ def _not_declared(unit: str, detail: str) -> Value:
     )
 
 
+def _non_blank_str(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{label} must be a string, got {type(value).__name__}")
+    if value.strip() == "":
+        raise ValueError(f"{label} must not be empty or blank")
+    return value
+
+
+def _coerce_cell(
+    raw: object,
+) -> tuple[str, str, str, int | None, str | None, str | None]:
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, Sequence) or len(raw) != 6:
+        raise ValueError("uncertain input 'cell' must be a 6-item sequence")
+    rotation_id = _non_blank_str(raw[0], "cell[0] (rotation_id)")
+    indicator = _non_blank_str(raw[1], "cell[1] (indicator)")
+    time_basis = _non_blank_str(raw[2], "cell[2] (time_basis)")
+    ag_year = raw[3]
+    if ag_year is not None and (
+        isinstance(ag_year, bool) or not isinstance(ag_year, int)
+    ):
+        raise TypeError("cell[3] (ag_year) must be an int or None")
+    carbon_model = (
+        None if raw[4] is None else _non_blank_str(raw[4], "cell[4] (carbon_model)")
+    )
+    computation = (
+        None if raw[5] is None else _non_blank_str(raw[5], "cell[5] (computation)")
+    )
+    return (rotation_id, indicator, time_basis, ag_year, carbon_model, computation)
+
+
+def _coerce_values(
+    raw: object, known_scenarios: set[str]
+) -> tuple[tuple[float, str | tuple[str, ...]], ...]:
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, Sequence):
+        raise TypeError("uncertain input 'values' must be a sequence")
+    coerced: list[tuple[float, str | tuple[str, ...]]] = []
+    for entry in raw:
+        if (
+            isinstance(entry, (str, bytes))
+            or not isinstance(entry, Sequence)
+            or len(entry) != 2
+        ):
+            raise ValueError(
+                "each entry of uncertain input 'values' must be a 2-item (value, scenarios) pair"
+            )
+        num, scenarios_ref = entry
+        if isinstance(num, bool) or not isinstance(num, (int, float)):
+            raise TypeError(
+                f"uncertain input value must be a number, got {type(num).__name__}"
+            )
+        float_val = float(num)
+        if not math.isfinite(float_val):
+            raise ValueError("uncertain input value must be finite")
+        if isinstance(scenarios_ref, str):
+            ref: str | tuple[str, ...] = _non_blank_str(scenarios_ref, "scenario_id")
+            referenced = (ref,)
+        elif isinstance(scenarios_ref, Sequence) and not isinstance(
+            scenarios_ref, bytes
+        ):
+            if not scenarios_ref:
+                raise ValueError(
+                    "an admitted value of an uncertain input names no scenario (D103, D117)"
+                )
+            ref = tuple(_non_blank_str(s, "scenario_id") for s in scenarios_ref)
+            referenced = ref
+        else:
+            raise TypeError(
+                "uncertain input scenario reference must be a string or sequence of strings"
+            )
+        absent = [s for s in referenced if s not in known_scenarios]
+        if absent:
+            raise ValueError(
+                f"scenarios {absent} are not scenarios of the table: "
+                f"{sorted(known_scenarios)}"
+            )
+        coerced.append((float_val, ref))
+    return tuple(coerced)
+
+
+def _coerce_uncertain_input(raw: object, known_scenarios: set[str]) -> UncertainInput:
+    if isinstance(raw, UncertainInput):
+        name, unit, cell, values = raw.name, raw.unit, raw.cell, raw.values
+    elif isinstance(raw, Mapping):
+        expected = {"name", "unit", "cell", "values"}
+        missing = expected - set(raw)
+        extra = set(raw) - expected
+        if missing or extra:
+            raise ValueError(
+                f"uncertain input mapping keys mismatch: missing={sorted(missing)}, "
+                f"extra={sorted(extra)}"
+            )
+        name = raw["name"]
+        unit = raw["unit"]
+        cell = raw["cell"]
+        values = raw["values"]
+    elif all(hasattr(raw, attr) for attr in ("name", "unit", "cell", "values")):
+        name = raw.name  # type: ignore[attr-defined]
+        unit = raw.unit  # type: ignore[attr-defined]
+        cell = raw.cell  # type: ignore[attr-defined]
+        values = raw.values  # type: ignore[attr-defined]
+    else:
+        raise TypeError(
+            f"uncertain_inputs items must be UncertainInput, got {type(raw).__name__}"
+        )
+    return UncertainInput(
+        name=_non_blank_str(name, "uncertain_input.name"),
+        unit=_non_blank_str(unit, "uncertain_input.unit"),
+        cell=_coerce_cell(cell),
+        values=_coerce_values(values, known_scenarios),
+    )
+
+
+def _coerce_uncertain_inputs(
+    uncertain_inputs: Sequence[UncertainInput | Mapping[str, Any] | Any],
+    known_scenarios: set[str],
+) -> tuple[UncertainInput, ...]:
+    if isinstance(uncertain_inputs, (str, bytes, Mapping)) or not isinstance(
+        uncertain_inputs, Sequence
+    ):
+        raise TypeError("uncertain_inputs must be a sequence of UncertainInput")
+    return tuple(
+        _coerce_uncertain_input(item, known_scenarios) for item in uncertain_inputs
+    )
+
+
+def _cell_description(
+    cell: tuple[str, str, str, int | None, str | None, str | None],
+) -> str:
+    rotation_id, indicator, time_basis, ag_year, carbon_model, computation = cell
+    parts = [rotation_id, indicator, time_basis]
+    if ag_year is not None:
+        parts.append(str(ag_year))
+    if carbon_model is not None:
+        parts.append(carbon_model)
+    if computation is not None:
+        parts.append(computation)
+    return ", ".join(parts)
+
+
 def _pair_state(
     table: ResultsTable, first: str, second: str
 ) -> tuple[PairState, tuple[str, ...], list[str]]:
@@ -250,7 +395,10 @@ def _pair_state(
 
 
 def assemble_decision_output(
-    table: ResultsTable, *, example_data: bool
+    table: ResultsTable,
+    *,
+    example_data: bool,
+    uncertain_inputs: Sequence[UncertainInput | Mapping[str, Any] | Any] | None = None,
 ) -> DecisionOutput:
     """The decision output document of ``table`` (module docstring). PROPOSED."""
     rotations = _in_order(row.rotation_id for row in table.rows)
@@ -438,6 +586,26 @@ def assemble_decision_output(
         )
         reasons.extend(texts)
 
+    measure_first: list[MeasureFirstItem] = []
+    if uncertain_inputs is not None:
+        inputs_tuple = _coerce_uncertain_inputs(uncertain_inputs, set(scenarios))
+        if inputs_tuple:
+            for first, second in pairs:
+                priority = measurement_priority(table, first, second, inputs_tuple)
+                for item in priority.items:
+                    measure_first.append(
+                        MeasureFirstItem(
+                            rank=item.rank,
+                            what=(
+                                f"'{item.input_name}' "
+                                f"({_cell_description(item.cell)}, {item.unit}) "
+                                f"for the pair ('{first}', '{second}')"
+                            ),
+                            why=item.why,
+                        )
+                    )
+            measure_first.sort(key=lambda item: item.rank)
+
     return DecisionOutput(
         contract="decision_output",
         example_data=example_data,
@@ -469,5 +637,5 @@ def assemble_decision_output(
             indicators_not_resolved=sorted(not_resolved),
             reasons=reasons,
         ),
-        measure_first=[],
+        measure_first=measure_first,
     )
