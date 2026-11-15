@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "540095f-E2-test_a_malformed_expected_order_raises-003",
+  "run_id": "run-20261115T194950Z-540095f",
+  "test_code": "E2",
+  "expected": {
+    "missing_reason": "the entry E2 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for validation/test_order_between_systems.py::test_a_malformed_expected_order_raises[integer]"
+  },
+  "notes": "Test validation/test_order_between_systems.py::test_a_malformed_expected_order_raises[integer]. Placed under E2: a test of validation/test_order_between_systems.py, the test file of entry E2, under the heading 'what the inputs may be' (rule of the second run, PROPOSED: every test of the file except the one under the heading 'the functions are pure and hold no value of the method')."
+}
