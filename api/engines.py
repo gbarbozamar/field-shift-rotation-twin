@@ -65,14 +65,20 @@ not-built form of a part (D12), all of issue #77.
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib
 import inspect
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, get_args
+from typing import Any, get_args, get_type_hints
 
 from adapters.ports import ClimateResult, SoilSlopeResult
-from api.carbon_forcing import STOCK_UNIT, build_carbon_forcing, crops_left_out
+from api.carbon_forcing import (
+    STOCK_UNIT,
+    build_carbon_forcing,
+    crops_left_out,
+    record_period,
+)
 from api.phases import (
     REPEAT_MODULE,
     Phase,
@@ -85,7 +91,7 @@ from api.ports import EnginesResult, Missing, ModuleStatus, PhaseResult, ReasonC
 from api.rotation_validator import load_rotation_definition
 from contracts.carbon_balance import CarbonBalance
 from contracts.carbon_forcing import CarbonForcing
-from contracts.inputs import RotationCalendar
+from contracts.inputs import RotationCalendar, SiteClimate
 from contracts.inputs.common import Value
 from contracts.results.models import (
     DIRECTION_OF,
@@ -648,6 +654,14 @@ def ledger_carbon_inputs(ledger: Any) -> Any:
     return list(ledger.annual_carbon_inputs)
 
 
+def ledger_monthly_carbon_inputs(ledger: Any) -> Any:
+    """The monthly series of the ledger for ``carbon_inputs`` (D221), unchanged;
+    ``None`` for a ledger without years."""
+    if ledger.years_missing is not None:
+        return None
+    return list(ledger.monthly_carbon_inputs)
+
+
 def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     """The note on the carbon inputs copied from the ledger (PROPOSED text).
 
@@ -691,6 +705,90 @@ def ledger_inputs_detail(forcing: CarbonForcing) -> str:
             "out (PROPOSED)"
         )
     return note
+
+
+# --- the daily reference evapotranspiration for the carbon forcing (D220) -------
+
+# The modules of engine/water/ the daily FAO-56 reference evapotranspiration of
+# D44 is read from, found by name like the entry points, so that the service
+# starts and answers without them.
+ET0_MODULE = "engine.water.et0"
+EP3_MODULE = "engine.water.exposure"
+EP3_PARAMETERS_MODULE = "engine.water._parameters"
+
+
+def daily_reference_evapotranspiration(
+    climate: SiteClimate, parameters: Mapping[str, dict]
+) -> dict[dt.date, float | ResultsMissing] | ResultsMissing:
+    """The daily FAO-56 reference evapotranspiration of D44, as EP3 computes it.
+
+    For the monthly potential evapotranspiration of RothC (D220 of #77). It is
+    the call EP3 makes (``engine/water/exposure.py``):
+    ``reference_evapotranspiration_from_climate_with_bounds`` with the
+    constants and the two bounds of D82 read from the catalogue under the
+    identifiers EP3 reads (``ET0_PARAMETERS``, ``ET0_BOUND_PARAMETERS``, scope
+    ``SITE``, on the first day of the record), the point units and the
+    unit-guard reason of EP3. No constant is written here. A record that is
+    absent makes the ET0 of every day missing with the reason the catalogue
+    gives (it is passed on, never replaced). ``engine/water/`` not built: a
+    ``Missing`` ``NOT_AVAILABLE``. PROPOSED; the unit of D181 brings the same
+    daily ET0 to the producer for the annual water balance.
+    """
+    try:
+        et0 = importlib.import_module(ET0_MODULE)
+        ep3 = importlib.import_module(EP3_MODULE)
+        records = importlib.import_module(EP3_PARAMETERS_MODULE)
+    except ModuleNotFoundError as error:
+        return ResultsMissing(
+            reason="NOT_AVAILABLE",
+            detail=(
+                "the daily reference evapotranspiration of D44 is not built: "
+                f"module {error.name!r} is absent"
+            ),
+        )
+    period = record_period(climate)
+    if period is None:
+        return ResultsMissing(
+            reason="MISSING_INPUT",
+            detail=(
+                "the daily reference evapotranspiration of D44: site data: climate "
+                "has no daily series"
+            ),
+        )
+    first_day = period[0]
+    catalogue = records.Catalogue(parameters)
+    constant_groups = get_type_hints(et0.Et0Constants)
+    bound_groups = get_type_hints(et0.Et0Bounds)
+    constants = et0.Et0Constants(
+        **{
+            group: constant_groups[group](
+                **{
+                    name: catalogue.value(f"{group}_{name}", ep3.SITE, first_day)
+                    for name in names
+                }
+            )
+            for group, names in ep3.ET0_PARAMETERS.items()
+        }
+    )
+    bounds = et0.Et0Bounds(
+        **{
+            group: bound_groups[group](
+                **{
+                    field: catalogue.value(parameter_id, ep3.SITE, first_day)
+                    for field, parameter_id in names.items()
+                }
+            )
+            for group, names in ep3.ET0_BOUND_PARAMETERS.items()
+        }
+    )
+    days = et0.reference_evapotranspiration_from_climate_with_bounds(
+        climate,
+        point_units=ep3.POINT_UNITS,
+        constants=constants,
+        bounds=bounds,
+        unit_guard_reason=ep3._UNIT_GUARD_REASON,
+    )
+    return {item.date: item.value for item in days}
 
 
 class EntryPointEngines:
@@ -850,15 +948,40 @@ class EntryPointEngines:
             phases = phase_calendars(calendar, phase_functions_of(functions))
         else:
             phases = (first_phase(calendar),)
+        # The daily reference evapotranspiration of D44, for the monthly
+        # climate of the forcing (D220): once per request, since it depends on
+        # the climate and the catalogue, not on the phase; only when a forcing
+        # is built.
+        reference_evapotranspiration = (
+            daily_reference_evapotranspiration(climate.data, self._parameters)
+            if self._builds_a_forcing()
+            else None
+        )
         runs = tuple(
             PhaseResult(
                 scenario_id=phase.scenario_id,
                 first_ag_year=phase.first_ag_year,
-                result=self._run_phase(phase, definition, climate, soil_slope),
+                result=self._run_phase(
+                    phase,
+                    definition,
+                    climate,
+                    soil_slope,
+                    reference_evapotranspiration,
+                ),
             )
             for phase in phases
         )
         return replace(runs[0].result, phases=runs)
+
+    def _builds_a_forcing(self) -> bool:
+        """Whether a phase builds a carbon forcing: a configured carbon engine is built."""
+        functions = self._functions
+        return (
+            functions.run_amg is not None and AMG_CARBON_MODEL in self._carbon_models
+        ) or (
+            functions.run_rothc is not None
+            and ROTHC_CARBON_MODEL in self._carbon_models
+        )
 
     def _run_phase(
         self,
@@ -866,6 +989,9 @@ class EntryPointEngines:
         definition: Any,
         climate: ClimateResult,
         soil_slope: SoilSlopeResult,
+        reference_evapotranspiration: (
+            dict[dt.date, float | ResultsMissing] | ResultsMissing | None
+        ) = None,
     ) -> EnginesResult:
         """EP1, EP3, EP4, EP5 and EP6 on the calendar of one phase; the same inputs every phase."""
         functions = self._functions
@@ -954,6 +1080,10 @@ class EntryPointEngines:
                 climate.data,
                 soil_slope.data,
                 carbon_inputs=None if ledger is None else ledger_carbon_inputs(ledger),
+                reference_evapotranspiration=reference_evapotranspiration,
+                monthly_carbon_inputs=(
+                    None if ledger is None else ledger_monthly_carbon_inputs(ledger)
+                ),
             )
 
         # EP5 on that forcing, with the catalogue by keyword (D65). Not called
