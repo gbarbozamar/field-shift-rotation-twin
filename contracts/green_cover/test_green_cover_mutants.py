@@ -36,6 +36,9 @@ def _obs(
     value: float | None = 0.55,
     missing: dict[str, Any] | None = None,
     unit: str = "dimensionless",
+    range_: dict[str, Any] | None = None,
+    range_missing: dict[str, Any] | None = None,
+    omit_range: bool = False,
     provenance: str | None = "DERIVED",
     sensor_source: str = "Sentinel-2 (HLS)",
     cloud_fraction: float | None = 0.1,
@@ -50,6 +53,12 @@ def _obs(
     }
     if missing is not None:
         doc["missing"] = missing
+    if range_ is not None:
+        doc["range"] = range_
+    if range_missing is not None:
+        doc["range_missing"] = range_missing
+    elif value is not None and range_ is None and not omit_range:
+        doc["range_missing"] = {"reason": "NOT_AVAILABLE"}
     if provenance is not None:
         doc["provenance"] = provenance
     if cloud_fraction is not None:
@@ -124,6 +133,15 @@ def test_all_c3_reason_codes_supported_on_observation_and_strip_missing(
     loaded_cf = GreenCoverStrip.model_validate(_strip([obs_cf]))
     assert loaded_cf.observations[0].cloud_fraction_missing is not None
     assert loaded_cf.observations[0].cloud_fraction_missing.reason == reason
+
+    # Range missing
+    if reason == "MISSING_INPUT":
+        with pytest.raises(ValidationError):
+            GreenCoverObservation.model_validate(_obs(range_missing={"reason": reason}))
+    obs_range = _obs(range_missing=copy.deepcopy(missing_obj))
+    loaded_range = GreenCoverStrip.model_validate(_strip([obs_range]))
+    assert loaded_range.observations[0].range_missing is not None
+    assert loaded_range.observations[0].range_missing.reason == reason
 
     # Strip-level missing
     loaded_strip = GreenCoverStrip.model_validate(
@@ -350,3 +368,103 @@ def test_mutant_weakened_model_validators_are_detected() -> None:
         GreenCoverStrip.model_validate(neither_strip)
     with _weaken_model_validator(GreenCoverStrip, "_validate_strip", lambda self: self):
         assert GreenCoverStrip.model_validate(neither_strip).observations == ()
+
+
+# --- 6. C2.1 / C2.2 value-range invariants & mutants --------------------------
+
+
+def test_c2_value_range_boundaries_and_strict_types() -> None:
+    # Exact bounds accepted (low == value, high == value, degenerate low == high).
+    for value, low, high in [
+        (0.45, 0.45, 0.65),
+        (0.65, 0.45, 0.65),
+        (0.50, 0.50, 0.50),
+    ]:
+        obs = GreenCoverObservation.model_validate(
+            _obs(
+                value=value,
+                range_={"low": low, "high": high, "kind": "uncertainty_band"},
+            )
+        )
+        assert obs.range is not None
+        assert obs.range.low == low
+        assert obs.range.high == high
+
+    # Off-by-epsilon outside bounds rejected.
+    for bad_value in [0.45 - 1e-6, 0.65 + 1e-6]:
+        with pytest.raises(ValidationError, match="outside its bounds"):
+            GreenCoverObservation.model_validate(
+                _obs(
+                    value=bad_value,
+                    range_={"low": 0.45, "high": 0.65, "kind": "uncertainty_band"},
+                )
+            )
+
+    # Inverted bounds (low > high), non-finite floats, and bools rejected.
+    with pytest.raises(ValidationError):
+        GreenCoverObservation.model_validate(
+            _obs(
+                value=0.5,
+                range_={"low": 0.6, "high": 0.4, "kind": "uncertainty_band"},
+            )
+        )
+    for bad_bound in [math.nan, math.inf, -math.inf, True]:
+        with pytest.raises(ValidationError):
+            GreenCoverObservation.model_validate(
+                _obs(
+                    value=0.5,
+                    range_={"low": bad_bound, "high": 0.6, "kind": "uncertainty_band"},
+                )
+            )
+
+    # Present observation with neither range nor range_missing, or with both.
+    with pytest.raises(ValidationError, match="range_missing"):
+        GreenCoverObservation.model_validate(_obs(value=0.5, omit_range=True))
+    with pytest.raises(ValidationError, match="never both"):
+        GreenCoverObservation.model_validate(
+            _obs(
+                value=0.5,
+                range_={"low": 0.4, "high": 0.6, "kind": "uncertainty_band"},
+                range_missing={"reason": "NOT_AVAILABLE"},
+            )
+        )
+
+    # Missing observation carrying range or range_missing.
+    for extra in [
+        {"range_": {"low": 0.4, "high": 0.6, "kind": "uncertainty_band"}},
+        {"range_missing": {"reason": "NOT_AVAILABLE"}},
+    ]:
+        with pytest.raises(ValidationError, match="missing value has no range"):
+            GreenCoverObservation.model_validate(
+                _obs(
+                    value=None,
+                    provenance=None,
+                    missing={"reason": "NO_COVERAGE"},
+                    **extra,
+                )
+            )
+
+
+def test_mutant_weakened_value_range_check_is_detected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    present_without_range = _obs(value=0.55, omit_range=True)
+    out_of_bounds = _obs(
+        value=0.9,
+        range_={"low": 0.4, "high": 0.6, "kind": "uncertainty_band"},
+    )
+    missing_with_range = _obs(
+        value=None,
+        provenance=None,
+        missing={"reason": "NO_COVERAGE"},
+        range_={"low": 0.4, "high": 0.6, "kind": "uncertainty_band"},
+    )
+
+    for payload in [present_without_range, out_of_bounds, missing_with_range]:
+        with pytest.raises(ValidationError):
+            GreenCoverObservation.model_validate(payload)
+
+    monkeypatch.setattr(gc_models, "_check_value_range", lambda *_args: None)
+    for payload in [present_without_range, out_of_bounds, missing_with_range]:
+        loaded = GreenCoverObservation.model_validate(payload)
+        assert isinstance(loaded, GreenCoverObservation)

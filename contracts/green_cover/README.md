@@ -26,7 +26,7 @@ Acceptance tests, from the repository root:
 python -m pytest contracts/green_cover/
 ```
 
-Models and pure validation only. No network calls, no parameter values, no thresholds, no citations. Shared parts (`ContractModel`, `IsoDate`, `Missing`, `NonEmptyStr`, `Provenance`, `QuantityId`) are imported from `contracts.inputs.common`, never copied.
+Models and pure validation only. No network calls, no parameter values, no thresholds, no citations. Shared parts (`ContractModel`, `IsoDate`, `Missing`, `NonEmptyStr`, `Provenance`, `QuantityId`, `Range`) are imported from `contracts.inputs.common`, never copied.
 
 ## Layout
 
@@ -63,6 +63,8 @@ All PROPOSED. Every model inherits from `contracts.inputs.common.ContractModel` 
 | `value` | `FiniteFloat \| None` | Required key; finite float when present, `null` when missing (never `NaN`/`inf`, never `0` as stand-in, C3.1) |
 | `missing` | `Missing \| None` | Present iff `value` is `null` (C3.1); never both and never neither |
 | `unit` | `NonEmptyStr` | Required; must equal `"dimensionless"` (C1.1), kept when `value` is `null` (C3.1) |
+| `range` | `Range \| None` | Uncertainty range (`low`, `high`, `kind`) in `"dimensionless"` with `low <= value <= high` (C2.1). Present iff `value` is present and `range_missing` is `null`; forbidden when `value` is `null` (C2.2) |
+| `range_missing` | `Missing \| None` | Reason the uncertainty range is absent (C2.2). Present iff `value` is present and `range` is `null`; forbidden when `value` is `null` (C2.2) |
 | `provenance` | `Provenance \| None` | Required in `{"OBSERVED", "DERIVED"}` when `value` is present (C4.1, C4.3, C4.4); must be `null`/omitted when `value` is `null` (C4.1) |
 | `sensor_source` | `NonEmptyStr` | Required, non-blank sensor/product name (e.g. `"Sentinel-2 (HLS)"`, `"Landsat-8 (HLS)"`, `"MODIS (MOD13Q1)"`) |
 | `cloud_fraction` | `FiniteFloat \| None` | Optional (default `None`); finite float in `[0.0, 1.0]` when present |
@@ -105,6 +107,13 @@ Every case below mutates `examples/PLACEHOLDER_green_cover.json` in memory and i
 | `observation-present-without-provenance` | Present observation omits `provenance` (C4.1) |
 | `observation-present-with-declared-provenance` | Present observation uses `"DECLARED"` |
 | `observation-present-with-simulated-provenance` | Present observation uses `"SIMULATED"` |
+| `observation-present-without-range-or-range-missing` | Present observation has neither `range` nor `range_missing` (C2.2) |
+| `observation-present-with-range-and-range-missing-both` | Present observation has both `range` and `range_missing` (C2.2) |
+| `observation-value-outside-range-below-low` | Present observation `value` is below `range.low` (C2.1) |
+| `observation-value-outside-range-above-high` | Present observation `value` is above `range.high` (C2.1) |
+| `observation-range-low-greater-than-high` | `range.low` is greater than `range.high` (C2.1) |
+| `observation-missing-with-range` | Missing observation carries `range` (C2.2) |
+| `observation-missing-with-range-missing` | Missing observation carries `range_missing` (C2.2) |
 | `observation-sensor-source-blank` | `sensor_source` is blank |
 | `observation-cloud-fraction-below-zero` | `cloud_fraction` is `-0.01` |
 | `observation-cloud-fraction-above-one` | `cloud_fraction` is `1.01` |
@@ -121,7 +130,8 @@ Every case below mutates `examples/PLACEHOLDER_green_cover.json` in memory and i
 | `accepted-same-date-same-sensor-different-indices` | Two indices (`evi`, `ndvi`) from one sensor on one date |
 | `accepted-same-date-different-sensors-same-index` | Two sensors on one date for the same index |
 | `accepted-cloud-fraction-boundaries` | `cloud_fraction` at exact `0.0` and `1.0` bounds |
-| `accepted-all-observations-missing-keeps-unit-and-sources` | Every observation missing with `NO_COVERAGE`, keeping `unit: "dimensionless"` and `sensor_source` |
+| `accepted-value-at-exact-range-bounds` | Present observation `value` equal to `range.low` and to `range.high` (C2.1) |
+| `accepted-all-observations-missing-keeps-unit-and-sources` | Every observation missing with `NO_COVERAGE`, keeping `unit: "dimensionless"`, `sensor_source`, and no `range`/`range_missing` |
 
 ## OPEN
 

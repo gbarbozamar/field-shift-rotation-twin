@@ -12,7 +12,7 @@ in its gated ``NOT_AVAILABLE`` state (``strip_missing`` with reason
 
 Shared parts are imported from ``contracts.inputs.common``, never copied:
 ``ContractModel``, ``IsoDate``, ``Missing``, ``NonEmptyStr``, ``Provenance``,
-``QuantityId``.
+``QuantityId``, ``Range``.
 
 Models and pure validation only. No network calls, no parameter values, no
 thresholds.
@@ -31,6 +31,7 @@ from contracts.inputs.common import (
     NonEmptyStr,
     Provenance,
     QuantityId,
+    Range,
 )
 
 CONTRACT_ID = "green_cover_strip"
@@ -58,6 +59,28 @@ ObservationTuple = Annotated[
 SourceTuple = Annotated[
     tuple[NonEmptyStr, ...], BeforeValidator(_coerce_sequence_to_tuple)
 ]
+
+
+def _check_value_range(
+    value: float | None,
+    range_: Range | None,
+    range_missing: Missing | None,
+) -> None:
+    """C2.1 / C2.2: same range rules as ``contracts.inputs.common.Value._range_rules``."""
+    if value is None:
+        if range_ is not None or range_missing is not None:
+            raise ValueError("a missing value has no range (C2.2)")
+        return
+    if range_ is not None and range_missing is not None:
+        raise ValueError(
+            "a value holds a range or the reason it has none, never both (C2.2)"
+        )
+    if range_ is None and range_missing is None:
+        raise ValueError(
+            "a value without a range carries the reason in range_missing (C2.2)"
+        )
+    if range_ is not None and not (range_.low <= value <= range_.high):
+        raise ValueError("range: the value is outside its bounds (C2.1)")
 
 
 def _check_observation_order_and_uniqueness(
@@ -98,11 +121,13 @@ def _check_sources_match_observations(
 class GreenCoverObservation(ContractModel):
     """One satellite green-cover observation for one date, sensor, and index.
 
-    Follows C3.1 and C4.1: ``value`` and ``missing`` are mutually exclusive,
-    ``unit`` is ``"dimensionless"`` (kept even when missing), a present value
-    carries ``provenance`` in ``{"OBSERVED", "DERIVED"}``, and a missing value
-    carries no provenance label. ``cloud_fraction`` is optional in [0, 1] or
-    absent with an explicit ``cloud_fraction_missing`` reason.
+    Follows C2.1, C2.2, C3.1, and C4.1: ``value`` and ``missing`` are mutually
+    exclusive; ``unit`` is ``"dimensionless"`` (kept even when missing); a
+    present value carries ``provenance`` in ``{"OBSERVED", "DERIVED"}`` and
+    either ``range`` or ``range_missing`` (never both, never neither, with
+    ``range.low <= value <= range.high``); a missing value carries no provenance
+    and no range or ``range_missing``. ``cloud_fraction`` is optional in [0, 1]
+    or absent with an explicit ``cloud_fraction_missing`` reason.
     """
 
     model_config = ConfigDict(
@@ -117,6 +142,8 @@ class GreenCoverObservation(ContractModel):
     value: FiniteFloat | None
     missing: Missing | None = None
     unit: NonEmptyStr
+    range: Range | None = None
+    range_missing: Missing | None = None
     provenance: Provenance | None = None
     sensor_source: NonEmptyStr
     cloud_fraction: FiniteFloat | None = None
@@ -153,6 +180,8 @@ class GreenCoverObservation(ContractModel):
                     f"observation: provenance must be one of {ALLOWED_PROVENANCES}, "
                     f"not {self.provenance!r} (C4.1, C4.3, C4.4)"
                 )
+
+        _check_value_range(self.value, self.range, self.range_missing)
 
         if self.cloud_fraction is not None and self.cloud_fraction_missing is not None:
             raise ValueError(

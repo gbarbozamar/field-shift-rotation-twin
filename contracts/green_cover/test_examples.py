@@ -81,6 +81,8 @@ def all_observations_missing() -> Mutation:
             obs["value"] = None
             obs["missing"] = {"reason": "NO_COVERAGE"}
             obs.pop("provenance", None)
+            obs.pop("range", None)
+            obs.pop("range_missing", None)
 
     return mutate
 
@@ -188,7 +190,11 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ),
     (
         "observation-null-without-missing",
-        both(put([*OBS0, "value"], None), drop([*OBS0, "provenance"])),
+        both(
+            put([*OBS0, "value"], None),
+            drop([*OBS0, "provenance"]),
+            drop([*OBS0, "range"]),
+        ),
         "missing part with its reason",
     ),
     (
@@ -210,6 +216,41 @@ INVALID: list[tuple[str, Mutation, str]] = [
         "observation-present-with-simulated-provenance",
         put([*OBS0, "provenance"], "SIMULATED"),
         "provenance must be one of",
+    ),
+    (
+        "observation-present-without-range-or-range-missing",
+        drop([*OBS0, "range"]),
+        "range_missing (C2.2)",
+    ),
+    (
+        "observation-present-with-range-and-range-missing-both",
+        put([*OBS0, "range_missing"], {"reason": "NOT_AVAILABLE"}),
+        "never both (C2.2)",
+    ),
+    (
+        "observation-value-outside-range-below-low",
+        put([*OBS0, "range"], {"low": 0.5, "high": 0.6, "kind": "PLACEHOLDER"}),
+        "outside its bounds (C2.1)",
+    ),
+    (
+        "observation-value-outside-range-above-high",
+        put([*OBS0, "range"], {"low": 0.1, "high": 0.3, "kind": "PLACEHOLDER"}),
+        "outside its bounds (C2.1)",
+    ),
+    (
+        "observation-range-low-greater-than-high",
+        put([*OBS0, "range"], {"low": 0.6, "high": 0.4, "kind": "PLACEHOLDER"}),
+        "low is greater than high (C2.1)",
+    ),
+    (
+        "observation-missing-with-range",
+        put([*OBS3, "range"], {"low": 0.0, "high": 0.5, "kind": "PLACEHOLDER"}),
+        "missing value has no range (C2.2)",
+    ),
+    (
+        "observation-missing-with-range-missing",
+        put([*OBS3, "range_missing"], {"reason": "NOT_AVAILABLE"}),
+        "missing value has no range (C2.2)",
     ),
     (
         "observation-sensor-source-blank",
@@ -270,6 +311,7 @@ VALID: list[tuple[str, Mutation]] = [
                         "quantity_id": "evi",
                         "value": 0.31,
                         "unit": "dimensionless",
+                        "range_missing": {"reason": "NOT_AVAILABLE"},
                         "provenance": "DERIVED",
                         "sensor_source": "Sentinel-2 (HLS)",
                     },
@@ -278,6 +320,7 @@ VALID: list[tuple[str, Mutation]] = [
                         "quantity_id": "ndvi",
                         "value": 0.42,
                         "unit": "dimensionless",
+                        "range_missing": {"reason": "NOT_AVAILABLE"},
                         "provenance": "DERIVED",
                         "sensor_source": "Sentinel-2 (HLS)",
                     },
@@ -297,6 +340,7 @@ VALID: list[tuple[str, Mutation]] = [
                         "quantity_id": "ndvi",
                         "value": 0.40,
                         "unit": "dimensionless",
+                        "range_missing": {"reason": "NOT_AVAILABLE"},
                         "provenance": "OBSERVED",
                         "sensor_source": "Landsat-8 (HLS)",
                     },
@@ -305,6 +349,7 @@ VALID: list[tuple[str, Mutation]] = [
                         "quantity_id": "ndvi",
                         "value": 0.42,
                         "unit": "dimensionless",
+                        "range_missing": {"reason": "NOT_AVAILABLE"},
                         "provenance": "DERIVED",
                         "sensor_source": "Sentinel-2 (HLS)",
                     },
@@ -316,6 +361,18 @@ VALID: list[tuple[str, Mutation]] = [
     (
         "accepted-cloud-fraction-boundaries",
         both(put([*OBS0, "cloud_fraction"], 0.0), put([*OBS2, "cloud_fraction"], 1.0)),
+    ),
+    (
+        "accepted-value-at-exact-range-bounds",
+        both(
+            put([*OBS0, "value"], 0.37),
+            put([*OBS2, "value"], 0.51),
+            drop([*OBS2, "range_missing"]),
+            put(
+                [*OBS2, "range"],
+                {"low": 0.45, "high": 0.51, "kind": "PLACEHOLDER_uncertainty"},
+            ),
+        ),
     ),
     (
         "accepted-all-observations-missing-keeps-unit-and-sources",
