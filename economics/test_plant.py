@@ -293,3 +293,93 @@ def test_assemble_answer_refuses_years_classified_with_another_start_month():
             sources=ANSWER["sources"],
             example_data=True,
         )
+
+
+# --- review of the whole 4 (brief S-034), PROPOSED test cases --------------------
+
+
+def _example_run(annual_items: int | None = None) -> _Run:
+    """The contract results example, its annual list cut to the first items."""
+    example = ResultsPerRotation.model_validate(RESULTS_EXAMPLE)
+    if annual_items is not None:
+        soil = example.soil_loss.model_copy(
+            update={"annual": example.soil_loss.annual[:annual_items]}
+        )
+        example = example.model_copy(update={"soil_loss": soil})
+    return _Run(example, None)
+
+
+def test_f1_a_record_year_the_annual_list_lacks_is_named_not_dropped():
+    """F1: the record years are those of the example; the run lists only the
+    first. The means stay over the year present, and every mean that lacks
+    a year names it."""
+    from kinds_of_year import mean_by_kind, series_from_results
+
+    request = _request()
+    full = _example_run().result
+    years = [item.ag_year for item in full.soil_loss.annual]
+    classified = plant.classify_years(
+        load_record(),
+        (min(years), max(years)),
+        WHY,
+        request.rotations[0].ag_year_start.month,
+        request.rotations,
+    )
+    run = _example_run(1)
+    kept = run.result.soil_loss.annual
+    absent = sorted(set(years) - {item.ag_year for item in kept})
+    assert absent
+    record, by_kind = plant.soil_loss_means(run, classified)
+    # The means over the years present are those of mean_by_kind, unchanged.
+    expected = mean_by_kind(
+        plant.INDICATOR, record.unit, series_from_results(kept), classified.kinds
+    )
+    assert record.value == expected.record.value
+    assert record.ag_years == expected.record.ag_years
+    named = ", ".join(str(year) for year in absent)
+    assert f"agricultural year(s) {named} of the record period" in record.detail
+    for kind, mean in by_kind.items():
+        assert mean.value == expected.by_kind[kind].value
+        assert mean.reason == expected.by_kind[kind].reason
+        lacks = [y for y in absent if classified.kinds[y].kind == kind]
+        if lacks:
+            listed = ", ".join(str(year) for year in lacks)
+            assert f"agricultural year(s) {listed} of the record period" in (
+                mean.detail
+            )
+
+
+def test_f3_without_a_period_the_soil_loss_carries_the_reason_of_the_caller():
+    """F3: years that are not years of the record for a named reason (as an
+    absent period) give the soil-loss means that reason, not NO_COVERAGE."""
+    request = _request()
+    reason = "NOT_AVAILABLE"
+    classified = plant.classify_years(
+        load_record(),
+        None,
+        WHY,
+        request.rotations[0].ag_year_start.month,
+        request.rotations,
+        reason=reason,
+    )
+    record, by_kind = plant.soil_loss_means(_example_run(), classified)
+    for mean in (record, *by_kind.values()):
+        assert mean.value is None
+        assert mean.reason == reason
+        assert WHY in mean.detail
+
+
+def test_f3_without_a_reason_the_years_off_the_record_stay_no_coverage():
+    """F3: without a reason of the caller (a period without a whole year),
+    the behaviour is the one before."""
+    request = _request()
+    classified = plant.classify_years(
+        load_record(),
+        None,
+        WHY,
+        request.rotations[0].ag_year_start.month,
+        request.rotations,
+    )
+    assert classified.reason is None and classified.why is None
+    record, _ = plant.soil_loss_means(_example_run(), classified)
+    assert record.reason == "NO_COVERAGE"

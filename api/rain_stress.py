@@ -238,10 +238,12 @@ def _why_not_read(parameters: dict[str, dict]) -> str | None:
 # --- scaling ---------------------------------------------------------------------
 
 
-def _finite(product: float) -> float:
-    if not math.isfinite(product):
+def _finite(number: float, factor: float) -> float:
+    # PROPOSED (S-034, F4): a product that overflows is not finite either
+    # (the ValueError the docstring of scale_erosivity names).
+    if not _finite_product(number, factor):
         raise ValueError(f"the record '{R_ID}' times the factor is not a finite number")
-    return product
+    return number * factor
 
 
 def _scaled_record(record: dict, factor: float) -> dict:
@@ -259,11 +261,11 @@ def _scaled_record(record: dict, factor: float) -> dict:
     # number raises ValueError here, before anything is multiplied.
     if isinstance(read_value(record), CatalogueMissing):
         return scaled
-    scaled["value"] = _finite(record["value"] * factor)
+    scaled["value"] = _finite(record["value"], factor)
     range_ = scaled["range"]
     if range_ is not None:
-        range_["low"] = _finite(range_["low"] * factor)
-        range_["high"] = _finite(range_["high"] * factor)
+        range_["low"] = _finite(range_["low"], factor)
+        range_["high"] = _finite(range_["high"], factor)
     note = scaled.get("note")
     added = _note(factor)
     scaled["note"] = f"{note}{NOTE_SEPARATOR}{added}" if note else added
@@ -334,9 +336,23 @@ def scales_to_finite(
         numbers = [record["value"]]
         if record["range"] is not None:
             numbers += [record["range"]["low"], record["range"]["high"]]
-        if not all(math.isfinite(number * stress.factor) for number in numbers):
+        if not all(_finite_product(number, stress.factor) for number in numbers):
             return False
     return True
+
+
+def _finite_product(number: float, factor: float) -> bool:
+    """Whether ``number * factor`` is a finite number. PROPOSED (S-034, F4).
+
+    A product that cannot be held as a float (an ``int`` too large, as a
+    ``RainStress`` built by hand with an ``int`` factor gives) raises
+    ``OverflowError`` in the product or in ``math.isfinite``: not finite,
+    never an exception.
+    """
+    try:
+        return math.isfinite(number * factor)
+    except OverflowError:
+        return False
 
 
 def applied_echo(

@@ -847,3 +847,70 @@ def test_readme_lists_every_proposed_case() -> None:
     cases = _all_cases()
     in_readme = re.findall(r"^\| `([a-z0-9-]+)` \|", listed, re.MULTILINE)
     assert sorted(in_readme) == sorted(cases)
+
+
+# --- Review of the whole 4 (brief S-034, F2), PROPOSED ---------------------------
+# Not cases of the README lists: a check of the wording of the messages only.
+
+# Test data: an identifier shorter than the three characters the route's
+# redaction looks for (api/rotation_validator.py).
+SHORT_ID = "q7"
+
+
+def _soybean_not_sown(data: dict[str, Any]) -> None:
+    soy = data["questions"]["soybean_crop_ids"][0]
+    (crop,) = [c for c in data["economic_facts"]["crops"] if c["crop_id"] == soy]
+    data["economic_facts"]["crops"].append(dict(crop, crop_id=SHORT_ID))
+    data["questions"]["soybean_crop_ids"] = [SHORT_ID]
+
+
+SHORT_ID_CASES: list[tuple[str, Mutation, str]] = [
+    (
+        "duplicate-rotation-id",
+        both(
+            put(["rotations", 0, "rotation_id"], SHORT_ID),
+            put(["rotations", 1, "rotation_id"], SHORT_ID),
+        ),
+        "share the rotation_id",
+    ),
+    (
+        "undeclared-crop",
+        put(["rotations", 2, "components", 0, "crop_id"], SHORT_ID),
+        "every crop sown is declared in economic_facts",
+    ),
+    (
+        "repeated-soybean-crop-id",
+        put(["questions", "soybean_crop_ids"], [SHORT_ID, SHORT_ID]),
+        "repeated",
+    ),
+    ("soybean-crop-not-sown", _soybean_not_sown, "sown by at least one rotation"),
+]
+
+
+# OPEN (S-034): this message still quotes the rotation_id (see the comment at
+# the message in plant_answer.py); strict, so it reports when it is fixed.
+SHORT_ID_OPEN = pytest.param(
+    both(
+        put(["rotations", 2, "rotation_id"], SHORT_ID),
+        put(["rotations", 2, "field_id"], "example-field-2"),
+    ),
+    "another field than the site",
+    id="rotation-of-another-field",
+    marks=pytest.mark.xfail(strict=True, reason="OPEN: S-034 F2, see plant_answer.py"),
+)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "fragment"),
+    [pytest.param(m, f, id=case) for case, m, f in SHORT_ID_CASES] + [SHORT_ID_OPEN],
+)
+def test_f2_a_request_message_never_quotes_a_submitted_id(
+    mutation: Mutation, fragment: str
+) -> None:
+    """F2: the message says what and where (a position), never the id."""
+    with pytest.raises(ValidationError) as caught:
+        PlantRequest.model_validate(_variant(REQUEST, mutation))
+    messages = [e["msg"] for e in caught.value.errors(include_input=False)]
+    assert any(fragment in message for message in messages)
+    for message in messages:
+        assert SHORT_ID not in message

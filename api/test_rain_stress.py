@@ -479,3 +479,24 @@ def test_a_factor_with_many_digits_is_written_exactly(number):
     note = scale_erosivity(parameters, stress)[key]["note"]
     for text in (stress.detail, note):
         assert f"multiplied by {number!r} " in f"{text} "
+
+
+# --- review of the whole 4 (brief S-034), PROPOSED test cases ----------------------
+
+# Test data: an int factor too large for a float. A RainStress built by hand
+# (rain_stress() turns every factor into a float); the product overflows.
+OVERFLOWING_INT_FACTOR = 10**400
+
+
+def test_f4_a_product_that_overflows_is_not_finite_never_an_exception():
+    """F4: number * factor raising OverflowError is "not finite", not a raise."""
+    from dataclasses import replace
+
+    from api.rain_stress import scales_to_finite
+
+    parameters = catalogue()
+    stress = replace(rain_stress(declared(TEST_FACTOR)), factor=OVERFLOWING_INT_FACTOR)
+    assert scales_to_finite(parameters, stress) is False
+    # scale_erosivity raises the ValueError its docstring names, not OverflowError.
+    with pytest.raises(ValueError, match="not a finite number"):
+        scale_erosivity(parameters, stress)
