@@ -29,7 +29,13 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    that reason. The daily reference evapotranspiration the forcing needs
    (D220, D181) is the answer of lane L1's public function
    ``engine.water.daily_reference_evapotranspiration`` (D256), found by name
-   like the entry points and called once per request;
+   like the entry points and called once per request. The monthly soil cover
+   of RothC (D222) is made from the days with a live crop that lane L1's
+   public rule ``engine.water.living_crop.live_crop_by_day`` (D135, D136,
+   the window of D157) gives on the calendar of the phase, over the record
+   period of the forcing, with the same catalogue EP3 reads; found by name
+   the same way, called once per phase, and counted by month here
+   (``live_crop_months_for_forcing``). No climate value enters it;
 5. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend``: the three rows of the
    ``CarbonBalance`` of EP5 unchanged for ``amg``, then those of EP6 for
@@ -78,8 +84,11 @@ from typing import Any, get_args
 from adapters.ports import ClimateResult, SoilSlopeResult
 from api.carbon_forcing import (
     STOCK_UNIT,
+    LiveCropMonth,
     build_carbon_forcing,
     crops_left_out,
+    record_period,
+    whole_ag_years,
 )
 from api.phases import (
     REPEAT_MODULE,
@@ -138,6 +147,10 @@ DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, RESIDUES, AMG, R
 REFERENCE_ET0 = EntryPoint(
     "D256", "water", "engine.water", "daily_reference_evapotranspiration"
 )
+# For the monthly soil cover of RothC (D222 of #77): lane L1's public rule of
+# the days with a live crop (D135, D136; unit l1/live-crop-by-day, #423), the
+# one EP3 builds its chain on. Not an entry point; found by name the same way.
+LIVE_CROP = EntryPoint("D222", "water", "engine.water.living_crop", "live_crop_by_day")
 
 # The contract EP4 returns (contracts/residue_ledger/, lane L1). Imported only
 # when EP4 has answered, never at module load: the runner must work before the
@@ -234,6 +247,9 @@ class EngineFunctions:
     daily_reference_evapotranspiration: (
         Callable[..., dict[dt.date, float | ResultsMissing]] | None
     ) = None
+    # For the soil cover of D222: whether a live crop stands on each day of
+    # the record (D135, D136). Not an entry point.
+    live_crop_by_day: Callable[..., dict[dt.date, bool | ResultsMissing]] | None = None
 
 
 def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
@@ -274,13 +290,15 @@ def discover_engine_functions() -> EngineFunctions:
     Also the two phase functions of issue #221; either one absent leaves both
     ``None`` in effect (the runner then runs phase 1 only); and
     ``components_crossing_phase``, optional (without it no count is written);
-    and ``daily_reference_evapotranspiration`` beside EP3 (D256), by the same
-    rule.
+    ``daily_reference_evapotranspiration`` beside EP3 (D256); and
+    ``live_crop_by_day`` of ``engine.water.living_crop`` for the soil cover
+    (D222), by the same rule.
     """
     return EngineFunctions(
         **{point.function: _import_function(point) for point in DISCOVERED},
         **{point.function: _import_function(point) for point in PHASE_FUNCTIONS},
         daily_reference_evapotranspiration=_import_function(REFERENCE_ET0),
+        live_crop_by_day=_import_function(LIVE_CROP),
     )
 
 
@@ -771,6 +789,96 @@ def reference_evapotranspiration_for_forcing(
     return answer
 
 
+# --- the days with a live crop for the soil cover of the forcing (D222) ---------
+
+# What the runner hands to the producer for ``soil_cover``: by (calendar year,
+# month), the count of days with a live crop and of days, or why it is missing.
+LiveCropMonths = dict[tuple[int, int], LiveCropMonth | ResultsMissing]
+
+
+def live_crop_months_for_forcing(
+    function: Callable[..., Any] | None,
+    calendar: RotationCalendar,
+    climate: SiteClimate,
+    parameters: dict[str, dict],
+) -> LiveCropMonths | ResultsMissing | None:
+    """For each calendar month of the record, the days with a live crop (D222).
+
+    ``function`` is lane L1's public rule ``live_crop_by_day`` (``LIVE_CROP``),
+    called as ``function(calendar, first, last, parameters=...)`` on the
+    calendar of the phase (the one EP3 reads in that phase), the record period
+    of the forcing (``api.carbon_forcing.record_period``: the days every daily
+    series covers) and the catalogue unchanged. Only the dates of the record
+    are read, never a climate value. Each month whose every day the answer
+    holds becomes a ``LiveCropMonth`` (the days whose answer is ``True``, and
+    the days of the month); a month with a day held missing is that day's
+    ``Missing``, its reason kept and the day named. A month the answer does
+    not hold in full is left out (the producer writes it ``NO_COVERAGE``).
+
+    ``None`` when no forcing can be laid out (no start month, no record, or no
+    whole agricultural year; the producer then answers why and the rule is not
+    called). ``function`` ``None`` (not built): a ``Missing`` ``NOT_AVAILABLE``
+    naming it, so every month of the cover is missing with that reason, never
+    zero. What the function raises is not caught. An answer that is not a
+    mapping of dates to a bool or a results ``Missing`` is a defect
+    (``TypeError``).
+    """
+    start_month = calendar.ag_year_start.month
+    period = record_period(climate)
+    if (
+        start_month is None
+        or period is None
+        or whole_ag_years(start_month, *period) is None
+    ):
+        return None
+    if function is None:
+        return ResultsMissing(
+            reason="NOT_AVAILABLE",
+            detail=(
+                f"the days with a live crop of D222 are not built: {_name(LIVE_CROP)}"
+            ),
+        )
+    first, last = period
+    answer = function(calendar, first, last, parameters=parameters)
+    if not isinstance(answer, dict) or not all(
+        isinstance(day, dt.date) and isinstance(value, bool | ResultsMissing)
+        for day, value in answer.items()
+    ):
+        raise TypeError(
+            f"{_name(LIVE_CROP)} returned {type(answer).__name__}, not a mapping "
+            "of dates to a bool or a Missing"
+        )
+    by_month: dict[tuple[int, int], list[dt.date]] = {}
+    for day in answer:
+        by_month.setdefault((day.year, day.month), []).append(day)
+    months: LiveCropMonths = {}
+    for (year, month), days in by_month.items():
+        first_of = dt.date(year, month, 1)
+        after = dt.date(year + (month == 12), month % 12 + 1, 1)
+        if len(set(days)) != (after - first_of).days:
+            continue  # a month the record does not hold in full
+        unknown = next(
+            (day for day in sorted(days) if isinstance(answer[day], ResultsMissing)),
+            None,
+        )
+        if unknown is not None:
+            missing = answer[unknown]
+            assert isinstance(missing, ResultsMissing)
+            months[(year, month)] = ResultsMissing(
+                reason=missing.reason,
+                detail=(
+                    f"whether a live crop stands on {unknown.isoformat()} is not "
+                    f"known: {missing.detail or 'no detail given'}"
+                ),
+            )
+            continue
+        months[(year, month)] = LiveCropMonth(
+            live_days=sum(1 for day in days if answer[day] is True),
+            days=len(days),
+        )
+    return months
+
+
 class EntryPointEngines:
     """``RotationEngines`` on the engine entry points of contracts/ENTRYPOINTS.md.
 
@@ -1063,6 +1171,12 @@ class EntryPointEngines:
                 calendar,
                 climate.data,
                 soil_slope.data,
+                live_crop_months=live_crop_months_for_forcing(
+                    functions.live_crop_by_day,
+                    calendar,
+                    climate.data,
+                    self._parameters,
+                ),
                 carbon_inputs=None if ledger is None else ledger_carbon_inputs(ledger),
                 reference_evapotranspiration=reference_evapotranspiration,
                 monthly_carbon_inputs=(
