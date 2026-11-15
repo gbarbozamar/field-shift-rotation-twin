@@ -751,14 +751,9 @@ def test_start_of_a_phase_is_capped_at_the_last_day_of_year_p():
     assert ag_year_of(laid.cycles[0].start, JULY) == laid.ag_years[0]
 
 
-def test_crossing_through_all_of_year_p_is_missing_for_ep1_not_no_crop():
-    # Review B2 on PR #228: "long" runs through all of year 1. In phase 1,
-    # EP1's crop of a day of year 1 is missing (before the first cycle, or
-    # inside the bound of long's missing end), never {"management": "no_crop"}.
-    # A cross-lane check of the reading of engine/erosion/soil_loss.py.
-    from engine.erosion.soil_loss import NO_CROP_SCOPE, _crop_scope
-
-    calendar = build(
+def e1() -> RotationCalendar:
+    """The verifier's calendar on PR #228: "long" runs from year 0 to year 2."""
+    return build(
         "2030-07-01",
         "2033-06-30",
         [
@@ -766,29 +761,66 @@ def test_crossing_through_all_of_year_p_is_missing_for_ep1_not_no_crop():
             component("c", CROP_C, "2032-10-01", "2033-05-31"),
         ],
     )
-    laid = run(repeat.phase_calendar(calendar, 1))
-    one_day = dt.timedelta(days=1)
-    checked = 0
-    for cycle in laid.cycles:
-        year_p = ag_year_of(cycle.start, JULY)  # year 1, by point 12
-        day = dt.date(year_p, JULY, 1)
-        # Every day of year 1 except the cycle's own start day, which is the
-        # residual listed under OPEN (point 12) in repeat.py.
-        while day < dt.date(year_p + 1, JULY, 1):
-            if day != cycle.start and laid.first_day <= day <= laid.last_day:
-                scope = _crop_scope(laid, day)
-                assert scope != NO_CROP_SCOPE, day
-                assert scope.reason == "MISSING_INPUT", day
-                assert day < cycle.start, day
-                if cycle.index > 0:
-                    # The missing-date bound of the previous cycle's "long".
-                    (previous,) = [
-                        c
-                        for c in laid.components
-                        if c.component_id == "long" and c.cycle == cycle.index - 1
-                    ]
-                    assert previous.end is None
-                    assert previous.start <= day <= previous.cycle_last_day
-                checked += 1
-            day += one_day
-    assert checked > 365 * 8
+
+
+def test_crossing_past_year_p_gets_a_missing_start_and_no_day_reads_no_crop():
+    # Reviews B2 and the residual on PR #228: in phase 1 "long" runs past the
+    # last day of year 1, so its start is missing too (D133). EP1 then bounds
+    # it by the whole cycle: no day of the record reads {"management":
+    # "no_crop"}, and crop c keeps its days. A cross-lane check of the
+    # reading of engine/erosion/soil_loss.py.
+    from engine.erosion.soil_loss import NO_CROP_SCOPE, _crop_scope
+
+    moved_calendar = repeat.phase_calendar(e1(), 1)
+    long = {c.component_id: c for c in moved_calendar.components}["long"]
+    for value in (long.start, long.end):
+        assert value.date is None
+        assert value.missing.reason == "NOT_COMPUTABLE"
+        assert "D133" in value.missing.detail
+    assert "runs past its last day" in long.start.missing.detail
+    laid = run(moved_calendar)
+    c_days = {
+        day
+        for item in laid.components
+        if item.component_id == "c"
+        for day in (
+            item.start + dt.timedelta(days=n)
+            for n in range((min(item.end, laid.last_day) - item.start).days + 1)
+        )
+    }
+    counts = {"no_crop": 0, "missing": 0, "c": 0}
+    day = laid.first_day
+    while day <= laid.last_day:
+        scope = _crop_scope(laid, day)
+        if scope == NO_CROP_SCOPE:
+            counts["no_crop"] += 1
+        elif isinstance(scope, dict):
+            assert scope == {"crop": CROP_C} and day in c_days, day
+            counts["c"] += 1
+        else:
+            assert scope.reason == "MISSING_INPUT", day
+            assert day not in c_days, day
+            counts["missing"] += 1
+        day += dt.timedelta(days=1)
+    assert counts["no_crop"] == 0
+    assert counts["c"] == len(c_days) > 0
+    # The verifier's cycle 2004-06-30 to 2007-06-29: 852 missing, 243 of c.
+    cycle = [d("2004-06-30") + dt.timedelta(days=n) for n in range(1095)]
+    scopes = [_crop_scope(laid, day) for day in cycle]
+    assert sum(1 for s in scopes if s == {"crop": CROP_C}) == 243
+    assert sum(1 for s in scopes if not isinstance(s, dict)) == 852
+
+
+def test_crossing_that_ends_inside_year_p_keeps_its_start():
+    # A crossing component that ends inside year p is unchanged by the
+    # missing-start rule: its start is moved, only its end is missing.
+    calendar = two_years(component("x", CROP_C, "2028-05-01", "2028-09-30"))
+    x = {c.component_id: c for c in repeat.phase_calendar(calendar, 1).components}["x"]
+    assert x.start.date == d("2030-05-01")
+    assert x.end.date is None and x.end.missing.reason == "NOT_COMPUTABLE"
+    assert "runs past" not in x.end.missing.detail
+    # The same for the phase of E1 whose year holds the end of "long".
+    long = {c.component_id: c for c in repeat.phase_calendar(e1(), 2).components}[
+        "long"
+    ]
+    assert long.start.date == d("2033-09-01") and long.end.date is None

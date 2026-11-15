@@ -77,8 +77,14 @@ is missing with its reason and ``components_crossing_phase`` names it (point
     Moved, that date would fall in the next cycle. It is not moved and not
     guessed (D133): it becomes missing with reason ``NOT_COMPUTABLE`` and a
     detail naming D133, the component's other dates are moved, and
-    ``components_crossing_phase`` names the component. No error is raised:
-    the phase runs, and the days that depend on that date are missing.
+    ``components_crossing_phase`` names the component. When its dates run
+    past the last day of year ``p``, its start becomes missing too, with the
+    same reason and a detail naming D133: no start in the cycle holds all its
+    days, and with both dates missing the bound of point 7 covers the whole
+    cycle, so its days read as missing, never as days with no crop (other
+    days of that cycle that no dated component holds read as missing too). No
+    error is raised: the phase runs, and the days that depend on those dates
+    are missing.
 12. The moved calendar's ``start_date`` is the calendar's ``start_date`` moved
     ``p`` years, or the day after the last date of a crossing component if
     that is later, but never later than the last day of year ``p`` (so phase
@@ -100,13 +106,12 @@ contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
 - Point 11, the rule for a component that crosses into year ``p``: none in
   this release (D133). Which date to cut, or a lead-in, stays for a later
   release (asked on #18).
-- Point 12, a crossing component that runs past the last day of year ``p``:
-  the start is capped at that day, so from the start of each cycle to the
-  component's last date (that last day of year ``p`` and the days of year
-  ``p + 1`` it still covers) no component holds the day, and an engine may
-  read those days as days with no crop. A calendar cannot hold a component
-  across two cycles, so no start in year ``p`` removes this. The component
-  is flagged (point 11) and named by ``components_crossing_phase``.
+- Point 11, a crossing component that runs past the last day of year ``p``
+  (longer than one year): a calendar cannot hold a component across two
+  cycles, so its start is missing too and the whole cycle is its bound. Its
+  days, and the days of that cycle no dated component holds (a real fallow
+  among them), are missing instead of described. A rule for it (D133, asked
+  on #18) would give those days back.
 - Point 11, a component of a year before ``p`` whose end date is missing and
   that has no dated period on or after year ``p``: it may cross the boundary
   but cannot be shown to, so it is moved with its end still missing (point
@@ -185,6 +190,13 @@ _CROSSING_DETAIL = (
     "moved (decision D132 of issue #77) the date would fall in the next cycle, "
     "and a component that crosses into the first year of a phase gets no rule "
     "in this release (decision D133), so the date is missing, never guessed"
+)
+_CROSSING_START_DETAIL = (
+    "phase {phase}: component {component_id!r} starts before year {phase} of "
+    "the calendar and runs past its last day; with the calendar moved "
+    "(decision D132 of issue #77) no start in the cycle holds all of its days, "
+    "and such a component gets no rule in this release (decision D133), so its "
+    "start is missing too and its days in the cycle are missing, never guessed"
 )
 _PHASE_START_MONTH_MISSING = (
     "the start month of the agricultural year (calendar.ag_year_start.month) is "
@@ -409,8 +421,15 @@ def phase_calendar(calendar: RotationCalendar, p: int) -> RotationCalendar:
         crossing = [day for day in _known_dates(component) if day >= boundary]
         if crossing:
             floor = max(floor, min(max(crossing) + one_day, last_day_of_year_p))
-        detail = _CROSSING_DETAIL.format(phase=p, component_id=component.component_id)
-        moved.append(_moved(component, length, boundary, detail))
+        names = {"phase": p, "component_id": component.component_id}
+        detail = _CROSSING_DETAIL.format(**names)
+        # Point 11: past the last day of year p, the start is missing too.
+        start_detail = (
+            _CROSSING_START_DETAIL.format(**names)
+            if crossing and max(crossing) > last_day_of_year_p
+            else None
+        )
+        moved.append(_moved(component, length, boundary, detail, start_detail))
 
     components = kept + moved
     placed = [day for item in components for day in _known_dates_of_dump(item)]
@@ -491,28 +510,39 @@ def _known_dates_of_dump(component: dict) -> list[IsoDate]:
     return [day for day in days if day is not None]
 
 
+def _missing_date(detail: str) -> dict:
+    return {
+        "date": None,
+        "missing": {"reason": CROSSING_REASON, "detail": detail},
+        "provenance": None,
+        "source": None,
+        "assumption": False,
+    }
+
+
 def _moved(
-    component: CalendarComponent, years: int, boundary: IsoDate, detail: str
+    component: CalendarComponent,
+    years: int,
+    boundary: IsoDate,
+    detail: str,
+    start_detail: str | None,
 ) -> dict:
     """The component one cycle later (point 10); a date on or after the
-    boundary becomes missing (point 11)."""
+    boundary becomes missing, and the start too when ``start_detail`` is
+    given (point 11)."""
 
     def move(value: dict) -> dict:
         day = value["date"]
         if day is None:
             return value
         if day >= boundary:
-            return {
-                "date": None,
-                "missing": {"reason": CROSSING_REASON, "detail": detail},
-                "provenance": None,
-                "source": None,
-                "assumption": False,
-            }
+            return _missing_date(detail)
         return {**value, "date": shifted_date(day, years)[0]}
 
     item = component.model_dump()
-    item["start"] = move(item["start"])
+    item["start"] = (
+        _missing_date(start_detail) if start_detail is not None else move(item["start"])
+    )
     item["end"] = move(item["end"])
     for period in item["periods"]:
         period["start"] = move(period["start"])
