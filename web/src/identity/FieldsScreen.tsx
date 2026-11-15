@@ -55,26 +55,29 @@ export default function FieldsScreen() {
 
       <StageRail />
 
-      {exampleCase.example_data && (
-        <div
-          role="note"
-          aria-label={strings['identity.banner_title']}
-          className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
-        >
-          <p className="text-sm font-semibold text-amber-900">{strings['identity.banner_title']}</p>
-          <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
-        </div>
-      )}
-
       {/* The workbench shell of issue #454: one source order, two columns
           from 1100px. The two wrappers below are plain block flow under
           1100px, so the small-screen stacking is exactly the order of this
-          file; the grid variant places the first wrapper (the map over the
-          field list) in the flexible column and the second (the six
-          inspector pieces, in their today order) in the fixed inspector
-          column. Every component still mounts exactly once. */}
-      <div className="min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1fr)_480px] min-[1100px]:items-start min-[1100px]:gap-6">
+          file; the grid variant places the first wrapper (the example-data
+          banner, the map over the field list) in the flexible column and
+          the second (the six inspector pieces, in their today order) in
+          the fixed inspector column. The banner sits inside the map column
+          at the developer's request (15 Nov 2026), so it spans the map's
+          width, not the whole shell. Every component still mounts exactly
+          once. */}
+      <div className="min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1fr)_520px] min-[1100px]:items-start min-[1100px]:gap-6">
         <div>
+          {exampleCase.example_data && (
+            <div
+              role="note"
+              aria-label={strings['identity.banner_title']}
+              className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
+            >
+              <p className="text-sm font-semibold text-amber-900">{strings['identity.banner_title']}</p>
+              <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
+            </div>
+          )}
+
           <div className="mt-6">
             <h3 className="text-base font-semibold">{strings['map.title']}</h3>
             <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
@@ -132,7 +135,7 @@ export default function FieldsScreen() {
             most the viewport minus the main padding), instead of
             leaving the left column as empty space on the way down.
             Under 1100px this wrapper is plain block flow, unchanged. */}
-        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[480px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
+        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[520px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
           <RotationRun />
 
           <SiteSheet />
