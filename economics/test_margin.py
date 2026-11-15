@@ -265,35 +265,57 @@ def test_structural_misuse_raises(years, counts):
         compute_rotation_margin(years, _facts(), counts)
 
 
-def test_all_none_counts_are_like_no_counts():
-    # S-027 F1 (PROPOSED): what count_kinds gives when a year is missing.
+def test_all_none_counts_give_average_no_coverage():
+    # S-027 F1 and R1 (PROPOSED): what count_kinds gives when a year has no
+    # kind. Not NOT_AVAILABLE: the years were classified, one has no coverage.
     counts = {kind: None for kind in KINDS_OF_YEAR}
     margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), counts)
     reference = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), None)
-    assert margin.average == reference.average
-    _assert_missing(margin.average, "NOT_AVAILABLE")
+    _assert_missing(margin.average, "NO_COVERAGE")
+    assert "no kind of year" in margin.average.detail
+    assert "not classified" not in margin.average.detail
+    # year_counts=None keeps NOT_AVAILABLE and its detail.
+    _assert_missing(reference.average, "NOT_AVAILABLE")
+    assert "not classified" in reference.average.detail
     for kind in KINDS_OF_YEAR:
         assert margin.by_kind[kind] == reference.by_kind[kind]
 
 
 def test_some_none_counts_are_refused():
-    # S-027 F1 (PROPOSED): some None and some integers is structural misuse.
+    # S-027 F1 and R3 (PROPOSED): some None and some integers is structural
+    # misuse, with its own message.
     counts = {"el_nino": 3, "neutral": None, "la_nina": 2}  # invented test data
-    with pytest.raises(ValueError, match="neutral"):
+    with pytest.raises(
+        ValueError, match="year_counts: counts are either all known or all None"
+    ):
         compute_rotation_margin([[GRAIN_A]], _facts(), counts)
 
 
-def test_count_kinds_with_a_missing_year_feeds_the_margin():
-    # S-027 F1 (PROPOSED): the seam between kinds_of_year and economics. A
-    # synthetic record (not the real one) whose last season is NDJ 2014: the
-    # agricultural year 2014 with start month 7 is decided by DJF 2015, which
-    # is not in it, so that year is missing NO_COVERAGE.
-    from kinds_of_year import SEASONS, classify_agricultural_years, count_kinds
+def test_all_none_counts_still_check_the_keys():
+    # S-027 R3 (PROPOSED): the key checks come first.
+    with pytest.raises(ValueError, match="no count for"):
+        compute_rotation_margin(
+            [[GRAIN_A]], _facts(), {"el_nino": None, "neutral": None}
+        )
 
+
+def test_count_kinds_with_a_missing_year_feeds_the_margin():
+    # S-027 F1, R1 and R4 (PROPOSED): the seam between kinds_of_year and
+    # economics. The rule (threshold, run length) is the committed record's;
+    # the seasons are synthetic, every one of 2013..2014 at 0.0 (not the real
+    # anomalies). The agricultural year 2014 with start month 7 is decided by
+    # DJF 2015, which is not in them, so that year is missing NO_COVERAGE.
+    from kinds_of_year import (
+        SEASONS,
+        classify_agricultural_years,
+        count_kinds,
+        load_record,
+    )
+
+    committed = load_record()
     record = {
-        # Invented test rule and anomalies, from no source.
-        "threshold": 1.0,
-        "min_consecutive_seasons": 2,
+        "threshold": committed["threshold"],
+        "min_consecutive_seasons": committed["min_consecutive_seasons"],
         "seasons": [
             {"season": name, "year": year, "anom": 0.0}
             for year in (2013, 2014)
@@ -304,7 +326,7 @@ def test_count_kinds_with_a_missing_year_feeds_the_margin():
     assert classified[2014].missing_reason == "NO_COVERAGE"
     counts = count_kinds(classified)
     margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), counts)
-    _assert_missing(margin.average, "NOT_AVAILABLE")
+    _assert_missing(margin.average, "NO_COVERAGE")
     # The same expected values as test 1.
     _assert_present(margin.by_kind["el_nino"], 300 * 3.0 - 500 - 90)
     _assert_present(margin.by_kind["neutral"], 300 * 2.5 - 500 - 90)

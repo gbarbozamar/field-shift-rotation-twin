@@ -377,6 +377,41 @@ def test_kind_of_year_holds_a_kind_or_a_reason(kind, reason):
         )
 
 
+@pytest.mark.parametrize("bad", ["dry", "El_Nino", ""])
+def test_kind_of_year_refuses_a_kind_not_in_kinds_of_year(bad):
+    # S-027 R2 (PROPOSED).
+    with pytest.raises(ValueError, match="KINDS_OF_YEAR"):
+        KindOfYear(
+            kind=bad, missing_reason=None, detail=None, season="DJF", season_year=2012
+        )
+
+
+def test_kind_of_year_refuses_a_detail_on_a_present_kind():
+    # S-027 R2 (PROPOSED): classify_agricultural_years sets no detail on a
+    # present kind, so one is refused.
+    with pytest.raises(ValueError, match="no missing detail"):
+        KindOfYear(
+            kind=NEUTRAL,
+            missing_reason=None,
+            detail="some text",
+            season="DJF",
+            season_year=2012,
+        )
+
+
+def test_every_classified_year_satisfies_the_invariant(record):
+    # S-027 R2: the real record over a period that holds present and missing
+    # years builds every KindOfYear without a ValueError.
+    classified = classify_agricultural_years(record, 2020, 2026, 7)
+    for item in classified.values():
+        if item.kind is not None:
+            assert item.kind in KINDS_OF_YEAR
+            assert item.detail is None
+        else:
+            assert item.missing_reason == "NO_COVERAGE"
+            assert item.detail
+
+
 def test_unknown_season_name_is_rejected(record):
     rec = synthetic(record, {})
     rec["seasons"][3] = {"season": "XYZ", "year": 2010, "anom": 0.0}

@@ -58,11 +58,26 @@ class KindOfYear:
             raise ValueError(
                 "a kind of year holds a kind or a missing_reason, never both or neither"
             )
+        # PROPOSED (S-027 R2): a present kind is one of KINDS_OF_YEAR and, as
+        # classify_agricultural_years builds it, carries no missing detail.
+        if self.kind is not None and self.kind not in KINDS_OF_YEAR:
+            raise ValueError(f"a kind of year is one of KINDS_OF_YEAR {KINDS_OF_YEAR}")
+        if self.kind is not None and self.detail is not None:
+            raise ValueError("a present kind of year carries no missing detail")
 
 
 def _is_int(value: object) -> bool:
     """An int that is not a bool."""
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_finite_real(value: object) -> bool:
+    """A finite int or float that is not a bool."""
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 def _check_years(first_year: int, last_year: int) -> None:
@@ -74,30 +89,17 @@ def _check_years(first_year: int, last_year: int) -> None:
 
 
 def _check_month(start_month: int) -> None:
-    if (
-        isinstance(start_month, bool)
-        or not isinstance(start_month, int)
-        or not 1 <= start_month <= 12
-    ):
+    if not _is_int(start_month) or not 1 <= start_month <= 12:
         raise ValueError("start_month must be an integer from 1 to 12")
 
 
 def _check_rule(record: Mapping[str, Any]) -> tuple[float, int]:
     """The threshold and run length of the record, checked."""
     threshold = record.get("threshold")
-    if (
-        isinstance(threshold, bool)
-        or not isinstance(threshold, (int, float))
-        or not math.isfinite(threshold)
-        or threshold <= 0
-    ):
+    if not _is_finite_real(threshold) or threshold <= 0:
         raise ValueError("record field 'threshold' must be a finite number > 0")
     run_length = record.get("min_consecutive_seasons")
-    if (
-        isinstance(run_length, bool)
-        or not isinstance(run_length, int)
-        or run_length < 1
-    ):
+    if not _is_int(run_length) or run_length < 1:
         raise ValueError(
             "record field 'min_consecutive_seasons' must be an integer >= 1"
         )
@@ -132,11 +134,7 @@ def _season_map(record: Mapping[str, Any]) -> dict[int, float]:
             )
         if not _is_int(year):
             raise ValueError(f"seasons row {index}: field 'year' must be an integer")
-        if (
-            isinstance(anom, bool)
-            or not isinstance(anom, (int, float))
-            or not math.isfinite(anom)
-        ):
+        if not _is_finite_real(anom):
             raise ValueError(
                 f"seasons row {index}: field 'anom' must be a finite real number"
             )

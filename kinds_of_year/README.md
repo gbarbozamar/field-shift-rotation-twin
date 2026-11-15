@@ -31,7 +31,7 @@ The record's `threshold` and `min_consecutive_seasons` are taken from this text,
 - Agricultural year Y begins at the declared start month of calendar year Y (C5.3). The season that decides it is the three-month season centred on the month six months after the start month (R6 of the loop decisions; for start month 7 that is DJF of Y+1). Its episode state is the kind of the year: `el_nino`, `la_nina`, else `neutral`. The season used is in the result.
 - A year whose deciding season, or a season needed to judge its run, is not in the record is missing `NO_COVERAGE` with a detail (C3.2, C5.5). Nothing is guessed.
 - The record is checked when classifying: `threshold` a finite number > 0, `min_consecutive_seasons` an integer >= 1, `seasons` a list, every row a mapping with `season` (one of `SEASONS`), `year` (an int, not a bool) and `anom` (a finite real number, not a bool or `None`), no duplicated (season, year) row; otherwise `ValueError` naming the field, or the row index and the field. `start_month` must be an integer 1..12, and `first_year` and `last_year` integers (a bool or a float is refused), with `first_year` not after `last_year`.
-- `KindOfYear` holds exactly one of `kind` and `missing_reason`; building one with both or neither is a `ValueError` (PROPOSED, S-027).
+- `KindOfYear` holds exactly one of `kind` and `missing_reason`; a present `kind` is one of `KINDS_OF_YEAR` and carries no `detail`. Building one otherwise is a `ValueError` (PROPOSED, S-027).
 - `count_kinds` gives the number of years of each kind, or `None` for every kind when any year is missing.
 
 ## Signature
