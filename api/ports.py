@@ -42,6 +42,7 @@ __all__ = [
     "Missing",
     "ModuleState",
     "ModuleStatus",
+    "PhaseResult",
     "ReasonCode",
     "ResultsPayload",
     "RotationEngines",
@@ -132,6 +133,10 @@ class EnginesResult:
     modules: Sequence[ModuleStatus] = field(default_factory=tuple)
     values_present: int = 0
     values_missing: int = 0
+    # One item per phase of the rotation (D109, PROPOSED): the first is the
+    # calendar unchanged and equals the fields above. Empty from an
+    # implementation that gives no phases; the route then writes one.
+    phases: Sequence[PhaseResult] = ()
 
     def __post_init__(self) -> None:
         for name in ("values_present", "values_missing"):
@@ -143,6 +148,33 @@ class EnginesResult:
             raise ValueError("EnginesResult: values are counted only in a result")
         if self.result is not None and not counted:
             raise ValueError("EnginesResult: a result counts its values")
+        if self.phases:
+            first = self.phases[0].result
+            if (first.calendar, first.result, first.result_missing) != (
+                self.calendar,
+                self.result,
+                self.result_missing,
+            ) or tuple(first.modules) != tuple(self.modules):
+                raise ValueError("EnginesResult: the first phase is the run itself")
+
+
+@dataclass(frozen=True)
+class PhaseResult:
+    """The run of one phase of the rotation (decision D109 of issue #77).
+
+    ``scenario_id`` is the phase's identifier (``phase_1`` ... ``phase_N``,
+    PROPOSED); ``first_ag_year`` the agricultural year (C5.3) of the calendar
+    EP2 built that comes first in this phase, ``None`` when it cannot be told
+    (no calendar, or no start month). ``result`` holds no phases itself.
+    """
+
+    scenario_id: str
+    first_ag_year: int | None
+    result: EnginesResult
+
+    def __post_init__(self) -> None:
+        if self.result.phases:
+            raise ValueError("PhaseResult: the run of one phase holds no phases")
 
 
 class RotationEngines(Protocol):

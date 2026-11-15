@@ -29,6 +29,12 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    contracts/results/models.py. Only an engine that is not built gives that
    form; every other absence keeps ``result=None`` with its reason.
 
+Steps 2 to 4 run once per phase of the rotation (decision D109 of issue
+#77; ``api/phases.py``, PROPOSED), on a calendar moved so that the phase's
+year comes first; phase 1 is the calendar of EP2 unchanged and is the
+top-level answer. ``EnginesResult.phases`` holds one ``PhaseResult`` per
+phase. An infeasible calendar, and every absence before step 2, runs once.
+
 Each engine function is injected (``EngineFunctions``). ``None`` means "this
 engine is not built". ``discover_engine_functions`` imports each one by the
 module path and name that contracts/ENTRYPOINTS.md gives, so when a lane lands
@@ -51,12 +57,21 @@ from __future__ import annotations
 import importlib
 import inspect
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, get_args
 
 from adapters.ports import ClimateResult, SoilSlopeResult
 from api.carbon_forcing import build_carbon_forcing, crops_left_out
-from api.ports import EnginesResult, Missing, ModuleStatus, ReasonCode
+from api.phases import (
+    REPEAT_MODULE,
+    RUNNER_COPY,
+    Phase,
+    PhaseFunctions,
+    first_phase,
+    phase_calendars,
+    scenario_id,
+)
+from api.ports import EnginesResult, Missing, ModuleStatus, PhaseResult, ReasonCode
 from api.rotation_validator import load_rotation_definition
 from contracts.carbon_balance import CarbonBalance
 from contracts.carbon_forcing import CarbonForcing
@@ -165,6 +180,10 @@ class EngineFunctions:
     )
     # EP5
     run_amg: Callable[..., CarbonBalance] | None = None
+    # The phase rule of lane L1 (issue #221), not an entry point. Used only
+    # when both are given; otherwise the runner's copy in api/phases.py.
+    phase_calendar: Callable[..., RotationCalendar] | None = None
+    list_phases: Callable[..., list[int]] | None = None
 
 
 def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
@@ -190,11 +209,33 @@ def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
     return function
 
 
+# The two functions of the phase rule agreed on issue #221, found by name in
+# ``engine.calendar.repeat`` like the entry points (PROPOSED transition).
+PHASE_FUNCTIONS: tuple[EntryPoint, ...] = (
+    EntryPoint("D109", "calendar", REPEAT_MODULE, "phase_calendar"),
+    EntryPoint("D109", "calendar", REPEAT_MODULE, "list_phases"),
+)
+
+
 def discover_engine_functions() -> EngineFunctions:
-    """Import each engine function by its exact module path and name."""
+    """Import each engine function by its exact module path and name.
+
+    Also the two phase functions of issue #221; either one absent leaves both
+    ``None`` in effect (the runner then uses its own copy).
+    """
     return EngineFunctions(
-        **{point.function: _import_function(point) for point in DISCOVERED}
+        **{point.function: _import_function(point) for point in DISCOVERED},
+        **{point.function: _import_function(point) for point in PHASE_FUNCTIONS},
     )
+
+
+def phase_functions_of(functions: EngineFunctions) -> PhaseFunctions:
+    """Lane L1's phase functions when both exist, else the runner's copy."""
+    if functions.phase_calendar is not None and functions.list_phases is not None:
+        return PhaseFunctions(
+            functions.phase_calendar, functions.list_phases, REPEAT_MODULE
+        )
+    return RUNNER_COPY
 
 
 def takes_parameters(function: Callable[..., Any]) -> bool:
@@ -506,7 +547,8 @@ class EntryPointEngines:
         # 1. EP2 first.
         if build_calendar is None:
             calendar_input = f"the rotation calendar: {NOT_BUILT}: {_name(CALENDAR)}"
-            return EnginesResult(
+            return _once(
+                None,
                 calendar=None,
                 result=None,
                 result_missing=Missing(
@@ -540,7 +582,8 @@ class EntryPointEngines:
             detail = "input not available: " + "; ".join(
                 f"{name} ({_INPUT_NAMES[name]})" for name in absent
             )
-            return EnginesResult(
+            return _once(
+                calendar,
                 calendar=calendar,
                 result=None,
                 result_missing=Missing(reason="MISSING_INPUT", detail=detail),
@@ -566,7 +609,8 @@ class EntryPointEngines:
                     for name, fields in other
                 )
             )
-            return EnginesResult(
+            return _once(
+                calendar,
                 calendar=calendar,
                 result=None,
                 result_missing=Missing(reason="MISSING_INPUT", detail=detail),
@@ -578,7 +622,40 @@ class EntryPointEngines:
                 ),
             )
 
-        # 4. EP1 and EP3, also for an infeasible calendar (G4), each with the
+        # 4. The phases of D109 (api/phases.py, PROPOSED): one run of EP1, EP3
+        # and EP5 per phase, on the calendar of that phase; phase 1 is the
+        # calendar unchanged. An infeasible calendar runs once, unmoved.
+        if calendar.feasibility.feasible:
+            phases = phase_calendars(calendar, phase_functions_of(functions))
+        else:
+            phases = (first_phase(calendar),)
+        runs = tuple(
+            PhaseResult(
+                scenario_id=phase.scenario_id,
+                first_ag_year=phase.first_ag_year,
+                result=self._run_phase(phase, climate, soil_slope),
+            )
+            for phase in phases
+        )
+        return replace(runs[0].result, phases=runs)
+
+    def _run_phase(
+        self, phase: Phase, climate: ClimateResult, soil_slope: SoilSlopeResult
+    ) -> EnginesResult:
+        """EP1, EP3 and EP5 on the calendar of one phase; the same inputs every phase."""
+        functions = self._functions
+        soil_loss_function = functions.compute_soil_loss
+        water_function = functions.compute_water_deficit_exposure
+        amg_function = functions.run_amg
+        amg_configured = AMG_CARBON_MODEL in self._carbon_models
+        if phase.calendar is None:
+            return _phase_not_laid_out(phase, functions, amg_configured)
+        calendar = phase.calendar
+        calendar_module = calendar_status(calendar)
+        for note in phase.notes:
+            calendar_module = _with_note(calendar_module, note)
+
+        # EP1 and EP3, also for an infeasible calendar (G4), each with the
         # parameter catalogue by keyword (Q3, D46, D56).
         arguments = {
             "calendar": calendar,
@@ -622,7 +699,7 @@ class EntryPointEngines:
                 )
             water_module = module_status_of(WATER.module_id, count_values(water))
 
-        # 5. EP5 on the forcing built from the same inputs (PROPOSED), with the
+        # EP5 on the forcing built from the same inputs (PROPOSED), with the
         # catalogue by keyword (D65). Not called when the forcing cannot be
         # laid out: its three rows are missing with that reason. Not called
         # either when ``amg`` is not a configured carbon model: no amg rows.
@@ -665,13 +742,13 @@ class EntryPointEngines:
                 modules=modules,
             )
 
-        # 6. What ResultsPerRotation cannot hold.
+        # What ResultsPerRotation cannot hold.
         if isinstance(soil_loss, ResultsMissing):
             return without_result(soil_loss.reason, soil_loss.detail)
         if not self._carbon_models:
             return without_result("NOT_AVAILABLE", CARBON_MODELS_NOT_CONFIGURED)
 
-        # 7. Assemble. A part whose engine is not built takes the not-built
+        # Assemble. A part whose engine is not built takes the not-built
         # form (D12); a part whose engine ran is its output, unchanged.
         result = ResultsPerRotation(
             case_id=calendar.case_id,
@@ -698,6 +775,42 @@ class EntryPointEngines:
             values_present=count.present,
             values_missing=count.missing,
         )
+
+
+def _phase_not_laid_out(
+    phase: Phase, functions: EngineFunctions, amg_configured: bool
+) -> EnginesResult:
+    """A phase whose calendar the phase function refused (the OPEN rule of a
+    crossing component): no engine is called, no result, the reason kept."""
+    assert phase.not_laid_out is not None
+    detail = "; ".join([*phase.notes, phase.not_laid_out])
+    reason: ReasonCode = "NOT_COMPUTABLE"  # PROPOSED
+    calendar_input = f"the rotation calendar of this phase: {detail}"
+    return EnginesResult(
+        calendar=None,
+        result=None,
+        result_missing=Missing(reason=reason, detail=detail),
+        modules=(
+            _status(CALENDAR.module_id, "not_available", reason, detail),
+            _dependent(EROSION, functions.compute_soil_loss, calendar_input),
+            _dependent(WATER, functions.compute_water_deficit_exposure, calendar_input),
+            *_carbon_dependent(functions.run_amg, amg_configured, calendar_input),
+        ),
+    )
+
+
+def _once(built: RotationCalendar | None, **fields: Any) -> EnginesResult:
+    """A run that called no engine after EP2: one phase, the calendar unchanged.
+
+    PROPOSED: ``phases`` then holds that same answer once, so the first item
+    always equals the top-level fields, also when no engine ran per phase.
+    """
+    result = EnginesResult(**fields)
+    phase_year = first_phase(built).first_ag_year if built is not None else None
+    only = PhaseResult(
+        scenario_id=scenario_id(0), first_ag_year=phase_year, result=result
+    )
+    return replace(result, phases=(only,))
 
 
 def other_field_inputs(

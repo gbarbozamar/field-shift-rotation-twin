@@ -37,6 +37,8 @@ from api.ports import (
 logger = logging.getLogger(__name__)
 
 PERIOD_NOT_CONFIGURED = "the climate record period is not configured"
+# The identifier of the run on the calendar unchanged (api/phases.py, PROPOSED).
+FIRST_SCENARIO = "phase_1"
 
 NonEmpty = Annotated[str, Field(min_length=1)]
 
@@ -123,8 +125,38 @@ class SourceOut(BaseModel):
         return value.astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+class ScenarioOut(BaseModel):
+    """The run of one phase of the rotation (decision D109 of issue #77). PROPOSED.
+
+    ``scenario_id`` is ``phase_1`` ... ``phase_N``; ``first_ag_year`` is the
+    agricultural year (C5.3) of the calendar built by EP2 that comes first in
+    this phase, ``null`` when it cannot be told. ``calendar`` is the calendar
+    the phase ran on (moved by api/phases.py). The sources are those of the
+    envelope: the inputs are the same for every phase.
+    """
+
+    scenario_id: str
+    first_ag_year: int | None
+    outcome: Outcome
+    calendar: dict[str, Any] | None
+    result: dict[str, Any] | None
+    result_missing: MissingOut | None
+    modules: list[ModuleOut]
+
+    @model_validator(mode="after")
+    def _missing_iff_no_result(self) -> Self:
+        if (self.result is None) != (self.result_missing is not None):
+            raise ValueError("result_missing must be set exactly when result is null")
+        return self
+
+
 class RunRotationResponse(BaseModel):
-    """The success envelope. ``result_missing`` is non-null exactly when ``result`` is null."""
+    """The success envelope. ``result_missing`` is non-null exactly when ``result`` is null.
+
+    The top-level fields are those of phase 1, the calendar unchanged (the
+    first item of ``scenarios``), so a reader of one result reads phase 1.
+    ``scenarios`` lists every phase in order (D109; PROPOSED).
+    """
 
     outcome: Outcome
     calendar: dict[str, Any] | None
@@ -132,11 +164,29 @@ class RunRotationResponse(BaseModel):
     result_missing: MissingOut | None
     modules: list[ModuleOut]
     sources: list[SourceOut]
+    scenarios: list[ScenarioOut]
 
     @model_validator(mode="after")
     def _missing_iff_no_result(self) -> Self:
         if (self.result is None) != (self.result_missing is not None):
             raise ValueError("result_missing must be set exactly when result is null")
+        if not self.scenarios:
+            raise ValueError("scenarios holds at least phase 1")
+        first = self.scenarios[0]
+        if (
+            first.outcome,
+            first.calendar,
+            first.result,
+            first.result_missing,
+            first.modules,
+        ) != (
+            self.outcome,
+            self.calendar,
+            self.result,
+            self.result_missing,
+            self.modules,
+        ):
+            raise ValueError("the first scenario is the top-level answer")
         return self
 
 
@@ -180,15 +230,20 @@ def _source_out(info: SourceInfo) -> SourceOut:
     )
 
 
-def build_envelope(
-    engines: EnginesResult, sources: Sequence[SourceInfo]
-) -> RunRotationResponse:
-    """Copy what the interfaces returned into the envelope. Raises on a defect."""
+def _scenario_out(
+    scenario_id: str,
+    first_ag_year: int | None,
+    engines: EnginesResult,
+    sources: Sequence[SourceInfo],
+) -> ScenarioOut:
+    """One run copied into the shape of a scenario. Raises on a defect."""
     modules = [
         ModuleOut(id=m.id, state=m.state, reason=m.reason, detail=m.detail)
         for m in engines.modules
     ]
-    return RunRotationResponse(
+    return ScenarioOut(
+        scenario_id=scenario_id,
+        first_ag_year=first_ag_year,
         outcome=derive_outcome(
             engines.result is not None,
             engines.values_present,
@@ -216,7 +271,31 @@ def build_envelope(
             else None
         ),
         modules=modules,
+    )
+
+
+def build_envelope(
+    engines: EnginesResult, sources: Sequence[SourceInfo]
+) -> RunRotationResponse:
+    """Copy what the interfaces returned into the envelope. Raises on a defect.
+
+    One scenario per phase the engines give; an implementation that gives no
+    phases (``EnginesResult.phases`` empty) ran once, on the calendar
+    unchanged: that run is written as ``phase_1``, its first year not told.
+    """
+    phases = [(p.scenario_id, p.first_ag_year, p.result) for p in engines.phases]
+    if not phases:
+        phases = [(FIRST_SCENARIO, None, engines)]
+    scenarios = [_scenario_out(*phase, sources) for phase in phases]
+    first = scenarios[0]
+    return RunRotationResponse(
+        outcome=first.outcome,
+        calendar=first.calendar,
+        result=first.result,
+        result_missing=first.result_missing,
+        modules=first.modules,
         sources=[_source_out(s) for s in sources],
+        scenarios=scenarios,
     )
 
 
