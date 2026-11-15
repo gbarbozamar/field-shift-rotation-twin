@@ -1,0 +1,88 @@
+{
+  "contract": "economic_facts",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "currency": "USD",
+  "crops": [
+    {
+      "crop_id": "PLACEHOLDER_soybean",
+      "kind": "grain",
+      "price": {
+        "value": 400.0,
+        "unit": "USD t-1",
+        "provenance": "DECLARED",
+        "source": "user",
+        "range_missing": { "reason": "NOT_DECLARED" }
+      },
+      "cost": {
+        "value": 600.0,
+        "unit": "USD ha-1",
+        "provenance": "DECLARED",
+        "source": "user",
+        "range_missing": { "reason": "NOT_DECLARED" }
+      },
+      "yield": {
+        "el_nino": {
+          "value": 2.6,
+          "unit": "t ha-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": { "reason": "NOT_DECLARED" }
+        },
+        "neutral": {
+          "value": 3.0,
+          "unit": "t ha-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": { "reason": "NOT_DECLARED" }
+        },
+        "la_nina": {
+          "value": 1.6,
+          "unit": "t ha-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": { "reason": "NOT_DECLARED" }
+        }
+      }
+    },
+    {
+      "crop_id": "PLACEHOLDER_cover_crop",
+      "kind": "cover",
+      "cost": {
+        "value": 90.0,
+        "unit": "USD ha-1",
+        "provenance": "DECLARED",
+        "source": "user",
+        "range_missing": { "reason": "NOT_DECLARED" }
+      }
+    },
+    {
+      "crop_id": "PLACEHOLDER_pasture",
+      "kind": "declared_margin",
+      "declared_margin": {
+        "el_nino": {
+          "value": 198.0,
+          "unit": "USD ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": { "reason": "NOT_DECLARED" }
+        },
+        "neutral": {
+          "value": 180.0,
+          "unit": "USD ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": { "reason": "NOT_DECLARED" }
+        },
+        "la_nina": {
+          "value": 126.0,
+          "unit": "USD ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": { "reason": "NOT_DECLARED" }
+        }
+      }
+    }
+  ]
+}
