@@ -14,7 +14,7 @@ What it does, in order:
    ``engine.calendar.repeat_over_record``.
 3. One entry per component in each cycle. For a ``grain`` component (D129 (c)):
 
-   - aboveground residue at harvest = ``residue_yield_ratio`` x ``crop_yield``;
+   - aboveground residue at harvest = ``rusle2_residue_yield_ratio`` x ``rusle2_crop_yield``;
    - exported = residue x ``residue_removed_fraction`` when the component
      declares its residue ``removed``; nothing when it declares
      ``left_on_surface`` or ``incorporated``; retained = residue - exported;
@@ -229,8 +229,8 @@ def _values(
         return {name: _gone("NOT_COMPUTABLE", detail) for name in names}
 
     crop = repeated.crop_id
-    ratio = _record(catalogue, "residue_yield_ratio", crop)
-    crop_yield = _record(catalogue, "crop_yield", crop)
+    ratio = _record(catalogue, "rusle2_residue_yield_ratio", crop)
+    rusle2_crop_yield = _record(catalogue, "rusle2_crop_yield", crop)
     carbon_fraction = _record(catalogue, "residue_carbon_fraction", crop)
     roots = _record(catalogue, "root_mass_at_harvest", crop)
     root_fraction = _record(catalogue, "root_carbon_fraction", crop)
@@ -238,8 +238,8 @@ def _values(
 
     produced = _combine(
         "aboveground_mass_produced",
-        "residue_yield_ratio x crop_yield",
-        [ratio, crop_yield],
+        "rusle2_residue_yield_ratio x rusle2_crop_yield",
+        [ratio, rusle2_crop_yield],
         lambda a, b: a * b,
     )
     residue = _residue_word(declared)

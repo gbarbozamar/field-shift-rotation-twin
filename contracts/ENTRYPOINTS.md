@@ -250,7 +250,7 @@ build_residue_ledger(
 
 What it returns: a `ResidueLedger` with one entry per component of the calendar in each cycle of the rotation repeated over the record (D47, `engine.calendar.repeat_over_record`, as EP1). Each entry holds the aboveground residue at harvest produced, exported and retained, as mass and as carbon, and apart from it the roots and the rhizodeposits. For a `grain` component:
 
-- the residue = `residue_yield_ratio` × `crop_yield` (D129 (c));
+- the residue = `rusle2_residue_yield_ratio` × `rusle2_crop_yield` (D129 (c));
 - the carbon = the mass × `residue_carbon_fraction`;
 - the export = the residue × `residue_removed_fraction` when the component declares `removed`, and nothing when it declares `left_on_surface` or `incorporated`;
 - the roots = `root_mass_at_harvest` with `root_carbon_fraction`;
@@ -269,7 +269,6 @@ It raises only `TypeError` for an argument that is not of its type, and `ValueEr
 
 Still `OPEN` (`engine/residues/README.md`, OPEN; `contracts/residue_ledger/README.md`, OPEN):
 
-- the identifiers of the two records shared with #218;
 - the units: the ledger is in `kg ha-1` (dry matter) and `kg C ha-1`, while AMG requires `t C ha-1` for a carbon input and converts nothing, so who converts is open; also the dry-matter basis of the yield;
 - how roots, rhizodeposits, cover crops and pastures are computed;
 - when a residue enters the soil;
@@ -439,12 +438,11 @@ Each item is a question a person can answer. The role that answers it is named a
 - `PROPOSED` by unit `l1/residue-ledger-ep4` (brief #220, at the lead developer's request after D122 of #77), for the lead developer's approval:
   - the contract `contracts/residue_ledger/`;
   - the signature of EP4 above: `rotation`, `calendar`, `climate` and keyword-only `parameters`, returning `ResidueLedger`;
-  - the residue at harvest from the records of D129 (c) (`residue_yield_ratio` × `crop_yield`, by crop);
+  - the residue at harvest from the records of D129 (c) (`rusle2_residue_yield_ratio` × `rusle2_crop_yield`, by crop), with the identifiers #218 fixed (PR #229);
   - five more records by crop: `residue_carbon_fraction`, `residue_removed_fraction`, `root_mass_at_harvest`, `root_carbon_fraction`, `rhizodeposit_carbon`.
 
   No site datum other than the period of the record and no result of another engine is read. EP4 takes `parameters`, which answers for EP4 the last bullet of Q3 ("whether they gain it").
 - Still `OPEN`:
-  - the two identifiers shared with #218 (`engine/residues/README.md`, OPEN 1);
   - the units of the ledger (`kg ha-1`, `kg C ha-1`) against the `t C ha-1` of AMG (OPEN 3), the dry-matter basis of the yield, and whether the ratio is mass per mass (OPEN 2; CITATION NEEDED);
   - how roots and rhizodeposits are computed, and any partition form, which would be a record with a cited source (OPEN 4; CITATION NEEDED);
   - a method for cover crops and pastures (OPEN 5);

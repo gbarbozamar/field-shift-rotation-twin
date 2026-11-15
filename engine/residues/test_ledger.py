@@ -55,8 +55,8 @@ YEARS = (2001, 2002, 2003)
 
 # PLACEHOLDER numbers by record and crop; none is a value of the method.
 NUMBERS: dict[str, dict[str, float]] = {
-    "residue_yield_ratio": {CROP_A: 0.777, CROP_B: 0.555},
-    "crop_yield": {CROP_A: 99.9, CROP_B: 88.8},
+    "rusle2_residue_yield_ratio": {CROP_A: 0.777, CROP_B: 0.555},
+    "rusle2_crop_yield": {CROP_A: 99.9, CROP_B: 88.8},
     "residue_carbon_fraction": {CROP_A: 0.111, CROP_B: 0.444},
     "residue_removed_fraction": {CROP_A: 0.333, CROP_B: 0.666},
     "root_mass_at_harvest": {CROP_A: 22.2, CROP_B: 11.1},
@@ -276,7 +276,7 @@ def test_two_crop_calendar_gives_ledger_with_carbon_recomputed():
     removed = {CROP_A: True, CROP_B: False}
     for entry in ledger.components:
         n = {name: by_crop[entry.crop_id] for name, by_crop in NUMBERS.items()}
-        produced = n["residue_yield_ratio"] * n["crop_yield"]
+        produced = n["rusle2_residue_yield_ratio"] * n["rusle2_crop_yield"]
         exported = (
             produced * n["residue_removed_fraction"] if removed[entry.crop_id] else 0.0
         )
@@ -302,7 +302,9 @@ def test_two_crop_calendar_gives_ledger_with_carbon_recomputed():
     for crop in (CROP_A, CROP_B):
         n = {name: by_crop[crop] for name, by_crop in NUMBERS.items()}
         share = n["residue_removed_fraction"] if removed[crop] else 0.0
-        retained = n["residue_yield_ratio"] * n["crop_yield"] * (1 - share)
+        retained = (
+            n["rusle2_residue_yield_ratio"] * n["rusle2_crop_yield"] * (1 - share)
+        )
         expected = {
             "aboveground_carbon_retained": retained * n["residue_carbon_fraction"],
             "root_carbon": n["root_mass_at_harvest"] * n["root_carbon_fraction"],
@@ -350,8 +352,8 @@ def test_roots_and_aboveground_residue_stay_apart():
 @pytest.mark.parametrize(
     ("name", "field"),
     [
-        ("residue_yield_ratio", "aboveground_mass_produced"),
-        ("crop_yield", "aboveground_mass_produced"),
+        ("rusle2_residue_yield_ratio", "aboveground_mass_produced"),
+        ("rusle2_crop_yield", "aboveground_mass_produced"),
         ("residue_carbon_fraction", "aboveground_carbon_produced"),
     ],
 )
@@ -372,7 +374,11 @@ def test_missing_ratio_yield_or_carbon_fraction_names_itself(name, field):
 def test_null_record_repeats_its_reason():
     ledger = run(
         parameters=catalogue(
-            **{"crop_yield.test_crop_a": record("crop_yield", CROP_A, None)}
+            **{
+                "rusle2_crop_yield.test_crop_a": record(
+                    "rusle2_crop_yield", CROP_A, None
+                )
+            }
         )
     )
     detail = entries(ledger, "c1")[0].aboveground_mass_produced.missing.detail
@@ -441,8 +447,8 @@ def test_residue_kept_on_the_field_exports_nothing(word):
 
 
 def test_record_in_another_unit_or_outside_its_bounds_is_not_computable():
-    other_unit = record("crop_yield", CROP_A, 1.0, unit=f"{MARK}_unit")
-    ledger = run(parameters=catalogue(**{f"crop_yield.{CROP_A}": other_unit}))
+    other_unit = record("rusle2_crop_yield", CROP_A, 1.0, unit=f"{MARK}_unit")
+    ledger = run(parameters=catalogue(**{f"rusle2_crop_yield.{CROP_A}": other_unit}))
     detail = entries(ledger, "c1")[0].aboveground_mass_produced.missing.detail
     assert "NOT_COMPUTABLE" in detail and "is not accepted" in detail
     too_big = record("residue_carbon_fraction", CROP_A, 1.5)

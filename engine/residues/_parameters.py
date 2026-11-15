@@ -82,18 +82,19 @@ class Record:
     what: str  # for the README and the details; never shown to users
 
 
-# The records, by the name the engine uses for each. Every identifier is
-# PROPOSED (brief #220). The first two are the records of D129 (c) for the
-# computed C of #218; their identifiers must match those of #218 (OPEN 1).
+# The records, by the name the engine uses for each. The last five identifiers
+# are PROPOSED (brief #220). The first two are the records of D129 (c) for the
+# computed C of #218, with the identifiers #218 fixed (PR #229), so the ledger
+# and the computed C read the same records.
 RECORDS: dict[str, Record] = {
-    "residue_yield_ratio": Record(
-        "residue_yield_ratio",
+    "rusle2_residue_yield_ratio": Record(
+        "rusle2_residue_yield_ratio",
         DIMENSIONLESS,
         NOT_NEGATIVE,
         "mass of aboveground residue at harvest per mass of yield (D129 (c))",
     ),
-    "crop_yield": Record(
-        "crop_yield",
+    "rusle2_crop_yield": Record(
+        "rusle2_crop_yield",
         MASS_UNIT,
         NOT_NEGATIVE,
         "yield of the crop per area, dry matter (D129 (c))",
