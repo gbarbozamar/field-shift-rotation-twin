@@ -1,11 +1,12 @@
-"""Acceptance test of unit l0/contracts-decision-output.
+"""Acceptance test of units l0/contracts-decision-output and l0/decision-output-d85-d99.
 
 The PLACEHOLDER example loads into ``DecisionOutput``, and each invalid
 variant of it is rejected. The variants are PROPOSED (blueprint section 3.7)
 and are listed in ``README.md`` under "PROPOSED cases"; a test checks that
 the two lists agree. The example of issue #96 is held as the producer wrote
 it, and a test checks that it differs from the contract only where
-``README.md`` says ("Differences from the producer's example").
+``README.md`` says ("Differences from the producer's example"), once the
+fields that decisions D85 to D99 of issue #77 add are added.
 
 Run from the repository root: ``uv run pytest contracts/decision_output/``.
 """
@@ -21,7 +22,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from contracts.decision_output import DecisionOutput
+from contracts.decision_output import STATE_NAMES, DecisionOutput
 from contracts.results.models import ResultsTable
 
 HERE = Path(__file__).parent
@@ -35,9 +36,13 @@ Mutation = Callable[[dict[str, Any]], None]
 SOIL_LOSS_LIMIT = ["limits", 0]
 WATER_LIMIT = ["limits", 1]
 SOIL_LOSS_COUNT = ["counts_by_year", 0]  # rotation a
-WATER_COUNT = ["counts_by_year", 2]  # rotation a
-SOIL_LOSS_DIFFERENCE = ["paired_differences", 0]  # 2001, a value
+SOIL_LOSS_RANGE = ["range_across_scenarios", 0]  # rotation a
+SOIL_LOSS_DIFFERENCE = ["paired_differences", 0]  # 2001, a value with a range
 MISSING_DIFFERENCE = ["paired_differences", 1]  # 2002, missing
+SOIL_LOSS_TOLERANCE = ["equal_tolerances", 0]  # a number
+SOIL_LOSS_PAIR_COUNT = ["pair_cell_counts", 0]  # counted by the sign
+CARBON_PAIR_COUNT = ["pair_cell_counts", 2]  # no tolerance, not counted by the sign
+PAIR_STATE = ["pair_states", 0]
 CARBON_DIFFERENCE = ["paired_differences", 3]  # amg, a value
 
 
@@ -152,12 +157,160 @@ def _declare_a_water_limit(data: dict[str, Any]) -> None:
         "provenance": "DECLARED",
         "source": "user",
     }
-    for count in data["counts_by_year"][2:]:
-        count["years_within_limits"] = 0
 
 
-def _drop_water_limit(data: dict[str, Any]) -> None:
-    del data["limits"][1]
+def _drop_soil_loss_limit(data: dict[str, Any]) -> None:
+    del data["limits"][0]
+
+
+NO_SOIL_LOSS_LIMIT = {
+    "value": None,
+    "unit": "t ha-1 yr-1",
+    "missing": {"reason": "NOT_DECLARED"},
+}
+
+
+def _without_soil_loss_limit(then: Mutation | None = None) -> Mutation:
+    """The soil-loss limit is not declared; ``then`` changes the result further."""
+
+    def mutate(data: dict[str, Any]) -> None:
+        data["limits"][0]["limit"] = copy.deepcopy(NO_SOIL_LOSS_LIMIT)
+        if then is not None:
+            then(data)
+
+    return mutate
+
+
+def _soil_loss_limit_not_declared(data: dict[str, Any]) -> None:
+    """D60: no row is evaluated; the year that held a value is not evaluated either."""
+    data["limits"][0]["limit"] = copy.deepcopy(NO_SOIL_LOSS_LIMIT)
+    for count in data["counts_by_year"]:
+        count["years_evaluated"] = 0
+        count["years_within_limits"] = None
+        count["not_evaluated"].insert(
+            0,
+            {
+                "time_basis": "ag_year",
+                "ag_year": 2001,
+                "missing": {
+                    "reason": "NOT_DECLARED",
+                    "detail": "PLACEHOLDER detail: no limit is declared (OPEN 6)",
+                },
+            },
+        )
+    for item in data["range_across_scenarios"]:
+        item.update(
+            minimum=None,
+            maximum=None,
+            scenario_of_the_minimum=None,
+            missing={"reason": "NOT_DECLARED"},
+        )
+
+
+def _water_count_per_rotation(data: dict[str, Any]) -> None:
+    for rotation_id in data["rotations"]:
+        data["counts_by_year"].append(
+            {
+                "rotation_id": rotation_id,
+                "scenario_id": "PLACEHOLDER_scenario_one",
+                "indicator": "water_deficit_exposure",
+                "years_evaluated": 0,
+                "years_within_limits": None,
+                "not_evaluated": [
+                    {"time_basis": "rotation", "missing": {"reason": "NOT_AVAILABLE"}}
+                ],
+            }
+        )
+
+
+def _count_of_soil_carbon_trend(data: dict[str, Any]) -> None:
+    data["limits"].append(
+        {
+            "indicator": "soil_carbon_trend",
+            "limit": {
+                "value": None,
+                "unit": "t C ha-1 yr-1",
+                "missing": {"reason": "NOT_DECLARED"},
+            },
+        }
+    )
+    for rotation_id in data["rotations"]:
+        data["counts_by_year"].append(
+            {
+                "rotation_id": rotation_id,
+                "scenario_id": "PLACEHOLDER_scenario_one",
+                "indicator": "soil_carbon_trend",
+                "carbon_model": "amg",
+                "computation": "end_minus_start",
+                "years_evaluated": 0,
+                "years_within_limits": None,
+                "not_evaluated": [],
+            }
+        )
+
+
+def _range_with_another_scenario_as_minimum(data: dict[str, Any]) -> None:
+    data["scenarios"].append("PLACEHOLDER_scenario_two")
+    for rotation_id in data["rotations"]:
+        count = copy.deepcopy(data["counts_by_year"][0])
+        count.update(
+            rotation_id=rotation_id,
+            scenario_id="PLACEHOLDER_scenario_two",
+            years_within_limits=1,
+        )
+        data["counts_by_year"].append(count)
+    data["range_across_scenarios"][0]["scenario_of_the_minimum"] = (
+        "PLACEHOLDER_scenario_two"
+    )
+
+
+def _range_over_two_scenarios(data: dict[str, Any]) -> None:
+    """Two scenarios: the minimum is 0 in scenario one, the maximum 1 in scenario two."""
+    data["scenarios"].append("PLACEHOLDER_scenario_two")
+    for rotation_id in data["rotations"]:
+        count = copy.deepcopy(data["counts_by_year"][0])
+        count.update(
+            rotation_id=rotation_id,
+            scenario_id="PLACEHOLDER_scenario_two",
+            years_within_limits=1,
+        )
+        data["counts_by_year"].append(count)
+    for item in data["range_across_scenarios"]:
+        item["maximum"] = 1
+
+
+def _state(**fields: Any) -> Mutation:
+    """Replace the state of the example pair, keeping its pair and coverage."""
+
+    def mutate(data: dict[str, Any]) -> None:
+        state = data["pair_states"][0]
+        for name in ("value", "missing", "reason", "reason_missing"):
+            state.pop(name, None)
+        state.update(fields)
+
+    return mutate
+
+
+def _not_evaluated_pair(data: dict[str, Any]) -> None:
+    _state(
+        value=None,
+        missing={
+            "reason": "MISSING_INPUT",
+            "detail": "PLACEHOLDER detail: every paired difference of the pair is missing",
+        },
+    )(data)
+    data["pair_states"][0]["coverage"]["cells_compared"] = 0
+
+
+def _robust_preference(data: dict[str, Any]) -> None:
+    _state(value="Robust preference")(data)
+    data["pair_states"][0]["preferred_rotation_id"] = "example-rotation-2"
+
+
+def _pair_count_not_given_by_sign(data: dict[str, Any]) -> None:
+    item = data["pair_cell_counts"][0]
+    item["by_sign_of_point_value"] = None
+    item["by_sign_of_point_value_missing"] = {"reason": "NOT_DECLARED"}
 
 
 def _three_rotations_one_uncounted(data: dict[str, Any]) -> None:
@@ -178,9 +331,16 @@ def _resolved(data: dict[str, Any]) -> None:
 
 
 def _no_counts_no_differences(data: dict[str, Any]) -> None:
-    data["limits"] = []
-    data["counts_by_year"] = []
-    data["paired_differences"] = []
+    for name in (
+        "limits",
+        "counts_by_year",
+        "range_across_scenarios",
+        "paired_differences",
+        "equal_tolerances",
+        "pair_cell_counts",
+        "pair_states",
+    ):
+        data[name] = []
 
 
 def _swapped_pair(data: dict[str, Any]) -> None:
@@ -233,7 +393,11 @@ INVALID: list[tuple[str, Mutation, str]] = [
         "missing",
     ),
     ("two-limits-of-one-indicator", _repeat(["limits"], 0), "more than one limit"),
-    ("counted-indicator-without-limit-item", _drop_water_limit, "no item in 'limits'"),
+    (
+        "counted-indicator-without-limit-item",
+        _drop_soil_loss_limit,
+        "no item in 'limits'",
+    ),
     (
         "count-names-rotation-not-listed",
         put(SOIL_LOSS_COUNT + ["rotation_id"], "current"),
@@ -273,10 +437,14 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ),
     (
         "within-counted-without-a-limit",
-        put(WATER_COUNT + ["years_within_limits"], 0),
+        _without_soil_loss_limit(),
         "D60",
     ),
-    ("evaluated-without-a-limit", put(WATER_COUNT + ["years_evaluated"], 1), "D60"),
+    (
+        "evaluated-without-a-limit",
+        _without_soil_loss_limit(put(SOIL_LOSS_COUNT + ["years_within_limits"], None)),
+        "D60",
+    ),
     ("count-repeated", _repeat(["counts_by_year"], 0), "repeats"),
     ("rotation-left-out-of-counts", drop(["counts_by_year", 1]), "leaves out"),
     (
@@ -355,7 +523,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ),
     (
         "difference-without-range-or-reason",
-        drop(SOIL_LOSS_DIFFERENCE + ["difference", "range_missing"]),
+        drop(SOIL_LOSS_DIFFERENCE + ["difference", "range"]),
         "range",
     ),
     (
@@ -409,6 +577,272 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ),
     ("measure-first-blank-why", put(["measure_first", 0, "why"], ""), "why"),
     ("uncounted-rotation", _three_rotations_one_uncounted, "leaves out"),
+    # D94, D95: the key of a count, and counts of years over 'ag_year' rows only.
+    ("count-of-water-per-rotation", _water_count_per_rotation, "D95"),
+    ("count-of-soil-carbon-trend", _count_of_soil_carbon_trend, "D95"),
+    (
+        "count-names-carbon-model-on-soil-loss",
+        put(SOIL_LOSS_COUNT + ["carbon_model"], "amg"),
+        "belong to 'soil_carbon_trend'",
+    ),
+    # D96: the range across scenarios.
+    (
+        "range-minimum-greater-than-maximum",
+        put(SOIL_LOSS_RANGE + ["minimum"], 1),
+        "greater than 'maximum'",
+    ),
+    (
+        "range-without-minimum",
+        put(SOIL_LOSS_RANGE + ["minimum"], None),
+        "together",
+    ),
+    (
+        "range-without-value-or-reason",
+        lambda data: data["range_across_scenarios"][0].update(
+            minimum=None, maximum=None, scenario_of_the_minimum=None
+        ),
+        "missing",
+    ),
+    (
+        "range-with-value-and-reason",
+        put(SOIL_LOSS_RANGE + ["missing"], {"reason": "NOT_DECLARED"}),
+        "never both",
+    ),
+    (
+        "range-scenario-of-minimum-not-listed",
+        put(SOIL_LOSS_RANGE + ["scenario_of_the_minimum"], "PLACEHOLDER_scenario_two"),
+        "not in 'scenarios'",
+    ),
+    (
+        "range-minimum-not-that-of-its-scenario",
+        _range_with_another_scenario_as_minimum,
+        "is not the minimum",
+    ),
+    (
+        "range-of-an-uncounted-indicator",
+        put(SOIL_LOSS_RANGE + ["indicator"], "water_deficit_exposure"),
+        "summarises no count",
+    ),
+    (
+        "range-names-rotation-not-listed",
+        put(SOIL_LOSS_RANGE + ["rotation_id"], "current"),
+        "not in 'rotations'",
+    ),
+    ("range-repeated", _repeat(["range_across_scenarios"], 0), "repeats"),
+    ("range-with-a-mean", put(SOIL_LOSS_RANGE + ["mean"], 0.0), "mean"),
+    (
+        "range-with-a-share-of-scenarios",
+        put(SOIL_LOSS_RANGE + ["share_of_scenarios"], 1.0),
+        "share_of_scenarios",
+    ),
+    # D87: the tolerance of "equal".
+    (
+        "tolerance-not-declared",
+        put(SOIL_LOSS_TOLERANCE + ["tolerance", "provenance"], "OBSERVED"),
+        "DECLARED",
+    ),
+    (
+        "tolerance-in-another-unit",
+        put(SOIL_LOSS_TOLERANCE + ["tolerance", "unit"], "t ha-1 month-1"),
+        "is in 't ha-1 yr-1'",
+    ),
+    (
+        "two-tolerances-of-one-indicator",
+        _repeat(["equal_tolerances"], 0),
+        "more than one tolerance",
+    ),
+    # D87, D99: the counts of a pair's cells.
+    (
+        "pair-count-without-tolerance-item",
+        drop(SOIL_LOSS_TOLERANCE),
+        "no item in 'equal_tolerances'",
+    ),
+    (
+        "pair-count-by-sign-without-a-tolerance",
+        lambda data: data["pair_cell_counts"][2].update(
+            by_sign_of_point_value={
+                "better": 0,
+                "worse": 1,
+                "equal": 0,
+                "missing_side": 1,
+            },
+            by_sign_of_point_value_missing=None,
+        ),
+        "no tolerance",
+    ),
+    (
+        "pair-count-by-sign-without-value-or-reason",
+        put(SOIL_LOSS_PAIR_COUNT + ["by_sign_of_point_value"], None),
+        "by_sign_of_point_value_missing",
+    ),
+    (
+        "pair-count-by-sign-with-value-and-reason",
+        put(
+            SOIL_LOSS_PAIR_COUNT + ["by_sign_of_point_value_missing"],
+            {"reason": "NOT_DECLARED"},
+        ),
+        "never both",
+    ),
+    (
+        "pair-count-without-range-count",
+        drop(SOIL_LOSS_PAIR_COUNT + ["by_difference_range"]),
+        "by_difference_range",
+    ),
+    (
+        "pair-count-range-count-negative",
+        put(SOIL_LOSS_PAIR_COUNT + ["by_difference_range", "not_separated"], -1),
+        "not_separated",
+    ),
+    (
+        "pair-count-more-ranges-than-values",
+        put(SOIL_LOSS_PAIR_COUNT + ["by_difference_range", "strict_improvement"], 1),
+        "D99",
+    ),
+    (
+        "pair-count-with-a-total",
+        put(SOIL_LOSS_PAIR_COUNT + ["total"], 2),
+        "total",
+    ),
+    (
+        "pair-count-with-a-p-value",
+        put(SOIL_LOSS_PAIR_COUNT + ["p_value"], 0.5),
+        "p_value",
+    ),
+    (
+        "pair-count-of-one-rotation",
+        put(
+            SOIL_LOSS_PAIR_COUNT + ["pair"],
+            ["example-rotation-1", "example-rotation-1"],
+        ),
+        "twice",
+    ),
+    (
+        "pair-count-names-rotation-not-listed",
+        put(SOIL_LOSS_PAIR_COUNT + ["pair", 0], "current"),
+        "not in 'rotations'",
+    ),
+    (
+        "pair-count-without-scenario",
+        drop(SOIL_LOSS_PAIR_COUNT + ["scenario_id"]),
+        "scenario_id",
+    ),
+    ("pair-count-repeated", _repeat(["pair_cell_counts"], 0), "repeats"),
+    # D85, D86, D88, D91, D97: the state of a pair and its coverage.
+    (
+        "pair-state-unknown-name",
+        put(PAIR_STATE + ["value"], "not resolved"),
+        "Input should be",
+    ),
+    (
+        "pair-state-not-evaluated-as-a-name",
+        _state(value="Not evaluated"),
+        "Input should be",
+    ),
+    (
+        "pair-state-without-value-or-reason",
+        _state(value=None),
+        "missing",
+    ),
+    (
+        "pair-state-with-value-and-missing",
+        put(PAIR_STATE + ["missing"], {"reason": "MISSING_INPUT", "detail": "x"}),
+        "never both",
+    ),
+    (
+        "pair-state-with-nothing-compared",
+        put(PAIR_STATE + ["coverage", "cells_compared"], 0),
+        "D85",
+    ),
+    (
+        "not-evaluated-pair-with-a-reason",
+        lambda data: (
+            _not_evaluated_pair(data),
+            data["pair_states"][0].update(reason="a difference without its range"),
+        ),
+        "D85",
+    ),
+    (
+        "pair-state-without-its-reason",
+        _state(value="Not separated: uncertainty missing"),
+        "D86",
+    ),
+    (
+        "pair-state-with-reason-of-another-state",
+        put(PAIR_STATE + ["reason"], "identical rows"),
+        "D86",
+    ),
+    (
+        "pair-state-with-reason-and-reason-missing",
+        put(PAIR_STATE + ["reason_missing"], {"reason": "NOT_AVAILABLE"}),
+        "never both",
+    ),
+    (
+        "within-uncertainty-with-a-reason-of-d86",
+        _state(
+            value="Not separated: within uncertainty",
+            reason="a difference without its range",
+        ),
+        "D86",
+    ),
+    (
+        "robust-preference-with-a-reason",
+        lambda data: (
+            _robust_preference(data),
+            data["pair_states"][0].update(reason="identical rows"),
+        ),
+        "no reason",
+    ),
+    (
+        "robust-preference-without-preferred-rotation",
+        _state(value="Robust preference"),
+        "preferred_rotation_id",
+    ),
+    (
+        "preferred-rotation-outside-the-pair",
+        lambda data: (
+            _robust_preference(data),
+            data["pair_states"][0].update(preferred_rotation_id="current"),
+        ),
+        "preferred_rotation_id",
+    ),
+    (
+        "preferred-rotation-without-robust-preference",
+        put(PAIR_STATE + ["preferred_rotation_id"], "example-rotation-2"),
+        "robust preference only",
+    ),
+    (
+        "coverage-compared-greater-than-cells",
+        put(PAIR_STATE + ["coverage", "cells_compared"], 6),
+        "D91",
+    ),
+    (
+        "coverage-left-out",
+        drop(PAIR_STATE + ["coverage"]),
+        "coverage",
+    ),
+    (
+        "coverage-as-a-share",
+        put(PAIR_STATE + ["coverage"], 0.4),
+        "coverage",
+    ),
+    (
+        "pair-state-names-rotation-not-listed",
+        put(PAIR_STATE + ["pair", 0], "current"),
+        "not in 'rotations'",
+    ),
+    (
+        "pair-state-of-one-rotation",
+        put(PAIR_STATE + ["pair"], ["example-rotation-1", "example-rotation-1"]),
+        "twice",
+    ),
+    (
+        "pair-state-repeated-swapped",
+        lambda data: (
+            data["pair_states"].append(copy.deepcopy(data["pair_states"][0])),
+            data["pair_states"][1]["pair"].reverse(),
+        ),
+        "more than one state",
+    ),
 ]
 
 VALID: list[tuple[str, Mutation]] = [
@@ -424,6 +858,41 @@ VALID: list[tuple[str, Mutation]] = [
     ("no-counts-no-differences", _no_counts_no_differences),
     ("swapped-pair", _swapped_pair),
     ("example-data-false", put(["example_data"], False)),
+    ("soil-loss-limit-not-declared", _soil_loss_limit_not_declared),
+    ("range-over-two-scenarios", _range_over_two_scenarios),
+    ("no-range-across-scenarios", put(["range_across_scenarios"], [])),
+    ("pair-count-not-given-by-sign", _pair_count_not_given_by_sign),
+    ("not-evaluated-pair", _not_evaluated_pair),
+    (
+        "identical-with-its-reason",
+        _state(value="Identical", reason="identical rows"),
+    ),
+    (
+        "not-robust-with-its-reason",
+        _state(
+            value="Not robust across scenarios",
+            reason="not robust across the admitted scenarios",
+        ),
+    ),
+    (
+        "within-uncertainty-with-reason-missing",
+        _state(
+            value="Not separated: within uncertainty",
+            reason_missing={
+                "reason": "NOT_AVAILABLE",
+                "detail": "PLACEHOLDER detail: D86 writes no reason for this state (OPEN, K3)",
+            },
+        ),
+    ),
+    (
+        "uncertainty-missing-with-reason-missing",
+        _state(
+            value="Not separated: uncertainty missing",
+            reason_missing={"reason": "NOT_AVAILABLE"},
+        ),
+    ),
+    ("robust-preference", _robust_preference),
+    ("no-pair-state", put(["pair_states"], [])),
 ]
 
 
@@ -495,6 +964,19 @@ def _apply_the_listed_differences(data: dict[str, Any]) -> None:
         item["ag_year"] = 2001
     # 6. The state names the indicators not resolved.
     data["state"]["indicators_not_resolved"] = []
+    # Not a difference: the fields that D85 to D99 of issue #77 add after #96
+    # (README.md, "Fields added by D85 to D99"), here left empty.
+    _add_the_fields_of_d85_to_d99(data)
+
+
+def _add_the_fields_of_d85_to_d99(data: dict[str, Any]) -> None:
+    for name in (
+        "range_across_scenarios",
+        "equal_tolerances",
+        "pair_cell_counts",
+        "pair_states",
+    ):
+        data[name] = []
 
 
 def test_producer_example_as_written_is_rejected() -> None:
@@ -627,3 +1109,89 @@ def test_example_differences_are_second_minus_first_of_the_table() -> None:
             assert item.difference.missing.reason == "MISSING_INPUT"
         else:
             assert item.difference.value == second.value - first.value
+
+
+def test_example_difference_ranges_follow_d92() -> None:
+    """D92: the range of B - A is [b_low - a_high, b_high - a_low], same kind, else missing."""
+    document = DecisionOutput.model_validate(load())
+    rows = {(row.rotation_id, row.cell()): row for row in _table().rows}
+    for item in document.paired_differences:
+        if item.difference.value is None:
+            continue
+        first, second = (
+            rows[(_table_id(rotation_id), item.cell())] for rotation_id in item.pair
+        )
+        if (
+            first.range is None
+            or second.range is None
+            or first.range.kind != second.range.kind
+        ):
+            assert item.difference.range is None
+            assert item.difference.range_missing is not None
+        else:
+            assert item.difference.range is not None
+            assert item.difference.range.low == second.range.low - first.range.high
+            assert item.difference.range.high == second.range.high - first.range.low
+            assert item.difference.range.kind == first.range.kind
+
+
+def test_example_pair_counts_and_coverage_agree_with_the_differences() -> None:
+    """D87, D91, D99: what the model cannot see, checked for the example alone.
+
+    The example's differences are all the cells of its one pair. Every cell
+    is in the count by the sign of the point value; only a cell whose
+    difference has a range is in the count by range; "k of N" counts the
+    cells with a value on both sides.
+    """
+    document = DecisionOutput.model_validate(load())
+    differences = document.paired_differences
+    (state,) = document.pair_states
+    assert state.coverage.cells_of_the_pair == len(differences)
+    assert state.coverage.cells_compared == sum(
+        item.difference.value is not None for item in differences
+    )
+    for count in document.pair_cell_counts:
+        cells = [
+            item
+            for item in differences
+            if item.pair == count.pair
+            and item.scenario_id == count.scenario_id
+            and item.indicator == count.indicator
+        ]
+        assert count.by_difference_range.cells() == sum(
+            item.difference.range is not None for item in cells
+        )
+        if count.by_sign_of_point_value is not None:
+            by_sign = count.by_sign_of_point_value
+            assert by_sign.cells_with_a_value() + by_sign.missing_side == len(cells)
+            assert by_sign.missing_side == sum(
+                item.difference.value is None for item in cells
+            )
+
+
+def test_example_range_across_scenarios_is_that_of_its_counts() -> None:
+    document = DecisionOutput.model_validate(load())
+    for item in document.range_across_scenarios:
+        within = [
+            count.years_within_limits
+            for count in document.counts_by_year
+            if (
+                count.rotation_id,
+                count.indicator,
+                count.carbon_model,
+                count.computation,
+            )
+            == item.key()
+        ]
+        assert (item.minimum, item.maximum) == (min(within), max(within))
+
+
+def test_state_names_are_those_of_d88_and_d97() -> None:
+    """D88 lists five names, the first being "Not evaluated" (D85: no state); D97 adds one."""
+    assert set(STATE_NAMES) == {
+        "Identical",
+        "Not separated: uncertainty missing",
+        "Not robust across scenarios",
+        "Robust preference",
+        "Not separated: within uncertainty",
+    }
