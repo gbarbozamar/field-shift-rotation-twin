@@ -18,13 +18,14 @@ import {
 } from '../plant/PlantScreen'
 import type { PlantAction, PlantScreenState, ServicePhase, ServiceStatus } from '../plant/PlantScreen'
 import { CropLegend } from '../plant/PlantVisuals'
-import type { PlantAnswer, PlantOption } from '../plant/plantData'
+import type { PlantAnswer, PlantOption, RainStressPart } from '../plant/plantData'
 import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../plant/plantRoute'
 import { buildRotationStrip, cropOrder, plantRotations } from '../plant/rotationStrip'
+import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import { boardColumns } from './boardModel'
 import type { SortKey } from './boardModel'
-import { AnswerBanner, BoardControls, PriceTrackPanel } from './BoardParts'
+import { AnswerBanner, AnswerLimits, BoardControls, PriceTrackPanel, RainEcho, RecordRibbon } from './BoardParts'
 import { CompareTable, SortPicker, cropsText } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
 
@@ -55,6 +56,12 @@ import type { OptionInfo } from './CompareTable'
 const REQUEST_FIELD_ID: string = rawPlantRequest.site.field_id
 
 const REQUEST_READ = readBaseRequest(rawPlantRequest)
+
+/** The soil-loss limit the request declares, as declared; null when it has no value. */
+const REQUEST_LIMIT: { value: number; unit: string } | null =
+  typeof rawPlantRequest.soil_loss_limit.value === 'number'
+    ? { value: rawPlantRequest.soil_loss_limit.value, unit: rawPlantRequest.soil_loss_limit.unit }
+    : null
 
 /** The board asks as soon as its field is picked: the state starts in service mode. */
 export function initialBoardState(): PlantScreenState {
@@ -120,11 +127,23 @@ function useBoardInfo(answer: PlantAnswer) {
   }, [answer])
 }
 
-function Answered({ answer }: { answer: PlantAnswer }) {
+function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: RainStressPart | null }) {
   const { info, order, scales } = useBoardInfo(answer)
   const [sort, setSort] = useState<SortKey>('rule')
   const columns = useMemo(() => boardColumns(answer, sort), [answer, sort])
   const chosen = answer.options.find((option) => option.rotation_id === answer.chosen) ?? null
+  // The rotation the cost of the limit is measured against, named as its column is.
+  const againstOption =
+    answer.limit_cost.kind === 'value'
+      ? (answer.options.find((option) => option.rotation_id === (answer.limit_cost as { against: string }).against) ?? null)
+      : null
+  const againstText =
+    againstOption !== null
+      ? formatString(strings['board.option_crops'], {
+          letter: String.fromCharCode(65 + answer.options.indexOf(againstOption)),
+          crops: cropsText(info(againstOption).strip) ?? againstOption.rotation_id,
+        })
+      : null
   // The sources an answer lacks are its root reason: said once, in the notice.
   const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
   return (
@@ -133,16 +152,24 @@ function Answered({ answer }: { answer: PlantAnswer }) {
         answer={answer}
         label={chosen !== null ? cropsText(info(chosen).strip) : null}
         showWhy={!lacksSources}
+        against={againstText}
       />
+      {rainStress !== null ? (
+        <RainEcho part={rainStress} />
+      ) : null}
       {answer.chosen === null ? (
         <SourcesNotice answer={answer} />
       ) : null}
-      <PriceTrackPanel tipping={answer.tipping_price} />
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <h3 className="text-xl font-bold">{strings['board.compare.title']}</h3>
         <SortPicker sort={sort} onSort={setSort} />
       </div>
       <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PriceTrackPanel tipping={answer.tipping_price} />
+        <RecordRibbon record={answer.kinds_of_year} marginOf={answer.margin_of} />
+      </div>
+      <AnswerLimits answer={answer} />
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <CropLegend order={order} />
         <a data-testid="board-report" href="#/plant" className="text-sm font-semibold text-fs-primary underline">
@@ -196,7 +223,7 @@ function BoardSide({
     )
   }
   return (
-    <Answered answer={service.answer.answer} />
+    <Answered answer={service.answer.answer} rainStress={service.answer.rainStress} />
   )
 }
 
@@ -242,6 +269,8 @@ export function BoardView({
           strictness={state.strictness}
           rain={state.rain && REQUEST_READ.rain.kind === 'present'}
           rainFactor={REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null}
+          record={service !== null && service.phase === 'answered' ? service.answer.answer.kinds_of_year : null}
+          limit={REQUEST_LIMIT}
           onMarginOf={(value) => dispatch({ type: 'margin_of', value })}
           onStrictness={(value) => dispatch({ type: 'strictness', value })}
           onRain={(on) => dispatch({ type: 'rain', on })}

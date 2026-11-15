@@ -63,6 +63,9 @@
   --fs-error: #a93f3b;
   --fs-error-bg: color-mix(in srgb, var(--fs-error) 9%, var(--fs-surface));
   --fs-selection-bg: color-mix(in srgb, var(--fs-primary) 12%, var(--fs-surface));
+  --fs-nino: #b5562f;
+  --fs-neutral: #9aa69d;
+  --fs-nina: #2f6f9a;
   --fs-crop-1: #7a9a2e;
   --fs-crop-2: #c99a2e;
   --fs-crop-3: #b5562f;
@@ -99,6 +102,9 @@
   --font-fs-heading: var(--fs-font-heading);
   --font-fs-mono: var(--fs-font-mono);
   --font-mono: var(--fs-font-mono);
+  --color-fs-nino: var(--fs-nino);
+  --color-fs-neutral: var(--fs-neutral);
+  --color-fs-nina: var(--fs-nina);
   --color-fs-crop-1: var(--fs-crop-1);
   --color-fs-crop-2: var(--fs-crop-2);
   --color-fs-crop-3: var(--fs-crop-3);

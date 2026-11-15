@@ -97,8 +97,17 @@ export type Measured =
 /** C4.2 for a margin (D249): the source every present margin carries. */
 export const MARGIN_SOURCE = 'computed from the declared economic facts'
 
-/** A soil-loss mean: a measured value with the sources or the assumption mark (C4.2). */
-export type SoilLossItem = Measured & { sources: string[]; assumption: boolean }
+/**
+ * A soil-loss mean: a measured value with the sources or the assumption mark
+ * (C4.2), and the agricultural years it is the mean of (n_years is their
+ * number).
+ */
+export type SoilLossItem = Measured & {
+  sources: string[]
+  assumption: boolean
+  n_years: number
+  ag_years: number[]
+}
 
 /** A limit check: its verdict, and its reason when it is not resolved. */
 export interface LimitCheck {
@@ -174,10 +183,30 @@ export interface PlantAnswer {
   limit_cost: LimitCost
   tipping_price: TippingPrice
   sources: PlantSource[]
+  /** The kinds of year the answer used: each agricultural year of the record and the number of each kind. */
+  kinds_of_year: KindsOfYearRecord
   /** D245: what the answer is, in its own words. */
   scope: string
   /** The limits of this release the answer declares (D250). */
   declared_limits: string[]
+}
+
+/** One agricultural year of the record and its kind; null when the year is not classified. */
+export interface YearKind {
+  ag_year: number
+  kind: KindOfYear | null
+}
+
+/**
+ * The kinds of year the answer used (KindsOfYearRecord of the contract):
+ * the id of the record, its years in order, and the number of years of each
+ * kind. Every count is null when a year has no kind (the record is not
+ * classified); the counts are never summed here to stand for a missing one.
+ */
+export interface KindsOfYearRecord {
+  source: string
+  years: YearKind[]
+  counts: Record<KindOfYear, number | null>
 }
 
 export type SourceState = 'fresh' | 'cached' | 'unavailable' | 'example'
@@ -417,7 +446,25 @@ function soilLoss(value: unknown, what: string): SoilLossItem {
   if (base.value !== null && item.sources.length === 0 && !item.assumption) {
     throw new Error(`${what}:value-without-source-or-assumption`)
   }
-  return { ...base, sources: [...item.sources], assumption: item.assumption }
+  // As SoilLossOut: the years are whole numbers, sorted and unique, and
+  // n_years is their number.
+  if (!Array.isArray(item.ag_years) || !item.ag_years.every((y) => Number.isInteger(y))) {
+    throw new Error(`${what}:ag-years-not-a-list-of-years`)
+  }
+  const agYears = item.ag_years as number[]
+  if (agYears.some((year, index) => index > 0 && year <= agYears[index - 1])) {
+    throw new Error(`${what}:ag-years-not-sorted-and-unique`)
+  }
+  if (item.n_years !== agYears.length) {
+    throw new Error(`${what}:n-years-not-the-number-of-ag-years`)
+  }
+  return {
+    ...base,
+    sources: [...item.sources],
+    assumption: item.assumption,
+    n_years: agYears.length,
+    ag_years: [...agYears],
+  }
 }
 
 function byMarginOf<T>(value: unknown, what: string, read: (v: unknown, w: string) => T) {
@@ -852,9 +899,51 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
     limit_cost: cost,
     tipping_price: tippingPrice(item.tipping_price, `${what}:tipping-price`),
     sources,
+    kinds_of_year: kindsOfYear(item.kinds_of_year, `${what}:kinds-of-year`),
     scope: answerScope(item.scope, `${what}:scope`),
     declared_limits: declaredLimits(item.declared_limits, `${what}:declared-limits`),
   }
+}
+
+/** The kinds of year of the answer, as KindsOfYearRecord of the contract. */
+function kindsOfYear(value: unknown, what: string): KindsOfYearRecord {
+  const item = record(value, what)
+  if (!isNonEmptyString(item.source)) {
+    throw new Error(`${what}:source-empty`)
+  }
+  if (!Array.isArray(item.years) || item.years.length === 0) {
+    throw new Error(`${what}:years-not-a-list`)
+  }
+  const years: YearKind[] = item.years.map((entry, index) => {
+    const year = record(entry, `${what}:years[${index}]`)
+    if (!Number.isInteger(year.ag_year)) {
+      throw new Error(`${what}:years[${index}]:ag-year-not-a-year`)
+    }
+    if (year.kind !== null && !oneOf(year.kind, KINDS_OF_YEAR)) {
+      throw new Error(`${what}:years[${index}]:kind-not-in-the-list`)
+    }
+    return { ag_year: year.ag_year as number, kind: year.kind }
+  })
+  if (years.some((year, index) => index > 0 && year.ag_year <= years[index - 1].ag_year)) {
+    throw new Error(`${what}:years-not-sorted-and-unique`)
+  }
+  const raw = record(item.counts, `${what}:counts`)
+  const counts = {} as Record<KindOfYear, number | null>
+  const classified = years.every((year) => year.kind !== null)
+  for (const kind of KINDS_OF_YEAR) {
+    const count = raw[kind]
+    if (count !== null && !Number.isInteger(count)) {
+      throw new Error(`${what}:counts:${kind}-not-a-count`)
+    }
+    // As KindsOfYearRecord: every count is null when a year has no kind,
+    // and otherwise each count is the number of years of its kind.
+    const expected = classified ? years.filter((year) => year.kind === kind).length : null
+    if (count !== expected) {
+      throw new Error(`${what}:counts:${kind}-not-the-years-of-its-kind`)
+    }
+    counts[kind] = count as number | null
+  }
+  return { source: item.source, years, counts }
 }
 
 /** D245: the scope of the answer, a text (PlantAnswer checks its exact words). */

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { displayNumber } from '../components/ValueDisplay'
+import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { barPercent, drawnSoilVerdict, stateTone, verdictTone } from '../plant/optionBars'
 import { RotationTimeline, StatePill } from '../plant/PlantVisuals'
@@ -69,9 +69,21 @@ export function SortPicker({ sort, onSort }: { sort: SortKey; onSort: (sort: Sor
   )
 }
 
+/** A missing number: "no value" with its reason, cut to two lines; the whole reason on hover. */
+function Missing({ item }: { item: Measured }) {
+  const text = item.missing !== null ? missingPatternText(strings['plant.table.no_value'], item.missing) : strings['plant.table.no_value']
+  return (
+    <span data-testid="board-missing" className="line-clamp-2 text-xs italic text-fs-muted" title={text}>
+      {text}
+    </span>
+  )
+}
+
 function Number({ item }: { item: Measured }) {
   if (item.value === null) {
-    return <span className="text-sm italic text-fs-muted">{strings['plant.table.no_value']}</span>
+    return (
+      <Missing item={item} />
+    )
   }
   return (
     <span className="whitespace-nowrap tabular-nums" title={String(item.value)}>

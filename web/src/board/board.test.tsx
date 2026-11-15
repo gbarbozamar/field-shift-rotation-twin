@@ -7,7 +7,7 @@ import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { exampleCase } from '../identity/exampleCase'
 import { parsePlantAnswer } from '../plant/plantData'
-import type { PlantAnswer, TippingPrice } from '../plant/plantData'
+import type { PlantAnswer, RainStressPart, TippingPrice } from '../plant/plantData'
 import type { ServicePhase } from '../plant/PlantScreen'
 import { buildRotationStrip, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
@@ -339,5 +339,122 @@ describe('the view by state (4)', () => {
       missingPatternText(strings['plant.answer.why'], open.missing!),
     )
     expect(count(html, 'data-testid="board-option"')).toBe(open.options.length)
+  })
+})
+
+describe('quantities and required labels (5)', () => {
+  const html = view(FIELD, answered(example))
+
+  it('each kind of year carries the number of agricultural years of the record behind it', () => {
+    const kinds = after(html, 'board-kind').split('</fieldset>')[0]
+    const text = visibleText(`<${kinds}`)
+    expect(text).toContain(
+      formatString(strings['board.kind.years'], {
+        kind: strings['board.kind.average'],
+        n: rawExample.kinds_of_year.years.length,
+      }),
+    )
+    for (const kind of ['el_nino', 'neutral', 'la_nina'] as const) {
+      expect(text).toContain(
+        formatString(strings['board.kind.years'], {
+          kind: strings[`plant.kind.${kind}`],
+          n: rawExample.kinds_of_year.counts[kind],
+        }),
+      )
+    }
+  })
+
+  it('before an answer the kinds of year carry no number: none is assumed', () => {
+    const kinds = after(view(FIELD, { phase: 'pending' }), 'board-kind').split('</fieldset>')[0]
+    expect(visibleText(`<${kinds}`)).not.toMatch(/\d/)
+  })
+
+  it('the limit rule names the limit the request declares, with its unit', () => {
+    const rule = after(html, 'board-rule').split('</fieldset>')[0]
+    const limit = rawRequest.soil_loss_limit
+    for (const key of ['on_average', 'every_kind'] as const) {
+      expect(visibleText(`<${rule}`)).toContain(
+        formatString(strings[`board.rule.${key}.limit`], { limit: displayNumber(limit.value), unit: limit.unit }),
+      )
+    }
+  })
+
+  it('the record ribbon has one cell per agricultural year and the count of each kind', () => {
+    const ribbon = after(html, 'board-record').split('</section>')[0]
+    expect(count(ribbon, 'data-testid="board-record-year"')).toBe(rawExample.kinds_of_year.years.length)
+    for (const kind of ['el_nino', 'neutral', 'la_nina'] as const) {
+      expect(visibleText(`<${ribbon}`)).toContain(
+        formatString(strings['board.record.count'], {
+          kind: strings[`plant.kind.${kind}`],
+          n: rawExample.kinds_of_year.counts[kind],
+          total: rawExample.kinds_of_year.years.length,
+        }),
+      )
+    }
+    expect(visibleText(`<${ribbon}`)).toContain(strings['board.record.note'])
+    expect(visibleText(`<${ribbon}`)).toContain(rawExample.kinds_of_year.source)
+  })
+
+  it('the banner keeps the scope of the answer in its own words (D245), not a shortened one', () => {
+    expect(visibleText(`<${after(html, 'board-scope').split('</p>')[0]}`)).toBe(rawExample.scope)
+  })
+
+  it('the cost of the limit names the rotation it is measured against', () => {
+    const against = example.options.find((o) => o.rotation_id === rawExample.limit_cost.against)!
+    const letter = String.fromCharCode(65 + example.options.indexOf(against))
+    const text = visibleText(`<${after(html, 'board-cost-against').split('</p>')[0]}`)
+    expect(text).toBe(
+      formatString(strings['board.cost.against'], {
+        rotation: formatString(strings['board.option_crops'], {
+          letter,
+          crops: cropsText(buildRotationStrip(plantRotations.rotations!.find((r) => r.rotation_id === against.rotation_id)!))!,
+        }),
+      }),
+    )
+  })
+
+  it('shows every limit the answer declares (D250) and the label of the soil-loss figures (D148)', () => {
+    const limits = after(html, 'board-limits').split('</section>')[0]
+    expect(count(limits, 'data-testid="board-declared-limit"')).toBe(rawExample.declared_limits.length)
+    for (const limit of rawExample.declared_limits) {
+      expect(visibleText(`<${limits}`)).toContain(formatString(strings['plant.declared_limit'], { limit }))
+    }
+    expect(decode(after(limits, 'board-soil-label').split('</li>')[0])).toBe(`>${strings['soil_loss.headline_label']}`)
+  })
+
+  it('a missing number says why, not only "no value"', () => {
+    const missing = example.options.flatMap((o) => (o.soil_loss[example.margin_of].missing !== null ? [o.soil_loss[example.margin_of].missing!] : []))
+    expect(missing.length).toBeGreaterThan(0)
+    expect(decode(html)).toContain(missingPatternText(strings['plant.table.no_value'], missing[0]))
+  })
+})
+
+describe('the rain stress test, as the service says it (6)', () => {
+  const applied = { kind: 'applied', factor: 1.2, unit: 'dimensionless', detail: 'DETAIL_MARKER', label: 'stress test' } as const
+
+  function withRain(part: RainStressPart | null): string {
+    return view(FIELD, { phase: 'answered', answer: { answer: example, rainStress: part } })
+  }
+
+  it('no stress test asked: no line about it', () => {
+    expect(count(withRain(null), 'data-testid="board-rain-echo"')).toBe(0)
+  })
+
+  it('applied: it says so with the detail of the service', () => {
+    const html = withRain({ ...applied, applied: true })
+    const echo = after(html, 'board-rain-echo').split('</p>')[0]
+    expect(echo).toContain('data-applied="true"')
+    expect(visibleText(`<${echo}`)).toBe(
+      formatString(strings['plant.service.rain_applied'], { label: applied.label, detail: applied.detail }),
+    )
+  })
+
+  it('asked but not applied: it says not applied, never as if it were', () => {
+    const html = withRain({ ...applied, applied: false })
+    const echo = after(html, 'board-rain-echo').split('</p>')[0]
+    expect(echo).toContain('data-applied="false"')
+    expect(visibleText(`<${echo}`)).toBe(
+      formatString(strings['plant.service.rain_not_applied'], { label: applied.label, detail: applied.detail }),
+    )
   })
 })
