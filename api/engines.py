@@ -13,11 +13,18 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    parameter catalogue as the keyword argument ``parameters`` (Q3, D46, D56
    of issue #77), always, as contracts/ENTRYPOINTS.md states; EP2 never does.
    An engine that does not take it is a defect (``TypeError``, ``500``);
-3. EP5 ``run_amg(forcing, parameters=...)`` under the same conditions as EP1
+3. EP4 ``build_residue_ledger(rotation=..., calendar=..., climate=...,
+   parameters=...)`` under the same conditions as EP1 and EP3, by keyword,
+   on the rotation as ``load_rotation`` returned it; its ``ResidueLedger`` is
+   checked through a lazy import of ``contracts.residue_ledger``
+   (``residue_ledger_type``), never at module load. Its series become the
+   ``annual_carbon_inputs`` of the forcing, copied unchanged (PROPOSED);
+   the ledger itself is not in the response;
+4. EP5 ``run_amg(forcing, parameters=...)`` under the same conditions as EP1
    and EP3, on the ``CarbonForcing`` that ``api.carbon_forcing`` builds from
    the calendar and the site data (PROPOSED). When the forcing cannot be laid
    out, EP5 is not called and its rows are missing with that reason;
-4. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
+5. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend``: the three rows of the
    ``CarbonBalance`` of EP5 unchanged for ``amg`` (the mapping of
    contracts/ENTRYPOINTS.md), and
@@ -29,7 +36,7 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    contracts/results/models.py. Only an engine that is not built gives that
    form; every other absence keeps ``result=None`` with its reason.
 
-Steps 2 to 4 run once per phase of the rotation (decision D109 of issue
+Steps 2 to 5 run once per phase of the rotation (decision D109 of issue
 #77; ``api/phases.py``, PROPOSED), on a calendar moved so that the phase's
 year comes first; phase 1 is the calendar of EP2 unchanged and is the
 top-level answer. ``EnginesResult.phases`` holds one ``PhaseResult`` per
@@ -61,7 +68,7 @@ from dataclasses import dataclass, replace
 from typing import Any, get_args
 
 from adapters.ports import ClimateResult, SoilSlopeResult
-from api.carbon_forcing import build_carbon_forcing, crops_left_out
+from api.carbon_forcing import STOCK_UNIT, build_carbon_forcing, crops_left_out
 from api.phases import (
     REPEAT_MODULE,
     RUNNER_COPY,
@@ -76,6 +83,7 @@ from api.rotation_validator import load_rotation_definition
 from contracts.carbon_balance import CarbonBalance
 from contracts.carbon_forcing import CarbonForcing
 from contracts.inputs import RotationCalendar
+from contracts.inputs.common import Value
 from contracts.results.models import (
     DIRECTION_OF,
     REASON_OF_A_PART_NOT_BUILT,
@@ -111,11 +119,17 @@ CALENDAR = EntryPoint("EP2", "calendar", "engine.calendar", "build_rotation_cale
 EROSION = EntryPoint("EP1", "erosion", "engine.erosion", "compute_soil_loss")
 WATER = EntryPoint("EP3", "water", "engine.water", "compute_water_deficit_exposure")
 AMG = EntryPoint("EP5", "amg", "engine.amg", "run_amg")
-DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, AMG)
-# Not discovered yet (contracts/ENTRYPOINTS.md); named in the detail of their
-# missing rows and module states once another carbon engine is built.
 RESIDUES = EntryPoint("EP4", "residues", "engine.residues", "build_residue_ledger")
+DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, RESIDUES, AMG)
+# Not discovered yet (contracts/ENTRYPOINTS.md); named in the detail of its
+# missing rows and module state once another carbon engine is built.
 ROTHC = EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")
+
+# The contract EP4 returns (contracts/residue_ledger/, lane L1). Imported only
+# when EP4 has answered, never at module load: the runner must work before the
+# contract lands (PROPOSED).
+RESIDUE_LEDGER_CONTRACT = "contracts.residue_ledger"
+RESIDUE_LEDGER_MODEL = "ResidueLedger"
 
 # PROPOSED: the module identifiers, one per entry of contracts/ENTRYPOINTS.md
 # (EP1 to EP6), in the order the runner reports them.
@@ -144,6 +158,7 @@ AMG_NOT_CONFIGURED = (
     "so engine.amg.run_amg is not called"
 )
 NOT_BUILT = "the module is not built yet"
+LEDGER_EMPTY = "the residue ledger holds no component and no carbon-input series"
 CARBON_NOT_BUILT = "no carbon engine is built yet"
 CARBON_MODELS_NOT_CONFIGURED = (
     "the identifiers of the carbon models are not configured "
@@ -178,6 +193,8 @@ class EngineFunctions:
     compute_water_deficit_exposure: Callable[..., list[WaterDeficitExposure]] | None = (
         None
     )
+    # EP4 (returns a ``ResidueLedger`` of contracts/residue_ledger/)
+    build_residue_ledger: Callable[..., Any] | None = None
     # EP5
     run_amg: Callable[..., CarbonBalance] | None = None
     # The phase rule of lane L1 (issue #221), not an entry point. Used only
@@ -398,19 +415,26 @@ def part_not_built(
     )
 
 
-def _carbon_modules(amg: ModuleStatus | None = None) -> tuple[ModuleStatus, ...]:
+def _carbon_modules(
+    amg: ModuleStatus | None = None, residues: ModuleStatus | None = None
+) -> tuple[ModuleStatus, ...]:
     """The states of ``residues``, ``amg`` and ``rothc``.
 
-    ``amg`` is ``None`` when EP5 is not built: then the three are written as
-    before EP5 existed, "no carbon engine is built yet". Otherwise ``amg`` is
-    its state and the other two name their own engine function.
+    ``amg`` is ``None`` when EP5 is not built and ``residues`` when EP4 is not
+    built. Both ``None``: the three are written as before any carbon engine
+    existed, "no carbon engine is built yet". Otherwise each given state is
+    used and every other carbon module names its own engine function.
     """
-    if amg is None:
+    if amg is None and residues is None:
         return tuple(
             _status(module_id, "not_available", "NOT_AVAILABLE", CARBON_NOT_BUILT)
             for module_id in CARBON_MODULE_IDS
         )
-    return (_not_built(RESIDUES), amg, _not_built(ROTHC))
+    return (
+        residues if residues is not None else _not_built(RESIDUES),
+        amg if amg is not None else _not_built(AMG),
+        _not_built(ROTHC),
+    )
 
 
 def _amg_not_configured() -> ModuleStatus:
@@ -418,14 +442,21 @@ def _amg_not_configured() -> ModuleStatus:
 
 
 def _carbon_dependent(
-    amg_function: Callable[..., Any] | None, amg_configured: bool, missing_input: str
+    functions: EngineFunctions, amg_configured: bool, missing_input: str
 ) -> tuple[ModuleStatus, ...]:
-    """The carbon modules when EP5 was not called because an input is missing."""
-    if amg_function is None:
-        return _carbon_modules()
-    if not amg_configured:
-        return _carbon_modules(_amg_not_configured())
-    return _carbon_modules(_missing_input(AMG.module_id, missing_input))
+    """The carbon modules when EP4 and EP5 were not called: an input is missing."""
+    residues = (
+        None
+        if functions.build_residue_ledger is None
+        else _missing_input(RESIDUES.module_id, missing_input)
+    )
+    if functions.run_amg is None:
+        amg = None
+    elif not amg_configured:
+        amg = _amg_not_configured()
+    else:
+        amg = _missing_input(AMG.module_id, missing_input)
+    return _carbon_modules(amg, residues)
 
 
 def crops_left_out_detail(count: int) -> str:
@@ -473,6 +504,150 @@ def check_balance(balance: object, forcing: CarbonForcing) -> CarbonBalance:
     return balance
 
 
+def residue_ledger_type() -> type:
+    """The ``ResidueLedger`` model, imported when EP4 has answered (PROPOSED).
+
+    A seam: the tests replace it with a class of their own, because the
+    contract may not be in the repository. When EP4 exists and its contract
+    does not, the ``ModuleNotFoundError`` propagates (a defect, ``500``).
+    """
+    module = importlib.import_module(RESIDUE_LEDGER_CONTRACT)
+    return getattr(module, RESIDUE_LEDGER_MODEL)
+
+
+def check_ledger(ledger: object, calendar: RotationCalendar) -> Any:
+    """What EP4 returned, checked against the calendar the runner gave it.
+
+    Anything but a ``ResidueLedger``, or a ledger of another rotation, is a
+    defect of the engine: ``TypeError`` (``500``). PROPOSED.
+    """
+    model = residue_ledger_type()
+    if not isinstance(ledger, model):
+        raise TypeError(
+            f"{_name(RESIDUES)} returned {type(ledger).__name__}, "
+            f"not {RESIDUE_LEDGER_MODEL}"
+        )
+    differ = [
+        field
+        for field in ("case_id", "field_id", "rotation_id")
+        if getattr(ledger, field) != getattr(calendar, field)
+    ]
+    if differ:
+        raise TypeError(
+            f"{_name(RESIDUES)} returned the ledger of another rotation: "
+            f"{' and '.join(differ)} differ from the calendar"
+        )
+    return ledger
+
+
+def ledger_values(ledger: Any) -> list[Any]:
+    """Every value of a ledger, in order: each ``Value`` of each component,
+    then each yearly value of each series (PROPOSED).
+
+    The values of a component are found by type (``Value`` of
+    contracts/inputs/common.py), not by name, so the runner needs no field
+    list of a contract it does not import.
+    """
+    values: list[Any] = []
+    for component in ledger.components:
+        for name in type(component).model_fields:
+            item = getattr(component, name)
+            if isinstance(item, Value):
+                values.append(item)
+    for series in ledger.annual_carbon_inputs:
+        values.extend(series.years)
+    return values
+
+
+def ledger_status(ledger: Any) -> ModuleStatus:
+    """The state of ``residues`` from the ledger EP4 returned (PROPOSED).
+
+    No agricultural year laid out (``years_missing``): ``not_available`` with
+    that reason and detail. Otherwise every value of ``ledger_values`` is
+    counted with the rule of every module (``available``, ``degraded``,
+    ``not_available``). A ledger with no value at all is ``not_available`` /
+    ``NOT_AVAILABLE``, ``LEDGER_EMPTY``.
+    """
+    if ledger.years_missing is not None:
+        return _status(
+            RESIDUES.module_id,
+            "not_available",
+            ledger.years_missing.reason,
+            ledger.years_missing.detail,
+        )
+    present = missing = 0
+    first = None
+    for item in ledger_values(ledger):
+        if item.value is None:
+            missing += 1
+            if first is None:
+                first = item.missing
+        else:
+            present += 1
+    if present + missing == 0:
+        return _status(
+            RESIDUES.module_id, "not_available", "NOT_AVAILABLE", LEDGER_EMPTY
+        )
+    if missing == 0:
+        return _status(RESIDUES.module_id, "available", None, None)
+    assert first is not None
+    return _status(
+        RESIDUES.module_id,
+        "degraded" if present else "not_available",
+        first.reason,
+        f"{missing} of {present + missing} values are missing",
+    )
+
+
+def ledger_carbon_inputs(ledger: Any) -> Any:
+    """What the forcing takes from the ledger: its series, or why it has none."""
+    if ledger.years_missing is not None:
+        return ledger.years_missing
+    return list(ledger.annual_carbon_inputs)
+
+
+def ledger_inputs_detail(forcing: CarbonForcing) -> str:
+    """The note on the carbon inputs copied from the ledger (PROPOSED text).
+
+    States the unit question (OPEN 3 of the residue ledger), that the ledger
+    wrote no series when it wrote none, and how many series carry
+    ``NOT_COMPUTABLE`` years, copied, never left out.
+    """
+    series = forcing.annual_carbon_inputs
+    if not series:
+        return (
+            f"{_name(RESIDUES)} wrote no carbon-input series, so the forcing "
+            "carries none"
+        )
+    units = sorted({item.unit for item in series})
+    note = (
+        f"{len(series)} carbon-input series copied unchanged from "
+        f"{_name(RESIDUES)}"
+        + (f", in {', '.join(repr(u) for u in units)}" if units else "")
+        + "; the platform converts no unit"
+    )
+    if any(unit != STOCK_UNIT for unit in units):
+        note += (
+            f" and {_name(AMG)} requires {STOCK_UNIT!r}: who converts is OPEN "
+            "(OPEN 3 of the residue ledger, for the lead developer)"
+        )
+    not_computable = sum(
+        1
+        for item in series
+        if any(
+            year.missing is not None and year.missing.reason == "NOT_COMPUTABLE"
+            for year in item.years
+        )
+    )
+    if not_computable:
+        note += (
+            f"; {not_computable} series carry NOT_COMPUTABLE years, each with "
+            "the reason the series itself gives; they are copied, never left "
+            "out (PROPOSED)"
+        )
+    return note
+
+
 class EntryPointEngines:
     """``RotationEngines`` on the engine entry points of contracts/ENTRYPOINTS.md.
 
@@ -487,7 +662,7 @@ class EntryPointEngines:
       returned it and after ``params.catalogue.check_catalogue`` reported no
       problem (the app loads and checks it at start-up, ``api/config.py``).
       Passed by keyword, the same object on every call and never copied,
-      edited or filtered, to EP1, EP3 and EP5 always.
+      edited or filtered, to EP1, EP3, EP4 and EP5 always.
       ``None`` (the default) is the empty catalogue ``{}``, today's state of
       ``params/records/``; it reads no file (PROPOSED).
     """
@@ -541,7 +716,6 @@ class EntryPointEngines:
         build_calendar = functions.build_rotation_calendar
         soil_loss_function = functions.compute_soil_loss
         water_function = functions.compute_water_deficit_exposure
-        amg_function = functions.run_amg
         amg_configured = AMG_CARBON_MODEL in self._carbon_models
 
         # 1. EP2 first.
@@ -559,10 +733,11 @@ class EntryPointEngines:
                     _not_built(CALENDAR),
                     _dependent(EROSION, soil_loss_function, calendar_input),
                     _dependent(WATER, water_function, calendar_input),
-                    *_carbon_dependent(amg_function, amg_configured, calendar_input),
+                    *_carbon_dependent(functions, amg_configured, calendar_input),
                 ),
             )
-        calendar = build_calendar(self._load_rotation(rotation))
+        definition = self._load_rotation(rotation)
+        calendar = build_calendar(definition)
         if not isinstance(calendar, RotationCalendar):
             raise TypeError(
                 f"{_name(CALENDAR)} returned {type(calendar).__name__}, not RotationCalendar"
@@ -591,7 +766,7 @@ class EntryPointEngines:
                     calendar_module,
                     _dependent(EROSION, soil_loss_function, detail),
                     _dependent(WATER, water_function, detail),
-                    *_carbon_dependent(amg_function, amg_configured, detail),
+                    *_carbon_dependent(functions, amg_configured, detail),
                 ),
             )
 
@@ -618,7 +793,7 @@ class EntryPointEngines:
                     calendar_module,
                     _dependent(EROSION, soil_loss_function, detail),
                     _dependent(WATER, water_function, detail),
-                    *_carbon_dependent(amg_function, amg_configured, detail),
+                    *_carbon_dependent(functions, amg_configured, detail),
                 ),
             )
 
@@ -633,19 +808,24 @@ class EntryPointEngines:
             PhaseResult(
                 scenario_id=phase.scenario_id,
                 first_ag_year=phase.first_ag_year,
-                result=self._run_phase(phase, climate, soil_slope),
+                result=self._run_phase(phase, definition, climate, soil_slope),
             )
             for phase in phases
         )
         return replace(runs[0].result, phases=runs)
 
     def _run_phase(
-        self, phase: Phase, climate: ClimateResult, soil_slope: SoilSlopeResult
+        self,
+        phase: Phase,
+        definition: Any,
+        climate: ClimateResult,
+        soil_slope: SoilSlopeResult,
     ) -> EnginesResult:
-        """EP1, EP3 and EP5 on the calendar of one phase; the same inputs every phase."""
+        """EP1, EP3, EP4 and EP5 on the calendar of one phase; the same inputs every phase."""
         functions = self._functions
         soil_loss_function = functions.compute_soil_loss
         water_function = functions.compute_water_deficit_exposure
+        residues_function = functions.build_residue_ledger
         amg_function = functions.run_amg
         amg_configured = AMG_CARBON_MODEL in self._carbon_models
         if phase.calendar is None:
@@ -699,6 +879,23 @@ class EntryPointEngines:
                 )
             water_module = module_status_of(WATER.module_id, count_values(water))
 
+        # EP4 on the rotation, the calendar of this phase (item 8 of "For
+        # the platform", engine/residues/README.md), the climate and the
+        # catalogue, all by keyword. Also for an infeasible calendar (G4).
+        ledger: Any = None
+        residues_module: ModuleStatus | None = None
+        if residues_function is not None:
+            ledger = check_ledger(
+                residues_function(
+                    rotation=definition,
+                    calendar=calendar,
+                    climate=climate.data,
+                    parameters=self._parameters,
+                ),
+                calendar,
+            )
+            residues_module = ledger_status(ledger)
+
         # EP5 on the forcing built from the same inputs (PROPOSED), with the
         # catalogue by keyword (D65). Not called when the forcing cannot be
         # laid out: its three rows are missing with that reason. Not called
@@ -709,7 +906,13 @@ class EntryPointEngines:
             amg_rows = []
             amg_module = _amg_not_configured()
         elif amg_function is not None:
-            forcing = build_carbon_forcing(calendar, climate.data, soil_slope.data)
+            from_ledger = ledger is not None and ledger.years_missing is None
+            forcing = build_carbon_forcing(
+                calendar,
+                climate.data,
+                soil_slope.data,
+                carbon_inputs=None if ledger is None else ledger_carbon_inputs(ledger),
+            )
             if isinstance(forcing, ResultsMissing):
                 amg_rows = missing_carbon_trend((AMG_CARBON_MODEL,), forcing)
                 amg_module = _status(
@@ -721,17 +924,29 @@ class EntryPointEngines:
                 )
                 amg_rows = list(balance.soil_carbon_trend)
                 amg_module = module_status_of(AMG.module_id, count_values(amg_rows))
+                if from_ledger:
+                    amg_module = _with_note(amg_module, ledger_inputs_detail(forcing))
+            # Whatever the source of the series: the ledger applies the same
+            # identifier filter, so such a crop has no series either way.
             left_out = crops_left_out(calendar)
             if left_out:
                 amg_module = _with_note(
                     amg_module, crops_left_out_detail(len(left_out))
                 )
+        elif residues_function is not None:
+            # EP4 built, EP5 not: the amg rows name EP5, not "no carbon engine".
+            amg_rows = missing_carbon_trend(
+                (AMG_CARBON_MODEL,),
+                ResultsMissing(
+                    reason="NOT_AVAILABLE", detail=f"{NOT_BUILT}: {_name(AMG)}"
+                ),
+            )
 
         modules = (
             calendar_module,
             erosion_module,
             water_module,
-            *_carbon_modules(amg_module),
+            *_carbon_modules(amg_module, residues_module),
         )
 
         def without_result(reason: ReasonCode, detail: str | None) -> EnginesResult:
@@ -794,7 +1009,7 @@ def _phase_not_laid_out(
             _status(CALENDAR.module_id, "not_available", reason, detail),
             _dependent(EROSION, functions.compute_soil_loss, calendar_input),
             _dependent(WATER, functions.compute_water_deficit_exposure, calendar_input),
-            *_carbon_dependent(functions.run_amg, amg_configured, calendar_input),
+            *_carbon_dependent(functions, amg_configured, calendar_input),
         ),
     )
 
