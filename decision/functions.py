@@ -1,20 +1,26 @@
 """Pure decision functions on a results table.
 
 Each public function implements the logic of one D entry of
-``docs/VALIDATION.md`` (D1, D2, D5, D6, D7), as the lead developer
+``docs/VALIDATION.md`` (D1 to D7, D10, D12), as the lead developer
 decided it on 14 November 2026 together with the decisions D74 and D85
-to D99 of issue #77 that those entries record. What those entries leave
-OPEN stays OPEN and is marked where it touches this module.
+to D99 of issue #77 that those entries record and, for D3, D4, D10 and
+D12, with D103 and D117 of the same issue and with the person-approved
+case of issue #223 (the v2.1 tables of #177, approved by the table
+designer and confirmed by the lead developer in review of #177). What
+those entries leave OPEN stays OPEN and is marked where it touches this
+module.
 
 The functions are pure: no network call, no file access, no clock, no
 global state. They read a ``ResultsTable`` of ``contracts/results/`` and
 never change it. This module holds no threshold and no expected value of
 the science: every limit comes in as an argument, declared by a person
-(``DeclaredLimit``), and the only number the decided logic names, zero
-as the point a difference is read against (D74, D93, D98), appears as
-that constant of the decisions. The forms of ``DeclaredLimit`` and of
-the result records are PROPOSED (blueprint section 3.7); the logic they
-carry is the decided part.
+(``DeclaredLimit``), every bracket and rank is read off the table and
+the person's mapping of the uncertain inputs (``UncertainInput``), and
+the only number the decided logic names, zero as the point a difference
+is read against (D74, D93, D98), appears as that constant of the
+decisions. The forms of ``DeclaredLimit``, ``UncertainInput``,
+``Measurement`` and of the result records are PROPOSED (blueprint
+section 3.7); the logic they carry is the decided part.
 
 The names of the states of a pair are exactly those of D88 with the
 name D97 adds (entry D7); no synonym is used.
@@ -775,13 +781,489 @@ def pair_counts(
                     equal=equal,
                     missing_side=missing_side,
                 ),
-                by_range=RangeClassCounts(
-                    strict_improvement=strict_improvement,
-                    deterioration=deterioration,
-                    not_separated=not_separated,
-                ),
-                cells_compared=compared,
-                cells_of_the_pair=len(of_the_group),
+            by_range=RangeClassCounts(
+                strict_improvement=strict_improvement,
+                deterioration=deterioration,
+                not_separated=not_separated,
+            ),
+            cells_compared=compared,
+            cells_of_the_pair=len(of_the_group),
+        )
+    )
+    return tuple(counts)
+
+
+# --- D3: the tipping point of an uncertain input (as D103 and D117 read it) ----
+
+
+@dataclass(frozen=True)
+class UncertainInput:
+    """One uncertain input of the decision, as the person who designed the
+    case maps it onto the table (PROPOSED form; the D3, D4, D10 and D12
+    logic it carries is decided).
+
+    ``name`` is what the person calls the input ("u1" in the approved
+    case) and ``unit`` the unit its values are read in. ``cell`` is the
+    cell of the table the input drives, as the tuple (rotation_id,
+    indicator, time_basis, ag_year, carbon_model, computation) of the
+    rows whose value, in every scenario, is the input's value ("u1
+    (B2021)" drives the soil-loss cell of rotation B of agricultural
+    year 2021). ``values`` is the person's ordered mapping of the
+    admitted values: each entry pairs one value with the ``scenario_id``
+    of the scenario of the table that holds this input at that value
+    with every other uncertain input at its reference value. D103: each
+    value of the input is one admitted scenario. D117: the phases of a
+    rotation nest inside a value, and the state at a value is the state
+    over all the phases at that value, read as D74 reads a set of
+    scenarios; this module reads the state of the one scenario the
+    mapping names — the degenerate single-phase case of the approved
+    unit, which the machinery accepts — and decides nothing of the
+    multi-phase case.
+    """
+
+    name: str
+    unit: str
+    cell: tuple[str, str, str, int | None, str | None, str | None]
+    values: tuple[tuple[float, str], ...]
+
+
+def _drives_the_cell(row: ResultsTableRow, cell: tuple) -> bool:
+    """Whether the row belongs to the cell an uncertain input drives."""
+    return (
+        row.rotation_id,
+        row.indicator,
+        row.time_basis,
+        row.ag_year,
+        row.carbon_model,
+        row.computation,
+    ) == cell
+
+
+def _scenario_table(table: ResultsTable, scenario_id: str) -> ResultsTable:
+    """The rows of one scenario of the table, as a table of their own."""
+    rows = [row for row in table.rows if row.scenario_id == scenario_id]
+    if not rows:
+        known = sorted({row.scenario_id for row in table.rows})
+        raise ValueError(
+            f"scenario '{scenario_id}' is not one of the scenarios of the "
+            f"table: {known}"
+        )
+    return ResultsTable(case_id=table.case_id, field_id=table.field_id, rows=rows)
+
+
+def _named_state(state: str | None) -> str:
+    """The name a state carries in the output text; a pair without a state
+    (D85) is written with the name D88 lists for it, which says nothing
+    of K1 (whether that name is a state or the absence of one)."""
+    return NOT_EVALUATED if state is None else state
+
+
+@dataclass(frozen=True)
+class TippingPoint:
+    """The tipping point of one uncertain input of the decision (D3, read
+    as D103 decides it and D117 allows it): the bracket between the two
+    adjacent admitted values where the state of the pair changes between a
+    robust preference and not, with the name and unit of the input.
+
+    ``states`` carries each admitted value, in the person's order, with
+    the state of the pair in the scenario that holds it (D103; under
+    D117 that state is in general the state over all the phases at that
+    value, which this module reads off the one scenario the person's
+    mapping names — the degenerate single-phase case). The change D3
+    reads is robust preference against not: a change between two states
+    that are both not a robust preference (in the approved case, "Not
+    separated: within uncertainty" into "Not robust across scenarios" at
+    the last value) is no change of the tipping point. ``bracket`` is
+    None when no adjacent pair changes, and ``reason`` then says why. No
+    value inside the bracket is interpolated; whether and how one may be
+    is OPEN for the science reviewers (entry D3).
+    """
+
+    first_rotation: str
+    second_rotation: str
+    input_name: str
+    unit: str
+    states: tuple[tuple[float, str | None], ...]
+    bracket: tuple[float, float] | None
+    reason: str | None
+
+
+def tipping_point(
+    table: ResultsTable,
+    first_rotation: str,
+    second_rotation: str,
+    uncertain_input: UncertainInput,
+) -> TippingPoint:
+    """The tipping point of one uncertain input of the decision, or the
+    reason there is none (D3, as D103 reads it).
+
+    The state at each admitted value is the state of the pair over the
+    scenario of the table that holds the input at that value, computed by
+    ``pair_state`` (D74 with D93, D97 and D98). The tipping point is the
+    bracket between the two adjacent values, in the person's order, where
+    that state changes between a robust preference and not; the approved
+    case holds one such bracket, and this function reports the first, in
+    the person's order. When no adjacent pair changes, ``bracket`` is
+    None and ``reason`` says why: the state is the same at every admitted
+    value (the reason of D3), or — a case the approved unit does not
+    hold — the state changes only between two states that are both not a
+    robust preference.
+    """
+    states: list[tuple[float, str | None]] = []
+    for value, scenario_id in uncertain_input.values:
+        scenario = _scenario_table(table, scenario_id)
+        states.append(
+            (value, pair_state(scenario, first_rotation, second_rotation).state)
+        )
+    if not states:
+        return TippingPoint(
+            first_rotation=first_rotation,
+            second_rotation=second_rotation,
+            input_name=uncertain_input.name,
+            unit=uncertain_input.unit,
+            states=(),
+            bracket=None,
+            reason=(
+                f"the input '{uncertain_input.name}' holds no admitted value, "
+                "so no tipping point is reported"
+            ),
+        )
+    bracket = None
+    for (first_value, first_state), (second_value, second_state) in zip(
+        states, states[1:]
+    ):
+        if (first_state == ROBUST_PREFERENCE) != (
+            second_state == ROBUST_PREFERENCE
+        ):
+            bracket = (first_value, second_value)
+            break
+    if bracket is not None:
+        reason = None
+    elif len({state for _, state in states}) == 1:
+        reason = (
+            f"the state of the pair ('{first_rotation}', '{second_rotation}') "
+            f"is '{_named_state(states[0][1])}' at every admitted value of "
+            f"'{uncertain_input.name}', so no tipping point is reported"
+        )
+    else:
+        reason = (
+            f"the pair ('{first_rotation}', '{second_rotation}') is not a "
+            f"robust preference at any admitted value of "
+            f"'{uncertain_input.name}': its state changes only between two "
+            "states that are both not a robust preference, so no tipping "
+            "point is reported"
+        )
+    return TippingPoint(
+        first_rotation=first_rotation,
+        second_rotation=second_rotation,
+        input_name=uncertain_input.name,
+        unit=uncertain_input.unit,
+        states=tuple(states),
+        bracket=bracket,
+        reason=reason,
+    )
+
+
+# --- D4: the priority of what to measure first ---------------------------------
+
+
+@dataclass(frozen=True)
+class MeasurementPriorityItem:
+    """One item of the priority list of D4: qualitative — its rank, what to
+    measure (the input's name, the cell of the table it drives and its
+    unit) and why.
+
+    ``states`` carries each admitted value of the input, in the person's
+    order, with the state of the pair in the scenario that holds the
+    input at that value, every other uncertain input at its reference
+    value: the evidence the rank is read from. The values of an input
+    change the set's state when those states are not all the same; such
+    an input holds rank 1, an input whose values never change it holds
+    rank 2. The ordering among the rank-1 inputs is OPEN for the science
+    reviewers (entry D4: the measure of how much an input moves the
+    decision): they tie and share the rank, and so do the rank-2 inputs.
+    No item is monetary (#96, entry D4).
+    """
+
+    rank: int
+    input_name: str
+    unit: str
+    cell: tuple[str, str, str, int | None, str | None, str | None]
+    why: str
+    states: tuple[tuple[float, str | None], ...]
+
+
+@dataclass(frozen=True)
+class MeasurementPriority:
+    """The priority list of what to measure first (D4) and the base state it
+    is built from.
+
+    ``base_state`` is the state of the pair over the whole admitted
+    scenario set — the table as given, every scenario together (D103: the
+    set-level state of ``pair_state``, "Not robust across scenarios" when
+    any member of the set is not a robust preference). The list exists
+    only from a base that is not a robust preference: a resolved (robust)
+    set gives the empty list.
+    """
+
+    first_rotation: str
+    second_rotation: str
+    base_state: str | None
+    items: tuple[MeasurementPriorityItem, ...]
+
+
+def measurement_priority(
+    table: ResultsTable,
+    first_rotation: str,
+    second_rotation: str,
+    uncertain_inputs: tuple[UncertainInput, ...],
+) -> MeasurementPriority:
+    """What to measure first, in rank order, and from which base state (D4,
+    with the base state of D103).
+
+    The base state is the state of the pair over the whole admitted
+    scenario set, the table as given; a robust preference there gives the
+    empty list. Otherwise every input of ``uncertain_inputs`` is ranked
+    by its admitted values: for each value, the state of the pair in the
+    scenario the person's mapping names (the scenario that holds the
+    input at that value with every other uncertain input at its
+    reference value). An input whose values change the set's state (those
+    states are not all the same) holds rank 1; an input whose values
+    never change it holds rank 2. The items of one rank keep the person's
+    order, and each carries why it holds its rank.
+    """
+    base = pair_state(table, first_rotation, second_rotation)
+    if base.state == ROBUST_PREFERENCE:
+        return MeasurementPriority(
+            first_rotation=first_rotation,
+            second_rotation=second_rotation,
+            base_state=base.state,
+            items=(),
+        )
+    items: list[MeasurementPriorityItem] = []
+    for uncertain_input in uncertain_inputs:
+        states: list[tuple[float, str | None]] = []
+        for value, scenario_id in uncertain_input.values:
+            scenario = _scenario_table(table, scenario_id)
+            states.append(
+                (value, pair_state(scenario, first_rotation, second_rotation).state)
+            )
+        changes_the_state = len({state for _, state in states}) > 1
+        if not states:
+            why = (
+                f"the input '{uncertain_input.name}' holds no admitted value, "
+                "so its values cannot change the state of the pair"
+            )
+        elif changes_the_state:
+            why = (
+                f"the admitted values of '{uncertain_input.name}' change the "
+                "state of the pair (every other uncertain input at its "
+                "reference value): "
+                + ", ".join(
+                    f"'{_named_state(state)}' at {value}"
+                    for value, state in states
+                )
+            )
+        else:
+            why = (
+                f"the admitted values of '{uncertain_input.name}' never change "
+                "the state of the pair (every other uncertain input at its "
+                f"reference value): '{_named_state(states[0][1])}' at every "
+                "value"
+            )
+        items.append(
+            MeasurementPriorityItem(
+                rank=1 if changes_the_state else 2,
+                input_name=uncertain_input.name,
+                unit=uncertain_input.unit,
+                cell=uncertain_input.cell,
+                why=why,
+                states=tuple(states),
             )
         )
-    return tuple(counts)
+    # Rank 1 comes before rank 2; the person's order holds inside a rank.
+    items.sort(key=lambda item: item.rank)
+    return MeasurementPriority(
+        first_rotation=first_rotation,
+        second_rotation=second_rotation,
+        base_state=base.state,
+        items=tuple(items),
+    )
+
+
+# --- D10: a measured value for one input of the priority list ------------------
+
+
+class Measurement(BaseModel):
+    """A value a person measured for one uncertain input of the priority
+    list (D10). PROPOSED form.
+
+    It enters with the label ``OBSERVED`` (C4.1), its unit, and its range
+    or its ``range_missing`` (C2); ``value`` is ``None`` for a blank
+    entry, which ``recompute_with_measurement`` refuses together with a
+    value in a unit other than the one of the input's mapping, and
+    neither is ever taken as zero (C3.1). The label OBSERVED travels on
+    this record: the rows the recompute writes keep the label the results
+    contract fixes for their indicator (C4.6 fixes DERIVED for soil
+    loss, and a soil-loss row labelled OBSERVED is not contract-valid),
+    so the measurement and its label are held beside the table, not
+    rewritten into it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid", strict=True, frozen=True, allow_inf_nan=False
+    )
+
+    input_name: str
+    value: float | None
+    unit: str
+    provenance: Literal["OBSERVED"]
+    range: Range | None = None
+    range_missing: Missing | None = None
+
+
+def recompute_with_measurement(
+    table: ResultsTable, uncertain_input: UncertainInput, measurement: Measurement
+) -> ResultsTable:
+    """The table with one uncertain input fixed at its measured value, and
+    everything else unchanged (D10).
+
+    A blank value is refused, and so is a value in a unit other than the
+    unit of the input's mapping; neither is ever taken as zero (C3.1).
+    The measurement carries its range or its ``range_missing``, never
+    both and never neither (C2.2). The rows of the cell the input drives
+    — in every scenario of the table — are rebuilt with the measured
+    value and its range (or its ``range_missing``): the scenario's cells
+    the input drives change, nothing else. Each rebuilt row keeps its
+    identifier, its unit, its direction, its label and its source, and
+    passes the validation of the contract as it is built (a value
+    outside its own range is refused there, C2.1; so are two bounds
+    equal to the value, C2.2).
+    """
+    if measurement.input_name != uncertain_input.name:
+        raise ValueError(
+            f"the measurement names the input '{measurement.input_name}', not "
+            f"'{uncertain_input.name}' of this mapping"
+        )
+    if measurement.value is None:
+        raise ValueError(
+            f"the measured value of '{uncertain_input.name}' is blank: it is "
+            "refused and never taken as zero (C3.1, D10)"
+        )
+    if measurement.unit != uncertain_input.unit:
+        raise ValueError(
+            f"the measured value of '{uncertain_input.name}' is in "
+            f"'{measurement.unit}', not in '{uncertain_input.unit}' (the unit "
+            "of the input's mapping): it is refused, with no conversion, and "
+            "never taken as zero (C3.1, D10)"
+        )
+    if measurement.range is not None and measurement.range_missing is not None:
+        raise ValueError(
+            "a measurement carries a range or a 'range_missing', never both "
+            "(C2.2, D10)"
+        )
+    if measurement.range is None and measurement.range_missing is None:
+        raise ValueError(
+            "a measurement without a range says so: give 'range', or "
+            "'range_missing' with a reason (C2.2, D10)"
+        )
+    rows: list[ResultsTableRow] = []
+    drives_any_row = False
+    for row in table.rows:
+        if _drives_the_cell(row, uncertain_input.cell):
+            drives_any_row = True
+            rows.append(
+                ResultsTableRow(
+                    rotation_id=row.rotation_id,
+                    scenario_id=row.scenario_id,
+                    time_basis=row.time_basis,
+                    ag_year=row.ag_year,
+                    indicator=row.indicator,
+                    direction=row.direction,
+                    value=measurement.value,
+                    unit=row.unit,
+                    range=measurement.range,
+                    range_missing=measurement.range_missing,
+                    missing=None,
+                    provenance=row.provenance,
+                    source=row.source,
+                    assumption=row.assumption,
+                )
+            )
+        else:
+            rows.append(row)
+    if not drives_any_row:
+        driven_cell = ", ".join(str(part) for part in uncertain_input.cell)
+        raise ValueError(
+            f"the cell of the input '{uncertain_input.name}' ({driven_cell}) "
+            "is not a cell of the table"
+        )
+    return ResultsTable(case_id=table.case_id, field_id=table.field_id, rows=rows)
+
+
+# --- D12: the tipping point, the measurement and the priority agree ------------
+
+
+@dataclass(frozen=True)
+class MeasurementConsistency:
+    """What a measured value on one side of a tipping point gives, and the
+    priority list that follows it (D12).
+
+    ``side`` places the measured value against the bracket: below it,
+    above it or inside it. A value on one side gives the state of that
+    side; what a value inside the bracket tells is not decided (D3
+    interpolates no value inside), and the state reported for it is
+    still the recomputed one of D10. ``state_after_measurement`` is the
+    state of the pair over the admitted set with the input fixed at the
+    measured value, and ``priority`` is the priority list (D4) over that
+    same recomputed set: it is empty exactly when the state has become a
+    robust preference.
+    """
+
+    first_rotation: str
+    second_rotation: str
+    measured_value: float
+    side: str
+    state_after_measurement: str | None
+    priority: MeasurementPriority
+
+
+def measurement_consistency(
+    table: ResultsTable,
+    first_rotation: str,
+    second_rotation: str,
+    uncertain_input: UncertainInput,
+    measurement: Measurement,
+    bracket: tuple[float, float],
+    uncertain_inputs: tuple[UncertainInput, ...],
+) -> MeasurementConsistency:
+    """The state a measured value gives on its side of the tipping point,
+    and the priority list over the recomputed set (D12 over D3, D10 and
+    D4).
+
+    The decision is recomputed with the input fixed at the measured value
+    (D10, ``recompute_with_measurement``); the state is read over that
+    recomputed admitted set and the priority list is built from it (D4):
+    a robust preference empties the list, any other state keeps it. The
+    bracket is the one ``tipping_point`` reported (D3).
+    """
+    recomputed = recompute_with_measurement(table, uncertain_input, measurement)
+    state = pair_state(recomputed, first_rotation, second_rotation).state
+    priority = measurement_priority(
+        recomputed, first_rotation, second_rotation, uncertain_inputs
+    )
+    below, above = bracket
+    if measurement.value < below:
+        side = "below the bracket"
+    elif measurement.value > above:
+        side = "above the bracket"
+    else:
+        side = "inside the bracket"
+    return MeasurementConsistency(
+        first_rotation=first_rotation,
+        second_rotation=second_rotation,
+        measured_value=measurement.value,
+        side=side,
+        state_after_measurement=state,
+        priority=priority,
+    )
