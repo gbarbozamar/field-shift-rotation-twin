@@ -6,6 +6,7 @@ import EntryScreen from './entry/EntryScreen'
 import FieldsScreen from './identity/FieldsScreen'
 import PlantScreen from './plant/PlantScreen'
 import PrintSheetScreen from './print/PrintSheetScreen'
+import SavedCaseScreen from './saved/SavedCaseScreen'
 
 export default function App() {
   const route = useHashRoute()
@@ -29,6 +30,8 @@ export default function App() {
           <PlantScreen />
         ) : route === '/print' ? (
           <PrintSheetScreen />
+        ) : route === '/saved' ? (
+          <SavedCaseScreen />
         ) : (
           <>
             <p>{strings['home.shell']}</p>

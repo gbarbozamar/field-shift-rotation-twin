@@ -88,14 +88,20 @@ export default function EntryScreen() {
         <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
       )}
 
-      <p className="mt-6 text-sm">
+      <nav className="mt-6 flex flex-wrap gap-4 text-sm">
         <a
           href="#/fields"
           className="font-medium text-emerald-700 underline transition hover:text-emerald-800"
         >
           {strings['identity.title']}
         </a>
-      </p>
+        <a
+          href="#/saved"
+          className="font-medium text-emerald-700 underline transition hover:text-emerald-800"
+        >
+          {strings['saved.open_case']}
+        </a>
+      </nav>
     </section>
   )
 }
