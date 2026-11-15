@@ -1,0 +1,16 @@
+{
+  "id": "atmospheric_pressure_exponent",
+  "scope": {},
+  "value": 5.26,
+  "unit": "dimensionless (not printed)",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 3, Eq. 7 (check sheet row 154, block B7)",
+    "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 7: «P = 101.3 ((293 − 0.0065 z)/293)^5.26» Value as printed: 5.26. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+}

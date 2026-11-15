@@ -1,0 +1,22 @@
+{
+  "id": "basal_crop_coefficient",
+  "scope": {
+    "crop": "wheat",
+    "stage": "end"
+  },
+  "value": 0.15,
+  "unit": "dimensionless",
+  "range": {
+    "low": 0.15,
+    "high": 0.3,
+    "basis": "Range printed in Table 17; footnote 10: «The higher value is for hand-harvested crops»"
+  },
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, Table 17",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: Cereals group row «i. Cereals | 0.15 | 1.10 | 0.25»; row «Spring Wheat | | 1.10 | 0.15-0.3 10»; row «Winter Wheat | 0.15-0.5 11 | 1.10 | 0.15-0.3 10». Column headers (images x0490e2n/o/p.gif): «Kcb ini», «Kcb mid», «Kcb end». Decision USER-AR: transferred reference, with climatic adjustment (Eq. 70) and sensitivity; no local calibration claimed. Scope key stage is in params/README.md, but EP3 reads one value per crop today (EXPOSURE.md OPEN 4). USER-AR takes the lower printed value. Lead developer's choice, 2026-11-14: the Spring Wheat row applies to the wheat of the case."
+}
