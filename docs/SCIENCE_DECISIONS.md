@@ -4,6 +4,8 @@ One place that lists the science decisions the lead developer has accepted, wher
 
 > **Status: PROPOSED** (blueprint section 3.7). Written by an AI integration session on 14 November 2026 from the lead developer's acceptance records and issue #77. It records decisions already taken; it takes none. It takes effect as a record when a person approves the pull request. The lead developer is also the science lead and the team reviews (D66); no external reviewer is waited for.
 
+**Scope and cut-off.** This file transcribes the science decisions the lead developer accepted on 14 November 2026: the acceptance ledger and the choices on the pre-check findings (D71 to D82 of issue #77), and D83, D84, D100, D101, D102 and D112. It cites some of the decisions D1 to D70 by number and restates the method of D68 and D70, but does not list them; D85 to D99 and D103 to D111 are not in it. **Issue #77 is the authoritative log**: where this file and #77 differ, #77 holds. The cut-off is **14 November 2026, 23:57 UTC (20:57 in Uruguay)**: the merge of pull request #201, which recorded D112 and was the last change to the content of this file before this paragraph was added. Every decision taken after the cut-off is in #77 only: D113 (15 November 2026, 00:09 UTC) to D256 (15 November 2026, 12:16 UTC), the last one when this paragraph was written. No row below was compared with those later decisions, so one of them may amend a row without this file saying so. What the rows say of the repository (the columns "Repo", "Missing" and "State in this branch") is also as written at the cut-off.
+
 ## How to read this file
 
 Five kinds of statement are kept apart, and every row says which one it is:
@@ -13,14 +15,14 @@ Five kinds of statement are kept apart, and every row says which one it is:
 | **Lead decision** | The lead developer chose it, in issue #77 (`D` numbers) or in an explicit chat reply recorded in the acceptance ledger (`USER-` identifiers) | Not a check of a published value (D34): accepting a method or a package does not mean a person opened the source at the locator and signed |
 | **Research proposal** | A session proposed it from sources (records `RESEARCH_PROPOSAL`) | Not accepted until a lead decision says so |
 | **AI transcription** | A session copied a value, form or text from an opened source, with locator and date | Not checked: under D34 a person checks it and signs `checked_by` |
-| **Human check** | The lead developer (`gbarbozamar`, D66) opened the source at the locator and signed | **None exists yet.** No row of this file is signed |
+| **Human check** | The lead developer (`gbarbozamar`, D66) opened the source at the locator and signed | Not a row of this file: no row here is signed. The signatures are in the `checked_by` field of each record or fixture. On `main` at `14e3a12` (15 November 2026), 138 records are signed `gbarbozamar`: the 77 of the catalogue `params/records/` (26 at its top, 45 in `water/`, 6 in `residues/`) and the 61 withdrawn from it under `params/withdrawn/computed_c/` (D148, D158, D164). Two fixtures under `validation/fixtures/` are signed too (`e3_ah703_tables.json`, `h2_example18.json`). Some records hold a value the lead developer declared, which no source prints; the `note` of each record says how it was checked or declared. None was on `main` at the cut-off |
 | **Executed test** | A test of this repository ran and passed | A structural test or a test on PLACEHOLDER or synthetic data is not a scientific validation |
 
 Values: this file repeats the values that are **declared** by the lead developer as scenario choices (dates, layer depths, sensitivity levels). It does **not** repeat values transcribed from a publication (crop coefficients, depletion fractions, available water, root anchors): those enter `params/records/` only after the lead developer checks them at the locator (D34, D66), and this file gives their locator only.
 
 ## Where the acceptances are recorded
 
-1. **Issue #77**, decisions D1 to D70, each with its date. The repository's decision log.
+1. **Issue #77**, decisions D1 to D256, each with its date; the last, D256, was recorded on 15 November 2026 (12:16 UTC). The repository's decision log, and the authoritative one. This file transcribes only the decisions named under "Scope and cut-off".
 2. **The acceptance ledger of the lead developer** (`accepted_by_user` of the research record `caso-INIA-investigacion-y-decisiones.json`, identifiers `USER-A` to `USER-AS`), explicit chat replies of 14 November 2026, kept in a local research folder that is **not versioned** and is not a primary source. They were recorded in issue #77 as [D71 to D82](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) on 14 November 2026; the column "Id" below gives the `D` number of each.
 3. **One later chat acceptance, not persisted in the ledger** (after `USER-AS`): both soybean sowing dates use the same soybean material, the one tied to the root reference of the accepted soil profile. It fixes no stage date: no R3 or R6 date is inferred from it. Recorded in #77 within D72.
 
@@ -156,7 +158,7 @@ Findings 5, 9 and 10 needed no choice: the code keeps the mean temperature (no s
 
 ## Pending human signature (D34, D66)
 
-Counts of the AI pre-check, from the copies of the check sheets (the originals of the lead developer are unchanged). **No row is signed.** A value enters `params/records/` only after `gbarbozamar` checks it at its locator (D66).
+Counts of the AI pre-check, from the copies of the check sheets (the originals of the lead developer are unchanged). **This section is as of the cut-off of this file, 14 November 2026, 23:57 UTC (20:57 in Uruguay): no row is signed**, and no signed record was on `main` then. The first signed records reached `main` after it (pull request #203, 15 November 2026, 00:30 UTC); what is signed on `main` now is counted under "How to read this file". The "Signature" column below is as written at the cut-off and does not mark the rows signed since. A value enters `params/records/` only after `gbarbozamar` checks it at its locator (D66).
 
 | Block | Rows | AI reading | Signature |
 |---|---|---|---|
@@ -174,4 +176,4 @@ Counts of the AI pre-check, from the copies of the check sheets (the originals o
 
 ## To record in issue #77
 
-Done: the `USER-` decisions, the later soybean-material acceptance and PC-1 to PC-7 were posted in issue #77 as [D71 to D82](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) on 14 November 2026 by the coordinating session, with the account `gbarbozamar`, as the lead developer authorised. `USER-B` (packages accepted with evidence; independent validation pending) is procedural and has no `D` number; under D66 the team reviews. D83 and D84 followed the same day; next free number: D85. Recording them there (with the next free `D` numbers) is the lead developer's or the coordinating session's act; this session publishes nothing.
+Done: the `USER-` decisions, the later soybean-material acceptance and PC-1 to PC-7 were posted in issue #77 as [D71 to D82](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) on 14 November 2026 by the coordinating session, with the account `gbarbozamar`, as the lead developer authorised. `USER-B` (packages accepted with evidence; independent validation pending) is procedural and has no `D` number; under D66 the team reviews. D83 and D84 followed the same day. The log has gone on since: its last decision is D256, recorded on 15 November 2026 (12:16 UTC), and the next free number was then D257; issue #77 gives the current one. Recording decisions there (with the next free `D` numbers) is the lead developer's or the coordinating session's act; this session publishes nothing.
