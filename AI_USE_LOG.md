@@ -137,6 +137,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-15 | L0 | `l0/erosion-lead-in-texts` (#254): `engine/erosion/soil_loss.py`, `engine/erosion/SOIL_LOSS.md` | Claude Code (Anthropic) | Reworded the two texts `BEFORE_FIRST_CYCLE` and `NO_HARVEST_BEFORE` to say the rule after D141; closed OPEN 41 | Text only; no value changes; checked by an independent AI verifier |
 | 2026-11-15 | L0 | `l0/water-records-signed` (#252): `params/records/water/` (45 files), `params/README.md`, `params/records/README.md` | Claude Code (Anthropic) | Copied into the catalogue the 45 water records the lead developer checked and signed (FAO-56 ET0 constants, PC-4 bounds, Kcb of Table 17) | The AI session moved signed files and signed nothing; values checked by a person (D34, D66); file equality checked by an independent AI verifier |
 | 2026-11-15 | L0 | `l0/methods-d138-d150` (#255): `docs/METHODS.md` | Claude Code (Anthropic) | Restated the decisions D135 to D150 of #77 in METHODS, each with a link to its comment | Restates only; no value, source or citation added; checked by an independent AI verifier |
+| 2026-11-15 | L0 | `l0/contracts-docs-d141-d148` (#256): `contracts/ENTRYPOINTS.md`, `contracts/CONVENTIONS.md` | Claude Code (Anthropic) | Stated D141, D147 and D148 in the two documents, as built on main | Text only; no signature, field, identifier or reason code changes; checked by an independent AI verifier |
 Rules:
 
 - No generated images, video or voice in the submission.
