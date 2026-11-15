@@ -12,5 +12,5 @@ acceptance test. Run, from the repository root::
 
     python -m pytest demo/
     python -m demo.run
-    python -m demo.saved_case YYYY-MM-DD
+    python -m demo.saved_case [YYYY-MM-DDTHH:MMZ]
 """
