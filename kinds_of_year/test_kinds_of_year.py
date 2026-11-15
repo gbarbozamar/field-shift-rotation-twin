@@ -5,8 +5,9 @@ Run with ``uv run pytest kinds_of_year/``.
 
 EXAMPLE DATA. The ONI record is not in the repository until a person checks
 and signs it (D240 (5), D34, D66). Every record here is written by hand: the
-rule of D240 (1) as the v6 page states it, and anomalies that mean nothing,
-chosen so that each case can be read off by hand. None is an ONI value.
+rule of D240 (1) as the v6 page states it, and, for each season, a file value
+(``anom``) and a printed value (``printed``, D258) that mean nothing, chosen so
+that each case can be read off by hand. None is an ONI value.
 """
 
 import inspect
@@ -28,7 +29,6 @@ from kinds_of_year import (
     count_kinds,
     deciding_season,
     load_record,
-    table_value,
 )
 
 EL_NINO, NEUTRAL, LA_NINA = KINDS_OF_YEAR
@@ -106,13 +106,22 @@ SYN_FIRST, SYN_LAST = 2010, 2014
 
 def synthetic(rule, values, first=SYN_FIRST, last=SYN_LAST):
     """A hand-made record: every season of ``first``..``last`` at 0.0 except
-    ``values``, with the threshold and run length of ``rule``."""
+    ``values``, with the threshold and run length of ``rule``.
+
+    Each season carries the file value ``anom`` and the printed value
+    ``printed`` (D258). A value of ``values`` is one number, given to both, or
+    a pair (anom, printed); a printed value of ``None`` leaves ``printed`` out
+    of the row, a season whose printed value is missing.
+    """
     seasons = []
     for year in range(first, last + 1):
         for name in SEASONS:
-            seasons.append(
-                {"season": name, "year": year, "anom": values.get((name, year), 0.0)}
-            )
+            given = values.get((name, year), 0.0)
+            anom, printed = given if isinstance(given, tuple) else (given, given)
+            row = {"season": name, "year": year, "anom": anom}
+            if printed is not None:
+                row["printed"] = printed
+            seasons.append(row)
     return {
         "threshold": rule["threshold"],
         "min_consecutive_seasons": rule["min_consecutive_seasons"],
@@ -250,7 +259,12 @@ def test_every_year_of_a_covered_period_has_a_kind(record):
     assert sum(counts.values()) == len(classified)
 
 
-# 6b. D240: the threshold is applied to the one-decimal table values ---------
+# 6b. D240 and D258: the threshold reads the value the v6 table prints ---------
+#
+# Every pair below is a hand-made (file value, printed value), EXAMPLE DATA:
+# two decimals as in ``oni.ascii.txt`` next to one decimal as in the v6 table.
+# None is an ONI value; the pairs are chosen so that the two values fall on
+# different sides of the threshold, or so that a printed value is missing.
 
 
 def run_ending_at(season, year, length, value):
@@ -265,69 +279,93 @@ def run_ending_at(season, year, length, value):
 
 
 @pytest.mark.parametrize(
-    ("anom", "table"),
-    [(0.45, "0.5"), (-0.45, "-0.5"), (-0.46, "-0.5"), (0.44, "0.4"), (-0.44, "-0.4")],
-)
-def test_table_value_has_one_decimal_rounded_half_away_from_zero(anom, table):
-    assert str(table_value(anom)) == table
-
-
-@pytest.mark.parametrize(
-    ("anom", "kind"),
+    ("anom", "printed", "kind"),
     [
-        (0.5, EL_NINO),  # prints 0.5: meets the threshold
-        (-0.5, LA_NINA),
-        (0.45, EL_NINO),  # two decimals below the threshold, prints 0.5
-        (-0.46, LA_NINA),  # prints -0.5
-        (0.44, NEUTRAL),  # prints 0.4: does not meet it
-        (-0.44, NEUTRAL),
+        # The printed value meets the threshold, the file value does not.
+        (0.46, 0.5, EL_NINO),
+        (-0.46, -0.5, LA_NINA),
+        # The printed value does not meet it. Half away from zero on the file
+        # value would give -0.5 here: the code must not round.
+        (-0.45, -0.4, NEUTRAL),
+        (0.45, 0.4, NEUTRAL),
+        # Both beyond it; the printed value is what is compared.
+        (-0.55, -0.5, LA_NINA),
     ],
 )
-def test_the_threshold_is_met_on_the_one_decimal_value(anom, kind):
-    # D240 (2): a run of the rule's length, every season at ``anom``.
-    rec = synthetic(RULE, run_from_djf(2012, RULE["min_consecutive_seasons"], anom))
-    assert classify_2011_july(rec).kind == kind
+def test_the_threshold_reads_the_printed_value(anom, printed, kind):
+    # D258: a run of the rule's length, every season at (anom, printed).
+    rec = synthetic(
+        RULE, run_from_djf(2012, RULE["min_consecutive_seasons"], (anom, printed))
+    )
+    result = classify_2011_july(rec)
+    assert (result.kind, result.missing_reason) == (kind, None)
+
+
+def test_a_season_with_no_printed_value_is_missing():
+    # D258: no printed value is a missing input with its reason; it is never
+    # rounded from the file value, never neutral and never zero.
+    values = run_from_djf(2012, RULE["min_consecutive_seasons"], (-0.66, -0.7))
+    values[("DJF", 2012)] = (-0.66, None)
+    result = classify_2011_july(synthetic(RULE, values))
+    assert result.kind is None
+    assert result.kind != NEUTRAL
+    assert result.missing_reason == "MISSING_INPUT"
+    assert result.missing_reason in get_args(ReasonCode)
+    assert "printed value" in result.detail and "DJF 2012" in result.detail
+    assert count_kinds({2011: result}) == dict.fromkeys(KINDS_OF_YEAR)
+    # A season a run needs, other than the deciding one, has no printed value
+    # either: still missing, naming it.
+    values = run_from_djf(2012, RULE["min_consecutive_seasons"], (-0.66, -0.7))
+    values[("FMA", 2012)] = (-0.66, None)
+    result = classify_2011_july(synthetic(RULE, values))
+    assert (result.kind, result.missing_reason) == (None, "MISSING_INPUT")
+    assert "FMA 2012" in result.detail
+    # A printed value given as null is missing in the same way.
+    rec = synthetic(RULE, {})
+    rec["seasons"][SEASONS.index("DJF") + 12 * (2012 - SYN_FIRST)]["printed"] = None
+    result = classify_2011_july(rec)
+    assert (result.kind, result.missing_reason) == (None, "MISSING_INPUT")
 
 
 # The five seasons D240 names, where the two-decimal and the one-decimal
 # readings part: each with the start month whose deciding season it is (start
-# months 1, 2, 11 and 12, as D240 says). The anomaly of the season is a
-# hand-made two-decimal value below the threshold that prints at it with one
-# decimal; the four seasons before it carry a hand-made value beyond the
-# threshold. EXAMPLE DATA: none of these numbers is a value of the record.
+# months 1, 2, 11 and 12, as D240 says), and the sign of its episode as the v6
+# table prints it. The season's hand-made file value is below the threshold
+# and its hand-made printed value is at it; the four seasons before it are
+# beyond it. EXAMPLE DATA: none of these numbers is a value of the record.
 D240_SEASONS = [
-    # (season, year, start month, agricultural year, two-decimal value, kind)
-    ("JJA", 2000, 1, 2000, 0.45, EL_NINO),
-    ("MJJ", 2002, 12, 2001, -0.46, LA_NINA),
-    ("JJA", 2007, 1, 2007, 0.46, EL_NINO),
-    ("JAS", 2021, 2, 2021, -0.45, LA_NINA),
-    ("AMJ", 2023, 11, 2022, 0.47, EL_NINO),
+    # (season, year, start month, agricultural year, file value, printed, kind)
+    ("JJA", 2000, 1, 2000, -0.46, -0.5, LA_NINA),
+    ("MJJ", 2002, 12, 2001, 0.47, 0.5, EL_NINO),
+    ("JJA", 2007, 1, 2007, -0.47, -0.5, LA_NINA),
+    ("JAS", 2021, 2, 2021, -0.46, -0.5, LA_NINA),
+    ("AMJ", 2023, 11, 2022, 0.46, 0.5, EL_NINO),
 ]
 
 
 @pytest.mark.parametrize(
-    ("season", "year", "start_month", "ag_year", "value", "kind"),
+    ("season", "year", "start_month", "ag_year", "anom", "printed", "kind"),
     D240_SEASONS,
     ids=[f"{season} {year}" for season, year, *_ in D240_SEASONS],
 )
-def test_the_five_seasons_of_d240_are_read_on_one_decimal(
-    season, year, start_month, ag_year, value, kind
+def test_the_five_seasons_of_d240_are_read_on_the_printed_value(
+    season, year, start_month, ag_year, anom, printed, kind
 ):
     assert deciding_season(ag_year, start_month) == (season, year)
     threshold = RULE["threshold"]
-    assert abs(value) < threshold  # the two-decimal value alone does not meet it
-    assert abs(table_value(value)) == table_value(threshold)  # the printed one does
-    beyond = threshold + 0.1 if value > 0 else -threshold - 0.1
-    values = run_ending_at(season, year, RULE["min_consecutive_seasons"], beyond)
-    values[(season, year)] = value
+    assert abs(anom) < threshold <= abs(printed)  # the readings part here
+    beyond = threshold + 0.2 if printed > 0 else -threshold - 0.2
+    values = run_ending_at(
+        season, year, RULE["min_consecutive_seasons"], (beyond, beyond)
+    )
+    values[(season, year)] = (anom, printed)
     rec = synthetic(RULE, values, first=year - 1, last=year + 1)
     result = classify_agricultural_years(rec, ag_year, ag_year, start_month)[ag_year]
     assert (result.kind, result.season, result.season_year) == (kind, season, year)
-    # A hand-made value that prints one tenth short of the threshold (0.44 is
-    # 0.4): the run is broken at the deciding season, and the year is neutral.
-    short = 0.44 if value > 0 else -0.44
-    assert abs(table_value(short)) < table_value(threshold)
-    values[(season, year)] = short
+    # A hand-made printed value one tenth short of the threshold breaks the run
+    # at the deciding season, and the year is neutral.
+    short = 0.4 if printed > 0 else -0.4
+    values[(season, year)] = (anom, short)
     rec = synthetic(RULE, values, first=year - 1, last=year + 1)
     result = classify_agricultural_years(rec, ag_year, ag_year, start_month)[ag_year]
     assert result.kind == NEUTRAL
@@ -437,6 +475,16 @@ def test_row_with_an_anom_that_is_not_a_finite_number_is_rejected(record, bad):
     rec = _small_record(record)
     rec["seasons"][6]["anom"] = bad
     with pytest.raises(ValueError, match="row 6: field 'anom'"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+@pytest.mark.parametrize("bad", [True, "0.5", float("nan"), float("inf")])
+def test_row_with_a_printed_value_that_is_not_a_finite_number_is_rejected(record, bad):
+    # D258: a printed value that is given is a finite number; a missing one is
+    # left out (or null), never a text or a flag.
+    rec = _small_record(record)
+    rec["seasons"][6]["printed"] = bad
+    with pytest.raises(ValueError, match="row 6: field 'printed'"):
         classify_agricultural_years(rec, 2011, 2011, 7)
 
 

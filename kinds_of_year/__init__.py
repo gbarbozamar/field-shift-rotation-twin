@@ -18,12 +18,10 @@ from .aggregate import (
 )
 from .classify import (
     SEASONS,
-    TABLE_DECIMALS,
     KindOfYear,
     classify_agricultural_years,
     count_kinds,
     deciding_season,
-    table_value,
 )
 
 
@@ -39,7 +37,6 @@ def load_record(path: Path | str) -> dict[str, Any]:
 
 __all__ = [
     "SEASONS",
-    "TABLE_DECIMALS",
     "KindMean",
     "KindOfYear",
     "MeansByKind",
@@ -50,5 +47,4 @@ __all__ = [
     "load_record",
     "mean_by_kind",
     "series_from_results",
-    "table_value",
 ]

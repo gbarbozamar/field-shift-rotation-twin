@@ -304,8 +304,9 @@ def test_count_kinds_with_a_missing_year_feeds_the_margin():
     # economics. EXAMPLE DATA: the ONI record is not in the repository until a
     # person signs it (D240 (5)), so the record is written by hand, with the
     # rule of D240 (1) (+/- 0.5 met for 5 consecutive overlapping seasons) and
-    # synthetic seasons, every one of 2013..2014 at 0.0 (not the real
-    # anomalies). The agricultural year 2014 with start month 7 is decided by
+    # synthetic seasons, every one of 2013..2014 at 0.0, as file value and as
+    # printed value (D258) (not the real anomalies). The agricultural year
+    # 2013 is neutral. The agricultural year 2014 with start month 7 is decided by
     # DJF 2015, which is not in them, so that year is missing NO_COVERAGE.
     pytest.importorskip("kinds_of_year", reason="kinds_of_year/ is not importable")
     from kinds_of_year import (
@@ -318,12 +319,13 @@ def test_count_kinds_with_a_missing_year_feeds_the_margin():
         "threshold": 0.5,
         "min_consecutive_seasons": 5,
         "seasons": [
-            {"season": name, "year": year, "anom": 0.0}
+            {"season": name, "year": year, "anom": 0.0, "printed": 0.0}
             for year in (2013, 2014)
             for name in SEASONS
         ],
     }
     classified = classify_agricultural_years(record, 2013, 2014, 7)
+    assert classified[2013].kind == "neutral"
     assert classified[2014].missing_reason == "NO_COVERAGE"
     counts = count_kinds(classified)
     margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), counts)
