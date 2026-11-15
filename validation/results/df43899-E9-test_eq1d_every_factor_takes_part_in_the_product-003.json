@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "df43899-E9-test_eq1d_every_factor_takes_part_in_the_product-003",
+  "run_id": "run-20261115T170110Z-df43899",
+  "test_code": "E9",
+  "expected": {
+    "missing_reason": "the entry E9 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_equation.py::test_eq1d_every_factor_takes_part_in_the_product[ls]"
+  },
+  "notes": "Test engine/erosion/test_equation.py::test_eq1d_every_factor_takes_part_in_the_product[ls]. Placed under E9: listed by name on the 'Test' line of entry E9 of docs/VALIDATION.md."
+}

@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "df43899-D3-test_t0_no_tipping_point_when_the_state_never_changes-001",
+  "run_id": "run-20261115T170110Z-df43899",
+  "test_code": "D3",
+  "expected": {
+    "missing_reason": "the entry D3 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_t0_no_tipping_point_when_the_state_never_changes"
+  },
+  "notes": "Test decision/test_decision.py::test_t0_no_tipping_point_when_the_state_never_changes. Placed under D3: under the heading of D3 in decision/test_decision.py, as the first and second runs placed it."
+}

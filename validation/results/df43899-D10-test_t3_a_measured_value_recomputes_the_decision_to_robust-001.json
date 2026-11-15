@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "df43899-D10-test_t3_a_measured_value_recomputes_the_decision_to_robust-001",
+  "run_id": "run-20261115T170110Z-df43899",
+  "test_code": "D10",
+  "expected": {
+    "missing_reason": "the entry D10 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_t3_a_measured_value_recomputes_the_decision_to_robust"
+  },
+  "notes": "Test decision/test_decision.py::test_t3_a_measured_value_recomputes_the_decision_to_robust. Placed under D10: under the heading of D10 in decision/test_decision.py, as the first and second runs placed it."
+}
