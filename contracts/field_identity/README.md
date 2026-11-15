@@ -215,7 +215,7 @@ Each item is a question a person has to answer. The role that answers it is name
 
 1. **How does a polygon become one point?** `DECIDED` as to who answers it (issue #77, D41): the centroid is the interface developer's proposal of a method; the question is the science reviewers' (`adapters/README.md` OPEN 10 for climate, OPEN 24 for the elevation model). Nothing in this folder computes a point. For the science reviewers.
 2. **A field without geometry.** `DECIDED` (issue #77, D41): allowed, its geometry missing with `NOT_DECLARED`. In the model, with the shape of [difference 3](#3-a-field-without-geometry-null-geometry-with-geometry_missing-beside-it), which is PROPOSED. Still open: is `NOT_DECLARED` the only reason a geometry can be missing? The model rejects the other seven codes of C3.2. For the interface developer.
-3. **Relationship to the saved case.** Issue #103 notes that the saved-case contract of sub-lane L2b absorbs or references this one, so the two do not diverge. Not answered here; no saved-case contract is in `contracts/` yet. For the interface developer, as holder of sub-lane L2b.
+3. **Relationship to the saved case.** Issue #103 notes that the saved-case contract of sub-lane L2b absorbs or references this one, so the two do not diverge. `DECIDED` (issue #77, D177): absorbed, not referenced. The saved case carries the field identity of the case unchanged, as its part `field_identity`, loaded by `FieldIdentity` of this folder; the contract is `contracts/saved_case/`, PROPOSED. For the interface developer, as holder of sub-lane L2b, who approves that contract as producer and consumer.
 
 ### Raised by the landing
 
