@@ -85,7 +85,7 @@ function ignore() {}
 /** The heading of a step of the plan: its number and what it is. */
 function StepTitle({ n, title, children = null }: { n: number; title: string; children?: ReactNode }) {
   return (
-    <div className="mb-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+    <div className="mb-2 flex min-w-0 flex-wrap items-end justify-between gap-x-6 gap-y-2">
       <h3 data-testid="board-step" className="flex items-center gap-2 text-xl font-bold">
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fs-text font-mono text-xs text-fs-surface">
           {n}

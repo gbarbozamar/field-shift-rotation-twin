@@ -73,7 +73,7 @@ function RotationEditor({
   const library = cropLibrary()
   const letter = String.fromCharCode(FIRST_LETTER + index)
   return (
-    <li data-testid="board-candidate" className="rounded-2xl border border-fs-border bg-fs-surface p-4">
+    <li data-testid="board-candidate" className="min-w-0 rounded-2xl border border-fs-border bg-fs-surface p-4">
       <div className="flex items-center gap-2">
         <span className="font-mono text-[11px] uppercase tracking-widest text-fs-muted">
           {formatString(strings['board.option'], { letter })}
@@ -136,8 +136,8 @@ function RotationEditor({
       </fieldset>
       <ul className="mt-3 space-y-2">
         {rotation.components.map((component) => (
-          <li key={component.crop_id} data-testid="board-candidate-crop" className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2 text-sm">
-            <span className="font-semibold">
+          <li key={component.crop_id} data-testid="board-candidate-crop" className="grid grid-cols-2 items-end gap-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <span className="col-span-2 font-semibold sm:col-span-1">
               {cropName(component.crop_id)}
             </span>
             {(['sowing', 'harvest'] as const).map((part) => (
@@ -148,7 +148,7 @@ function RotationEditor({
                 {component[part].date !== null ? (
                   <input
                     type="date"
-                    className="rounded-lg border border-fs-border bg-fs-bg px-2 py-1 tabular-nums"
+                    className="w-full min-w-0 rounded-lg border border-fs-border bg-fs-bg px-2 py-1 tabular-nums"
                     value={component[part].date}
                     onChange={(event) =>
                       onChange(setComponentDate(rotations, index, component.component_id, part, event.target.value))

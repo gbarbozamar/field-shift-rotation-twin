@@ -84,10 +84,10 @@ export function hasExampleCrops(strip: RotationStrip | null): boolean {
 /** The selector of what the options are ordered by. */
 export function SortPicker({ sort, onSort }: { sort: SortKey; onSort: (sort: SortKey) => void }) {
   return (
-    <label data-testid="board-sort" className="inline-flex flex-wrap items-center gap-2">
+    <label data-testid="board-sort" className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-2">
       <span className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.sort.label']}</span>
       <select
-        className="min-h-9 cursor-pointer rounded-lg border border-fs-border bg-fs-surface px-3 py-1 text-sm font-semibold"
+        className="min-h-9 min-w-0 max-w-full cursor-pointer rounded-lg border border-fs-border bg-fs-surface px-3 py-1 text-sm font-semibold"
         value={sort}
         onChange={(event) => {
           const picked = SORT_KEYS.find((key) => key === event.target.value)
