@@ -1,0 +1,18 @@
+{
+  "id": "rusle2_crop_yield",
+  "scope": {
+    "crop": "maize"
+  },
+  "value": 5834.125,
+  "unit": "kg ha-1",
+  "range": null,
+  "range_missing_reason": "A mean of eight seasons; no uncertainty range is stated (the eight printed values are in the note).",
+  "citation": {
+    "reference": "MGAP-DIEA (2026). Anuario Estadístico Agropecuario 2026. Ministerio de Ganadería, Agricultura y Pesca, Dirección de Estadísticas Agropecuarias, Montevideo.",
+    "locator": "Cuadro 1 'Área sembrada, producción y rendimiento de cultivos cerealeros e industriales, por año agrícola', row 'Maíz' / 'Rendimiento', seasons 2018/19 to 2025/26, p. 107 (footnote 3: 'Rendimiento en kilos por hectárea sembrada')",
+    "url": "https://descargas.mgap.gub.uy/DIEA/Anuarios/Anuario2026/ANUARIO2026.pdf#page=107"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DERIVED: mean of the eight printed seasons [7608, 6536, 5396, 5763, 1415, 6758, 7452, 5745] = 5834.125 kg ha-1 (D131, lead developer's choice; the drought season 2022/23 is kept). National yield per hectare sown, not Colonia. The table does not say whether maize is grain only. Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-15 against the page image (D34, D66)."
+}

@@ -1,0 +1,19 @@
+{
+  "id": "rusle2_canopy_cover",
+  "scope": {
+    "crop": "wheat",
+    "stage": "day_15"
+  },
+  "value": 0.1,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Renard, K.G., Foster, G.R., Weesies, G.A., McCool, D.K., Yoder, D.C. (coord.) (1997). Predicting Soil Erosion by Water: A Guide to Conservation Planning With the Revised Universal Soil Loss Equation (RUSLE). U.S. Department of Agriculture, Agriculture Handbook No. 703.",
+    "locator": "Table 5-2 'Typical values of root mass, canopy cover, and canopy-droplet-fall-height for row crops and small-grain crops', p. 170 (PDF p. 192; page printed sideways), column 'Land surface covered by canopy (%)' / 'Spring small grain', row 15 days after planting",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/AH_703%20-%20Predicting%20Soil%20Erosion%20by%20Water%20-%20A%20Guide%20to%20Conservation%20Planning%20With%20the%20RUSLE%20(RUSLE).pdf#page=192"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Table 5-2 prints 10 (percent); the record holds 10 / 100 = 0.1 (DERIVED; the engine reads a fraction, OPEN 33). Table footnotes 5 and 7: 60 bu/ac yield. Series chosen by D129 (a). Wheat series DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15: 'Spring small grain' of Table 5-2, because Uruguayan wheat develops through the winter with no dormant period (stem elongation from late July to early September at Paysandu, Facultad de Agronomia EEMAC reports 2018 and 2025), while the 'Winter small grain' column is 'specific to areas with ... a winter dormant period' (Table 5-2, footnote 5) and RUSLE2 says 'the length of dormancy is climate dependent' (RUSLE2 User's Reference Guide, p. 232). The series ends at day 75; the engine holds the last value up to harvest (OPEN 29), about day 177 at the plots (Grahmann et al. 2022, p. 4: planted 29 June 2018, harvested 23 December 2018): a declared assumption. Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-15 against the page image (D34, D66). Identifier and scope of brief #218 (PR #229)."
+}
