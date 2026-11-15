@@ -121,8 +121,10 @@ WATER = EntryPoint("EP3", "water", "engine.water", "compute_water_deficit_exposu
 AMG = EntryPoint("EP5", "amg", "engine.amg", "run_amg")
 RESIDUES = EntryPoint("EP4", "residues", "engine.residues", "build_residue_ledger")
 DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, RESIDUES, AMG)
-# Not discovered yet (contracts/ENTRYPOINTS.md); named in the detail of its
-# missing rows and module state once another carbon engine is built.
+# Not discovered and not called yet (contracts/ENTRYPOINTS.md), whether or not
+# the engine exists: the runner does not look for it. It is named in the
+# detail of its missing rows and module state once another carbon engine is
+# built. Discovering and calling it is a later unit of lane L2a (api/README.md).
 ROTHC = EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")
 
 # The contract EP4 returns (contracts/residue_ledger/, lane L1). Imported only
@@ -158,6 +160,9 @@ AMG_NOT_CONFIGURED = (
     "so engine.amg.run_amg is not called"
 )
 NOT_BUILT = "the module is not built yet"
+# For an entry point the runner does not look for (EP6): true whether or not
+# the engine exists, unlike NOT_BUILT.
+NOT_CALLED = "the runner does not call this engine yet"
 LEDGER_EMPTY = "the residue ledger holds no component and no carbon-input series"
 CARBON_NOT_BUILT = "no carbon engine is built yet"
 CARBON_MODELS_NOT_CONFIGURED = (
@@ -397,6 +402,15 @@ def _not_built(point: EntryPoint) -> ModuleStatus:
     )
 
 
+def _not_called(point: EntryPoint) -> ModuleStatus:
+    return _status(
+        point.module_id,
+        "not_available",
+        "NOT_AVAILABLE",
+        f"{NOT_CALLED}: {_name(point)}",
+    )
+
+
 def _missing_input(module_id: str, detail: str) -> ModuleStatus:
     return _status(module_id, "not_available", "MISSING_INPUT", detail)
 
@@ -441,7 +455,7 @@ def _carbon_modules(
     return (
         residues if residues is not None else _not_built(RESIDUES),
         amg if amg is not None else _not_built(AMG),
-        _not_built(ROTHC),
+        _not_called(ROTHC),
     )
 
 
@@ -1068,10 +1082,10 @@ def carbon_trend(
             rows.extend(amg_rows)
             continue
         point = CARBON_ENTRY_POINTS[carbon_model]
-        not_built = ResultsMissing(
-            reason="NOT_AVAILABLE", detail=f"{NOT_BUILT}: {_name(point)}"
+        not_called = ResultsMissing(
+            reason="NOT_AVAILABLE", detail=f"{NOT_CALLED}: {_name(point)}"
         )
-        rows.extend(missing_carbon_trend((carbon_model,), not_built))
+        rows.extend(missing_carbon_trend((carbon_model,), not_called))
     return rows
 
 
