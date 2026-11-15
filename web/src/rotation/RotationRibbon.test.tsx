@@ -22,8 +22,13 @@ import type { RotationComponent, RotationDefinition } from './exampleRotation'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 
-/** The exact missing renders expected for the reason codes of the example. */
-const MISSING_HARVEST = `${strings['ribbon.harvest']}: ${strings['missing.NOT_APPLICABLE']}`
+/**
+ * The exact missing renders expected for the reason codes of the example.
+ * The NOT_APPLICABLE harvests carry their detail, which the missing render
+ * shows in parentheses for any reason code.
+ */
+const MISSING_HARVEST_COVER = `${strings['ribbon.harvest']}: ${strings['missing.NOT_APPLICABLE']} (cover crop is terminated, not harvested)`
+const MISSING_HARVEST_PASTURE = `${strings['ribbon.harvest']}: ${strings['missing.NOT_APPLICABLE']} (a pasture is grazed, not harvested)`
 const MISSING_GRAZING = `${strings['ribbon.mgmt_grazing']}: ${strings['missing.NOT_DECLARED']}`
 const MISSING_TERMINATION = `${strings['ribbon.mgmt_termination']}: ${strings['missing.NOT_DECLARED']}`
 
@@ -87,6 +92,52 @@ describe('RotationRibbon: the rotation lines above the timeline', () => {
   })
 })
 
+// --- the provisional mark of the agricultural-year start (display polish) ------
+
+describe('RotationRibbon: the provisional mark of the agricultural-year start', () => {
+  it('appends the provisional flag to the start line when the contract marks it provisional', () => {
+    expect(exampleRotation.ag_year_start.provisional).toBe(true)
+    const markup = markupOf()
+    expect(markup).toContain(
+      `${formatString(strings['ribbon.ag_year_start'], {
+        month: exampleRotation.ag_year_start.month,
+      })} ${strings['ribbon.provisional']}`,
+    )
+  })
+
+  it('shows no flag when the start month is not provisional', () => {
+    const settled: RotationDefinition = {
+      ...exampleRotation,
+      ag_year_start: { ...exampleRotation.ag_year_start, provisional: false },
+    }
+    const markup = markupOf(settled)
+    expect(markup).toContain(
+      formatString(strings['ribbon.ag_year_start'], {
+        month: settled.ag_year_start.month,
+      }),
+    )
+    expect(markup).not.toContain(strings['ribbon.provisional'])
+  })
+})
+
+// --- a rotation that does not repeat (display polish) ---------------------------
+
+describe('RotationRibbon: a rotation that repeats or does not', () => {
+  it('keeps the repeats line for a rotation that repeats', () => {
+    expect(exampleRotation.repeats).toBe(true)
+    const markup = markupOf()
+    expect(markup).toContain(`>${strings['ribbon.repeats']}<`)
+    expect(markup).not.toContain(strings['ribbon.not_repeating'])
+  })
+
+  it('shows the not-repeating phrase in place of the repeats line', () => {
+    const onceOnly: RotationDefinition = { ...exampleRotation, repeats: false }
+    const markup = markupOf(onceOnly)
+    expect(markup).toContain(`>${strings['ribbon.not_repeating']}<`)
+    expect(markup).not.toContain(`>${strings['ribbon.repeats']}<`)
+  })
+})
+
 describe('RotationRibbon: the timeline', () => {
   it('renders the components left to right in position order, whatever order the file lists', () => {
     const shuffled: RotationDefinition = {
@@ -133,13 +184,14 @@ describe('RotationRibbon: the timeline', () => {
     )
   })
 
-  it('a missing harvest shows the missing pattern with its reason, never a blank', () => {
+  it('a missing harvest shows the missing pattern with its reason and its detail, never a blank', () => {
     const markup = markupOf()
-    // The cover crop and the pasture each miss a harvest, each with a reason.
-    expect(markup.match(new RegExp(MISSING_HARVEST, 'g'))).toHaveLength(2)
+    // The cover crop and the pasture each miss a harvest, each with its reason and its detail.
+    expect(markup).toContain(MISSING_HARVEST_COVER)
+    expect(markup).toContain(MISSING_HARVEST_PASTURE)
     const chunks = cardChunks(markup)
-    expect(visibleText(chunks[1])).toContain(MISSING_HARVEST)
-    expect(visibleText(chunks[2])).toContain(MISSING_HARVEST)
+    expect(visibleText(chunks[1])).toContain(MISSING_HARVEST_COVER)
+    expect(visibleText(chunks[2])).toContain(MISSING_HARVEST_PASTURE)
     // No harvest row is blank: every card names its harvest, dated or missing.
     for (const chunk of chunks) {
       expect(visibleText(chunk)).toContain(strings['ribbon.harvest'])
