@@ -1,12 +1,13 @@
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { cropName, isExampleCrop } from './boardModel'
+import { cropName } from './boardModel'
 import {
   MAX_ROTATIONS,
   MIN_ROTATIONS,
   cropLibrary,
   draftProblems,
   duplicateRotation,
+  isUserRotation,
   removeRotation,
   renameRotation,
   sameDraft,
@@ -41,7 +42,21 @@ function problemText(problem: DraftProblem): string {
       return formatString(strings['board.builder.problem.no_name'], {
         letter: String.fromCharCode(FIRST_LETTER + problem.index),
       })
+    case 'harvest_before_sowing':
+      return formatString(strings['board.builder.problem.harvest_before_sowing'], {
+        letter: String.fromCharCode(FIRST_LETTER + problem.index),
+        crop: cropName(problem.crop_id),
+      })
   }
+}
+
+/** What a copy is named after: the name the user gave, or the crops of a rotation of the example. */
+export function copyName(rotation: DraftRotation): string {
+  if (isUserRotation(rotation.rotation_id)) {
+    return rotation.label
+  }
+  const crops = [...new Set(rotation.components.map((component) => cropName(component.crop_id)))]
+  return crops.join(strings['board.crops_join'])
 }
 
 function RotationEditor({
@@ -74,7 +89,7 @@ function RotationEditor({
               duplicateRotation(
                 rotations,
                 index,
-                formatString(strings['board.builder.copy_name'], { name: rotation.label }),
+                formatString(strings['board.builder.copy_name'], { name: copyName(rotation) }),
               ),
             )
           }
@@ -121,12 +136,9 @@ function RotationEditor({
       </fieldset>
       <ul className="mt-3 space-y-2">
         {rotation.components.map((component) => (
-          <li key={component.component_id} data-testid="board-candidate-crop" className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2 text-sm">
+          <li key={component.crop_id} data-testid="board-candidate-crop" className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2 text-sm">
             <span className="font-semibold">
               {cropName(component.crop_id)}
-              {isExampleCrop(component.crop_id) ? (
-                <span className="ml-1.5 text-[11px] font-normal text-fs-warning">{strings['board.example_crop']}</span>
-              ) : null}
             </span>
             {(['sowing', 'harvest'] as const).map((part) => (
               <label key={part} className="block">
@@ -218,11 +230,13 @@ export function RotationBuilder({
         >
           {strings['board.builder.reset']}
         </button>
-        {changed ? (
-          <p data-testid="board-builder-changed" className="text-sm font-semibold text-fs-warning">
-            {strings['board.builder.changed']}
-          </p>
-        ) : null}
+        <p
+          data-testid={changed ? 'board-builder-changed' : 'board-builder-unchanged'}
+          data-changed={String(changed)}
+          className="text-sm text-fs-muted data-[changed=true]:font-semibold data-[changed=true]:text-fs-warning"
+        >
+          {strings[changed ? 'board.builder.changed' : 'board.builder.no_changes']}
+        </p>
       </div>
     </div>
   )

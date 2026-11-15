@@ -150,7 +150,15 @@ export function setComponentDate(
       ? { ...component, [part]: { ...component[part], date } }
       : component,
   )
-  return replaced(rotations, index, { ...rotation, components: ordered(components) })
+  // Not put in sowing order here: the user may be typing the date, and a
+  // crop that moved under the cursor would take the next keystroke.
+  // normalizeDraft orders them when the draft is compared.
+  return replaced(rotations, index, { ...rotation, components })
+}
+
+/** The draft with the crops of each rotation in sowing order and renumbered: what is sent. */
+export function normalizeDraft(rotations: DraftRotation[]): DraftRotation[] {
+  return rotations.map((rotation) => ({ ...rotation, components: ordered(rotation.components) }))
 }
 
 /** What keeps a draft from being compared. */
@@ -160,6 +168,8 @@ export type DraftProblem =
   | { kind: 'no_soybean' }
   | { kind: 'no_crop'; index: number }
   | { kind: 'no_name'; index: number }
+  /** A crop is harvested before it is sown: the rotation definition refuses it. */
+  | { kind: 'harvest_before_sowing'; index: number; crop_id: string }
 
 /** The problems of a draft, in a fixed order; none means it can be sent. */
 export function draftProblems(rotations: DraftRotation[]): DraftProblem[] {
@@ -173,6 +183,14 @@ export function draftProblems(rotations: DraftRotation[]): DraftProblem[] {
   rotations.forEach((rotation, index) => {
     if (rotation.components.length === 0) problems.push({ kind: 'no_crop', index })
     if (rotation.label.trim() === '') problems.push({ kind: 'no_name', index })
+    for (const component of rotation.components) {
+      const sown = component.sowing.date
+      const harvested = component.harvest.date
+      // ISO dates compare as text.
+      if (sown !== null && harvested !== null && harvested < sown) {
+        problems.push({ kind: 'harvest_before_sowing', index, crop_id: component.crop_id })
+      }
+    }
   })
   return problems
 }

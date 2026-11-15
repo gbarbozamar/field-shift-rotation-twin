@@ -4,7 +4,7 @@ import rawRequest from '../data/PLACEHOLDER_plant_request.json'
 import { formatString } from '../lib/format'
 import { parsePlantRequestRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
-import { RotationBuilder } from './RotationBuilder'
+import { RotationBuilder, copyName } from './RotationBuilder'
 import {
   MAX_ROTATIONS,
   MIN_ROTATIONS,
@@ -13,6 +13,7 @@ import {
   duplicateRotation,
   exampleRotations,
   isUserRotation,
+  normalizeDraft,
   removeRotation,
   renameRotation,
   sameDraft,
@@ -154,6 +155,35 @@ describe('what keeps a draft from being compared (4)', () => {
   })
 })
 
+describe('dates while typing and when compared (4b)', () => {
+  it('a date that passes another crop does not move the crops while the user types; comparing orders them', () => {
+    const draft = exampleRotations()
+    const [first, second] = draft[1].components
+    const typed = setComponentDate(draft, 1, first.component_id, 'sowing', '2029-01-01')
+    expect(typed[1].components.map((c) => c.crop_id)).toEqual([first.crop_id, second.crop_id])
+    const sent = normalizeDraft(typed)
+    expect(sent[1].components.map((c) => c.crop_id)).toEqual([second.crop_id, first.crop_id])
+    expect(sent[1].components.map((c) => c.position)).toEqual([1, 2])
+  })
+
+  it('a crop harvested before it is sown is a problem, named with its option and crop', () => {
+    const draft = exampleRotations()
+    const crop = draft[0].components[0]
+    const wrong = setComponentDate(draft, 0, crop.component_id, 'harvest', '2020-01-01')
+    expect(draftProblems(wrong)).toContainEqual({ kind: 'harvest_before_sowing', index: 0, crop_id: crop.crop_id })
+    expect(draftProblems(draft).some((p) => p.kind === 'harvest_before_sowing')).toBe(false)
+  })
+
+  it('a copy of an example rotation is named after its crops, never after the example label; a copy of the user\'s keeps their name', () => {
+    for (const rotation of exampleRotations()) {
+      expect(copyName(rotation)).not.toContain(rotation.label)
+      expect(copyName(rotation)).not.toContain('PLACEHOLDER')
+    }
+    const mine = duplicateRotation(exampleRotations(), 0, 'Mine')
+    expect(copyName(mine[mine.length - 1])).toBe('Mine')
+  })
+})
+
 describe('the builder (5)', () => {
   function render(draft: DraftRotation[], sent: DraftRotation[] = exampleRotations()): string {
     return renderToString(
@@ -174,6 +204,7 @@ describe('the builder (5)', () => {
     const html = render(exampleRotations())
     expect(tag(html, 'board-builder-compare')).toContain('disabled=""')
     expect(html).not.toContain('data-testid="board-builder-changed"')
+    expect(html).toContain(strings['board.builder.no_changes'])
   })
 
   it('changed and valid: comparing is offered and the change is said', () => {

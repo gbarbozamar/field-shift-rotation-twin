@@ -12,7 +12,7 @@ import type { ServicePhase } from '../plant/PlantScreen'
 import { buildRotationStrip, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
 import { SORT_KEYS, answerChanges, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
-import { CompareTable, cropsText } from './CompareTable'
+import { CompareTable, cropsText, orderNote } from './CompareTable'
 import { BoardView, initialBoardState } from './BoardScreen'
 
 /**
@@ -269,13 +269,17 @@ describe('the view by state (4)', () => {
   it('an answer: the banner names the crops of the chosen rotation; one column per option in the order of the rule, the chosen first', () => {
     const html = view(FIELD, answered(example))
     const chosen = plantRotations.rotations!.find((r) => r.rotation_id === rawExample.chosen)!
-    expect(visibleText(`<${after(html, 'board-chosen').split('</p>')[0]}`)).toBe(cropsText(buildRotationStrip(chosen)))
+    expect(visibleText(`<${after(html, 'board-chosen').split('</p>')[0]}`)).toBe(
+      formatString(strings['board.option_title'], {
+        letter: String.fromCharCode(65 + rawExample.options.findIndex((o) => o.rotation_id === rawExample.chosen)),
+        title: cropsText(buildRotationStrip(chosen))!,
+      }),
+    )
     const columns = html.split('data-testid="board-option"').slice(1)
     expect(columns.length).toBe(rawExample.options.length)
     boardColumns(example, 'rule').forEach((column, index) => {
       const header = columns[index].split('</th>')[0]
       expect(header).toContain(`data-state="${column.option.state}"`)
-      expect(header).toContain('data-testid="board-example-crops"')
       expect(visibleText(`<${header}`)).toContain(formatString(strings['board.option'], { letter: column.letter }))
       expect(count(header, 'data-testid="board-position"')).toBe(column.position !== null ? 1 : 0)
     })
@@ -405,9 +409,9 @@ describe('quantities and required labels (5)', () => {
     const text = visibleText(`<${after(html, 'board-cost-against').split('</p>')[0]}`)
     expect(text).toBe(
       formatString(strings['board.cost.against'], {
-        rotation: formatString(strings['board.option_crops'], {
+        rotation: formatString(strings['board.option_title'], {
           letter,
-          crops: cropsText(buildRotationStrip(plantRotations.rotations!.find((r) => r.rotation_id === against.rotation_id)!))!,
+          title: cropsText(buildRotationStrip(plantRotations.rotations!.find((r) => r.rotation_id === against.rotation_id)!))!,
         }),
       }),
     )
@@ -651,5 +655,48 @@ describe('what changed between two answers (9)', () => {
     expect(count(render(null), 'data-testid="board-changes"')).toBe(0)
     expect(count(render(example), 'data-testid="board-change"')).toBe(answerChanges(example, open).length)
     expect(visibleText(after(render(open), 'board-changes-none').split('</p>')[0])).toContain(strings['board.changed.none'])
+  })
+})
+
+describe('names, the order note and a board that does not blank (10)', () => {
+  it('one mark says the crops are example crops, and the legend reads them as names', () => {
+    const html = view(FIELD, answered(example))
+    expect(count(html, 'data-testid="board-example-crops"')).toBe(1)
+    const legend = after(html, 'plant-legend').split('</ul>')[0]
+    expect(visibleText(`<${legend}`)).not.toContain('PLACEHOLDER')
+    expect(visibleText(`<${legend}`)).toContain(cropName(rawRequest.rotations[0].components[0].crop_id))
+  })
+
+  it('says so when the order picked cannot place the options', () => {
+    const columns = (sort: (typeof SORT_KEYS)[number], answer: PlantAnswer = example) => boardColumns(answer, sort)
+    const open = answerOf('every_kind', 'average')
+    expect(orderNote(columns('margin'), 'margin')).toBeNull()
+    expect(orderNote(columns('yours'), 'yours')).toBeNull()
+    expect(orderNote(columns('rule', open), 'rule')).toBe(strings['board.sort.none_rule'])
+    const unplaced = columns('soil').filter((c) => c.position === null).length
+    expect(unplaced).toBeGreaterThan(0)
+    expect(orderNote(columns('soil'), 'soil')).toBe(formatString(strings['board.sort.some'], { n: unplaced }))
+    const unclassified: PlantAnswer = {
+      ...example,
+      kinds_of_year: { ...example.kinds_of_year, counts: { el_nino: null, neutral: null, la_nina: null } },
+    }
+    expect(orderNote(columns('worst', unclassified), 'worst')).toBe(strings['board.sort.none'])
+  })
+
+  it('while a new answer is on its way the one before stays, marked as updating', () => {
+    const render = (updating: boolean) =>
+      renderToString(
+        <BoardView
+          selectedFieldId={FIELD}
+          state={initialBoardState()}
+          apiBase={BASE}
+          service={answered(example)}
+          updating={updating}
+        />,
+      )
+    expect(count(render(true), 'data-testid="board-option"')).toBe(example.options.length)
+    expect(render(true)).toContain('data-updating="true"')
+    expect(visibleText(after(render(true), 'board-updating').split('</p>')[0])).toContain(strings['board.updating'])
+    expect(count(render(false), 'data-testid="board-updating"')).toBe(0)
   })
 })

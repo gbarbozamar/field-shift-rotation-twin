@@ -28,7 +28,14 @@ import { buildTimeline } from './timeline'
  */
 
 /** The legend of the crop colours: each crop once, with its id as it travels. */
-export function CropLegend({ order }: { order: readonly string[] }) {
+export function CropLegend({
+  order,
+  nameOf = (cropId) => cropId,
+}: {
+  order: readonly string[]
+  /** How a crop id reads; the id itself by default. */
+  nameOf?: (cropId: string) => string
+}) {
   if (order.length === 0) {
     return null
   }
@@ -39,7 +46,9 @@ export function CropLegend({ order }: { order: readonly string[] }) {
           <span aria-hidden="true" className="inline-flex h-3 w-4 overflow-hidden rounded-sm">
             <span className={swatchOf(cropId, order)} style={{ flex: 1 }} />
           </span>
-          <span className="font-mono">{cropId}</span>
+          <span className="font-mono" title={cropId}>
+            {nameOf(cropId)}
+          </span>
         </li>
       ))}
     </ul>

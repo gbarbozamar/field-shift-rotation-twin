@@ -1,6 +1,6 @@
 import { useMemo, useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
-import { QueryClient, useQuery } from '@tanstack/react-query'
+import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
@@ -24,7 +24,7 @@ import { buildRotationStrip, cropOrder, plantRotations, readPlantRotations } fro
 import type { PlantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { answerChanges, boardColumns, optionLetter } from './boardModel'
+import { answerChanges, boardColumns, cropName, isExampleCrop, optionLetter } from './boardModel'
 import type { SortKey } from './boardModel'
 import {
   AnswerBanner,
@@ -35,10 +35,10 @@ import {
   RainEcho,
   RecordRibbon,
 } from './BoardParts'
-import { CompareTable, SortPicker, cropsText } from './CompareTable'
+import { CompareTable, SortPicker, optionTitle, orderNote } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
-import { exampleRotations } from './rotationDraft'
+import { exampleRotations, normalizeDraft } from './rotationDraft'
 import type { DraftRotation } from './rotationDraft'
 
 /**
@@ -160,6 +160,7 @@ function Answered({
   rotations,
   firstStep,
   previous,
+  updating,
 }: {
   answer: PlantAnswer
   rainStress: RainStressPart | null
@@ -168,6 +169,8 @@ function Answered({
   firstStep: number
   /** The answer shown before this one, when there was one: what changed is said. */
   previous: PlantAnswer | null
+  /** True while the answer shown is the one before and the new one is on its way. */
+  updating: boolean
 }) {
   const { info, order, scales } = useBoardInfo(answer, rotations)
   const [sort, setSort] = useState<SortKey>('rule')
@@ -179,20 +182,26 @@ function Answered({
     if (option === undefined) {
       return rotationId
     }
-    return formatString(strings['board.option_crops'], {
+    return formatString(strings['board.option_title'], {
       letter: optionLetter(answer, option),
-      crops: cropsText(info(option).strip) ?? option.rotation_id,
+      title: optionTitle(option, info(option)),
     })
   }
+  const note = orderNote(columns, sort)
   const againstText = answer.limit_cost.kind === 'value' ? nameOf(answer.limit_cost.against) : null
   // The sources an answer lacks are its root reason: said once, in the notice.
   const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
   return (
-    <div className="space-y-6">
+    <div data-testid="board-answered" data-updating={String(updating)} className="space-y-6 data-[updating=true]:opacity-60">
+      {updating ? (
+        <p data-testid="board-updating" role="status" className="text-sm font-semibold text-fs-muted">
+          {strings['board.updating']}
+        </p>
+      ) : null}
       <div className="space-y-3">
         <AnswerBanner
           answer={answer}
-          label={chosen !== null ? cropsText(info(chosen).strip) : null}
+          label={chosen !== null ? nameOf(chosen.rotation_id) : null}
           showWhy={!lacksSources}
           against={againstText}
         />
@@ -210,9 +219,19 @@ function Answered({
         <StepTitle n={firstStep} title={strings['board.compare.title']}>
           <SortPicker sort={sort} onSort={setSort} />
         </StepTitle>
+        {note !== null ? (
+          <p data-testid="board-order-note" className="mb-2 text-sm font-semibold text-fs-warning">
+            {note}
+          </p>
+        ) : null}
         <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} />
-        <div className="mt-2">
-          <CropLegend order={order} />
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <CropLegend order={order} nameOf={cropName} />
+          {order.some(isExampleCrop) ? (
+            <span data-testid="board-example-crops" className="rounded-full border border-fs-warning px-2 py-0.5 text-[11px] font-semibold text-fs-warning">
+              {strings['board.example_crops']}
+            </span>
+          ) : null}
         </div>
       </div>
       <div>
@@ -254,6 +273,7 @@ function BoardSide({
   rotations,
   firstStep,
   previous,
+  updating,
 }: {
   selectedFieldId: string | null
   apiBase: string | null
@@ -261,6 +281,7 @@ function BoardSide({
   rotations: PlantRotations
   firstStep: number
   previous: PlantAnswer | null
+  updating: boolean
 }) {
   if (selectedFieldId === null) {
     return (
@@ -301,6 +322,7 @@ function BoardSide({
       rotations={rotations}
       firstStep={firstStep}
       previous={previous}
+      updating={updating}
     />
   )
 }
@@ -322,6 +344,7 @@ export function BoardView({
   rotations = plantRotations,
   builder = null,
   previous = null,
+  updating = false,
 }: {
   selectedFieldId: string | null
   state: PlantScreenState
@@ -339,6 +362,8 @@ export function BoardView({
   builder?: ReactNode
   /** The answer shown before the one of the service now, when there was one. */
   previous?: PlantAnswer | null
+  /** True while the answer shown is the one before and the new one is on its way. */
+  updating?: boolean
 }) {
   // The steps are numbered as shown: the candidates are a step only for the
   // field whose rotations can be edited.
@@ -351,7 +376,6 @@ export function BoardView({
           <h2 id="board-title" className="text-4xl font-extrabold leading-tight">
             {strings['board.title']}
           </h2>
-          <p className="mt-1 max-w-[70ch] text-fs-muted">{strings['plant.rule']}</p>
         </div>
         {exampleCase.example_data ? (
           <p data-testid="board-example" role="note" className="rounded-full border border-fs-warning bg-fs-warning-bg px-3 py-1 text-sm text-fs-warning">
@@ -429,6 +453,7 @@ export function BoardView({
         rotations={rotations}
         firstStep={scenarioStep + 1}
         previous={previous}
+        updating={updating}
       />
 
       <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
@@ -457,8 +482,10 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
     () => (asks ? serviceRequestOf(state, baseRequest) : null),
     [asks, baseRequest, state.mode, state.strictness, state.marginOf, state.rain],
   )
+  // While a new answer is on its way the one before stays on screen, marked
+  // as updating, so a control does not blank the board.
   const query = useQuery(
-    plantScreenQueryOptions(apiBase, request),
+    { ...plantScreenQueryOptions(apiBase, request), placeholderData: keepPreviousData },
     apiBase === null ? NO_SERVICE_CLIENT : undefined,
   )
   // The map opens the screen and steps aside once a field is picked, unless
@@ -483,6 +510,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       state={state}
       apiBase={apiBase}
       service={phase}
+      updating={request !== null && query.isPlaceholderData}
       previous={answerNow !== null && answerNow === seen.current ? seen.previous : null}
       dispatch={dispatch}
       map={<FieldsMap />}
@@ -494,7 +522,11 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
           draft={draft}
           sent={sent}
           onChange={setDraft}
-          onCompare={() => setSent(draft)}
+          onCompare={() => {
+            const ordered = normalizeDraft(draft)
+            setDraft(ordered)
+            setSent(ordered)
+          }}
           onReset={() => {
             const example = exampleRotations()
             setDraft(example)

@@ -43,6 +43,37 @@ export function cropsText(strip: RotationStrip | null): string | null {
   return crops.length === 0 ? null : crops.map(cropName).join(strings['board.crops_join'])
 }
 
+/**
+ * How the board names an option, everywhere: by the name the user gave it,
+ * or, for a rotation of the request, by its crops; its id when the request
+ * says nothing of it.
+ */
+export function optionTitle(option: PlantOption, { rotation, strip }: OptionInfo): string {
+  if (rotation !== null && isUserRotation(rotation.rotation_id)) {
+    return rotation.label
+  }
+  return cropsText(strip) ?? option.rotation_id
+}
+
+/**
+ * What the picker says when the order picked cannot place every option:
+ * none of them (nothing was ordered), or how many are left out. Null when
+ * every option is placed, and for the order of the request.
+ */
+export function orderNote(columns: BoardColumn[], sort: SortKey): string | null {
+  if (sort === 'yours') {
+    return null
+  }
+  const unplaced = columns.filter((column) => column.position === null).length
+  if (unplaced === 0) {
+    return null
+  }
+  if (unplaced === columns.length) {
+    return strings[sort === 'rule' ? 'board.sort.none_rule' : 'board.sort.none']
+  }
+  return formatString(strings[sort === 'rule' ? 'board.sort.some_rule' : 'board.sort.some'], { n: unplaced })
+}
+
 /** True when a crop of the rotation is a placeholder of the example data. */
 export function hasExampleCrops(strip: RotationStrip | null): boolean {
   return strip !== null && cropOrder([strip]).some(isExampleCrop)
@@ -81,6 +112,7 @@ function Missing({ item }: { item: Measured }) {
   )
 }
 
+/** A number of the table: its unit is said once, in the head of its row. */
 function Number({ item }: { item: Measured }) {
   if (item.value === null) {
     return (
@@ -88,9 +120,8 @@ function Number({ item }: { item: Measured }) {
     )
   }
   return (
-    <span className="whitespace-nowrap tabular-nums" title={String(item.value)}>
-      <span className="font-fs-heading text-xl font-extrabold">{displayNumber(item.value)}</span>{' '}
-      <span className="text-[11px] text-fs-muted">{item.unit}</span>
+    <span className="font-fs-heading text-xl font-extrabold tabular-nums" title={String(item.value)}>
+      {displayNumber(item.value)}
     </span>
   )
 }
@@ -138,11 +169,14 @@ function Bar({
 
 function Row({
   label,
+  note = null,
   selected = false,
   columns,
   cell,
 }: {
   label: string
+  /** What is said once for the whole row: its unit, the limit it is read against. */
+  note?: ReactNode
   /** True for the row of the kind of year looked at. */
   selected?: boolean
   columns: BoardColumn[]
@@ -150,8 +184,11 @@ function Row({
 }) {
   return (
     <tr data-selected={String(selected)} className="border-t border-fs-border data-[selected=true]:font-semibold">
-      <th scope="row" className="px-4 py-3 text-left align-top text-xs font-semibold uppercase tracking-wide text-fs-muted">
+      <th scope="row" className="sticky left-0 z-10 bg-fs-surface px-4 py-3 text-left align-top text-xs font-semibold uppercase tracking-wide text-fs-muted">
         {label}
+        {note !== null ? (
+          <span className="mt-0.5 block font-normal normal-case tracking-normal">{note}</span>
+        ) : null}
       </th>
       {columns.map(({ option }) => (
         <td
@@ -184,8 +221,7 @@ function KindCell({
     <div className="tabular-nums">
       {margin.value !== null ? (
         <p title={String(margin.value)}>
-          <span className="font-fs-heading text-base font-bold">{displayNumber(margin.value)}</span>{' '}
-          <span className="text-[11px] text-fs-muted">{margin.unit}</span>
+          <span className="font-fs-heading text-base font-bold">{displayNumber(margin.value)}</span>
           {worst ? (
             <span data-testid="board-worst" className="ml-1.5 rounded border border-fs-border px-1 text-[10px] font-semibold uppercase text-fs-muted">
               {strings['board.worst_mark']}
@@ -201,7 +237,7 @@ function KindCell({
           className="text-xs text-fs-muted data-[tone=over]:font-bold data-[tone=over]:text-fs-error"
           title={String(loss.value)}
         >
-          {formatString(strings['board.kind.soil'], { value: displayNumber(loss.value), unit: loss.unit })}
+          {formatString(strings['board.kind.soil'], { value: displayNumber(loss.value) })}
           {tone === 'over' ? (
             <span className="ml-1 uppercase">{strings['plant.table.over_limit']}</span>
           ) : null}
@@ -238,15 +274,27 @@ export function CompareTable({
   scales: CompareScales
 }) {
   const kind = answer.margin_of
+  // The units and the limit are those of the answer, said once per row. Every
+  // option is judged against one limit (a rule of the contract), so the first
+  // option that carries it speaks for the row.
+  const first = answer.options[0]
+  const marginUnit = first.margin[kind].unit
+  const soilUnit = first.soil_loss[kind].unit
+  const limited = answer.options.find((option) => option.limit !== null)
+  const limit = limited !== undefined ? { value: limited.limit!, unit: limited.limit_unit } : null
   return (
     <div className="overflow-x-auto rounded-2xl border border-fs-border bg-fs-surface">
-      <table data-testid="board-compare" className="w-full min-w-[44rem] table-fixed border-collapse">
+      <table
+        data-testid="board-compare"
+        className="w-full table-fixed border-collapse"
+        style={{ minWidth: `${9 + columns.length * 12}rem` }}
+      >
         <colgroup>
           <col className="w-36" />
         </colgroup>
         <thead>
           <tr>
-            <td />
+            <td className="sticky left-0 z-10 bg-fs-surface" />
             {columns.map(({ option, letter, position, tied }) => {
               const { rotation, strip } = info(option)
               return (
@@ -283,9 +331,7 @@ export function CompareTable({
                     className="mt-2 font-fs-heading text-xl font-extrabold leading-tight"
                     title={rotation !== null ? rotation.label : undefined}
                   >
-                    {rotation !== null && isUserRotation(rotation.rotation_id)
-                      ? rotation.label
-                      : (cropsText(strip) ?? option.rotation_id)}
+                    {optionTitle(option, { rotation, strip })}
                   </p>
                   {rotation !== null && isUserRotation(rotation.rotation_id) && cropsText(strip) !== null ? (
                     <p data-testid="board-option-crops-line" className="text-sm font-semibold">
@@ -295,11 +341,6 @@ export function CompareTable({
                   {strip !== null && strip.years.length !== 0 ? (
                     <p className="text-xs text-fs-muted">
                       {formatString(strings['board.cycle'], { n: strip.years.length })}
-                    </p>
-                  ) : null}
-                  {hasExampleCrops(strip) ? (
-                    <p data-testid="board-example-crops" className="text-[11px] font-semibold text-fs-warning">
-                      {strings['board.example_crops']}
                     </p>
                   ) : null}
                 </th>
@@ -322,6 +363,7 @@ export function CompareTable({
           />
           <Row
             label={formatString(strings['plant.margin_of'], { kind: strings[`plant.kind.${kind}`] })}
+            note={marginUnit}
             columns={columns}
             cell={(option) => (
               <div>
@@ -332,6 +374,16 @@ export function CompareTable({
           />
           <Row
             label={formatString(strings['plant.soil_loss_of'], { kind: strings[`plant.kind.${kind}`] })}
+            note={
+              <>
+                {soilUnit}
+                {limit !== null ? (
+                  <span data-testid="board-row-limit" className="block font-semibold text-fs-text">
+                    {formatString(strings['board.limit_is'], { limit: displayNumber(limit.value), unit: limit.unit })}
+                  </span>
+                ) : null}
+              </>
+            }
             columns={columns}
             cell={(option) => (
               <div>
@@ -343,14 +395,6 @@ export function CompareTable({
                   tone={verdictTone(drawnSoilVerdict(option, kind))}
                   limit={option.limit}
                 />
-                {option.limit !== null ? (
-                  <p className="mt-1 text-[11px] text-fs-muted">
-                    {formatString(strings['board.limit_is'], {
-                      limit: displayNumber(option.limit),
-                      unit: option.limit_unit,
-                    })}
-                  </p>
-                ) : null}
               </div>
             )}
           />
@@ -358,6 +402,7 @@ export function CompareTable({
             <Row
               key={each}
               label={strings[`plant.kind.${each}`]}
+              note={formatString(strings['board.row.kind_units'], { margin: marginUnit, soil: soilUnit })}
               selected={each === kind}
               columns={columns}
               cell={(option) => (
