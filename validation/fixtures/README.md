@@ -4,19 +4,21 @@ Signed files that hold the expected values of a check of `docs/VALIDATION.md` to
 
 > **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), amended for two H2 steps by [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727). This README holds no value of a source: the values are in the signed files, checked against the source by the person who signs.
 >
-> **The three files below are on `main`, signed.** `e3_ah703_tables.json` arrived with #238, `h2_example18.json` with #239, and `h1_fao56_example37.json` under [D228 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768), each with its `checked_by` filled, as is the `checked_by` of every parameter record it carries where applicable (D34, D66). All three tests run on them.
+> **Five signed fixtures are indexed here** (four already on `main`, plus `h10_grahmann2022_runoff.json` from this PR):
 >
-> **One more fixture is not in this folder:** the one of [H10] (`docs/VALIDATION.md`). It waits for a person to transcribe it from its source, check it and sign it in `checked_by` (D34, D66); no fixture enters this folder unsigned. This README gives none of its values. Its path is PROPOSED in `docs/VALIDATION.md`, and its format is not described here yet:
->
-> - `h10_grahmann2022_runoff.json`, for [H10]. No test reads it yet; the comparator of [H10] (`validation/h10_runoff.py`) is tested on hand-made values only.
+> - `e3_ah703_tables.json` (`#238`, `[E3]`), `h2_example18.json` (`#239`, `[H2]`), and `h1_fao56_example37.json` (`#455`, `[H1]`, [D228](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768)), each with `checked_by` filled (and parameter records signed where applicable, D34, D66). All three checks run and pass.
+> - `fao56_example35_surface_layer.json` (`#515`): signed FAO-56 Chapter 7, Example 35 (corrected February 2006 edition) surface-layer fixture (`checked_by: gbarbozamar`), with `early_wetting_option`, `full_precision_interpolation`, `half_digit_criterion` (half-last-digit comparison), and `surface_only_scope` accepted by `gbarbozamar` after seeing the comparison results (`results_seen_before_acceptance: true`, `retroactive_preregistration: false`, `full_ep3_reproduction: false`). `engine/water/evaporation/surface_layer.py` `step` itself remains unchanged pending L1 integration review.
+> - `h10_grahmann2022_runoff.json` (this PR, `[H10]`): signed numeric transcription of Grahmann et al. (2022), Table 5 (`2017`–`2019`, `checked_by: gbarbozamar`, `transcribed_by: AI session, 2026-11-15`), while `year_basis_checked_by` remains empty (`""`) so `[H10]` stays **`not evaluated`** (`BLOCKED_NOT_EVALUATED`) until all five open human gates are closed.
 
 | File | Check | Test that reads it |
 |---|---|---|
 | `h1_fao56_example37.json` | [H1]: the ten-day stressed soil water balance against FAO-56 Chapter 8, EXAMPLE 37 | `engine/water/balance/test_bucket.py::test_h1_public_reference_case` |
 | `h2_example18.json` | [H2]: the daily reference evapotranspiration against FAO-56 Chapter 4, EXAMPLE 18 | `engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56` |
 | `e3_ah703_tables.json` | [E3]: `LS` against AH703 Table 4-2 and `m` against the Moderate column of Table 4-5 | `engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values` |
+| `fao56_example35_surface_layer.json` | FAO-56 Chapter 7, Example 35 (corrected Feb 2006): surface-layer evaporation (`#515`; `results_seen_before_acceptance: true`, `surface_only_scope`, `full_ep3_reproduction: false`) | `engine/water/evaporation/test_surface_layer.py::test_fao56_chapter_7_worked_example` |
+| `h10_grahmann2022_runoff.json` | [H10]: Grahmann et al. (2022) Table 5 yearly runoff & rainfall (`2017`–`2019`) and D230 criteria (`year_basis_checked_by` empty, keeping `[H10]` `not evaluated`) | `validation/test_h10_fixture_gate.py` (fixture & gate checks; `validation/test_h10_runoff.py` tests `validation/h10_runoff.py` on hand-made values) |
 
-## Skip rule (all three files)
+## Skip rule (`h1_fao56_example37.json`, `h2_example18.json`, `e3_ah703_tables.json`)
 
 A test **skips**, with a reason that names its file and every part that is not signed, when:
 
@@ -28,9 +30,9 @@ Once everything is signed the test **runs**. From then on a malformed file, a va
 
 Each test also has cases that write a PLACEHOLDER fixture to a temporary folder (`tmp_path`) and show that the loader and the comparison run and pass, and that a value outside its tolerance fails. Those PLACEHOLDER numbers are made up or computed by the engine itself; none is a value of a source.
 
-## Common fields
+## Common fields (`h1_fao56_example37.json`, `h2_example18.json`, `e3_ah703_tables.json`)
 
-These fields are in all three files, as the scientific-integration session writes them. The tests read `checked_by` only; the others are for the person who checks.
+These fields appear in `h1_fao56_example37.json`, `h2_example18.json`, and `e3_ah703_tables.json`, as the scientific-integration session writes them. The tests read `checked_by` only; the others are for the person who checks. (See the sections below for `fao56_example35_surface_layer.json` and `h10_grahmann2022_runoff.json`.)
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -106,6 +108,30 @@ In each cell, `printed` is the number exactly as the table prints it (digits, a 
 The draft of the scientific-integration session gives `length_unit.record` as the path of a separate record file. In this format the record itself is copied in, so that it is signed and checked with the file.
 
 What the test does with the file: it reads `a1` to `a4`, `s_break` and `b1` to `b4` from the parameter catalogue (`params/records/`, empty scope) by the identifiers of the table in `engine/erosion/LS.md`, computes `LS = S * L` for each cell of Table 4-2 with `slope_steepness_factor` and `slope_length_factor` (slope in percent, length and unit length in feet), and `m` for each cell of Table 4-5 from `slope_length_factor` alone (at a length ten times the unit length, `L = 10 ** m`, so `m = log10(L)`). A coefficient absent from the catalogue fails the test once the fixture is signed.
+
+## `fao56_example35_surface_layer.json` (`#515`)
+
+Signed surface-layer worked-example fixture for FAO-56 Chapter 7, Example 35 (corrected February 2006 edition), added in `#515`. By explicit user acceptance (`gbarbozamar`), the methodological choices `early_wetting_option` (`wetting_ordering: de_after_wetting`), `full_precision_interpolation`, `half_digit_criterion` (`ACCEPTED_AFTER_RESULTS`), and `surface_only_scope` apply strictly to the surface-layer comparison (`early_wetting_step`) read by `engine/water/evaporation/test_surface_layer.py::test_fao56_chapter_7_worked_example` and `engine/water/evaporation/test_early_wetting.py`. Acceptance was recorded **after** viewing the comparison results (`results_seen_before_acceptance: true`, `retroactive_preregistration: false`, `full_ep3_reproduction: false`), and `engine/water/evaporation/surface_layer.py` `step` remains unchanged pending L1 integration review (D185, dryland regression, and column balance).
+
+## `h10_grahmann2022_runoff.json`
+
+Verified by `validation/test_h10_fixture_gate.py`. Carries the published Table 5 annual runoff and rainfall values for 2017–2019 (Grahmann et al. 2022) and the D230 criteria (`pbias_bound_percent: 25`, `event_cap_mm: 100`), with numeric transcription signed (`status: "SIGNED_TRANSCRIPTION_BY_EXPLICIT_USER_AUTHORIZATION"`, `checked_by: "gbarbozamar"`, `transcribed_by: "AI session, 2026-11-15"`).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | text | `"SIGNED_TRANSCRIPTION_BY_EXPLICIT_USER_AUTHORIZATION"` |
+| `checked_by` | text | Person who signed the numeric transcription (`"gbarbozamar"`) |
+| `transcribed_by` | text | Who transcribed the table (`"AI session, 2026-11-15"`) |
+| `source` | object | `reference`, `url`, and `locator` (Table 5 and six Wischmeier plots) |
+| `aggregation` | text | States six-plot annual average; do not mix with LEELP1 or demo soil |
+| `year_basis` | text | `"calendar_year_PER_D230_TO_BE_CHECKED"` |
+| `year_basis_checked_by` | text | **Separate gate.** Empty (`""`) keeps `[H10]` `not evaluated` (`BLOCKED_NOT_EVALUATED`) even though numeric values are signed |
+| `rows` | list | Three annual entries (`2017`, `2018`, `2019`) with `year`, `runoff_mm`, `printed`, `rainfall_mm`, and `locator` |
+| `criteria` | object | D230 criteria (`pbias_bound_percent`, `event_cap_mm`, `source`) |
+| `signature_record` | text | Reference to the external acceptance record |
+| `checked_scope` | text | States numeric scope vs. pending `year_basis_checked_by` |
+
+**Gate rule:** signing `checked_by` alone does not make `[H10]` evaluable. `validation/test_h10_fixture_gate.py` enforces that `[H10]` remains `not evaluated` (`BLOCKED_NOT_EVALUATED`) while `year_basis_checked_by` is empty, and while the remaining human gates in `docs/VALIDATION.md` (crop dates, 35-vs-6-day interval conflict, rainfall forcing route, plot HSG/CN and soil profile, and an actual EP3 plot run) remain open.
 
 ## OPEN
 
