@@ -1,0 +1,604 @@
+"""Acceptance test of ``POST /api/plant/run`` (unit l2/plant-route, brief S-018).
+
+Run with ``uv run pytest api/test_plant.py`` from the repository root.
+
+Status: PROPOSED test cases. Fakes only: the climate, the soil and slope and
+the engines are fakes of api/test_rotations.py or written here; no network and
+no real service. The soil loss per agricultural year the fake engines give is
+the example data of contracts/plant_answer/README.md ("the soil loss per kind
+of year of each rotation (14.0, 11.0, 8.0; 6.5, 5.0, 4.0; 4.0, 3.0, 2.5 t
+ha-1 yr-1), the one soil-loss year left missing (2022 of
+example-rotation-soybean-cover-pasture, reason MISSING_INPUT)"), placed on the
+kinds of year of the example answer. Every expected value of case 1 is read
+from the example answer file, never typed here.
+"""
+
+from __future__ import annotations
+
+import copy
+import datetime as dt
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from api.config import PARAMETERS_FOLDER, load_parameters
+from api.main import create_app
+from api.plant import NO_FACTORY, REDACTED_MESSAGE
+from api.ports import EnginesResult, ErrorDetail, Missing, ModuleStatus, RunSettings
+from api.rain_stress import R_ID, rain_stress, scale_erosivity
+from api.test_rotations import FakeClimate, FakeSoilSlope
+from contracts.inputs.common import Value
+from contracts.plant_answer import (
+    PlantAnswer,
+    PlantRequest,
+    check_answer_against_request,
+)
+from contracts.results.models import ResultsPerRotation
+
+ROOT = Path(__file__).parent.parent
+EXAMPLES = ROOT / "contracts" / "plant_answer" / "examples"
+ROUTE = "/api/plant/run"
+ORIGIN = "http://localhost:5173"
+
+REQUEST = json.loads(
+    (EXAMPLES / "PLACEHOLDER_plant_request.json").read_text(encoding="utf-8")
+)
+ANSWER = json.loads(
+    (EXAMPLES / "PLACEHOLDER_plant_answer.json").read_text(encoding="utf-8")
+)
+RESULT_TEMPLATE = json.loads(
+    (
+        ROOT / "contracts/results/examples/PLACEHOLDER_results_per_rotation.json"
+    ).read_text(encoding="utf-8")
+)
+
+SOYBEAN, COVER, PASTURE = (r["rotation_id"] for r in REQUEST["rotations"])
+START_MONTH = ANSWER["kinds_of_year"]["start_month"]
+KIND_OF = {y["ag_year"]: y["kind"] for y in ANSWER["kinds_of_year"]["years"]}
+FIRST_YEAR, LAST_YEAR = min(KIND_OF), max(KIND_OF)
+# The whole agricultural years FIRST_YEAR..LAST_YEAR with START_MONTH.
+PERIOD = RunSettings(
+    start_date=dt.date(FIRST_YEAR, START_MONTH, 1),
+    end_date=dt.date(LAST_YEAR + 1, START_MONTH, 1) - dt.timedelta(days=1),
+)
+
+# Example data of contracts/plant_answer/README.md (see the module docstring).
+SOURCE = ANSWER["options"][0]["soil_loss"]["average"]["sources"][0]
+LEVELS = {
+    SOYBEAN: {"el_nino": 14.0, "neutral": 11.0, "la_nina": 8.0},
+    COVER: {"el_nino": 6.5, "neutral": 5.0, "la_nina": 4.0},
+    PASTURE: {"el_nino": 4.0, "neutral": 3.0, "la_nina": 2.5},
+}
+MISSING_YEAR = {PASTURE: 2022}
+MISSING_DETAIL = "PLACEHOLDER: example of a soil loss the engine did not give"
+MODULES = (ModuleStatus(id="PLACEHOLDER_MODULE", state="available"),)
+NOT_BUILT_DETAIL = "PLACEHOLDER: the erosion engine is not built in this test"
+
+
+# --- fakes ------------------------------------------------------------------------
+
+
+def _annual(rotation_id: str, year: int) -> dict[str, Any]:
+    item = {
+        "ag_year": year,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "unit": "t ha-1 yr-1",
+    }
+    if MISSING_YEAR.get(rotation_id) == year:
+        return {
+            **item,
+            "value": None,
+            "missing": {"reason": "MISSING_INPUT", "detail": MISSING_DETAIL},
+        }
+    return {
+        **item,
+        "value": LEVELS[rotation_id][KIND_OF[year]],
+        "range_missing": {"reason": "NOT_AVAILABLE"},
+        "provenance": "DERIVED",
+        "source": SOURCE,
+    }
+
+
+def _monthly(year: int) -> list[dict[str, Any]]:
+    months = []
+    for step in range(12):
+        month = (START_MONTH - 1 + step) % 12 + 1
+        calendar_year = year + (START_MONTH - 1 + step) // 12
+        months.append(
+            {
+                "year": calendar_year,
+                "month": month,
+                "ag_year": year,
+                "indicator": "soil_loss",
+                "direction": "lower_is_better",
+                "value": None,
+                "unit": "t ha-1 month-1",
+                "missing": {
+                    "reason": "NOT_AVAILABLE",
+                    "detail": "PLACEHOLDER: no monthly value in this test",
+                },
+            }
+        )
+    return months
+
+
+def _not_built(indicator: str, direction: str, units: list[str]) -> dict[str, Any]:
+    return {
+        "indicator": indicator,
+        "direction": direction,
+        "units": units,
+        "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER"},
+    }
+
+
+def result_of(rotation_id: str, *, soil_loss_built: bool = True) -> EnginesResult:
+    document = copy.deepcopy(RESULT_TEMPLATE)
+    years = range(FIRST_YEAR, LAST_YEAR + 1)
+    document.update(
+        case_id=REQUEST["site"]["case_id"],
+        field_id=REQUEST["site"]["field_id"],
+        rotation_id=rotation_id,
+        water_deficit_exposure=_not_built(
+            "water_deficit_exposure", "higher_is_better", ["dimensionless"]
+        ),
+        soil_carbon_trend=_not_built(
+            "soil_carbon_trend", "higher_is_better", ["t C ha-1 yr-1"]
+        ),
+    )
+    if soil_loss_built:
+        document["soil_loss"] = {
+            "annual": [_annual(rotation_id, year) for year in years],
+            "monthly": [m for year in years for m in _monthly(year)],
+        }
+    else:
+        document["soil_loss"] = {
+            **_not_built(
+                "soil_loss", "lower_is_better", ["t ha-1 yr-1", "t ha-1 month-1"]
+            ),
+            "missing": {"reason": "NOT_AVAILABLE", "detail": NOT_BUILT_DETAIL},
+        }
+    return EnginesResult(
+        calendar=None,
+        result=ResultsPerRotation.model_validate(document),
+        result_missing=None,
+        modules=MODULES,
+        values_present=1,
+        values_missing=1,
+    )
+
+
+NO_RESULT = EnginesResult(
+    calendar=None,
+    result=None,
+    result_missing=Missing(
+        reason="MISSING_INPUT", detail="PLACEHOLDER: input not available: climate"
+    ),
+    modules=(
+        ModuleStatus(
+            id="PLACEHOLDER_MODULE", state="not_available", reason="MISSING_INPUT"
+        ),
+    ),
+)
+
+
+class FakeEngines:
+    """Answers by the ``rotation_id`` of the rotation; records every call."""
+
+    def __init__(self, answers: dict[str, EnginesResult] | None = None) -> None:
+        self.answers = answers or {rid: result_of(rid) for rid in LEVELS}
+        self.calls: list[tuple[Any, Any, Any]] = []
+
+    def run(self, rotation, climate, soil_slope) -> EnginesResult:
+        self.calls.append((rotation, climate, soil_slope))
+        return self.answers[rotation["rotation_id"]]
+
+
+class Factory:
+    """An engines factory that records the catalogue it was given."""
+
+    def __init__(self, engines: FakeEngines | None = None) -> None:
+        self.engines = engines or FakeEngines()
+        self.catalogues: list[dict[str, dict]] = []
+
+    def __call__(self, catalogue: dict[str, dict]) -> FakeEngines:
+        self.catalogues.append(catalogue)
+        return self.engines
+
+
+class Raises:
+    def run(self, rotation, climate, soil_slope):
+        raise RuntimeError("PLACEHOLDER_SECRET_EXCEPTION_TEXT")
+
+
+CATALOGUE = load_parameters(PARAMETERS_FOLDER)
+
+
+def client(**kwargs: Any) -> TestClient:
+    kwargs.setdefault("settings", PERIOD)
+    kwargs.setdefault("climate", FakeClimate())
+    kwargs.setdefault("soil_slope", FakeSoilSlope())
+    if "engines" not in kwargs:
+        kwargs.setdefault("parameters", CATALOGUE)
+        kwargs.setdefault("engines_factory", Factory())
+    return TestClient(create_app([ORIGIN], **kwargs), raise_server_exceptions=False)
+
+
+def body(**questions: Any) -> dict[str, Any]:
+    document = copy.deepcopy(REQUEST)
+    document["questions"].update(questions)
+    return document
+
+
+def answered(response) -> dict[str, Any]:
+    """A 200 that is a PlantAnswer and answers the request it was asked."""
+    assert response.status_code == 200, response.text
+    data = response.json()
+    answer = PlantAnswer.model_validate_json(json.dumps(data))
+    assert answer.model_dump(mode="json") == data
+    return data
+
+
+def checked(request: dict[str, Any], data: dict[str, Any]) -> None:
+    check_answer_against_request(
+        PlantRequest.model_validate_json(json.dumps(request)),
+        PlantAnswer.model_validate_json(json.dumps(data)),
+    )
+
+
+def without_sources(document: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in document.items() if key != "sources"}
+
+
+# --- case 1: the example request ---------------------------------------------------
+
+
+def test_the_example_request_gives_the_example_answer():
+    climate, soil, factory = FakeClimate(), FakeSoilSlope(), Factory()
+    response = client(climate=climate, soil_slope=soil, engines_factory=factory).post(
+        ROUTE, json=REQUEST
+    )
+    data = answered(response)
+    checked(REQUEST, data)
+    # Every field but the sources equals the example answer, which the pure
+    # functions computed from the same example inputs. Compared as the
+    # contract writes it: the route writes every member of a declared Value
+    # (null and false included, never exclude_none), the example file leaves
+    # out the members it does not set.
+    example = PlantAnswer.model_validate(ANSWER).model_dump(mode="json")
+    assert without_sources(data) == without_sources(example)
+    for key in ("answer", "chosen", "limit_cost", "tipping_price"):
+        assert data[key] == ANSWER[key]
+    for ours, theirs in zip(data["options"], ANSWER["options"], strict=True):
+        assert ours["state"] == theirs["state"]
+        assert ours["margin"] == theirs["margin"]
+    # The sources: the two fakes, then the ONI record as in the example.
+    assert [s["id"] for s in data["sources"]] == [
+        "PLACEHOLDER_CLIMATE",
+        "PLACEHOLDER_SOIL",
+        "oni_v6",
+    ]
+    assert data["sources"][2] == ANSWER["sources"][1]
+    # One climate request, one soil request, each rotation run once on them.
+    assert len(climate.requests) == 1
+    assert soil.calls == [(REQUEST["site"]["case_id"], REQUEST["site"]["field_id"])]
+    calls = factory.engines.calls
+    assert [call[0]["rotation_id"] for call in calls] == [SOYBEAN, COVER, PASTURE]
+    assert all(call[1] is calls[0][1] and call[2] is calls[0][2] for call in calls)
+
+
+# --- case 2: invalid requests ------------------------------------------------------
+
+
+def _nothing_called(climate, soil, engines) -> None:
+    assert climate.requests == []
+    assert soil.calls == []
+    assert engines.calls == []
+
+
+def _keep(count: int) -> dict[str, Any]:
+    document = copy.deepcopy(REQUEST)
+    rotations = document["rotations"]
+    document["rotations"] = [
+        {**copy.deepcopy(rotations[i % len(rotations)]), "rotation_id": f"r-{i}"}
+        for i in range(count)
+    ]
+    return document
+
+
+def _error(response, status: int, code: str) -> dict[str, Any]:
+    assert response.status_code == status, response.text
+    data = response.json()
+    assert set(data) == {"error"}
+    assert set(data["error"]) == {"code", "message", "details"}
+    assert data["error"]["code"] == code
+    return data["error"]
+
+
+@pytest.mark.parametrize("count", [2, 6])
+def test_two_or_six_rotations_are_invalid_and_nothing_is_called(count):
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    response = client(climate=climate, soil_slope=soil, engines=engines).post(
+        ROUTE, json=_keep(count)
+    )
+    error = _error(response, 422, "INVALID_REQUEST")
+    assert [d["path"] for d in error["details"]] == ["rotations"]
+    _nothing_called(climate, soil, engines)
+
+
+def test_an_invalid_rotation_is_rotation_invalid_and_nothing_is_called():
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    request = copy.deepcopy(REQUEST)
+    del request["rotations"][1]["components"]
+    response = client(climate=climate, soil_slope=soil, engines=engines).post(
+        ROUTE, json=request
+    )
+    error = _error(response, 422, "ROTATION_INVALID")
+    assert error["details"]
+    assert all(d["path"].startswith("rotations.1") for d in error["details"])
+    _nothing_called(climate, soil, engines)
+
+
+def test_a_problem_of_the_injected_validator_is_reported_under_its_index():
+    class OneProblem:
+        def validate(self, rotation):
+            if rotation["rotation_id"] != PASTURE:
+                return []
+            return [ErrorDetail(path="components.0", code="PLACEHOLDER", message="m")]
+
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    response = client(
+        climate=climate,
+        soil_slope=soil,
+        engines=engines,
+        rotation_validator=OneProblem(),
+    ).post(ROUTE, json=REQUEST)
+    error = _error(response, 422, "ROTATION_INVALID")
+    assert error["details"] == [
+        {"path": "rotations.2.components.0", "code": "PLACEHOLDER", "message": "m"}
+    ]
+    _nothing_called(climate, soil, engines)
+
+
+def test_an_error_does_not_repeat_a_submitted_value():
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    request = copy.deepcopy(REQUEST)
+    request["rotations"][2]["field_id"] = "PLACEHOLDER_other_field"
+    response = client(climate=climate, soil_slope=soil, engines=engines).post(
+        ROUTE, json=request
+    )
+    error = _error(response, 422, "INVALID_REQUEST")
+    assert error["details"][0]["message"] == REDACTED_MESSAGE
+    assert PASTURE not in response.text
+    assert "PLACEHOLDER_other_field" not in response.text
+    _nothing_called(climate, soil, engines)
+
+
+@pytest.mark.parametrize(
+    ("payload", "status", "code"),
+    [
+        ([1, 2, 3], 422, "INVALID_REQUEST"),
+        ({**REQUEST, "site": {**REQUEST["site"], "latitude": 1000.0}}, 422, None),
+    ],
+)
+def test_a_body_that_is_not_a_plant_request_is_422(payload, status, code):
+    response = client(engines=FakeEngines()).post(ROUTE, json=payload)
+    error = _error(response, status, code or "SITE_INVALID")
+    assert error["message"]
+
+
+def test_malformed_json_is_400():
+    response = client(engines=FakeEngines()).post(
+        ROUTE, content=b"{", headers={"Content-Type": "application/json"}
+    )
+    _error(response, 400, "MALFORMED_JSON")
+
+
+# --- case 3: no climate period ------------------------------------------------------
+
+
+def _numbers(data: Any, keys=("value", "price", "distance_percent", "limit")):
+    if isinstance(data, dict):
+        for key, item in data.items():
+            if key in keys and isinstance(item, int | float):
+                yield item
+            yield from _numbers(item, keys)
+    elif isinstance(data, list):
+        for item in data:
+            yield from _numbers(item, keys)
+
+
+def test_without_a_period_soil_loss_is_missing_and_nothing_is_resolved():
+    climate, engines = FakeClimate(), FakeEngines(dict.fromkeys(LEVELS, NO_RESULT))
+    response = client(climate=climate, engines=engines, settings=RunSettings()).post(
+        ROUTE, json=REQUEST
+    )
+    data = answered(response)
+    checked(REQUEST, data)
+    assert climate.requests == []
+    assert data["sources"][0]["state"] == "unavailable"
+    for option in data["options"]:
+        for mean in option["soil_loss"].values():
+            assert mean["value"] is None
+            assert mean["reason"] == "MISSING_INPUT"
+            assert "input not available: climate" in mean["detail"]
+        limit = option["limit"]
+        checks = [limit["on_average"], limit["every_kind"], *limit["by_kind"].values()]
+        assert {c["verdict"] for c in checks} == {"not_resolved"}
+        assert option["state"] == "not_resolved"
+        # Not classified: the average margin is missing, never a weighted guess.
+        assert option["margin"]["average"]["value"] is None
+        assert option["margin"]["average"]["reason"] == "NOT_AVAILABLE"
+    assert data["answer"] == "not_resolved"
+    assert data["chosen"] is None
+    # The kinds of year are missing with their reason; no count is known.
+    years = data["kinds_of_year"]["years"]
+    assert years and all(y["kind"] is None for y in years)
+    assert {y["missing_reason"] for y in years} == {"NOT_AVAILABLE"}
+    assert all("not configured" in y["detail"] for y in years)
+    assert set(data["kinds_of_year"]["counts"].values()) == {None}
+    # No zero stands for a missing value anywhere.
+    assert 0 not in list(_numbers(data))
+
+
+# --- case 4: the soil-loss engine not built -----------------------------------------
+
+
+def test_a_soil_loss_engine_not_built_gives_its_reason_to_every_option():
+    engines = FakeEngines(
+        {rid: result_of(rid, soil_loss_built=False) for rid in LEVELS}
+    )
+    data = answered(
+        client(engines=engines).post(ROUTE, json=body(rain_stress_factor=None))
+    )
+    checked(body(rain_stress_factor=None), data)
+    for option in data["options"]:
+        for mean in option["soil_loss"].values():
+            assert mean["value"] is None
+            assert mean["reason"] == "NOT_AVAILABLE"
+            assert NOT_BUILT_DETAIL in mean["detail"]
+        assert option["limit_check"]["verdict"] == "not_resolved"
+        assert NOT_BUILT_DETAIL in option["limit_check"]["detail"]
+        assert option["state"] == "not_resolved"
+    assert data["answer"] == "not_resolved"
+    # The kinds of year still come from the record and the margins are there.
+    assert data["kinds_of_year"] == ANSWER["kinds_of_year"]
+    assert [o["margin"] for o in data["options"]] == [
+        o["margin"] for o in ANSWER["options"]
+    ]
+
+
+# --- case 5: rain stress -------------------------------------------------------------
+
+
+def test_no_rain_stress_factor_gives_no_echo_and_one_plain_run():
+    engines = FakeEngines()
+    request = body(rain_stress_factor=None)
+    data = answered(client(engines=engines).post(ROUTE, json=request))
+    checked(request, data)
+    assert data["rain_stress"] is None
+    assert len(engines.calls) == 3
+
+
+def test_a_factor_with_a_factory_reaches_the_engines_on_the_scaled_catalogue():
+    factory = Factory()
+    data = answered(client(engines_factory=factory).post(ROUTE, json=REQUEST))
+    (catalogue,) = factory.catalogues
+    stress = rain_stress(
+        Value.model_validate(REQUEST["questions"]["rain_stress_factor"])
+    )
+    assert catalogue == scale_erosivity(CATALOGUE, stress)
+    scaled = [k for k, r in catalogue.items() if r.get("id") == R_ID]
+    assert scaled and all(catalogue[k] != CATALOGUE[k] for k in scaled)
+    assert len(factory.engines.calls) == 3
+    assert data["rain_stress"]["applied"] is True
+    example = PlantAnswer.model_validate(ANSWER).model_dump(mode="json")
+    assert data["rain_stress"] == example["rain_stress"]
+
+
+def test_a_factor_with_injected_engines_and_no_factory_is_not_applied():
+    engines = FakeEngines()
+    data = answered(client(engines=engines).post(ROUTE, json=REQUEST))
+    checked(REQUEST, data)
+    echo = data["rain_stress"]
+    assert echo["applied"] is False
+    assert NO_FACTORY in echo["detail"]
+    assert Value.model_validate(echo["declared"]) == Value.model_validate(
+        REQUEST["questions"]["rain_stress_factor"]
+    )
+    assert len(engines.calls) == 3
+
+
+def test_a_missing_factor_is_echoed_missing():
+    factor = {
+        "value": None,
+        "unit": "dimensionless",
+        "missing": {"reason": "NOT_DECLARED"},
+    }
+    factory = Factory()
+    request = body(rain_stress_factor=factor)
+    data = answered(client(engines_factory=factory).post(ROUTE, json=request))
+    checked(request, data)
+    assert data["rain_stress"]["missing"] == {"reason": "NOT_DECLARED", "detail": None}
+    assert factory.catalogues == []
+
+
+# --- case 6: the questions change what is ranked ---------------------------------------
+
+
+def test_strictness_every_kind_changes_the_answer():
+    request = body(strictness="every_kind")
+    data = answered(client().post(ROUTE, json=request))
+    checked(request, data)
+    assert (data["answer"], data["chosen"]) != (ANSWER["answer"], ANSWER["chosen"])
+    assert data["answer"] == "not_resolved"
+    assert [o["limit_check"] for o in data["options"]] == [
+        o["limit"]["every_kind"] for o in ANSWER["options"]
+    ]
+
+
+def test_margin_of_a_kind_of_year_changes_the_answer():
+    request = body(margin_of="la_nina")
+    data = answered(client().post(ROUTE, json=request))
+    checked(request, data)
+    assert (data["answer"], data["chosen"]) != (ANSWER["answer"], ANSWER["chosen"])
+    assert data["answer"] == "not_resolved"
+
+
+# --- defects: 500 -----------------------------------------------------------------------
+
+
+def _internal(response) -> None:
+    error = _error(response, 500, "INTERNAL_ERROR")
+    assert error["details"] == []
+    assert "PLACEHOLDER_SECRET_EXCEPTION_TEXT" not in response.text
+    assert response.headers.get("access-control-allow-origin") == ORIGIN
+
+
+def test_an_engine_that_raises_answers_500():
+    response = client(engines=Raises()).post(
+        ROUTE, json=REQUEST, headers={"Origin": ORIGIN}
+    )
+    _internal(response)
+
+
+def test_engines_that_answer_for_another_rotation_answer_500():
+    engines = FakeEngines({rid: result_of(SOYBEAN) for rid in LEVELS})
+    response = client(engines=engines).post(
+        ROUTE, json=REQUEST, headers={"Origin": ORIGIN}
+    )
+    _internal(response)
+
+
+# --- the default app ---------------------------------------------------------------------
+
+
+def test_the_default_app_answers_the_example_request():
+    """The engines of the repository, the stand-in sources and no period: a
+    200 with every soil-loss mean missing and the stress applied through the
+    default factory on the catalogue."""
+    app = create_app([], parameters=CATALOGUE)
+    data = answered(TestClient(app).post(ROUTE, json=REQUEST))
+    checked(REQUEST, data)
+    assert data["rain_stress"]["applied"] is True
+    assert all(
+        mean["value"] is None
+        for option in data["options"]
+        for mean in option["soil_loss"].values()
+    )
+    assert 0 not in list(_numbers(data))
+
+
+# --- the other routes ------------------------------------------------------------------
+
+
+def test_the_rotation_route_is_unchanged_next_to_the_new_one():
+    response = client(engines=FakeEngines()).post(
+        "/api/rotations/run",
+        json={"site": REQUEST["site"], "rotation": REQUEST["rotations"][0]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["result"]["rotation_id"] == SOYBEAN

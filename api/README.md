@@ -15,6 +15,7 @@ under [Decided](#decided), with its decision number of issue #77.
 | `GET /health` | Liveness. Unchanged, at the root |
 | `POST /api/rotations/run` | One rotation for one field, end to end. Synchronous, JSON in and JSON out |
 | `POST /api/decisions/run` | Two rotations of one field and the decision output of the pair (#268). Synchronous, JSON in and JSON out. **PROPOSED** |
+| `POST /api/plant/run` | "What should I plant?": one field, three to five rotations, a `PlantRequest` in and a `PlantAnswer` out (`contracts/plant_answer/`). Synchronous. **PROPOSED** |
 
 Every product route lives under `/api`.
 
@@ -264,6 +265,90 @@ measured (OPEN below).
 - Whether `ResultsTable` gains a wholly missing form (question 14 of
   `contracts/results/README.md`): until then a part not built gives no
   decision.
+
+## `POST /api/plant/run` (PROPOSED, unit `l2/plant-route`)
+
+"What should I plant?" for one field and three to five rotations (R4, R10,
+R13, R15 of the loop decisions). Module `api/plant.py`; acceptance test
+`api/test_plant.py` (`uv run pytest api/test_plant.py`). The body is a
+`PlantRequest` and a `200` is a `PlantAnswer` of `contracts/plant_answer/`,
+written with every null kept (`model_dump(mode="json")`). Every number of the
+answer comes from a function of `economics/` or `kinds_of_year/`, or is
+copied from an engine result or from the request; the route computes none.
+
+In order:
+
+1. **Request.** The body is loaded into `PlantRequest` (as JSON). A body that
+   fails is `422` in the one error shape: `ROTATION_INVALID` when every
+   problem lies inside one rotation item (`rotations.<i>.…`), `SITE_INVALID`
+   when every problem lies inside `site`, `INVALID_REQUEST` otherwise (a wrong
+   number of rotations, a rule of the whole request). Then each rotation goes
+   through the `RotationValidator`; a problem is `ROTATION_INVALID` under
+   `rotations.<i>`. A message that repeats a submitted text (three characters
+   or more, as `api/rotation_validator.py` looks for) is replaced by a fixed
+   text. Nothing is called before that. Malformed JSON is `400`.
+2. **Sources.** Climate and soil and slope are asked for once for the site,
+   as `POST /api/decisions/run` does. `sources` lists them, then the ONI
+   record of `kinds_of_year/` (state `cached`, OPEN 5 of the contract).
+3. **Engines.** Each rotation runs once through the `RotationEngines`, with
+   its request item unchanged. **Phase 1 is enough for the answer**: the
+   top-level result of the run (`EnginesResult.result`) is read, the other
+   phases are not. A result for another `rotation_id` is a defect (`500`).
+4. **Kinds of year.** The whole agricultural years of the configured climate
+   period (`api.carbon_forcing.whole_ag_years`, by the rotations' shared
+   start month) are classified with `classify_agricultural_years` on the ONI
+   record, loaded once when the app is built (`create_app` keyword
+   `kinds_of_year_record`; `None` loads the committed record). The years come
+   from the settings period, not from the calendar. Without a period, or with
+   a period that holds no whole agricultural year, the record's years are not
+   known: the contract still asks for at least one year, so the answer lists
+   the agricultural years of the declared dates of the rotations, each missing
+   `NOT_AVAILABLE` with a detail saying it is not a year of the record; every
+   count is null and the margins get `year_counts=None` (average missing
+   `NOT_AVAILABLE`).
+5. **Soil loss.** The annual values of the phase-1 result
+   (`kinds_of_year.series_from_results`) are averaged with `mean_by_kind`;
+   `average` is the record mean. No result (no period, an input absent,
+   calendar not built) or a soil-loss part not built gives every mean missing
+   with the engine's reason and detail, never zero.
+6. **Limit.** `assess_limit(limit, average, by_kind, kinds_in_record=...)`:
+   the kinds with at least one year in the record when every year is
+   classified (R13); `None` (every kind kept) when a year has no kind or the
+   years are not the record's. A missing declared limit gives every check not
+   resolved, as `assess_limit` does.
+7. **Margins.** `compute_rotation_margin(years, facts, year_counts)`, with
+   `year_counts` from `count_kinds`. `years` is read from the
+   `RotationDefinition` (PROPOSED, not the calendar): each component counts in
+   the agricultural year of its sowing date, in position order, from the first
+   such year to the last. A missing sowing date (`MISSING_INPUT`), a year of
+   the cycle without a crop, or a declared-margin crop sharing its year
+   (both `NOT_COMPUTABLE`) give that rotation's margins missing with the
+   reason. The margin the ranking reads is `questions.margin_of`.
+8. **Decision and tipping price.** `choose_rotation(options, strictness)`;
+   `find_tipping_price(..., price_range, strictness, margin_of)` for the
+   tipping field (its own `decision` is the answer and is not repeated). When
+   one rotation has no years, the tipping price is missing on both sides with
+   `MISSING_INPUT`, naming it.
+9. **Rain stress (R10).** No factor: `rain_stress` null, one plain run. A
+   missing factor: the missing echo, one plain run. A factor: the engines are
+   rebuilt by `engines_factory(scale_erosivity(parameters, stress))` and the
+   echo is `applied_echo(parameters, stress)`. `engines_factory` is a
+   `create_app` keyword used only by this route; with the default engines it
+   defaults to `EntryPointEngines` on the same engine functions. With
+   `engines` given and no factory, the run is not stressed and the echo says
+   `applied: false` with the reason in its detail; never a silent run.
+10. `erosivity` is `"mean_annual"` (S-026 may add `"per_year"`).
+11. `example_data` is true when the request says so, when a rotation, the
+    climate or the soil and slope carries the mark
+    (`api.decisions.example_data_of`), or when a source has state `example`.
+12. The answer is checked with `check_answer_against_request`; a failure is a
+    defect of the route. What an engine raises is not caught by the engines:
+    the route answers `500` `INTERNAL_ERROR` with no exception text.
+
+**OPEN for this route:** per-year erosivity (S-026); a margin range; the
+years of the record when no period is configured (the contract requires at
+least one year in `kinds_of_year`); whether the other phases of a rotation
+should enter the answer.
 
 ## Errors (`api/errors.py`)
 
