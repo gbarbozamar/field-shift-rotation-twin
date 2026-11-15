@@ -1,0 +1,300 @@
+{
+  "status": "SIGNED_TRANSCRIPTION_BY_EXPLICIT_USER_AUTHORIZATION",
+  "test": "engine/water/balance/test_bucket.py::test_h1_public_reference_case",
+  "path_in_repository": "validation/fixtures/h1_fao56_example37.json",
+  "source": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and drainage paper 56. FAO, Rome.",
+    "locator": "Chapter 8, ETc under soil water stress conditions, EXAMPLE 37 'Effect of water stress on crop evapotranspiration': the statement, the lines 'From Eq. 82' and 'From Eq. 83', the daily table of ten days with columns (1) to (8), and the notes (1) to (8) under it",
+    "url": "https://www.fao.org/4/X0490E/x0490e0e.htm",
+    "read": "2026-11-15"
+  },
+  "transcribed_by": "AI session (unit l0/validation-e8-e9-h7-h8-d226-d227, brief #347 and its amendment), from the online page read on 2026-11-15; cross-read with the raw copy and the recomputation of the research session of D228",
+  "checked_by": "gbarbozamar",
+  "inputs": {
+    "reference_evapotranspiration": {
+      "value": 5.0,
+      "printed": "5.0",
+      "unit": "mm/day",
+      "locator": "Example 37, statement and column (2)",
+      "verbatim": "The expected ETo for the coming decade is 5 mm/day",
+      "note": "The statement prints 5; the table prints 5.0 on every day."
+    },
+    "crop_coefficient": {
+      "value": 1.2,
+      "printed": "1.2",
+      "unit": "dimensionless",
+      "locator": "Example 37, statement and column (3)",
+      "verbatim": "Kc = 1.2",
+      "note": "D228 reads it as the basal coefficient Kcb, with Ke = 0 (a modelling choice)."
+    },
+    "root_depth": {
+      "value": 0.8,
+      "printed": "0.8",
+      "unit": "m",
+      "locator": "Example 37, statement",
+      "verbatim": "Zr = 0.8 m",
+      "note": "D228: the column depth equals Zr (a modelling choice)."
+    },
+    "depletion_fraction": {
+      "value": 0.4,
+      "printed": "0.40",
+      "unit": "dimensionless",
+      "locator": "Example 37, statement",
+      "verbatim": "p = 0.40"
+    },
+    "total_available_water": {
+      "value": 160.0,
+      "printed": "160",
+      "unit": "mm",
+      "locator": "Example 37, line 'From Eq. 82'",
+      "verbatim": "TAW = 1000 (0.32-0.12) 0.8 = 160 mm",
+      "note": "With the column depth equal to Zr, the capacity of the one-layer column."
+    },
+    "initial_depletion": {
+      "value": 55.0,
+      "printed": "55.0",
+      "unit": "mm",
+      "locator": "Example 37, statement, and row 'start' of column (8)",
+      "verbatim": "the initial root zone depletion is 55 mm",
+      "note": "D228: the initial state is the printed depletion (a modelling choice)."
+    }
+  },
+  "rows": [
+    {
+      "day": 1,
+      "stress_coefficient": {
+        "value": 1.0,
+        "printed": "1.00",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 1, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 6.0,
+        "printed": "6.0",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 1, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 61.0,
+        "printed": "61.0",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 1, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 2,
+      "stress_coefficient": {
+        "value": 1.0,
+        "printed": "1.00",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 2, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 6.0,
+        "printed": "6.0",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 2, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 67.0,
+        "printed": "67.0",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 2, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 3,
+      "stress_coefficient": {
+        "value": 0.97,
+        "printed": "0.97",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 3, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 5.8,
+        "printed": "5.8",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 3, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 72.8,
+        "printed": "72.8",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 3, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 4,
+      "stress_coefficient": {
+        "value": 0.91,
+        "printed": "0.91",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 4, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 5.4,
+        "printed": "5.4",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 4, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 78.3,
+        "printed": "78.3",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 4, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 5,
+      "stress_coefficient": {
+        "value": 0.85,
+        "printed": "0.85",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 5, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 5.1,
+        "printed": "5.1",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 5, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 83.4,
+        "printed": "83.4",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 5, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 6,
+      "stress_coefficient": {
+        "value": 0.8,
+        "printed": "0.80",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 6, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 4.8,
+        "printed": "4.8",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 6, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 88.2,
+        "printed": "88.2",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 6, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 7,
+      "stress_coefficient": {
+        "value": 0.75,
+        "printed": "0.75",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 7, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 4.5,
+        "printed": "4.5",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 7, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 92.6,
+        "printed": "92.6",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 7, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 8,
+      "stress_coefficient": {
+        "value": 0.7,
+        "printed": "0.70",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 8, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 4.2,
+        "printed": "4.2",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 8, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 96.9,
+        "printed": "96.9",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 8, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 9,
+      "stress_coefficient": {
+        "value": 0.66,
+        "printed": "0.66",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 9, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 3.9,
+        "printed": "3.9",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 9, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 100.8,
+        "printed": "100.8",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 9, column (8) Dr, i end"
+      }
+    },
+    {
+      "day": 10,
+      "stress_coefficient": {
+        "value": 0.62,
+        "printed": "0.62",
+        "unit": "dimensionless",
+        "locator": "Example 37, daily table, row of day 10, column (6) Ks"
+      },
+      "adjusted_crop_evapotranspiration": {
+        "value": 3.7,
+        "printed": "3.7",
+        "unit": "mm/day",
+        "locator": "Example 37, daily table, row of day 10, column (7) ETc adj"
+      },
+      "depletion_end": {
+        "value": 104.5,
+        "printed": "104.5",
+        "unit": "mm",
+        "locator": "Example 37, daily table, row of day 10, column (8) Dr, i end"
+      }
+    }
+  ],
+  "tolerance": {
+    "stress_coefficient": 0.005,
+    "adjusted_crop_evapotranspiration": 0.05,
+    "depletion_end": 0.05
+  },
+  "tolerance_rule": "The rule of D124 as D228 applies it: half a unit of the last printed digit of each value: 0.005 for Ks (two decimals), 0.05 for ETc adj and Dr, i end (one decimal).",
+  "tolerance_decided_by": "D228 of issue #77, https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768, taking the rule of D124",
+  "printed_but_not_read": {
+    "soil_water": "theta FC = 0.32 and theta WP = 0.12 m3 m-3 (statement); they give TAW by Eq. 82",
+    "readily_available_water": "RAW = 0.40 (160) = 64 mm (line 'From Eq. 83')",
+    "columns_not_compared": "(1) day, (2) ETo 5.0, (3) Kc 1.2, (4) ETc 6.0 on every day, and (5) Dr, i start, which note (5) says is column 8 of the previous day",
+    "precipitation_and_irrigation": "none: 'neither rain nor irrigations are either forecasted or planned'"
+  },
+  "notes_of_the_table": {
+    "5": "Root zone depletion at the beginning of the day (column 8 of previous day),",
+    "6": "Eq. 84 where Ks = 1 if Dr, i < RAW.",
+    "7": "Eq. 81, crop ET under soil water stress conditions.",
+    "8": "Depletion at end of day."
+  },
+  "readings_of_d228": [
+    "Kc is read as the basal coefficient with Ke = 0.",
+    "The column depth equals Zr.",
+    "The initial state is the printed depletion.",
+    "The stress coefficient uses the depletion at the start of the day, as note (5) prints."
+  ],
+  "human_check_record": "SIGNATURE_RECORD.json"
+}
