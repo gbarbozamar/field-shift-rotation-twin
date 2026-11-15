@@ -2,7 +2,7 @@
 
 What to type, in order, and what you should see: clone, install, run the tests, start the backend without Docker, send the example rotation, read the answer, build and open the interface.
 
-**Checked against commit `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9` of `main`, on 15 November 2026.** Every command below was run, in this order, in a fresh `git clone` of the public repository at that commit, and every output shown is the output seen then. A second fresh clone, made later that day at `2e5caf99086080a36a13d5972b493708258393a9` (which changes only documentation files after `3ced36f`), was taken through this page from top to bottom and gave the same outputs. `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
+**Checked against commit `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9` of `main`, on 15 November 2026.** Every command below was run, in this order, in a fresh `git clone` of the public repository at that commit, and every output shown is the output seen then. A second fresh clone, made later that day at `2e5caf99086080a36a13d5972b493708258393a9` (which changes only documentation files after `3ced36f`), was taken through this page from top to bottom and gave the same outputs. The module states of steps 7 and 8 were checked again at commit `f060a09` (15 November 2026), by sending the same request to the backend in process in configurations A and B: since the runner calls RothC, `rothc` answers like the other engines, and the tables below show that. `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
 
 The commands are written for a POSIX shell (bash); the `NAME=value command` form sets a variable for one command. They come from `CLAUDE.md`, `api/README.md`, `web/README.md` and `.github/workflows/ci.yml`.
 
@@ -43,7 +43,7 @@ At the checked commit, on a machine where the Docker command is installed but Do
 1 failed, 4763 passed, 17 skipped, 7 warnings
 ```
 
-The numbers grow with each unit that adds tests, so on a later commit yours will be higher. What you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). The run took between ten and twenty minutes on the machines it was run on; how long depends on the machine.
+The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (the skipped count can go down as well as up). What you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). The run took between ten and twenty minutes on the machines it was run on; how long depends on the machine.
 
 The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml`):
 
@@ -152,8 +152,7 @@ The three indicators and their modules:
 |---|---|---|
 | Soil loss | `erosion` | `not_available`, `MISSING_INPUT` (climate and soil absent) |
 | Water-deficit exposure | `water` | `not_available`, `MISSING_INPUT` (climate and soil absent) |
-| Soil-carbon trend | `residues`, `amg` | `not_available`, `MISSING_INPUT` (climate and soil absent) |
-| Soil-carbon trend | `rothc` | `not_available`, `NOT_AVAILABLE`, "the runner does not call this engine yet: engine.rothc.run_rothc" |
+| Soil-carbon trend | `residues`, `amg`, `rothc` | `not_available`, `MISSING_INPUT` (climate and soil absent) |
 
 No indicator carries a number: each is missing with its reason, never zero. The `calendar` module is `available`.
 
@@ -177,7 +176,7 @@ CORS_ORIGINS=http://localhost:5173 SOIL_SLOPE_EXAMPLE_FILE=data/demo/la_estanzue
 Illustrative rotation: missing input: input not available: climate (site data: climate)
 ```
 
-The soil source is now listed with state `example`; the climate is still `climate_not_connected`, `NOT_AVAILABLE`. Without a climate record no indicator can be computed: `erosion`, `water`, `residues` and `amg` stay `not_available` / `MISSING_INPUT`, their detail now naming only the climate; `rothc` stays `not_available` / `NOT_AVAILABLE` with the same detail as in step 7; `calendar` stays `available`.
+The soil source is now listed with state `example`; the climate is still `climate_not_connected`, `NOT_AVAILABLE`. Without a climate record no indicator can be computed: `erosion`, `water`, `residues`, `amg` and `rothc` stay `not_available` / `MISSING_INPUT`, their detail now naming only the climate; `calendar` stays `available`.
 
 ### C. The climate source and the demonstration soil file switched on: not run when this page was written
 
@@ -209,6 +208,8 @@ The soil-loss figure of the demonstration is not on this page as a result of a r
 POWER_SETTINGS_FILE= CLIMATE_START_DATE= CLIMATE_END_DATE= docker compose up
 ```
 
+Both commands need the Docker daemon running, not only the `docker` command installed: with the daemon stopped they fail to connect to it.
+
 **Not run when this page was written:** Docker was not used.
 
 ## 9. The deployed service
@@ -217,7 +218,6 @@ The interface is published at `https://gbarbozamar.github.io/field-shift-rotatio
 
 ## Limits of the answer, at the checked commit
 
-- **Without a climate record nothing is computed.** In configurations A and B every indicator is missing (`MISSING_INPUT`, except RothC, below); the answer is `no_result`.
-- **RothC is not called by the runner** at this commit: its rows and its module say "the runner does not call this engine yet: engine.rothc.run_rothc", whatever the configuration.
+- **Without a climate record nothing is computed.** In configurations A and B every indicator is missing with `MISSING_INPUT`, RothC included; the answer is `no_result`.
 - **The soil-loss figure, when it appears, carries the label of D148** quoted above, and it is the same for both rotations of D128 (D158).
 - **Example data is example data.** The fields, the rotation and most of the Fields screen are synthetic, and the screen labels them so. The demonstration soil-and-slope file is marked `example_data: true`, and the backend refuses to start with one that is not (`api/README.md`).
