@@ -45,7 +45,7 @@ export default function FieldsScreen() {
     exampleCase.fields.find((field) => field.field_id === selectedFieldId) ?? null
 
   return (
-    <section aria-labelledby="fields-screen-title" className="max-w-2xl">
+    <section aria-labelledby="fields-screen-title">
       <h2 id="fields-screen-title" className="text-lg font-semibold">
         {strings['identity.title']}
       </h2>
@@ -55,77 +55,103 @@ export default function FieldsScreen() {
 
       <StageRail />
 
-      {exampleCase.example_data && (
-        <div
-          role="note"
-          aria-label={strings['identity.banner_title']}
-          className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
-        >
-          <p className="text-sm font-semibold text-amber-900">{strings['identity.banner_title']}</p>
-          <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
-        </div>
-      )}
+      {/* The workbench shell of issue #454: one source order, two columns
+          from 1100px. The two wrappers below are plain block flow under
+          1100px, so the small-screen stacking is exactly the order of this
+          file; the grid variant places the first wrapper (the example-data
+          banner, the map over the field list) in the flexible column and
+          the second (the six inspector pieces, in their today order) in
+          the fixed inspector column. The banner sits inside the map column
+          at the developer's request (15 Nov 2026), so it spans the map's
+          width, not the whole shell. Every component still mounts exactly
+          once. */}
+      <div className="min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1fr)_520px] min-[1100px]:items-start min-[1100px]:gap-6">
+        <div>
+          {exampleCase.example_data && (
+            <div
+              role="note"
+              aria-label={strings['identity.banner_title']}
+              className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
+            >
+              <p className="text-sm font-semibold text-amber-900">{strings['identity.banner_title']}</p>
+              <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
+            </div>
+          )}
 
-      <div className="mt-6">
-        <h3 className="text-base font-semibold">{strings['map.title']}</h3>
-        <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
-        <div className="mt-2">
-          <FieldsMap />
+          <div className="mt-6">
+            <h3 className="text-base font-semibold">{strings['map.title']}</h3>
+            <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
+            <div className="mt-2 h-[60dvh] min-h-[24rem] max-h-[80dvh]">
+              <FieldsMap />
+            </div>
+          </div>
+
+          <ul className="mt-6 space-y-3">
+            {exampleCase.fields.map((field) => {
+            const isSelected = field.field_id === selectedFieldId
+            return (
+              <li key={field.field_id}>
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedFieldId(field.field_id)}
+                  className={[
+                    'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
+                    isSelected ? 'border-emerald-500' : 'border-slate-200',
+                    ...(isSelected
+                      ? ['bg-emerald-50', 'ring-2', 'ring-emerald-500']
+                      : ['bg-white', 'hover:border-slate-300', 'hover:bg-slate-50']),
+                  ].join(' ')}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-slate-900">{field.name}</span>
+                    {isSelected && (
+                      <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                        {strings['identity.selected']}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-500">
+                    {strings['identity.field_id_label']}: {field.field_id}
+                  </span>
+                </button>
+              </li>
+            )
+            })}
+          </ul>
+
+          {exampleCase.fields.length === 0 && (
+            <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
+          )}
+        </div>
+
+        {/* The inspector column of issue #454, corrected after the
+            developer's screen check of 15 Nov 2026: a grid item is as
+            wide as its widest unbreakable content unless it may shrink
+            (min-w-0 on the item and on every child, long words may
+            break), and the six stacked pieces are far taller than the
+            map-and-list column, so from 1100px the inspector stays
+            beside the map as a panel with its own scroll (sticky, at
+            most the viewport minus the main padding), instead of
+            leaving the left column as empty space on the way down.
+            Under 1100px this wrapper is plain block flow, unchanged. */}
+        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[520px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
+          <RotationRun />
+
+          <SiteSheet />
+
+          {selectedFieldId === exampleRotation.field_id && (
+            <div className="mt-8">
+              <RotationRibbon rotation={exampleRotation} />
+            </div>
+          )}
+          {selectedFieldId !== null && <ClocksScreen />}
+
+          {selectedFieldId !== null && <ResultCards />}
+
+          {selectedFieldId !== null && <DecisionSection />}
         </div>
       </div>
-
-      <ul className="mt-6 space-y-3">
-        {exampleCase.fields.map((field) => {
-          const isSelected = field.field_id === selectedFieldId
-          return (
-            <li key={field.field_id}>
-              <button
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => setSelectedFieldId(field.field_id)}
-                className={[
-                  'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
-                  isSelected ? 'border-emerald-500' : 'border-slate-200',
-                  ...(isSelected
-                    ? ['bg-emerald-50', 'ring-2', 'ring-emerald-500']
-                    : ['bg-white', 'hover:border-slate-300', 'hover:bg-slate-50']),
-                ].join(' ')}
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-900">{field.name}</span>
-                  {isSelected && (
-                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                      {strings['identity.selected']}
-                    </span>
-                  )}
-                </span>
-                <span className="mt-1 block text-sm text-slate-500">
-                  {strings['identity.field_id_label']}: {field.field_id}
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-
-      {exampleCase.fields.length === 0 && (
-        <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
-      )}
-
-      <RotationRun />
-
-      <SiteSheet />
-
-      {selectedFieldId === exampleRotation.field_id && (
-        <div className="mt-8">
-          <RotationRibbon rotation={exampleRotation} />
-        </div>
-      )}
-      {selectedFieldId !== null && <ClocksScreen />}
-
-      {selectedFieldId !== null && <ResultCards />}
-
-      {selectedFieldId !== null && <DecisionSection />}
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${strings['identity.selected']}: ${selectedField.name}` : ''}
