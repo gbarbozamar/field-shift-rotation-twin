@@ -60,7 +60,13 @@ D214 to D217 of issue #77 where #264 left them PROPOSED (a demanded sum that
 is not above zero, D214; the provenance label and the source, D215; the
 reason of the missing range, D216; one value per agricultural year, D217),
 and ends the ``source`` of every value with the clause of method facts of
-D215 (``METHOD_FACTS``). See EXPOSURE.md in this folder.
+D215 (``METHOD_FACTS``). Unit ``l1/live-crop-by-day`` (issue #399) moves
+the rule that gives the crop period of each day of the record (the
+repetition, the lead-in, undated components, overlaps and the stage lengths)
+to ``engine/water/living_crop.py``, and the chain is built on its
+``LiveCropOverRecord``, so the monthly soil cover of RothC (D222) reads the
+same rule through ``live_crop_by_day``; no result of EP3 changes. See
+EXPOSURE.md in this folder.
 
 Status: PROPOSED (blueprint section 3.7): the order of the checks, the
 reason of each item, the identifier and scope of each parameter, how the
@@ -84,7 +90,7 @@ from dataclasses import dataclass, fields
 from typing import get_args, get_type_hints
 
 from contracts.inputs.common import Missing as InputsMissing
-from contracts.inputs.rotation_calendar import CalendarComponent, RotationCalendar
+from contracts.inputs.rotation_calendar import RotationCalendar
 from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.inputs.site_soil_slope import SiteSoilSlope
 from contracts.results.models import (
@@ -97,7 +103,6 @@ from contracts.results.models import (
 from engine.calendar.repeat import (
     RepeatedComponent,
     RepeatedRotation,
-    repeat_over_record,
 )
 from engine.water import balance, evaporation, fallow, living_crop
 from engine.water._parameters import Catalogue, Scope, check_parameters
@@ -375,29 +380,13 @@ RANGE_NOT_BUILT = (
 NO_CROP_ON_THE_DAY = "NOT_APPLICABLE"
 # The demanded sum of a year must lie above this for the ratio to exist.
 _ZERO = 0
-CROP_UNKNOWN = (
-    "the crop of the day is not known: the day lies before the first cycle of "
-    "the rotation repeated over the agricultural years of the climate record "
-    "(decisions D47 and D109 of issue #77, engine/calendar/repeat.py), and no "
-    "component of the cycle before it has an end date inside the record "
-    "(decision D141), so the calendar does not describe the day: nothing is "
-    "laid out before the first cycle (point 6 of engine/calendar/repeat.py, "
-    "OPEN 5 of engine/water/EXPOSURE.md)"
-)
-CROP_DATES_MISSING = (
-    "the crop of the day is not known: a component of the calendar has a "
-    "missing date, so the days it covers are not known, within its cycle of "
-    "the rotation repeated over the record (point 7 of "
-    "engine/calendar/repeat.py)"
-)
-REPETITION_NOT_LAID_OUT = (
-    "engine/calendar/repeat.py did not repeat the calendar over the years of "
-    "the record although its start month is known (D47)"
-)
-REPETITION_OTHER_YEARS = (
-    "engine/calendar/repeat.py laid out other agricultural years than EP3 did "
-    "from the same record and start month (D47)"
-)
+# The texts of the crop of a day live with its rule in
+# engine/water/living_crop.py (unit #399); EP3 keeps their names.
+CROP_UNKNOWN = living_crop.CROP_UNKNOWN
+CROP_DATES_MISSING = living_crop.CROP_DATES_MISSING
+CROPS_OVERLAP = living_crop.CROPS_OVERLAP
+REPETITION_NOT_LAID_OUT = living_crop.REPETITION_NOT_LAID_OUT
+REPETITION_OTHER_YEARS = living_crop.REPETITION_OTHER_YEARS
 STAGE_UNKNOWN = (
     "the growth stage of the day is not known: the calendar carries no growth "
     "stage and a stage length of the crop has no value in parameters (the "
@@ -406,10 +395,6 @@ STAGE_UNKNOWN = (
     "decision D78 of issue #77) nor its root depth (the root growth of FAO-56 "
     "Annex 8, D78) can be taken, and missing stages stay missing (decision D79 "
     "of issue #77)"
-)
-CROPS_OVERLAP = (
-    "two components of the calendar cover the day, and the water chain takes "
-    "one crop per day"
 )
 
 
@@ -551,131 +536,11 @@ def _unit_problems(
 # --- the rotation over the record, and the crop of each day ---------------------
 
 
-def _over_record(calendar: RotationCalendar, record: DailySeries) -> RepeatedRotation:
-    """The calendar repeated over the agricultural years of the record.
-
-    The repetition is ``engine.calendar.repeat_over_record`` (D47, D109), on
-    the dates of the ``precipitation`` series, the series that marks the
-    record for EP1 too; no rule of it is written here, and it is called once,
-    with the record as it is. A calendar moved by ``phase_calendar`` (D132)
-    is repeated like any other. Nothing is laid out past the record: a cycle
-    that does not fit whole is cut at its end (D109), so a component sown
-    after the last day of the record's years is not known here.
-
-    Raises ``ValueError``, as EP1 does, if the helper does not lay out the
-    agricultural years this entry point lists from the same record and start
-    month.
-    """
-    start_month = calendar.ag_year_start.month
-    repeated = repeat_over_record(calendar, record.start_date, record.end_date)
-    if not isinstance(repeated, RepeatedRotation):
-        raise ValueError(REPETITION_NOT_LAID_OUT)
-    years = range(
-        _ag_year_of(record.start_date, start_month),
-        _ag_year_of(record.end_date, start_month) + _FIRST,
-    )
-    if repeated.ag_years != tuple(years):
-        raise ValueError(REPETITION_OTHER_YEARS)
-    return repeated
-
-
-def _earliest(component: RepeatedComponent) -> dt.date:
-    """The first day a component can cover: its start, else its cycle's start
-    (point 7 of engine/calendar/repeat.py)."""
-    return component.start if component.start is not None else component.calendar_start
-
-
-def _latest(component: RepeatedComponent) -> dt.date:
-    """The last day a component can cover: its end, else the day before the
-    next cycle starts (point 7 of engine/calendar/repeat.py)."""
-    return component.end if component.end is not None else component.cycle_last_day
-
-
-def _why_dates_are_missing(components: list[CalendarComponent]) -> dict[str, str]:
-    """For each component with a missing date, which date and the reason the
-    calendar gives for it (C3.2), as one text."""
-    texts: dict[str, str] = {}
-    for component in components:
-        reasons: dict[str, list[str]] = {}
-        for edge, value in (("start", component.start), ("end", component.end)):
-            if value.date is not None:
-                continue
-            why = "no reason given"
-            if value.missing is not None:
-                why = value.missing.reason
-                if value.missing.detail is not None:
-                    why = f"{why}: {value.missing.detail}"
-            reasons.setdefault(why, []).append(edge)
-        if reasons:
-            texts[component.component_id] = "; ".join(
-                f"{' and '.join(edges)} date {why}" for why, edges in reasons.items()
-            )
-    return texts
-
-
-def _component_of_day(
-    calendar: RotationCalendar, repeated: RepeatedRotation
-) -> Callable[[dt.date], RepeatedComponent | None | Missing]:
-    """The component on the field on a day, ``None`` for a day with no crop, or why it is not known.
-
-    PROPOSED, as EP1 reads it (``_covering`` of engine/erosion/soil_loss.py).
-    The day is a day of the record, so it lies inside the agricultural years
-    the rotation is repeated over (D47). It takes the one component of the
-    repeated rotation whose dates cover it, in whichever cycle; a component
-    that starts before the record and ends inside it is one of them, with its
-    declared dates (the lead-in of ``repeat_over_record``, D141), so it is
-    present from the first day of the record. No component when none can
-    cover the day. Not known (``MISSING_INPUT``) for a day before the first
-    cycle that the lead-in does not describe, and for a day a component with
-    a missing date could cover, within its cycle (the detail names the
-    component and repeats the reason the calendar gives for the date, so a
-    crossing component ``phase_calendar`` could not place names D141). Two
-    components on one day are not computed (``NOT_COMPUTABLE``).
-    """
-    dated = [
-        component
-        for component in repeated.components
-        if component.start is not None and component.end is not None
-    ]
-    undated = [
-        component
-        for component in repeated.components
-        if component.start is None or component.end is None
-    ]
-    why = _why_dates_are_missing(calendar.components)
-
-    def component_of(day: dt.date) -> RepeatedComponent | None | Missing:
-        if day < repeated.described_from:
-            return Missing(reason="MISSING_INPUT", detail=CROP_UNKNOWN)
-        covering = [item for item in dated if item.start <= day <= item.end]
-        if len(covering) == _FIRST:
-            (only,) = covering
-            return only
-        if covering:
-            return Missing(reason="NOT_COMPUTABLE", detail=CROPS_OVERLAP)
-        possible = dict.fromkeys(
-            item.component_id
-            for item in undated
-            if _earliest(item) <= day <= _latest(item)
-        )
-        if possible:
-            names = ", ".join(
-                f"component {name!r} ({why.get(name, 'a date is missing')})"
-                for name in possible
-            )
-            return Missing(
-                reason="MISSING_INPUT", detail=f"{CROP_DATES_MISSING}: {names}"
-            )
-        return None
-
-    return component_of
-
-
 def _following_crop(
     repeated: RepeatedRotation,
 ) -> Callable[[dt.date], str | Missing]:
     """The crop sown after a fallow day (``fallow.following_crop``), read from
-    the rotation repeated over the record (``_over_record``).
+    the rotation repeated over the record (``living_crop.repeat_calendar_over_record``).
 
     A component with a start date is a sowing. One without a start date can
     be sown from the start of its cycle to its last possible day (point 7 of
@@ -692,7 +557,11 @@ def _following_crop(
             if component.start is not None
         ],
         [
-            (component.calendar_start, _latest(component), component.component_id)
+            (
+                component.calendar_start,
+                living_crop.latest_day(component),
+                component.component_id,
+            )
             for component in repeated.components
             if component.start is None
         ],
@@ -709,18 +578,19 @@ class Growth:
 
 
 def _growth_of_day(
-    catalogue: Catalogue,
+    catalogue: Catalogue, over: living_crop.LiveCropOverRecord
 ) -> Callable[[dt.date, RepeatedComponent], Growth | Missing | None]:
     """The basal crop coefficient and root depth of a day with a crop, or why they are not known.
 
     PROPOSED (issues #206 and #253). The day lies in the period of the one
     dated component of the repeated rotation that carries the crop
-    (``_component_of_day`` gives a component only then). The four stage
-    lengths of the crop are read by crop (``STAGE_LENGTH_PARAMETERS``) once
-    per component and cycle, on the first day of it the chain meets, and the
-    days with a live crop are taken from ``living_crop.live_crop_days`` (unit
-    #357), which places the stages from the start of the component, its
-    sowing (``stages.place_stages``), with the dates the repetition gives it. A
+    (``living_crop.component_of_day`` gives a component only then). The days
+    with a live crop of its period are ``over.live_days`` (units #357 and
+    #399, ``engine/water/living_crop.py``): the four stage lengths of the
+    crop are read by crop (``STAGE_LENGTH_PARAMETERS``) once per component
+    and cycle, on the first day of it the chain meets, and the stages are
+    placed from the start of the component, its sowing
+    (``stages.place_stages``), with the dates the repetition gives it. A
     component that starts before the record (D141) keeps its declared sowing,
     so its first day in the record is the day of its stages counted from that
     sowing; nothing of the days before the record is computed.
@@ -742,32 +612,18 @@ def _growth_of_day(
     curves). A record the stage of the day needs that is missing makes the
     day ``MISSING_INPUT``, naming it.
     """
-    placed: dict[tuple[int, str], living_crop.LiveCropDays | Missing] = {}
 
     def growth(day: dt.date, component: RepeatedComponent) -> Growth | Missing | None:
         scope: Scope = ((CROP_KEY, component.crop_id),)
-        key = (component.cycle, component.component_id)
-        if key not in placed:
-            lengths = {
-                stage: catalogue.value(parameter_id, scope, day)
-                for stage, parameter_id in STAGE_LENGTH_PARAMETERS.items()
-            }
-            # The days with a live crop of the period (D135, D136), the one
-            # rule of engine/water/living_crop.py (unit #357).
-            live = living_crop.live_crop_days(
-                component.start,
-                component.end,
-                lengths,
-                what=f"component '{component.component_id}'",
-            )
-            if isinstance(live, Missing) and live.reason == "MISSING_INPUT":
+        # The days with a live crop of the period (D135, D136), the one rule
+        # of engine/water/living_crop.py (units #357 and #399).
+        live = over.live_days(component, day)
+        if isinstance(live, Missing):
+            if live.reason == "MISSING_INPUT":
                 # A stage length has no value: EP3 names it with its own text,
                 # since without the stage neither Kcb nor the root depth can
                 # be taken (D79); the records are named by the catalogue.
-                live = Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
-            placed[key] = live
-        live = placed[key]
-        if isinstance(live, Missing):
+                return Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
             return live
         if not live.is_live(day):
             # After maturity: no living crop (D136).
@@ -1162,11 +1018,22 @@ def _run_chain(
     precipitation_series = by_quantity.get(PRECIPITATION)
     precipitation_values = _series_values(precipitation_series)
     wind_values = _series_values(by_quantity.get(WIND_SPEED_2M))
-    # The rotation over the years of the record (D47, D109, D132, D141).
-    repeated = _over_record(calendar, by_quantity[PRECIPITATION])
-    component_of = _component_of_day(calendar, repeated)
-    growth_of = _growth_of_day(catalogue)
-    following_of = _following_crop(repeated)
+    # The rotation over the years of the record (D47, D109, D132, D141), and
+    # the component and live days of each day: the one rule of
+    # engine/water/living_crop.py (unit #399), on the dates of the
+    # precipitation series. The stage lengths are read through EP3's own
+    # catalogue, so a missing one is named by it, on the day it is needed.
+    record = by_quantity[PRECIPITATION]
+    over = living_crop.LiveCropOverRecord(
+        calendar,
+        living_crop.repeat_calendar_over_record(
+            calendar, record.start_date, record.end_date
+        ),
+        catalogue,
+    )
+    component_of = over.component
+    growth_of = _growth_of_day(catalogue, over)
+    following_of = _following_crop(over.repeated)
 
     chain: list[ChainDay] = []
     for day in days:
