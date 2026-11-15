@@ -763,3 +763,35 @@ describe('names, the order note and a board that does not blank (10)', () => {
     expect(count(render(false), 'data-testid="board-updating"')).toBe(0)
   })
 })
+
+describe('polish (11)', () => {
+  it('the controls are shown but not offered when no field can be asked for', () => {
+    const disabled = (html: string) => count(after(html, 'board-controls').split('</div></div>')[0], 'disabled=""')
+    expect(disabled(view(null, null))).toBeGreaterThan(0)
+    expect(disabled(view(OTHER_FIELD, null))).toBeGreaterThan(0)
+    expect(disabled(view(FIELD, null, null))).toBeGreaterThan(0)
+    expect(after(view(FIELD, answered(example)), 'board-kind').split('>')[0]).not.toContain('disabled=""')
+  })
+
+  it('the average carries no count when a year of the record has no kind', () => {
+    const unclassified: PlantAnswer = {
+      ...example,
+      kinds_of_year: {
+        ...example.kinds_of_year,
+        years: example.kinds_of_year.years.map((year, index) => (index === 0 ? { ...year, kind: null } : year)),
+        counts: { el_nino: null, neutral: null, la_nina: null },
+      },
+    }
+    const kinds = after(view(FIELD, answered(unclassified)), 'board-kind').split('</fieldset>')[0]
+    expect(visibleText(`<${kinds}`)).not.toMatch(/\d/)
+  })
+
+  it('each year of the ribbon carries the letter of its kind, not only its colour', () => {
+    const ribbon = after(view(FIELD, answered(example)), 'board-record').split('</ol>')[0]
+    const cells = ribbon.split('data-testid="board-record-year"').slice(1)
+    rawExample.kinds_of_year.years.forEach((year, index) => {
+      const letter = strings[`plant.kind.${year.kind as 'el_nino'}`].charAt(0).toUpperCase()
+      expect(visibleText(`<${cells[index]}`)).toContain(`${letter} ${year.ag_year}`)
+    })
+  })
+})

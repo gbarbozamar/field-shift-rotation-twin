@@ -41,6 +41,7 @@ function Segmented({
   labels,
   selected,
   onSelect,
+  disabled,
 }: {
   name: string
   legend: string
@@ -49,9 +50,11 @@ function Segmented({
   /** The index of the choice that is on. */
   selected: number
   onSelect: (index: number) => void
+  /** True when the choice has nothing to act on: it is shown, not offered. */
+  disabled: boolean
 }) {
   return (
-    <fieldset data-testid={name} className="min-w-0">
+    <fieldset data-testid={name} disabled={disabled} className="min-w-0 disabled:opacity-50">
       <legend className="font-mono text-[10px] uppercase tracking-widest opacity-70">{legend}</legend>
       <div className="mt-1 inline-flex flex-wrap gap-1 rounded-lg bg-white/10 p-1">
         {labels.map((label, index) => (
@@ -84,7 +87,10 @@ function kindChoiceLabel(kind: MarginOf, record: KindsOfYearRecord | null): stri
   if (record === null) {
     return name
   }
-  const years = kind === 'average' ? record.years.length : record.counts[kind]
+  // The average is over the years of the record only when each of them has
+  // a kind: with a year not classified no count is said, for any choice.
+  const classified = record.years.every((year) => year.kind !== null)
+  const years = kind === 'average' ? (classified ? record.years.length : null) : record.counts[kind]
   return years === null ? name : formatString(strings['board.kind.years'], { kind: name, n: years })
 }
 
@@ -100,6 +106,7 @@ export function BoardControls({
   rainFactor,
   record,
   limit,
+  disabled = false,
   onMarginOf,
   onStrictness,
   onRain,
@@ -113,6 +120,8 @@ export function BoardControls({
   record: KindsOfYearRecord | null
   /** The soil-loss limit the request declares, with its unit; null when it declares none. */
   limit: { value: number; unit: string } | null
+  /** True when there is no field whose rotations can be asked for: the controls are shown, not offered. */
+  disabled?: boolean
   onMarginOf: (value: MarginOf) => void
   onStrictness: (value: Strictness) => void
   onRain: (on: boolean) => void
@@ -127,6 +136,7 @@ export function BoardControls({
         legend={strings['board.hud.year']}
         labels={MARGINS_OF.map((kind) => kindChoiceLabel(kind, record))}
         selected={MARGINS_OF.indexOf(marginOf)}
+        disabled={disabled}
         onSelect={(index) => onMarginOf(MARGINS_OF[index])}
       />
       <Segmented
@@ -138,6 +148,7 @@ export function BoardControls({
             : strings[`board.rule.${value}`],
         )}
         selected={STRICTNESSES.indexOf(strictness)}
+        disabled={disabled}
         onSelect={(index) => onStrictness(STRICTNESSES[index])}
       />
       {rainFactor !== null ? (
@@ -149,6 +160,7 @@ export function BoardControls({
             formatString(strings['board.rain.factor'], { factor: displayNumber(rainFactor.value) }),
           ]}
           selected={rain ? 1 : 0}
+          disabled={disabled}
           onSelect={(index) => onRain(index === 1)}
         />
       ) : null}
@@ -438,8 +450,10 @@ export function RecordRibbon({ record, marginOf }: { record: KindsOfYearRecord; 
           >
             <span
               data-tone={year.kind !== null ? kindTone(year.kind) : 'open'}
-              className="block h-4 rounded-sm data-[tone=neutral]:bg-fs-neutral data-[tone=nina]:bg-fs-nina data-[tone=nino]:bg-fs-nino data-[tone=open]:fs-fog"
-            />
+              className="block h-5 rounded-sm text-center font-mono text-[11px] font-semibold leading-5 text-white data-[tone=neutral]:bg-fs-neutral data-[tone=neutral]:text-fs-text data-[tone=nina]:bg-fs-nina data-[tone=nino]:bg-fs-nino data-[tone=open]:fs-fog"
+            >
+              {year.kind !== null ? strings[`plant.kind.${year.kind}`].charAt(0).toUpperCase() : null}
+            </span>
             <span className="block text-center font-mono text-[9px] text-fs-muted">{year.ag_year}</span>
           </li>
         ))}

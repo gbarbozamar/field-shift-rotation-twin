@@ -107,7 +107,7 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
             <div
               data-selected={String(field.field_id === selectedFieldId)}
               data-described={String(described)}
-              className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[described=false]:fs-fog data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
+              className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[described=false]:border-dashed data-[described=false]:bg-transparent data-[described=false]:text-fs-muted data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
             >
               <p className="font-bold leading-tight">{field.name}</p>
               <p className="text-xs text-fs-muted">
@@ -427,6 +427,9 @@ export function BoardView({
               <span className="rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:hidden">
                 {strings['board.builder.open']}
               </span>
+              <span className="hidden rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:inline">
+                {strings['board.builder.close']}
+              </span>
             </StepTitle>
           </summary>
           {builder}
@@ -442,6 +445,7 @@ export function BoardView({
           rainFactor={REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null}
           record={service !== null && service.phase === 'answered' ? service.answer.answer.kinds_of_year : null}
           limit={REQUEST_LIMIT}
+          disabled={selectedFieldId !== REQUEST_FIELD_ID || apiBase === null}
           onMarginOf={(value) => dispatch({ type: 'margin_of', value })}
           onStrictness={(value) => dispatch({ type: 'strictness', value })}
           onRain={(on) => dispatch({ type: 'rain', on })}
