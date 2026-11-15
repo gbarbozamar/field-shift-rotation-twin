@@ -4,19 +4,19 @@ Signed files that hold the expected values of a check of `docs/VALIDATION.md` to
 
 > **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), amended for two H2 steps by [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727). This README holds no value of a source: the values are in the signed files, checked against the source by the person who signs.
 >
-> **The two files below are on `main`, signed.** `e3_ah703_tables.json` arrived with #238 and `h2_example18.json` with #239, each with its `checked_by` filled, as is the `checked_by` of every parameter record it carries (D34, D66). Both tests run on them.
+> **The three files below are on `main`, signed.** `e3_ah703_tables.json` arrived with #238, `h2_example18.json` with #239, and `h1_fao56_example37.json` under [D228 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768), each with its `checked_by` filled, as is the `checked_by` of every parameter record it carries where applicable (D34, D66). All three tests run on them.
 >
-> **Two more fixtures are not in this folder:** the ones of [H1] and [H10] (`docs/VALIDATION.md`). Each waits for a person to transcribe it from its source, check it and sign it in `checked_by` (D34, D66); no fixture enters this folder unsigned. This README gives none of their values. Their paths are PROPOSED in `docs/VALIDATION.md`, and their formats are not described here yet:
+> **One more fixture is not in this folder:** the one of [H10] (`docs/VALIDATION.md`). It waits for a person to transcribe it from its source, check it and sign it in `checked_by` (D34, D66); no fixture enters this folder unsigned. This README gives none of its values. Its path is PROPOSED in `docs/VALIDATION.md`, and its format is not described here yet:
 >
-> - `h1_fao56_example37.json`, for [H1]. `engine/water/balance/test_bucket.py::test_h1_public_reference_case` reads it, with the skip rule below: until the signed file is here, that test skips and names the file.
 > - `h10_grahmann2022_runoff.json`, for [H10]. No test reads it yet; the comparator of [H10] (`validation/h10_runoff.py`) is tested on hand-made values only.
 
 | File | Check | Test that reads it |
 |---|---|---|
+| `h1_fao56_example37.json` | [H1]: the ten-day stressed soil water balance against FAO-56 Chapter 8, EXAMPLE 37 | `engine/water/balance/test_bucket.py::test_h1_public_reference_case` |
 | `h2_example18.json` | [H2]: the daily reference evapotranspiration against FAO-56 Chapter 4, EXAMPLE 18 | `engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56` |
 | `e3_ah703_tables.json` | [E3]: `LS` against AH703 Table 4-2 and `m` against the Moderate column of Table 4-5 | `engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values` |
 
-## Skip rule (both files)
+## Skip rule (all three files)
 
 A test **skips**, with a reason that names its file and every part that is not signed, when:
 
@@ -30,12 +30,12 @@ Each test also has cases that write a PLACEHOLDER fixture to a temporary folder 
 
 ## Common fields
 
-These fields are in both files, as the scientific-integration session writes them. The tests read `checked_by` only; the others are for the person who checks.
+These fields are in all three files, as the scientific-integration session writes them. The tests read `checked_by` only; the others are for the person who checks.
 
 | Field | Type | Meaning |
 |---|---|---|
 | `test` | text | The test that reads the file |
-| `source` | object | `reference`, and in H2 also `locator`, `url` and `read` (the date the source was read) |
+| `source` | object | `reference`, and in H1 and H2 also `locator`, `url` and `read` (the date the source was read) |
 | `transcribed_by` | text | Who transcribed the values (D34) |
 | `checked_by` | text | **The signature.** The person who checked every value of the file against the source (D34, D66). Empty means not signed |
 | `tolerance_rule` | text | The rule of D124 in words |
@@ -44,6 +44,28 @@ These fields are in both files, as the scientific-integration session writes the
 Any other field, such as `also_needed` or `not_printed_by_the_example`, is free text for the person who checks and is not read.
 
 A **parameter record** below is a record in the format of `params/README.md` ("Record format"), checked with `params.catalogue.check_record` once signed. Records that the scientific-integration session prepared in that format are copied in unchanged.
+
+## `h1_fao56_example37.json`
+
+Read by `engine/water/balance/test_bucket.py::test_h1_public_reference_case` (via `h1_load_case` and `run_h1`). Carries no parameter records.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs` | object | Exactly the six inputs (`H1_INPUTS`): `reference_evapotranspiration`, `crop_coefficient`, `root_depth`, `depletion_fraction`, `total_available_water`, and `initial_depletion` |
+| `rows` | list | Non-empty ordered list of daily objects, one per day with `day` equal to `1, 2, 3 ...` in order (the ten days of Example 37) and exactly the three entries (`H1_COLUMNS`): `stress_coefficient`, `adjusted_crop_evapotranspiration`, and `depletion_end` |
+| `tolerance` | object | `{column: absolute tolerance}`, one entry per column in `H1_COLUMNS`, in the unit of the column. D124 / [D228](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768): half a unit of the last digit of `printed`. The test recomputes each from `printed` (`h1_half_unit`) across every day and fails if the file says otherwise |
+
+An **entry** of `inputs` or a column of `rows`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `value` | number | Finite number. In `rows` (and in `inputs` when `printed` is given) it must equal `float(printed)` |
+| `printed` | text | Required in every column of `rows`; optional in `inputs`. The number as printed by the example (`PRINTED`: optional minus sign, digits, optional point and decimals), so that its decimal digits give the tolerance |
+| `unit`, `locator`, `verbatim`, `note` | text | For the person who checks; not read |
+
+The top-level metadata fields `status`, `path_in_repository`, `printed_but_not_read`, `notes_of_the_table`, `readings_of_d228`, and `human_check_record` are unread metadata for the human checker.
+
+What the test does with the file: following D228, it builds daily `DayInput` records with zero precipitation, zero runoff, zero `evaporation_coefficient` (`Ke = 0`), and `CropDay` from `crop_coefficient`, `root_depth`, and `depletion_fraction`; calls `run_balance` with `initial_storage = total_available_water - initial_depletion`, `capacity = total_available_water`, and `column_depth = root_depth`; computes `stress_coefficient`, `adjusted_crop_evapotranspiration` (`transpiration + evaporation`), and `depletion_end` (`capacity - storage_end`) for each day; and compares each against `rows` within the D124/D228 half-last-digit tolerance (`h1_half_unit`). Any `Missing` output fails the test.
 
 ## `h2_example18.json`
 
