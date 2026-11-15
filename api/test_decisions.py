@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from adapters.example_soil_slope import ExampleSoilSlopeSource
 from adapters.ports import ClimateRequest, ClimateResult, SourceInfo
+from api import decisions
 from api.decision_layer import NamedDecisionLayer
 from api.engines import discover_engine_functions
 from api.main import create_app
@@ -35,6 +36,7 @@ from api.ports import (
     PhaseResult,
     RunSettings,
 )
+from api.rotations import SiteReference
 from api.test_decision_layer import smallest_document
 from api.test_rotations import PERIOD, FakeClimate, FakeSoilSlope
 from contracts.decision_output import DecisionOutput
@@ -749,52 +751,40 @@ def test_two_rotations_of_n_and_m_phases_give_n_times_m_scenarios():
     assert len({row.scenario_id for row in table.rows}) == 6
 
 
-def _shifted(rotation_id: str, years: int) -> EnginesResult:
-    """The result example of a rotation with every agricultural year moved by
-    ``years`` (hand-written, PLACEHOLDER): the years a run of the same record
-    numbers differently, as another start month can."""
-    document = copy.deepcopy({**RESULT, "rotation_id": rotation_id})
-    for item in document["soil_loss"]["annual"]:
-        item["ag_year"] += years
-    for item in document["soil_loss"]["monthly"]:
-        item["ag_year"] += years
-        item["year"] += years
-    for item in document["water_deficit_exposure"]:
-        if item.get("ag_year") is not None:
-            item["ag_year"] += years
-    return EnginesResult(
-        calendar=None,
-        result=ResultsPerRotation.model_validate(document),
-        result_missing=None,
-        modules=MODULES,
-        values_present=1,
-        values_missing=1,
-    )
-
-
-def test_two_rotations_of_different_start_months_answer_no_decision_today():
-    """Today's answer, pinned: two rotations whose ``ag_year_start.month``
-    differs answer 200 with ``decision_missing`` ``NOT_COMPUTABLE``. The route
-    does not compare the months; the results table refuses the scenario
-    because the runs do not hold the same cells (their agricultural years
-    differ). Whether such a pair should be refused, aligned or compared is
-    asked of the lead developer on issue #18; this test pins the behaviour
-    until that answer, it does not decide it."""
+def test_two_rotations_of_different_start_months_are_an_invalid_request():
+    """D255 of #77: the rotations of a pair share one start month of the
+    agricultural year; a pair whose months differ is ``422`` ``ROTATION_INVALID``
+    naming ``ag_year_start.month`` of the second rotation, never its value, and
+    no source, engine or decision layer is called."""
     first = rotation(FIRST)
     second = rotation(SECOND)
     month = first["ag_year_start"]["month"]
-    second["ag_year_start"] = {**second["ag_year_start"], "month": month % 12 + 1}
-    engines = FakeEngines({FIRST: with_result(FIRST), SECOND: _shifted(SECOND, 1)})
+    other = month % 12 + 1
+    second["ag_year_start"] = {**second["ag_year_start"], "month": other}
+    engines = FakeEngines({FIRST: with_result(FIRST), SECOND: with_result(SECOND)})
     layer = FakeDecisionLayer()
     response = client(engines=engines, decision_layer=layer).post(
         ROUTE, json={"site": SITE, "rotations": [first, second]}
     )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["decision"] is None
-    assert body["decision_missing"]["reason"] == "NOT_COMPUTABLE"
-    assert body["scenarios"] == []
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert error["code"] == "ROTATION_INVALID"
+    assert [(d["path"], d["code"]) for d in error["details"]] == [
+        ("rotations.1.ag_year_start.month", "not_the_start_month")
+    ]
+    assert str(other) not in error["details"][0]["message"]
+    assert engines.calls == []
     assert layer.calls == []
+
+
+def test_two_rotations_of_the_same_start_month_pass_the_check():
+    """The check of D255 refuses nothing when the months agree."""
+    assert (
+        decisions.identity_problems(
+            SiteReference(**SITE), [rotation(FIRST), rotation(SECOND)]
+        )
+        == []
+    )
 
 
 # --- the engines of the repository ------------------------------------------------------
