@@ -6,8 +6,10 @@ PROPOSED (unit `l2/kinds-of-year`, brief S-012). Classifies each agricultural ye
 |---|---|
 | `records/oni_v6.json` | The transcribed record: reference, both URLs, locator, date read, the verbatim definition text, the threshold and run length taken from it, and the ANOM column of `oni.ascii.txt` for DJF 2000 to NDJ 2025 |
 | `classify.py` | `classify_agricultural_years`, `count_kinds`, `deciding_season`, `KindOfYear`, `SEASONS` |
+| `aggregate.py` | `mean_by_kind`, `series_from_results`, `YearValue`, `KindMean`, `MeansByKind` (see below) |
 | `__init__.py` | Exports the above and `load_record(path=None)` |
 | `test_kinds_of_year.py` | Acceptance test: `uv run pytest kinds_of_year/` |
+| `test_aggregate.py` | Acceptance test of the means by kind of year |
 
 ## Source
 
@@ -37,6 +39,21 @@ The record's `threshold` and `min_consecutive_seasons` are taken from this text,
 ## Signature
 
 `checked_by` is `UNSIGNED_AI_PRECHECK`: a session transcribed and cross-checked the values, no person has compared them with the source yet. It stays until a person does.
+
+## Means by kind of year (PROPOSED, unit `l2/by-kind-of-year`, brief S-013)
+
+`aggregate.py` turns a per-agricultural-year series of one indicator (soil loss in `t ha-1 yr-1`, or water-deficit exposure, dimensionless, on the time basis `ag_year`) into the mean of each kind of year and the mean of the whole record. Aggregation only, no new science. The types are new and PROPOSED; the results contract is not edited.
+
+- `YearValue(value, reason, detail)`: one year, a finite number (not a bool) or a reason code of C3.2, exactly one of the two.
+- `KindMean(value, unit, n_years, ag_years, reason, detail)`: one mean or missing with its reason. `n_years` and `ag_years` (sorted) name only the years whose values entered it, also when it is missing; zero is never a stand-in.
+- `MeansByKind(indicator, unit, by_kind, record, unclassified_years)`: `by_kind` holds every kind of `KINDS_OF_YEAR` in that order, read-only.
+- `mean_by_kind(indicator, unit, series, kinds)`: the arithmetic mean of the values of the years of each kind, no weighting, and of all years of the series (`record`).
+  - A kind with no year of the series: missing `NO_COVERAGE`, detail "no agricultural year of the record is <kind>", `n_years` 0.
+  - A group with a year whose value is missing: missing `MISSING_INPUT`, the detail names each such year and the reason it carries. The same for the record.
+  - A year whose `KindOfYear` is missing, or that is not in `kinds`, enters the record mean, enters no kind mean and is listed in `unclassified_years`. The kind means are still given, because their years are known: **the consumer decides** whether a kind mean is usable while some years are unclassified.
+  - A year of `kinds` absent from the series is ignored. An empty series, a non-integer year, an entry that is not a `YearValue` or `KindOfYear`, or a blank indicator or unit is a `ValueError`. Inputs are not mutated.
+- `series_from_results(items)`: a series from `AnnualSoilLoss` or `WaterDeficitExposure` items of `contracts.results`, the value, or the reason and detail of `missing`, copied unchanged. A water-deficit exposure on the time basis `rotation`, another item type (for example `MonthlySoilLoss`), mixed indicators or units, a repeated agricultural year or an empty sequence is a `ValueError`.
+- Test: `kinds_of_year/test_aggregate.py`, invented series, expected means written as arithmetic.
 
 ## OPEN
 
