@@ -1,51 +1,80 @@
 @import "tailwindcss";
 
-/* Self-hosted fonts (issue #430). The two families ship as local woff2
-   files under src/assets/fonts with their SIL OFL 1.1 licence texts next
-   to them; nothing is loaded from an external host. */
+/* Self-hosted fonts (l3/own-identity). The three families ship as local
+   files under src/assets/fonts, unmodified from the official Google Fonts
+   repository, with their SIL OFL 1.1 licence texts next to them; nothing is
+   loaded from an external host. */
 @font-face {
-  font-family: 'DM Sans';
+  font-family: 'Bricolage Grotesque';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 200 800;
   font-display: swap;
-  src: url('./assets/fonts/dm-sans-latin.woff2') format('woff2');
+  src: url('./assets/fonts/bricolage-grotesque-variable.ttf') format('truetype');
 }
 
 @font-face {
-  font-family: 'Space Grotesk';
+  font-family: 'Atkinson Hyperlegible';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400;
   font-display: swap;
-  src: url('./assets/fonts/space-grotesk-latin.woff2') format('woff2');
+  src: url('./assets/fonts/atkinson-hyperlegible-regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/atkinson-hyperlegible-bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/atkinson-hyperlegible-italic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/ibm-plex-mono-medium.ttf') format('truetype');
 }
 
 :root {
-  /* Design tokens, transcribed verbatim from the approved design handoff
-     of the interface unit l3/design-tokens (issue #430). Do not reformat
-     the values: the tests compare them character by character. */
-  --fs-bg: hsl(140 18% 96%);
-  --fs-surface: #fff;
-  --fs-text: hsl(165 18% 15%);
-  --fs-muted: hsl(165 7% 40%);
-  --fs-border: hsl(140 10% 89%);
-  --fs-brand: hsl(105 43% 45%);
-  --fs-primary: hsl(105 45% 33%);
-  --fs-info: hsl(201 70% 32%);
-  --fs-warning: #885400;
-  --fs-warning-bg: #fff7e8;
-  --fs-error: #ad3325;
-  --fs-error-bg: #fff0ed;
-  --fs-selection-bg: #eaf3e7;
-  --fs-font-body: 'DM Sans', system-ui, sans-serif;
-  --fs-font-heading: 'Space Grotesk', system-ui, sans-serif;
+  /* Design tokens of the interface's own identity (l3/own-identity),
+     chosen by the owner of the interface lane. Do not reformat the values:
+     the tests compare them character by character. */
+  --fs-bg: #edf0ea;
+  --fs-surface: #f8faf5;
+  --fs-text: #16201b;
+  --fs-muted: #56635b;
+  --fs-border: #c6cfc4;
+  --fs-faint: #dce2d9;
+  --fs-brand: #17766d;
+  --fs-primary: #17766d;
+  --fs-info: #16201b;
+  --fs-ok: #2f6b3a;
+  --fs-warning: #946719;
+  --fs-warning-bg: color-mix(in srgb, var(--fs-warning) 9%, var(--fs-surface));
+  --fs-error: #a93f3b;
+  --fs-error-bg: color-mix(in srgb, var(--fs-error) 9%, var(--fs-surface));
+  --fs-selection-bg: color-mix(in srgb, var(--fs-primary) 12%, var(--fs-surface));
+  --fs-crop-1: #7a9a2e;
+  --fs-crop-2: #c99a2e;
+  --fs-crop-3: #b5562f;
+  --fs-crop-4: #17766d;
+  --fs-crop-5: #3b7633;
+  --fs-crop-6: #7b5e8a;
+  --fs-font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --fs-font-heading: 'Bricolage Grotesque', system-ui, sans-serif;
+  --fs-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --fs-radius: 8px;
   --fs-control-min: 44px;
   --fs-motion: 160ms;
-
-  /* Added by l3/plant-redesign (PROPOSED): a verdict that meets, and the
-     faint track behind bars and timelines. */
-  --fs-ok: #2f6b3a;
-  --fs-faint: #dce2d9;
 }
 
 /* Tailwind 4 theme bridge: registers the tokens as utilities for later
@@ -68,6 +97,14 @@
   --color-fs-error-bg: var(--fs-error-bg);
   --font-fs-body: var(--fs-font-body);
   --font-fs-heading: var(--fs-font-heading);
+  --font-fs-mono: var(--fs-font-mono);
+  --font-mono: var(--fs-font-mono);
+  --color-fs-crop-1: var(--fs-crop-1);
+  --color-fs-crop-2: var(--fs-crop-2);
+  --color-fs-crop-3: var(--fs-crop-3);
+  --color-fs-crop-4: var(--fs-crop-4);
+  --color-fs-crop-5: var(--fs-crop-5);
+  --color-fs-crop-6: var(--fs-crop-6);
 }
 
 body {

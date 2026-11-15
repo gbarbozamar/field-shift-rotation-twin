@@ -100,7 +100,7 @@ function ItemRow({
       className={['flex', 'gap-3', '[&>div]:min-w-0', '[&>div]:flex-1'].join(' ')}
     >
       {item.value !== null && (
-        <span data-testid="row-label" className={['font-mono', 'text-sm', 'text-slate-500'].join(' ')}>
+        <span data-testid="row-label" className={['font-mono', 'text-sm', 'text-fs-muted'].join(' ')}>
           {label}
         </span>
       )}
@@ -184,12 +184,12 @@ function CarbonItemRow({
       data-testid="carbon-item"
       className={['space-y-1', 'pt-2', 'first:pt-0'].join(' ')}
     >
-      <p data-testid="carbon-model-label" className={['text-xs', 'text-slate-500'].join(' ')}>
+      <p data-testid="carbon-model-label" className={['text-xs', 'text-fs-muted'].join(' ')}>
         {formatString(strings['cards.model_label'], { model: value.carbon_model })}
       </p>
       <p
         data-testid="carbon-computation-label"
-        className={['text-xs', 'text-slate-500'].join(' ')}
+        className={['text-xs', 'text-fs-muted'].join(' ')}
       >
         {formatString(strings['cards.computation_label'], { computation: value.computation })}
       </p>
@@ -197,7 +197,7 @@ function CarbonItemRow({
         {value.item.value !== null && (
           <span
             data-testid="row-label"
-            className={['font-mono', 'text-sm', 'text-slate-500'].join(' ')}
+            className={['font-mono', 'text-sm', 'text-fs-muted'].join(' ')}
           >
             {indicator}
           </span>
@@ -241,8 +241,8 @@ function RotationCard({ doc }: { doc: ResultsPerRotation }) {
         'mt-4',
         'rounded-lg',
         'border',
-        'border-slate-200',
-        'bg-white',
+        'border-fs-border',
+        'bg-fs-surface',
         'px-4',
         'py-3',
       ].join(' ')}
@@ -252,7 +252,7 @@ function RotationCard({ doc }: { doc: ResultsPerRotation }) {
       </h4>
       <h5
         data-testid="availability-heading"
-        className={['mt-3', 'text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+        className={['mt-3', 'text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
       >
         {strings['cards.availability']}
       </h5>
@@ -279,15 +279,15 @@ export default function ResultCards() {
             'mt-3',
             'rounded-lg',
             'border',
-            'border-amber-300',
-            'bg-amber-50',
+            'border-fs-warning',
+            'bg-fs-warning-bg',
             'px-4',
             'py-3',
           ].join(' ')}
         >
           <p
             data-testid="results-example-banner"
-            className={['text-sm', 'text-amber-900'].join(' ')}
+            className={['text-sm', 'text-fs-warning'].join(' ')}
           >
             {strings['example.banner']}
           </p>

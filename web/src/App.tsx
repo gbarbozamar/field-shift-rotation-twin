@@ -14,9 +14,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-fs-bg text-fs-text">
-      <header className="border-b border-slate-200 px-6 py-4">
+      <header className="border-b border-fs-border px-6 py-4">
         <h1 className="text-xl font-semibold">{strings['app.title']}</h1>
-        <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
+        <p className="text-sm text-fs-muted">{strings['app.subtitle']}</p>
       </header>
       <main className="px-6 py-8">
         {route === '/' ? (
@@ -28,10 +28,10 @@ export default function App() {
         ) : (
           <>
             <p>{strings['home.shell']}</p>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-fs-muted">
               {formatString(strings['home.route'], { route })}
             </p>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-fs-muted">
               {formatString(strings['home.backend'], { api: API_URL })}
             </p>
           </>

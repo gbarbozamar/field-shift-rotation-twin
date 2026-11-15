@@ -127,7 +127,7 @@ function afterText(answer: AnswerKind, takesOver: string | null): string {
 
 function MissingLine({ what, missing }: { what: string; missing: MissingPart }) {
   return (
-    <p data-testid="plant-missing" className="text-sm italic text-slate-500">
+    <p data-testid="plant-missing" className="text-sm italic text-fs-muted">
       {missingPatternText(what, missing)}
     </p>
   )
@@ -162,16 +162,16 @@ function SoilLossLine({
       <MeasuredLine what={what} item={item} />
       {bar}
       {item.value !== null && item.sources.length !== 0 ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-fs-muted">
           {formatString(strings['value.source'], { source: item.sources.join('; ') })}
         </p>
       ) : null}
       {item.value !== null && item.assumption ? (
-        <p className="text-xs text-slate-500">{strings['assumption.mark']}</p>
+        <p className="text-xs text-fs-muted">{strings['assumption.mark']}</p>
       ) : null}
       {item.value !== null ? (
         // D148 (issue #77): every soil-loss figure shown carries this label.
-        <p data-testid="plant-soil-loss-label" className="text-xs text-slate-500">
+        <p data-testid="plant-soil-loss-label" className="text-xs text-fs-muted">
           {strings['soil_loss.headline_label']}
         </p>
       ) : null}
@@ -182,7 +182,7 @@ function SoilLossLine({
 /** The mark of a value the user declares in the request (C4.2): its source. */
 function DeclaredMark({ testid }: { testid: string }) {
   return (
-    <p data-testid={testid} className="text-xs text-slate-500">
+    <p data-testid={testid} className="text-xs text-fs-muted">
       {strings['plant.declared']}
     </p>
   )
@@ -238,7 +238,7 @@ function CheckLine({
 /** The kinds lists of the every-kind check, with the kinds not in the record beside it. */
 function KindsLines({ option }: { option: PlantOption }) {
   return (
-    <div className="text-xs text-slate-600">
+    <div className="text-xs text-fs-muted">
       <p>{formatString(strings['plant.kinds.not_met'], { kinds: kindsText(option.kinds_not_met) })}</p>
       <p>
         {formatString(strings['plant.kinds.not_resolved'], {
@@ -256,7 +256,7 @@ function KindsLines({ option }: { option: PlantOption }) {
 
 function EconomicsSource() {
   return (
-    <p className="text-xs text-slate-500">
+    <p className="text-xs text-fs-muted">
       {formatString(strings['value.source'], { source: strings['plant.source.economics'] })}
     </p>
   )
@@ -568,7 +568,7 @@ function StateDetail({ answer, option }: { answer: PlantAnswer; option: PlantOpt
     lines.push(missingPatternText(strings['plant.state.why'], option.limit_check.missing))
   }
   return (
-    <div data-testid="plant-option-state-detail" className="text-xs text-slate-600">
+    <div data-testid="plant-option-state-detail" className="text-xs text-fs-muted">
       {lines.map((line) => (
         <p key={line}>{line}</p>
       ))}
@@ -776,7 +776,7 @@ function Sources({ answer }: { answer: PlantAnswer }) {
   return (
     <div className="mt-4">
       <h3 className="text-sm font-semibold">{strings['plant.sources.heading']}</h3>
-      <ul className="text-xs text-slate-500">
+      <ul className="text-xs text-fs-muted">
         {answer.sources.map((source) => (
           <li key={source.id} data-testid="plant-source">
             {source.state === 'unavailable' && source.missing_reason !== null ? (
@@ -880,7 +880,7 @@ function OriginLine({
 }) {
   return (
     <div data-testid="plant-origin" className="mt-3 flex flex-wrap items-center gap-3">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-fs-muted">
         {origin.kind === 'service'
           ? formatString(strings['plant.service.origin_service'], { api: origin.api })
           : null}
@@ -889,7 +889,7 @@ function OriginLine({
         <button
           type="button"
           data-testid="plant-service-ask"
-          className="rounded border border-teal-700 px-3 py-1 text-sm font-medium text-teal-800"
+          className="rounded border border-fs-primary px-3 py-1 text-sm font-medium text-fs-primary"
           onClick={onAskService}
         >
           {strings['plant.service.ask']}
@@ -899,7 +899,7 @@ function OriginLine({
         <button
           type="button"
           data-testid="plant-service-back"
-          className="rounded border border-slate-400 px-3 py-1 text-sm font-medium text-slate-700"
+          className="rounded border border-fs-border px-3 py-1 text-sm font-medium text-fs-text"
           onClick={onBackToExample}
         >
           {strings['plant.service.back']}
@@ -918,7 +918,7 @@ function StatusPanel({ status }: { status: ServiceStatus }) {
     return (
       <div
         data-testid="plant-answer-not-available"
-        className="rounded-lg border border-slate-200 bg-white px-4 py-3"
+        className="rounded-lg border border-fs-border bg-fs-surface px-4 py-3"
       >
         <MissingLine what={strings['plant.answer.missing_what']} missing={status.missing} />
       </div>
@@ -926,14 +926,14 @@ function StatusPanel({ status }: { status: ServiceStatus }) {
   }
   if (status.kind === 'not_asked') {
     return (
-      <p data-testid="plant-service-not-asked" className="text-sm text-slate-500">
+      <p data-testid="plant-service-not-asked" className="text-sm text-fs-muted">
         {strings['plant.service.not_asked']}
       </p>
     )
   }
   if (status.kind === 'pending') {
     return (
-      <p data-testid="plant-service-pending" className="text-sm text-slate-500">
+      <p data-testid="plant-service-pending" className="text-sm text-fs-muted">
         {strings['plant.service.pending']}
       </p>
     )
@@ -942,11 +942,11 @@ function StatusPanel({ status }: { status: ServiceStatus }) {
     <div
       data-testid="plant-service-error"
       role="alert"
-      className="rounded-lg border border-red-300 bg-red-50 px-4 py-3"
+      className="rounded-lg border border-fs-error bg-fs-error-bg px-4 py-3"
     >
-      <h3 className="text-sm font-semibold text-red-800">{strings['plant.service.error_heading']}</h3>
-      <p className="text-sm text-red-700">{strings[`plant.service.error.${status.code}`]}</p>
-      <p data-testid="plant-service-error-code" className="text-xs text-slate-500">
+      <h3 className="text-sm font-semibold text-fs-error">{strings['plant.service.error_heading']}</h3>
+      <p className="text-sm text-fs-error">{strings[`plant.service.error.${status.code}`]}</p>
+      <p data-testid="plant-service-error-code" className="text-xs text-fs-muted">
         {formatString(strings['api.code.shown'], { code: status.code })}
       </p>
     </div>
@@ -970,7 +970,7 @@ function RainStressBlock({ part }: { part: RainStressPart }) {
             what={formatString(strings['plant.service.rain_what'], { label: part.label })}
             missing={part.missing}
           />
-          <p className="text-xs text-slate-500">{part.detail}</p>
+          <p className="text-xs text-fs-muted">{part.detail}</p>
         </div>
       )}
     </div>
@@ -1009,7 +1009,7 @@ function RainQuestion({ rain }: { rain: RainControl }) {
             {strings['plant.q.rain_control']}
           </label>
           {rain.nextAnswer === true ? (
-            <p data-testid="plant-rain-next-answer" className="text-xs text-slate-500">
+            <p data-testid="plant-rain-next-answer" className="text-xs text-fs-muted">
               {strings['plant.service.rain_next_answer']}
             </p>
           ) : null}
@@ -1028,7 +1028,7 @@ function RainQuestion({ rain }: { rain: RainControl }) {
         </div>
       ) : (
         <div>
-          <label className="inline-flex items-center gap-1 text-sm text-slate-400">
+          <label className="inline-flex items-center gap-1 text-sm text-fs-muted">
             <input type="checkbox" disabled />
             {strings['plant.q.rain_control']}
           </label>
@@ -1083,14 +1083,14 @@ function Questions({
               value={price}
               onChange={(event) => onPrice(Number(event.target.value))}
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-fs-muted">
               {formatString(strings['plant.q.price_range'], {
                 low: num(tipping.low),
                 high: num(tipping.high),
                 unit: tipping.unit,
               })}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-fs-muted">
               {formatString(strings['plant.q.price_today'], { price: num(tipping.today!), unit: tipping.unit })}
             </p>
             {/* Today's price and the range are declared by the user; the
@@ -1100,7 +1100,7 @@ function Questions({
         ) : (
           <input id="plant-price" type="range" className="w-full" disabled />
         )}
-        <p className="text-xs text-slate-500">{strings['plant.q.price_hint']}</p>
+        <p className="text-xs text-fs-muted">{strings['plant.q.price_hint']}</p>
       </div>
 
       <fieldset data-testid="plant-q-kind">
@@ -1169,15 +1169,15 @@ export function PlantView(props: PlantViewProps) {
       <p className="mt-2 max-w-[68ch] text-fs-muted">{strings['plant.rule']}</p>
 
       {set.example_data && status === undefined ? (
-        <div role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-          <p data-testid="plant-example-banner" className="text-sm text-amber-900">
+        <div role="note" className="mt-3 rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3">
+          <p data-testid="plant-example-banner" className="text-sm text-fs-warning">
             {strings['example.banner']}
           </p>
         </div>
       ) : null}
 
       {status !== undefined && status.kind !== 'failed' ? (
-        <p data-testid="plant-example-inputs" className="mt-3 text-sm text-slate-600">
+        <p data-testid="plant-example-inputs" className="mt-3 text-sm text-fs-muted">
           {strings['plant.q.example_inputs']}
         </p>
       ) : null}
@@ -1200,7 +1200,7 @@ export function PlantView(props: PlantViewProps) {
         </div>
       </div>
 
-      <p data-testid="plant-disclaimer" className="mt-6 text-xs text-slate-500">
+      <p data-testid="plant-disclaimer" className="mt-6 text-xs text-fs-muted">
         {strings['disclaimer.full']}
       </p>
     </section>
@@ -1412,11 +1412,11 @@ export function PlantNoServiceView() {
       <h2 id="plant-title" className="text-2xl font-semibold">
         {strings['plant.title']}
       </h2>
-      <p className="mt-1 text-sm text-slate-600">{strings['plant.rule']}</p>
-      <p data-testid="plant-service-not-available" className="mt-3 text-sm font-medium text-slate-700">
+      <p className="mt-1 text-sm text-fs-muted">{strings['plant.rule']}</p>
+      <p data-testid="plant-service-not-available" className="mt-3 text-sm font-medium text-fs-text">
         {strings['plant.service.not_available']}
       </p>
-      <p data-testid="plant-disclaimer" className="mt-6 text-xs text-slate-500">
+      <p data-testid="plant-disclaimer" className="mt-6 text-xs text-fs-muted">
         {strings['disclaimer.full']}
       </p>
     </section>

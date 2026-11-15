@@ -28,14 +28,14 @@ export default function EntryScreen() {
       <h2 id="entry-screen-title" className="text-lg font-semibold">
         {strings['entry.title']}
       </h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-fs-muted">
         {exampleCase.label} · {formatString(strings['entry.fields_count'], { n: exampleCase.fields.length })}
       </p>
 
       {exampleCase.example_data && (
         <p
           role="note"
-          className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          className="mt-4 rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3 text-sm text-fs-warning"
         >
           {strings['example.banner']}
         </p>
@@ -52,21 +52,21 @@ export default function EntryScreen() {
                 onClick={() => setSelectedFieldId(field.field_id)}
                 className={[
                   'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
-                  isSelected ? 'border-emerald-500' : 'border-slate-200',
+                  isSelected ? 'border-fs-primary' : 'border-fs-border',
                   ...(isSelected
-                    ? ['bg-emerald-50', 'ring-2', 'ring-emerald-500']
-                    : ['bg-white', 'hover:border-slate-300', 'hover:bg-slate-50']),
+                    ? ['bg-fs-selection', 'ring-2', 'ring-fs-primary']
+                    : ['bg-fs-surface', 'hover:border-fs-border', 'hover:bg-fs-bg']),
                 ].join(' ')}
               >
                 <span className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-900">{field.name}</span>
+                  <span className="font-medium text-fs-text">{field.name}</span>
                   {isSelected && (
-                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                    <span className="rounded bg-fs-primary px-2 py-0.5 text-xs font-semibold text-white">
                       {strings['identity.selected']}
                     </span>
                   )}
                 </span>
-                <span className="mt-1 block text-sm text-slate-500">
+                <span className="mt-1 block text-sm text-fs-muted">
                   {strings['identity.field_id_label']}: {field.field_id}
                 </span>
               </button>
@@ -74,7 +74,7 @@ export default function EntryScreen() {
                 <button
                   type="button"
                   onClick={() => openFieldOnFieldsScreen(field.field_id)}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  className="rounded-lg bg-fs-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-fs-primary"
                 >
                   {strings['entry.open_field']}
                 </button>
@@ -85,13 +85,13 @@ export default function EntryScreen() {
       </ul>
 
       {exampleCase.fields.length === 0 && (
-        <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
+        <p className="mt-6 text-sm text-fs-muted">{strings['identity.empty_list']}</p>
       )}
 
       <p className="mt-6 text-sm">
         <a
           href="#/fields"
-          className="font-medium text-emerald-700 underline transition hover:text-emerald-800"
+          className="font-medium text-fs-primary underline transition hover:text-fs-primary"
         >
           {strings['identity.title']}
         </a>

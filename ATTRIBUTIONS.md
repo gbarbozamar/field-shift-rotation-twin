@@ -46,8 +46,9 @@ Add a row **when the item is first used**, not at the end.
 | OpenStreetMap standard tiles | (no version) | https://www.openstreetmap.org/copyright | ODbL (attribution required; OSMF tile usage policy) | l3 | 2026-11-14 |
 | leaflet | 1.9.4 | https://leafletjs.com | BSD-2-Clause | l3 | 2026-11-14 |
 | @types/leaflet | 1.9.22 | https://github.com/DefinitelyTyped/DefinitelyTyped | MIT | l3 | 2026-11-14 |
-| DM Sans (self-hosted woff2, `web/src/assets/fonts/dm-sans-latin.woff2`) | (no version) | https://github.com/googlefonts/dm-fonts | SIL OFL 1.1 (`web/src/assets/fonts/dmsans-OFL.txt`) | l3 | 2026-11-15 |
-| Space Grotesk (self-hosted woff2, `web/src/assets/fonts/space-grotesk-latin.woff2`) | (no version) | https://github.com/floriankarsten/space-grotesk | SIL OFL 1.1 (`web/src/assets/fonts/spacegrotesk-OFL.txt`) | l3 | 2026-11-15 |
+| Bricolage Grotesque (self-hosted ttf, `web/src/assets/fonts/bricolage-grotesque-variable.ttf`, unmodified from `ofl/bricolagegrotesque` of https://github.com/google/fonts) | (no version) | https://github.com/ateliertriay/bricolage | SIL OFL 1.1 (`web/src/assets/fonts/bricolagegrotesque-OFL.txt`) | l3 | 2026-11-15 |
+| Atkinson Hyperlegible, regular, bold and italic (self-hosted ttf, `web/src/assets/fonts/atkinson-hyperlegible-*.ttf`, unmodified from `ofl/atkinsonhyperlegible` of https://github.com/google/fonts) | 1.006 | https://www.brailleinstitute.org/freefont/ | SIL OFL 1.1 (`web/src/assets/fonts/atkinsonhyperlegible-OFL.txt`) | l3 | 2026-11-15 |
+| IBM Plex Mono, medium (self-hosted ttf, `web/src/assets/fonts/ibm-plex-mono-medium.ttf`, unmodified from `ofl/ibmplexmono` of https://github.com/google/fonts) | 2.3 | https://github.com/IBM/plex | SIL OFL 1.1 (`web/src/assets/fonts/ibmplexmono-OFL.txt`) | l3 | 2026-11-15 |
 ## Tables and publications
 
 | Citation | URL or DOI | What is taken from it | Checked by a second person |

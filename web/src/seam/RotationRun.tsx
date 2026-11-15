@@ -92,8 +92,8 @@ function RotationRunError({ error }: { error: unknown }) {
   if (error instanceof ApiError) {
     return (
       <div data-testid="rotation-run-error" role="alert" className="mt-2">
-        <p className="text-sm text-red-700">{strings[`api.${error.code}`]}</p>
-        <p data-testid="rotation-run-error-code" className="text-xs text-slate-500">
+        <p className="text-sm text-fs-error">{strings[`api.${error.code}`]}</p>
+        <p data-testid="rotation-run-error-code" className="text-xs text-fs-muted">
           {formatString(strings['api.code.shown'], { code: error.code })}
         </p>
       </div>
@@ -101,7 +101,7 @@ function RotationRunError({ error }: { error: unknown }) {
   }
   return (
     <div data-testid="rotation-run-error" role="alert" className="mt-2">
-      <p className="text-sm text-red-700">{strings['common.error']}</p>
+      <p className="text-sm text-fs-error">{strings['common.error']}</p>
     </div>
   )
 }
@@ -176,7 +176,7 @@ function WithdrawnC() {
     return (
       <p
         data-testid="withdrawn-line"
-        className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+        className={['text-sm', 'italic', 'text-fs-muted'].join(' ')}
       >
         {reason}
       </p>
@@ -185,7 +185,7 @@ function WithdrawnC() {
   return (
     <p
       data-testid="withdrawn-line"
-      className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+      className={['text-sm', 'italic', 'text-fs-muted'].join(' ')}
     >
       {reason.slice(0, at)}
       <a
@@ -222,7 +222,7 @@ function DeclaredCHeadline({ rows }: { rows: IndicatorRow[] }) {
       <ValueDisplay what={headline.what} item={headline.item} />
       <p
         data-testid="headline-label"
-        className={['text-sm', 'text-slate-500'].join(' ')}
+        className={['text-sm', 'text-fs-muted'].join(' ')}
       >
         {strings['soil_loss.headline_label']}
       </p>
@@ -240,21 +240,21 @@ function RunResult({ view, runName }: { view: RunRotationView; runName: string }
       {view.liveData ? (
         <p
           data-testid="rotation-run-live"
-          className="mt-1 text-sm font-medium text-emerald-700"
+          className="mt-1 text-sm font-medium text-fs-primary"
         >
           {strings['seam.with_real_data']}
         </p>
       ) : null}
       <p
         data-testid="rotation-run-outcome"
-        className="mt-1 font-mono text-xs text-slate-500"
+        className="mt-1 font-mono text-xs text-fs-muted"
       >
         {view.outcome}
       </p>
       {view.resultMissing !== null ? (
         <p
           data-testid="rotation-run-result-missing"
-          className="mt-2 text-sm italic text-slate-500"
+          className="mt-2 text-sm italic text-fs-muted"
         >
           {missingPattern(runName, view.resultMissing)}
         </p>
@@ -297,14 +297,14 @@ export function RotationRunPanel({ state, onRun, runName }: RotationRunPanelProp
         disabled={busy}
         className={[
           'rounded-lg',
-          'bg-emerald-600',
+          'bg-fs-primary',
           'px-4',
           'py-2',
           'text-sm',
           'font-semibold',
           'text-white',
           'transition',
-          'hover:bg-emerald-700',
+          'hover:bg-fs-primary',
           'disabled:cursor-not-allowed',
           'disabled:opacity-60',
         ].join(' ')}
@@ -312,7 +312,7 @@ export function RotationRunPanel({ state, onRun, runName }: RotationRunPanelProp
         {strings['seam.with_real_data']}
       </button>
       {state.phase === 'pending' ? (
-        <p data-testid="rotation-run-loading" className="mt-2 text-sm text-slate-500">
+        <p data-testid="rotation-run-loading" className="mt-2 text-sm text-fs-muted">
           {strings['common.loading']}
         </p>
       ) : null}

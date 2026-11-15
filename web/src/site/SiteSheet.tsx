@@ -66,7 +66,7 @@ export function MonthlySeriesBlock({ series }: { series: MonthlySeries }) {
           unit: series.unit,
         })}
       </h4>
-      <p data-testid="series-months-count" className="mt-1 text-xs text-slate-500">
+      <p data-testid="series-months-count" className="mt-1 text-xs text-fs-muted">
         {formatString(strings['site.months_count'], { count: series.months.length })}
       </p>
       <ul className="mt-2 space-y-2">
@@ -74,7 +74,7 @@ export function MonthlySeriesBlock({ series }: { series: MonthlySeries }) {
           const label = monthLabel(month.year, month.month)
           return (
             <li key={label} data-testid="month-row" className="flex gap-3">
-              <span data-testid="month-label" className="font-mono text-sm text-slate-500">
+              <span data-testid="month-label" className="font-mono text-sm text-fs-muted">
                 {label}
               </span>
               <ValueDisplay what={`${series.quantity} ${label}`} item={monthItem(series, month)} />
@@ -96,7 +96,7 @@ export default function SiteSheet() {
         {strings['site.title']}
       </h3>
       {selectedFieldId === null ? (
-        <p data-testid="site-select-hint" className="mt-1 text-sm text-slate-500">
+        <p data-testid="site-select-hint" className="mt-1 text-sm text-fs-muted">
           {strings['site.select_hint']}
         </p>
       ) : (
@@ -104,9 +104,9 @@ export default function SiteSheet() {
           {(siteClimate.example_data || siteSoilSlope.example_data) && (
             <div
               role="note"
-              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
+              className="rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3"
             >
-              <p data-testid="site-example-banner" className="text-sm text-amber-900">
+              <p data-testid="site-example-banner" className="text-sm text-fs-warning">
                 {strings['example.banner']}
               </p>
             </div>

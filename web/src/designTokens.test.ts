@@ -5,23 +5,24 @@ import { dirname, join, relative, resolve } from 'path'
 import { fileURLToPath } from 'url'
 
 /**
- * Acceptance test of the design-token unit (issue #430).
+ * Acceptance test of the design tokens and fonts of the interface
+ * (issue #430; values replaced by l3/own-identity with the interface's own
+ * identity, chosen by the owner of the interface lane).
  *
- * Case 1 — the four files of the approved font package ship under
- * web/src/assets/fonts, byte-for-byte: the two woff2 files are checked
- * against the SHA-256 hashes of the design handoff, and the two SIL OFL
- * 1.1 licence texts ship unchanged next to them.
+ * Case 1: the font files ship under web/src/assets/fonts, byte-for-byte as
+ * downloaded from the official Google Fonts repository: the five ttf files
+ * are checked against their SHA-256 hashes, and the three SIL OFL 1.1
+ * licence texts ship next to them.
  *
- * Case 2 — web/src/index.css holds the whole design foundation: the two
+ * Case 2: web/src/index.css holds the whole design foundation: the
  * @font-face rules with relative paths (no absolute path, no external
- * host), every --fs- token with the exact value of the handoff, the
- * Tailwind 4 @theme bridge that exposes the tokens as utilities, the
- * shell application (body, h1-h4), the :focus-visible base, ::selection
- * and the prefers-reduced-motion block.
+ * host), every --fs- token with its exact value, the Tailwind 4 @theme
+ * bridge that exposes the tokens as utilities, the shell application
+ * (body, h1-h4), the :focus-visible base, ::selection and the
+ * prefers-reduced-motion block.
  *
- * Case 3 — no .css/.ts/.tsx file under web/src references an external
- * font host: the fonts are self-hosted files, never a CDN or web-font
- * service.
+ * Case 3: no .css/.ts/.tsx file under web/src references an external font
+ * host: the fonts are self-hosted files, never a CDN or web-font service.
  */
 
 const srcDir = dirname(fileURLToPath(import.meta.url))
@@ -29,31 +30,57 @@ const fontsDir = resolve(srcDir, 'assets/fonts')
 const cssPath = resolve(srcDir, 'index.css')
 const appPath = resolve(srcDir, 'App.tsx')
 
-/** The font files of the design handoff, with the approved woff2 hashes. */
+/**
+ * The font files, with the SHA-256 of each ttf as downloaded on 15 Nov 2026
+ * from github.com/google/fonts (ofl/bricolagegrotesque,
+ * ofl/atkinsonhyperlegible, ofl/ibmplexmono), unmodified.
+ */
 const FONT_PACKAGE: Record<string, string | null> = {
-  'dm-sans-latin.woff2': '9fea608a947e67020c33cad9a6fe3d60c54119dfb8cff87768a8117a15ed7543',
-  'dmsans-OFL.txt': null,
-  'space-grotesk-latin.woff2': '0640890476fc1198ab4de571fb658de443c4d85b66466ec09534a8737ab1ce9d',
-  'spacegrotesk-OFL.txt': null,
+  'bricolage-grotesque-variable.ttf': '413e7357809ddd12fd80a96a8a396de0e401638d4acd3cb3e37532f0472ac682',
+  'bricolagegrotesque-OFL.txt': null,
+  'atkinson-hyperlegible-regular.ttf': '7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669',
+  'atkinson-hyperlegible-bold.ttf': '5a3b0c8cc8ca545155150b4512a1fa248298df121c50d6557e651e61fbdab92f',
+  'atkinson-hyperlegible-italic.ttf': '021beda4d3c6edfc78872e436d74009f9a1bcb294331908fe5747c61d3dcc514',
+  'atkinsonhyperlegible-OFL.txt': null,
+  'ibm-plex-mono-medium.ttf': 'a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755',
+  'ibmplexmono-OFL.txt': null,
 }
 
-/** The tokens, transcribed verbatim from the approved design handoff. */
+/** The @font-face rules: family, style, weight and file, one per ttf. */
+const FONT_FACES = [
+  { family: 'Bricolage Grotesque', style: 'normal', weight: '200 800', file: 'bricolage-grotesque-variable.ttf' },
+  { family: 'Atkinson Hyperlegible', style: 'normal', weight: '400', file: 'atkinson-hyperlegible-regular.ttf' },
+  { family: 'Atkinson Hyperlegible', style: 'normal', weight: '700', file: 'atkinson-hyperlegible-bold.ttf' },
+  { family: 'Atkinson Hyperlegible', style: 'italic', weight: '400', file: 'atkinson-hyperlegible-italic.ttf' },
+  { family: 'IBM Plex Mono', style: 'normal', weight: '500', file: 'ibm-plex-mono-medium.ttf' },
+]
+
+/** The tokens of the interface's own identity (l3/own-identity). */
 const TOKENS: Record<string, string> = {
-  '--fs-bg': 'hsl(140 18% 96%)',
-  '--fs-surface': '#fff',
-  '--fs-text': 'hsl(165 18% 15%)',
-  '--fs-muted': 'hsl(165 7% 40%)',
-  '--fs-border': 'hsl(140 10% 89%)',
-  '--fs-brand': 'hsl(105 43% 45%)',
-  '--fs-primary': 'hsl(105 45% 33%)',
-  '--fs-info': 'hsl(201 70% 32%)',
-  '--fs-warning': '#885400',
-  '--fs-warning-bg': '#fff7e8',
-  '--fs-error': '#ad3325',
-  '--fs-error-bg': '#fff0ed',
-  '--fs-selection-bg': '#eaf3e7',
-  '--fs-font-body': "'DM Sans', system-ui, sans-serif",
-  '--fs-font-heading': "'Space Grotesk', system-ui, sans-serif",
+  '--fs-bg': '#edf0ea',
+  '--fs-surface': '#f8faf5',
+  '--fs-text': '#16201b',
+  '--fs-muted': '#56635b',
+  '--fs-border': '#c6cfc4',
+  '--fs-faint': '#dce2d9',
+  '--fs-brand': '#17766d',
+  '--fs-primary': '#17766d',
+  '--fs-info': '#16201b',
+  '--fs-ok': '#2f6b3a',
+  '--fs-warning': '#946719',
+  '--fs-warning-bg': 'color-mix(in srgb, var(--fs-warning) 9%, var(--fs-surface))',
+  '--fs-error': '#a93f3b',
+  '--fs-error-bg': 'color-mix(in srgb, var(--fs-error) 9%, var(--fs-surface))',
+  '--fs-selection-bg': 'color-mix(in srgb, var(--fs-primary) 12%, var(--fs-surface))',
+  '--fs-crop-1': '#7a9a2e',
+  '--fs-crop-2': '#c99a2e',
+  '--fs-crop-3': '#b5562f',
+  '--fs-crop-4': '#17766d',
+  '--fs-crop-5': '#3b7633',
+  '--fs-crop-6': '#7b5e8a',
+  '--fs-font-body': "'Atkinson Hyperlegible', system-ui, sans-serif",
+  '--fs-font-heading': "'Bricolage Grotesque', system-ui, sans-serif",
+  '--fs-font-mono': "'IBM Plex Mono', ui-monospace, monospace",
   '--fs-radius': '8px',
   '--fs-control-min': '44px',
   '--fs-motion': '160ms',
@@ -71,6 +98,14 @@ const THEME_COLORS = [
   '--color-fs-info',
   '--color-fs-warning',
   '--color-fs-error',
+  '--color-fs-ok',
+  '--color-fs-faint',
+  '--color-fs-crop-1',
+  '--color-fs-crop-2',
+  '--color-fs-crop-3',
+  '--color-fs-crop-4',
+  '--color-fs-crop-5',
+  '--color-fs-crop-6',
 ]
 
 /**
@@ -106,20 +141,21 @@ function listStyleSourceFiles(dir: string): string[] {
   return found
 }
 
-describe('self-hosted fonts of the design package', () => {
-  it('ships the four approved files under web/src/assets/fonts', () => {
+describe('self-hosted fonts', () => {
+  it('ships the font files and their licence texts under web/src/assets/fonts, and no other file', () => {
     for (const name of Object.keys(FONT_PACKAGE)) {
       const path = join(fontsDir, name)
       expect(existsSync(path), `${name} must exist under web/src/assets/fonts`).toBe(true)
       expect(readFileSync(path).length, `${name} must not be empty`).toBeGreaterThan(0)
     }
+    expect(readdirSync(fontsDir).sort()).toEqual(Object.keys(FONT_PACKAGE).sort())
   })
 
-  it('the two woff2 files match the SHA-256 hashes of the design handoff', () => {
+  it('the ttf files match the SHA-256 hashes of the official files', () => {
     for (const [name, expected] of Object.entries(FONT_PACKAGE)) {
       if (expected === null) continue
       const actual = sha256(join(fontsDir, name))
-      expect(actual, `${name} must be the approved file, byte-for-byte`).toBe(expected)
+      expect(actual, `${name} must be the official file, byte-for-byte`).toBe(expected)
     }
   })
 })
@@ -127,33 +163,26 @@ describe('self-hosted fonts of the design package', () => {
 describe('index.css design foundation', () => {
   const css = readFileSync(cssPath, 'utf8')
 
-  it('declares both @font-face rules with relative paths only', () => {
+  it('declares one @font-face rule per font file, with relative paths only', () => {
     expect(css, 'the tailwind import stays first').toMatch(/^@import "tailwindcss";/)
     const faces = css.match(/@font-face\s*\{[^}]*\}/g) ?? []
-    expect(faces.length, 'exactly two @font-face rules').toBe(2)
-    for (const family of ['DM Sans', 'Space Grotesk']) {
-      const face = faces.find((block) => block.includes(`font-family: '${family}'`))
-      expect(face, `the ${family} @font-face must exist`).toBeDefined()
-      expect(face, `${family} covers weights 400 to 700`).toContain('font-weight: 400 700')
-      expect(face, `${family} is normal style`).toContain('font-style: normal')
-      expect(face, `${family} uses font-display swap`).toContain('font-display: swap')
-      expect(face, `${family} points at the local woff2`).toMatch(/src: url\('\.\/assets\/fonts\/[^']+'\) format\('woff2'\)/)
+    expect(faces.length, 'one @font-face rule per ttf').toBe(FONT_FACES.length)
+    for (const { family, style, weight, file } of FONT_FACES) {
+      const face = faces.find((block) => block.includes(`url('./assets/fonts/${file}')`))
+      expect(face, `the @font-face of ${file} must exist`).toBeDefined()
+      expect(face, `${file} is ${family}`).toContain(`font-family: '${family}';`)
+      expect(face, `${file} has weight ${weight}`).toContain(`font-weight: ${weight};`)
+      expect(face, `${file} has style ${style}`).toContain(`font-style: ${style};`)
+      expect(face, `${file} uses font-display swap`).toContain('font-display: swap')
+      expect(face, `${file} is declared as truetype`).toContain("format('truetype')")
     }
-    expect(css).toContain("url('./assets/fonts/dm-sans-latin.woff2')")
-    expect(css).toContain("url('./assets/fonts/space-grotesk-latin.woff2')")
-    // No absolute path and no external host: every url() is one of the two
+    // No absolute path and no external host: every url() is one of the
     // relative font paths, quoted exactly as written.
     const urls = [...css.matchAll(/url\(([^)]*)\)/g)].map((m) => m[1])
-    expect(urls.length, 'the two font urls must be present').toBe(2)
-    for (const url of urls) {
-      expect(
-        ["'./assets/fonts/dm-sans-latin.woff2'", "'./assets/fonts/space-grotesk-latin.woff2'"],
-        `font urls must be relative: ${url}`,
-      ).toContain(url)
-    }
+    expect(urls.sort()).toEqual(FONT_FACES.map(({ file }) => `'./assets/fonts/${file}'`).sort())
   })
 
-  it('defines every --fs- token with the exact value of the handoff', () => {
+  it('defines every --fs- token with its exact value', () => {
     for (const [name, value] of Object.entries(TOKENS)) {
       expect(css, `${name} must be ${value}`).toContain(`${name}: ${value};`)
     }
@@ -172,6 +201,8 @@ describe('index.css design foundation', () => {
     expect(theme, 'the heading font utility must be registered').toContain(
       '--font-fs-heading: var(--fs-font-heading);',
     )
+    expect(theme, 'the mono font utility must be registered').toContain('--font-fs-mono: var(--fs-font-mono);')
+    expect(theme, 'font-mono follows the mono token').toContain('--font-mono: var(--fs-font-mono);')
   })
 
   it('applies the tokens to the shell', () => {

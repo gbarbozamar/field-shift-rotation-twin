@@ -24,12 +24,12 @@ import type { RotationStrip } from './rotationStrip'
  * appearance on the screen (cropOrder), and repeated past its end.
  */
 const CROP_SWATCHES = [
-  'bg-emerald-600',
-  'bg-amber-500',
-  'bg-sky-600',
-  'bg-fuchsia-600',
-  'bg-lime-500',
-  'bg-orange-700',
+  'bg-fs-crop-1',
+  'bg-fs-crop-2',
+  'bg-fs-crop-3',
+  'bg-fs-crop-4',
+  'bg-fs-crop-5',
+  'bg-fs-crop-6',
 ] as const
 
 export function swatchOf(cropId: string, order: readonly string[]): string {
@@ -54,7 +54,7 @@ function Swatch({ className }: { className: string }) {
 function StripMarks({ strip }: { strip: RotationStrip }) {
   const start = strip.ag_year_start
   return (
-    <div className="text-xs text-slate-500">
+    <div className="text-xs text-fs-muted">
       <p data-testid="plant-strip-ag-year">
         {formatString(strings['ribbon.ag_year_start'], { month: start.month })}
         {start.provisional ? (
@@ -98,7 +98,7 @@ export function StripBlock({
       detail: strings['plant.strip.no_definition_detail'],
     }
     return (
-      <p data-testid="plant-strip-unavailable" className="mt-2 text-sm italic text-slate-500">
+      <p data-testid="plant-strip-unavailable" className="mt-2 text-sm italic text-fs-muted">
         {missingPatternText(strings['plant.strip.what'], why)}
       </p>
     )
@@ -116,20 +116,20 @@ export function StripBlock({
             <div
               key={year.index}
               data-testid="plant-strip-year"
-              className="rounded border border-slate-200 px-2 py-1"
+              className="rounded border border-fs-border px-2 py-1"
             >
-              <p className="text-xs font-semibold text-slate-600">
+              <p className="text-xs font-semibold text-fs-muted">
                 {formatString(strings['plant.strip.year_label'], { n: year.index })}
               </p>
               {year.crops.length === 0 ? (
-                <p className="text-xs text-slate-500">{yearText(year)}</p>
+                <p className="text-xs text-fs-muted">{yearText(year)}</p>
               ) : (
                 <ul>
                   {year.crops.map((crop) => (
                     <li key={crop.component_id} className="flex items-center gap-1 text-xs">
                       <Swatch className={swatchOf(crop.crop_id, order)} />
                       <span>{cropText(crop, year.index)}</span>
-                      <span className="text-slate-500">
+                      <span className="text-fs-muted">
                         {formatString(strings['plant.strip.purpose'], { purpose: crop.purpose })}
                       </span>
                     </li>
@@ -141,11 +141,11 @@ export function StripBlock({
         </div>
       ) : null}
       {strip.unplaced.map((crop) => (
-        <p key={crop.component_id} data-testid="plant-strip-unplaced" className="text-xs italic text-slate-500">
+        <p key={crop.component_id} data-testid="plant-strip-unplaced" className="text-xs italic text-fs-muted">
           {unplacedText(crop)}
         </p>
       ))}
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fs-muted">
         {strings[strip.repeats ? 'ribbon.repeats' : 'ribbon.not_repeating']}
       </p>
       <StripMarks strip={strip} />
@@ -161,24 +161,24 @@ const FILL_POSITION = { position: 'absolute', top: 0, bottom: 0, left: 0 } as co
  * form, not only by its colour; a text mark under the bar says it is a loss,
  * and the number keeps its minus sign.
  */
-const NEGATIVE_FILL = ['bg-rose-100', 'border-2', 'border-dashed', 'border-rose-700'].join(' ')
+const NEGATIVE_FILL = ['bg-fs-error-bg', 'border-2', 'border-dashed', 'border-fs-error'].join(' ')
 
 /** The margin bar: from zero, its share of the largest absolute margin shown. */
 export function MarginBar({ value, scale }: { value: number; scale: number }) {
   const negative = value < 0
   return (
     <div>
-      <div data-testid="plant-bar-margin" aria-hidden="true" className="relative mt-1 h-3 rounded bg-slate-100">
+      <div data-testid="plant-bar-margin" aria-hidden="true" className="relative mt-1 h-3 rounded bg-fs-faint">
         <span
           data-testid="plant-bar-margin-fill"
           data-negative={String(negative)}
           data-pattern={negative ? 'dashed' : 'solid'}
-          className={negative ? NEGATIVE_FILL : 'bg-teal-600'}
+          className={negative ? NEGATIVE_FILL : 'bg-fs-primary'}
           style={{ ...FILL_POSITION, width: `${barPercent(value, scale)}%` }}
         />
       </div>
       {negative ? (
-        <p data-testid="plant-bar-margin-loss" className="text-xs text-rose-800">
+        <p data-testid="plant-bar-margin-loss" className="text-xs text-fs-error">
           {strings['plant.bar.margin_loss']}
         </p>
       ) : null}
@@ -188,10 +188,10 @@ export function MarginBar({ value, scale }: { value: number; scale: number }) {
 
 /** The fill of the soil-loss bar by what it says; not in the record has no verdict colour. */
 const DRAWN_FILL = {
-  meets: 'bg-emerald-600',
-  does_not_meet: 'bg-rose-600',
-  not_resolved: 'bg-amber-400',
-  not_in_record: 'bg-slate-300',
+  meets: 'bg-fs-ok',
+  does_not_meet: 'bg-fs-error',
+  not_resolved: 'bg-fs-warning',
+  not_in_record: 'bg-fs-muted',
 } as const
 
 function drawnKey(drawn: DrawnVerdict): keyof typeof DRAWN_FILL {
@@ -245,7 +245,7 @@ export function SoilLossBar({
   const key = drawnKey(drawn)
   return (
     <div>
-      <div data-testid="plant-bar-soil" aria-hidden="true" className="relative mt-1 h-3 rounded bg-slate-100">
+      <div data-testid="plant-bar-soil" aria-hidden="true" className="relative mt-1 h-3 rounded bg-fs-faint">
         <span
           data-testid="plant-bar-soil-fill"
           data-verdict={key}
@@ -255,18 +255,18 @@ export function SoilLossBar({
         {limit !== null ? (
           <span
             data-testid="plant-bar-limit"
-            className="absolute -bottom-1 -top-1 w-0.5 bg-slate-900"
+            className="absolute -bottom-1 -top-1 w-0.5 bg-fs-text"
             style={{ left: `${barPercent(limit, scale)}%` }}
           />
         ) : null}
       </div>
       {limit === null && limitMissing !== null ? (
-        <p data-testid="plant-bar-no-limit" className="text-xs italic text-slate-500">
+        <p data-testid="plant-bar-no-limit" className="text-xs italic text-fs-muted">
           {missingPatternText(strings['plant.bar.limit_line'], limitMissing)}
         </p>
       ) : null}
       {verdictInText ? (
-        <p data-testid="plant-bar-soil-verdict" className="text-xs text-slate-600">
+        <p data-testid="plant-bar-soil-verdict" className="text-xs text-fs-muted">
           {drawnVerdictText(what, drawn)}
         </p>
       ) : null}

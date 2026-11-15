@@ -114,14 +114,14 @@ function CountGroup({ count }: { count: PairCellCount }) {
     <div data-testid="decision-counts-group" className={['mt-3'].join(' ')}>
       <p
         data-testid="decision-counts-cell-label"
-        className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+        className={['font-mono', 'text-xs', 'text-fs-muted'].join(' ')}
       >
         {cellLabel(count)}
       </p>
       <div className={['mt-1'].join(' ')}>
         <p
           data-testid="decision-counts-by-point-heading"
-          className={['text-xs', 'font-semibold', 'text-slate-600'].join(' ')}
+          className={['text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
         >
           {strings['decision.counts_by_point']}
         </p>
@@ -138,7 +138,7 @@ function CountGroup({ count }: { count: PairCellCount }) {
         ) : (
           <p
             data-testid="decision-counts-by-point-missing"
-            className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+            className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
           >
             {missingPatternText(
               strings['decision.counts_by_point'],
@@ -150,7 +150,7 @@ function CountGroup({ count }: { count: PairCellCount }) {
       <div className={['mt-2'].join(' ')}>
         <p
           data-testid="decision-counts-by-range-heading"
-          className={['text-xs', 'font-semibold', 'text-slate-600'].join(' ')}
+          className={['text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
         >
           {strings['decision.counts_by_range']}
         </p>
@@ -181,7 +181,7 @@ function YearsWithinRow({ entry }: { entry: RangeAcrossScenarios }) {
     <li data-testid="decision-years-within" className={['flex', 'gap-2'].join(' ')}>
       <span
         data-testid="decision-years-label"
-        className={['font-mono', 'text-sm', 'text-slate-500'].join(' ')}
+        className={['font-mono', 'text-sm', 'text-fs-muted'].join(' ')}
       >
         {rangeLabel(entry)}
       </span>
@@ -196,7 +196,7 @@ function YearsWithinRow({ entry }: { entry: RangeAcrossScenarios }) {
       ) : (
         <span
           data-testid="decision-years-missing"
-          className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+          className={['text-sm', 'italic', 'text-fs-muted'].join(' ')}
         >
           {missingPatternText(rangeLabel(entry), entry.missing)}
         </span>
@@ -223,8 +223,8 @@ function PairBlock({ state, document }: { state: PairState; document: DecisionOu
         'mt-4',
         'rounded-lg',
         'border',
-        'border-slate-200',
-        'bg-white',
+        'border-fs-border',
+        'bg-fs-surface',
         'px-4',
         'py-3',
       ].join(' ')}
@@ -235,7 +235,7 @@ function PairBlock({ state, document }: { state: PairState; document: DecisionOu
 
       <h5
         data-testid="decision-state-heading"
-        className={['mt-3', 'text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+        className={['mt-3', 'text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
       >
         {strings['decision.state']}
       </h5>
@@ -255,7 +255,7 @@ function PairBlock({ state, document }: { state: PairState; document: DecisionOu
           {state.reason !== undefined ? (
             <p
               data-testid="decision-state-reason"
-              className={['text-sm', 'text-slate-500'].join(' ')}
+              className={['text-sm', 'text-fs-muted'].join(' ')}
             >
               {state.reason}
             </p>
@@ -263,7 +263,7 @@ function PairBlock({ state, document }: { state: PairState; document: DecisionOu
           {state.reason_missing !== undefined ? (
             <p
               data-testid="decision-state-reason-missing"
-              className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+              className={['text-sm', 'italic', 'text-fs-muted'].join(' ')}
             >
               {missingPatternText(state.value, state.reason_missing)}
             </p>
@@ -272,7 +272,7 @@ function PairBlock({ state, document }: { state: PairState; document: DecisionOu
       ) : (
         <p
           data-testid="decision-state-missing"
-          className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+          className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
         >
           {missingPatternText(pairName, state.missing)}
         </p>
@@ -287,7 +287,7 @@ function PairBlock({ state, document }: { state: PairState; document: DecisionOu
 
       <h5
         data-testid="decision-counts-heading"
-        className={['mt-3', 'text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+        className={['mt-3', 'text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
       >
         {strings['decision.counts']}
       </h5>
@@ -329,7 +329,7 @@ function OverallState({ state }: { state: DecisionState }) {
       ) : (
         <p
           data-testid="decision-overall-missing"
-          className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+          className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
         >
           {missingPatternText(strings['decision.state'], state.missing)}
         </p>
@@ -340,7 +340,7 @@ function OverallState({ state }: { state: DecisionState }) {
             <li
               key={index}
               data-testid="decision-overall-reason"
-              className={['text-sm', 'text-slate-600'].join(' ')}
+              className={['text-sm', 'text-fs-muted'].join(' ')}
             >
               {reason}
             </li>
@@ -369,7 +369,7 @@ function DecisionDocument({
       {liveData ? (
         <p
           data-testid="decision-live"
-          className={['mt-3', 'text-sm', 'font-medium', 'text-emerald-700'].join(' ')}
+          className={['mt-3', 'text-sm', 'font-medium', 'text-fs-primary'].join(' ')}
         >
           {strings['seam.with_real_data']}
         </p>
@@ -382,15 +382,15 @@ function DecisionDocument({
             'mt-3',
             'rounded-lg',
             'border',
-            'border-amber-300',
-            'bg-amber-50',
+            'border-fs-warning',
+            'bg-fs-warning-bg',
             'px-4',
             'py-3',
           ].join(' ')}
         >
           <p
             data-testid="decision-example-banner"
-            className={['text-sm', 'text-amber-900'].join(' ')}
+            className={['text-sm', 'text-fs-warning'].join(' ')}
           >
             {strings['example.banner']}
           </p>
@@ -422,8 +422,8 @@ function DecisionRouteError({ error }: { error: unknown }) {
   if (error instanceof ApiError) {
     return (
       <div data-testid="decision-route-error" role="alert" className={['mt-3'].join(' ')}>
-        <p className={['text-sm', 'text-red-700'].join(' ')}>{strings[`api.${error.code}`]}</p>
-        <p data-testid="decision-route-error-code" className={['text-xs', 'text-slate-500'].join(' ')}>
+        <p className={['text-sm', 'text-fs-error'].join(' ')}>{strings[`api.${error.code}`]}</p>
+        <p data-testid="decision-route-error-code" className={['text-xs', 'text-fs-muted'].join(' ')}>
           {formatString(strings['api.code.shown'], { code: error.code })}
         </p>
       </div>
@@ -431,7 +431,7 @@ function DecisionRouteError({ error }: { error: unknown }) {
   }
   return (
     <div data-testid="decision-route-error" role="alert" className={['mt-3'].join(' ')}>
-      <p className={['text-sm', 'text-red-700'].join(' ')}>{strings['common.error']}</p>
+      <p className={['text-sm', 'text-fs-error'].join(' ')}>{strings['common.error']}</p>
     </div>
   )
 }
@@ -450,7 +450,7 @@ function FallbackReason({ state }: { state: DecisionSectionState }) {
     return (
       <p
         data-testid="decision-route-missing"
-        className={['mt-3', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+        className={['mt-3', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
       >
         {missingPatternText(strings['decision.title'], state.answer.missing)}
       </p>
@@ -463,7 +463,7 @@ function FallbackReason({ state }: { state: DecisionSectionState }) {
     return (
       <p
         data-testid="decision-not-called"
-        className={['mt-3', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+        className={['mt-3', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
       >
         {missingPatternText(strings['decision.pairs'], state.missing)}
       </p>
@@ -485,7 +485,7 @@ export function DecisionPanel({ state }: { state: DecisionSectionState }) {
       </h3>
 
       {state.phase === 'pending' ? (
-        <p data-testid="decision-loading" className={['mt-3', 'text-sm', 'text-slate-500'].join(' ')}>
+        <p data-testid="decision-loading" className={['mt-3', 'text-sm', 'text-fs-muted'].join(' ')}>
           {strings['common.loading']}
         </p>
       ) : state.phase === 'answered' && state.answer.kind === 'decision' ? (

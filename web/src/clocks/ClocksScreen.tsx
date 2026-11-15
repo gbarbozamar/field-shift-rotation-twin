@@ -35,10 +35,10 @@ function YearColumn({ row }: { row: ClockRow }) {
     <div
       data-testid="clock-column"
       className={[
-        'w-44', 'rounded-lg', 'border', 'border-slate-200', 'bg-white', 'px-3', 'py-2',
+        'w-44', 'rounded-lg', 'border', 'border-fs-border', 'bg-fs-surface', 'px-3', 'py-2',
       ].join(' ')}
     >
-      <p data-testid="clock-year" className="font-mono text-sm font-semibold text-slate-700">
+      <p data-testid="clock-year" className="font-mono text-sm font-semibold text-fs-text">
         {row.ag_year}
       </p>
       <div className="mt-1">
@@ -89,16 +89,16 @@ export default function ClocksScreen() {
       <h3 id="clocks-title" data-testid="clocks-title" className="text-base font-semibold">
         {strings['clocks.title']}
       </h3>
-      <p className="mt-1 text-sm text-slate-500">{strings['clocks.years_hint']}</p>
+      <p className="mt-1 text-sm text-fs-muted">{strings['clocks.years_hint']}</p>
 
       <div
         role="note"
-        className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
+        className="mt-3 rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3"
       >
-        <p data-testid="clocks-example-banner" className="text-sm text-amber-900">
+        <p data-testid="clocks-example-banner" className="text-sm text-fs-warning">
           {strings['example.banner']}
         </p>
-        <p data-testid="clocks-example-note" className="mt-1 text-sm text-amber-800">
+        <p data-testid="clocks-example-note" className="mt-1 text-sm text-fs-warning">
           {strings['clocks.example_note']}
         </p>
       </div>
@@ -107,7 +107,7 @@ export default function ClocksScreen() {
         <div key={rotation.rotation_id} data-testid="clocks-rotation" className="mt-6">
           <h4
             data-testid="clocks-rotation-id"
-            className="font-mono text-sm font-semibold text-slate-700"
+            className="font-mono text-sm font-semibold text-fs-text"
           >
             {rotation.rotation_id}
           </h4>

@@ -41,7 +41,7 @@ function MissingRow({ label, missing }: { label: string; missing: MissingPart })
   return (
     <p
       data-testid="ribbon-missing"
-      className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+      className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
     >
       {missingPatternText(label, missing)}
     </p>
@@ -56,13 +56,13 @@ function DatedRow({ label, part }: { label: string; part: DatedPart }) {
   return (
     <div className="mt-2">
       <p className="text-sm">
-        <span className="text-slate-500">{label}:</span>{' '}
+        <span className="text-fs-muted">{label}:</span>{' '}
         <span data-testid="ribbon-date" className="font-medium">
           {part.date}
         </span>{' '}
-        <span className="text-slate-500">{strings[`provenance.${part.provenance}`]}</span>
+        <span className="text-fs-muted">{strings[`provenance.${part.provenance}`]}</span>
       </p>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fs-muted">
         {formatString(strings['value.source'], { source: part.source })}
       </p>
     </div>
@@ -76,7 +76,7 @@ function ResidueRow({ residue }: { residue: ResiduePart }) {
   }
   return (
     <p className="mt-1 text-sm">
-      <span className="text-slate-500">{strings['ribbon.mgmt_residue']}:</span>{' '}
+      <span className="text-fs-muted">{strings['ribbon.mgmt_residue']}:</span>{' '}
       <span className="font-medium">{residue}</span>
     </p>
   )
@@ -89,7 +89,7 @@ function GrazingRow({ grazing }: { grazing: GrazingPart }) {
   }
   return (
     <p className="mt-1 text-sm">
-      <span className="text-slate-500">{strings['ribbon.mgmt_grazing']}:</span>{' '}
+      <span className="text-fs-muted">{strings['ribbon.mgmt_grazing']}:</span>{' '}
       <span className="font-medium">{grazing.intensity}</span>
     </p>
   )
@@ -102,7 +102,7 @@ function TerminationRow({ termination }: { termination: TerminationPart }) {
   }
   return (
     <p className="mt-1 text-sm">
-      <span className="text-slate-500">{strings['ribbon.mgmt_termination']}:</span>{' '}
+      <span className="text-fs-muted">{strings['ribbon.mgmt_termination']}:</span>{' '}
       <span data-testid="ribbon-date" className="font-medium">
         {termination.date}
       </span>{' '}
@@ -121,8 +121,8 @@ function ComponentCard({ component }: { component: RotationComponent }) {
         'flex-1',
         'rounded-lg',
         'border',
-        'border-slate-200',
-        'bg-white',
+        'border-fs-border',
+        'bg-fs-surface',
         'p-4',
       ].join(' ')}
     >
@@ -130,19 +130,19 @@ function ComponentCard({ component }: { component: RotationComponent }) {
         {formatString(strings['ribbon.component'], { position: component.position })}
       </h4>
       <p className="mt-2 text-sm">
-        <span className="text-slate-500">{strings['ribbon.crop']}:</span>{' '}
+        <span className="text-fs-muted">{strings['ribbon.crop']}:</span>{' '}
         <span data-testid="ribbon-crop" className="font-medium">
           {component.crop_id}
         </span>
       </p>
       <p className="mt-1 text-sm">
-        <span className="text-slate-500">{strings['ribbon.purpose']}:</span>{' '}
+        <span className="text-fs-muted">{strings['ribbon.purpose']}:</span>{' '}
         <span className="font-medium">{component.purpose}</span>
       </p>
       <DatedRow label={strings['ribbon.sowing']} part={component.sowing} />
       <DatedRow label={strings['ribbon.harvest']} part={component.harvest} />
-      <div className={['mt-3', 'border-t', 'border-slate-100', 'pt-2'].join(' ')}>
-        <p className="text-xs font-semibold uppercase text-slate-500">
+      <div className={['mt-3', 'border-t', 'border-fs-faint', 'pt-2'].join(' ')}>
+        <p className="text-xs font-semibold uppercase text-fs-muted">
           {strings['ribbon.management']}
         </p>
         <div className="mt-1">
@@ -175,12 +175,12 @@ export function RotationRibbon({ rotation }: { rotation: RotationDefinition }) {
             'mt-2',
             'rounded',
             'border',
-            'border-amber-300',
-            'bg-amber-50',
+            'border-fs-warning',
+            'bg-fs-warning-bg',
             'px-3',
             'py-2',
             'text-sm',
-            'text-amber-800',
+            'text-fs-warning',
           ].join(' ')}
         >
           {strings['example.banner']}
@@ -189,7 +189,7 @@ export function RotationRibbon({ rotation }: { rotation: RotationDefinition }) {
       <p className="mt-3 text-sm font-medium">
         {formatString(strings['ribbon.rotation_of'], { label: rotation.label })}
       </p>
-      <p data-testid="ag-year-line" className="mt-1 text-sm text-slate-500">
+      <p data-testid="ag-year-line" className="mt-1 text-sm text-fs-muted">
         {formatString(strings['ribbon.ag_year_start'], { month: rotation.ag_year_start.month })}
         {rotation.ag_year_start.provisional && (
           <>
@@ -198,7 +198,7 @@ export function RotationRibbon({ rotation }: { rotation: RotationDefinition }) {
           </>
         )}
       </p>
-      <p data-testid="repeats-line" className="mt-1 text-sm text-slate-500">
+      <p data-testid="repeats-line" className="mt-1 text-sm text-fs-muted">
         {rotation.repeats ? strings['ribbon.repeats'] : strings['ribbon.not_repeating']}
       </p>
       <ol className={['mt-4', 'flex', 'list-none', 'gap-4', 'overflow-x-auto', 'pb-2'].join(' ')}>

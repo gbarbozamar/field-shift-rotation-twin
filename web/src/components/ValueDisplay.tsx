@@ -165,7 +165,7 @@ export function ValueDisplay({ what, item }: ValueDisplayProps) {
   if (item.missing) {
     return (
       <div className="text-sm leading-5">
-        <p data-testid="missing-line" className="italic text-slate-500">
+        <p data-testid="missing-line" className="italic text-fs-muted">
           {missingPattern(what, item.missing)}
         </p>
       </div>
@@ -178,15 +178,15 @@ export function ValueDisplay({ what, item }: ValueDisplayProps) {
         <span data-testid="value-number" className="font-medium" title={String(item.value)}>
           {displayNumber(item.value)}
         </span>{' '}
-        <span data-testid="value-unit" className="text-slate-500">
+        <span data-testid="value-unit" className="text-fs-muted">
           {item.unit}
         </span>{' '}
-        <span data-testid="value-label" className="text-slate-500">
+        <span data-testid="value-label" className="text-fs-muted">
           {strings[`provenance.${item.provenance}`]}
         </span>
       </p>
       {item.source !== undefined ? (
-        <details data-testid="source-details" className="text-slate-500">
+        <details data-testid="source-details" className="text-fs-muted">
           <summary data-testid="source-line" className="truncate">
             {formatString(strings['value.source'], { source: item.source })}
           </summary>
@@ -196,12 +196,12 @@ export function ValueDisplay({ what, item }: ValueDisplayProps) {
         </details>
       ) : null}
       {item.assumption === true ? (
-        <p data-testid="assumption-line" className="text-slate-500">
+        <p data-testid="assumption-line" className="text-fs-muted">
           {strings['assumption.mark']}
         </p>
       ) : null}
       {item.range !== undefined ? (
-        <p data-testid="range-line" className="text-slate-500">
+        <p data-testid="range-line" className="text-fs-muted">
           {formatString(strings['value.range'], {
             low: item.range.low,
             high: item.range.high,

@@ -49,7 +49,7 @@ export default function FieldsScreen() {
       <h2 id="fields-screen-title" className="text-lg font-semibold">
         {strings['identity.title']}
       </h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-fs-muted">
         {strings['identity.case_label']}: {exampleCase.label}
       </p>
 
@@ -71,16 +71,16 @@ export default function FieldsScreen() {
             <div
               role="note"
               aria-label={strings['identity.banner_title']}
-              className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
+              className="mt-4 rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3"
             >
-              <p className="text-sm font-semibold text-amber-900">{strings['identity.banner_title']}</p>
-              <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
+              <p className="text-sm font-semibold text-fs-warning">{strings['identity.banner_title']}</p>
+              <p className="mt-1 text-sm text-fs-warning">{strings['identity.banner_text']}</p>
             </div>
           )}
 
           <div className="mt-6">
             <h3 className="text-base font-semibold">{strings['map.title']}</h3>
-            <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
+            <p className="mt-1 text-sm text-fs-muted">{strings['map.select_hint']}</p>
             <div className="mt-2 h-[60dvh] min-h-[24rem] max-h-[80dvh]">
               <FieldsMap />
             </div>
@@ -97,21 +97,21 @@ export default function FieldsScreen() {
                   onClick={() => setSelectedFieldId(field.field_id)}
                   className={[
                     'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
-                    isSelected ? 'border-emerald-500' : 'border-slate-200',
+                    isSelected ? 'border-fs-primary' : 'border-fs-border',
                     ...(isSelected
-                      ? ['bg-emerald-50', 'ring-2', 'ring-emerald-500']
-                      : ['bg-white', 'hover:border-slate-300', 'hover:bg-slate-50']),
+                      ? ['bg-fs-selection', 'ring-2', 'ring-fs-primary']
+                      : ['bg-fs-surface', 'hover:border-fs-border', 'hover:bg-fs-bg']),
                   ].join(' ')}
                 >
                   <span className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-slate-900">{field.name}</span>
+                    <span className="font-medium text-fs-text">{field.name}</span>
                     {isSelected && (
-                      <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                      <span className="rounded bg-fs-primary px-2 py-0.5 text-xs font-semibold text-white">
                         {strings['identity.selected']}
                       </span>
                     )}
                   </span>
-                  <span className="mt-1 block text-sm text-slate-500">
+                  <span className="mt-1 block text-sm text-fs-muted">
                     {strings['identity.field_id_label']}: {field.field_id}
                   </span>
                 </button>
@@ -121,7 +121,7 @@ export default function FieldsScreen() {
           </ul>
 
           {exampleCase.fields.length === 0 && (
-            <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
+            <p className="mt-6 text-sm text-fs-muted">{strings['identity.empty_list']}</p>
           )}
         </div>
 
