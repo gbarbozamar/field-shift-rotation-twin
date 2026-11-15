@@ -247,6 +247,33 @@ Phases (D132, D141): by [D132](https://github.com/gbarbozamar/field-shift-rotati
 
 Depends on: Q2, Q3 (parameters; answered: see the question), Q5 (which agricultural years; answered: see the question), Q10 (inputs and outputs of the water engine; answered for latitude and elevation: they arrive in `climate`, and this signature does not change), Q11 (unit).
 
+### Beside EP3: `daily_reference_evapotranspiration` (D256)
+
+Status: PROPOSED
+
+Decided by D256 of issue #77: the daily FAO-56 reference evapotranspiration that the runner needs for the carbon forcing (D220, D181) comes from this public function of lane L1, `engine.water.daily_reference_evapotranspiration`, found by name as the entry points are. It is not a numbered entry point: it returns a series that the runner passes on, not an indicator. It is the one exception D256 makes to "one public function per engine" (the proposal of EP3 above, Q2, and the section "Not covered by this file").
+
+| Aspect | Entry |
+|---|---|
+| Lane | L1 Engines (lead developer) |
+| Module path | `engine.water` (file `engine/water/__init__.py`; the function is in `engine/water/reference_et0.py`) |
+| Function name | `daily_reference_evapotranspiration` |
+| Argument `climate` | `SiteClimate` (`contracts/inputs/site_climate.py`). The same object EP3 receives |
+| Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner, keyword-only, no default (Q3, D46, D56) |
+| Return type | `dict[datetime.date, float \| Missing]`: one item per day of the climate record, in date order; `Missing` is the one of `contracts/results/models.py` |
+
+```text
+daily_reference_evapotranspiration(
+    climate: SiteClimate,
+    *,
+    parameters: dict[str, dict],
+) -> dict[date, float | Missing]
+```
+
+What it returns: the daily FAO-56 reference evapotranspiration of D44, in mm per day, exactly the series EP3 runs its daily chain on (D44, D256). It makes the call EP3 makes, with EP3's own identifiers of the constants and of the two bounds of D82, its catalogue reader, point units and unit-guard reason; no constant is written in it. A day without a value is `Missing` with the reason EP3's chain gives that day; a constant or bound without a record makes every day `MISSING_INPUT`, naming it by `id` and scope. A climate with no daily series gives an empty mapping. Raises `TypeError` for an argument that is not its type (G5). `engine/water/test_reference_et0.py` checks, on the PLACEHOLDER chain and both rotations of D128, that the series equals day by day the one EP3 uses.
+
+Not yet built from D256: EP3 still builds its own call (`_run_chain` of `engine/water/exposure.py`) instead of calling this function; the change waits for the pull request that has that file open. The runner (`api/engines.py`) still rebuilds the call from private names until the platform owner switches it to this function.
+
 ### EP4 `engine/residues/`
 
 Status: PROPOSED
