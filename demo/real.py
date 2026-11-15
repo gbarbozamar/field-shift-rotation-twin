@@ -316,8 +316,14 @@ def catalogue_at(level: float) -> dict[str, dict]:
     The lower level declares 0 % (bare soil) for every fallow of both
     rotations; the upper level declares the cap for the fallows of the
     rotations that have one — here the soybean rotation alone (0.40,
-    continuous soybean). The records are checked as the service checks its
-    own catalogue; a problem is a defect of this module.
+    continuous soybean). The water lane ships the lower level of the
+    soybean fallow itself (D208 keeps both levels of D115 as one range in
+    a single record): where the shipped record already holds this level's
+    value the shipped record wins, with its citation, and no duplicate is
+    added; where it holds the range's other end, the level's own
+    declaration governs this run and replaces it. The records are checked
+    as the service checks its own catalogue; a problem is a defect of
+    this module.
     """
     from params.catalogue import check_catalogue
 
@@ -332,8 +338,20 @@ def catalogue_at(level: float) -> dict[str, dict]:
             for crop in _crops_of(rotation)
         }
     for crop, value in covers.items():
-        name = f"demo/{water.SURFACE_RESIDUE_COVER}.{level}.{crop}.json"
-        catalogue[name] = cover_record(_scope_of(crop), value)
+        scope = _scope_of(crop)
+        shipped = [
+            key
+            for key, record in catalogue.items()
+            if record.get("id") == water.SURFACE_RESIDUE_COVER
+            and record.get("scope") == scope
+        ]
+        if shipped and catalogue[shipped[0]].get("value") == value:
+            continue
+        for key in shipped:
+            del catalogue[key]
+        catalogue[f"demo/{water.SURFACE_RESIDUE_COVER}.{level}.{crop}.json"] = (
+            cover_record(scope, value)
+        )
     problems = check_catalogue(catalogue)
     if problems:
         raise ValueError(
