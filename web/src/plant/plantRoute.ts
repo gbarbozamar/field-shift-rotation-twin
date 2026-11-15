@@ -1,5 +1,7 @@
 import { ApiError, postToRoute } from '../seam/runRotationApi'
-import { parsePlantAnswer, parseRainStress } from './plantData'
+import type { MissingPart } from '../components/ValueDisplay'
+import { strings } from '../strings'
+import { missingPart, parsePlantAnswer, parseRainStress } from './plantData'
 import type { MarginOf, PlantAnswer, RainStressPart, Strictness } from './plantData'
 
 /**
@@ -19,7 +21,8 @@ import type { MarginOf, PlantAnswer, RainStressPart, Strictness } from './plantD
  *   parser refuses, or an answer to other questions than those asked, is
  *   ApiError UNEXPECTED, never shown as an answer.
  *
- * No number, no wording: pure functions and the fetch boundary only.
+ * No number: pure functions and the fetch boundary only; the one wording
+ * used (the detail of an unreadable request) comes from strings.ts.
  */
 
 /** The route path, with the /api prefix the backend serves under. */
@@ -91,25 +94,90 @@ export interface DeclaredFactor {
 }
 
 /**
- * The rain-stress factor the base request declares, or null when it declares
- * none with a value (null, or a factor missing with its reason): then the
- * heavier-rain control has nothing to send.
+ * The rain-stress factor of a request as the screen reads it (fix round 1 of
+ * S-021, PROPOSED):
+ * - present: a value with its unit and provenance, which heavier rain sends;
+ * - declared_missing: the request declares the factor missing, with its
+ *   reason (and detail), shown as declared, never replaced by another reason;
+ * - none: the request has no factor object at all (null or absent);
+ * - unreadable: the request (or its factor) cannot be read, a typed absence
+ *   (MISSING_INPUT with the detail of strings key
+ *   plant.service.rain_request_invalid_detail), never an exception.
+ */
+export type RainFactorRead =
+  | { kind: 'present'; factor: DeclaredFactor }
+  | { kind: 'declared_missing'; missing: MissingPart }
+  | { kind: 'none' }
+  | { kind: 'unreadable'; missing: MissingPart }
+
+function unreadableFactor(): RainFactorRead {
+  return {
+    kind: 'unreadable',
+    missing: { reason: 'MISSING_INPUT', detail: strings['plant.service.rain_request_invalid_detail'] },
+  }
+}
+
+/** Reads the rain-stress factor of a request. Pure, and never throws. */
+export function readRainFactor(baseRequest: unknown): RainFactorRead {
+  try {
+    const factor = questionsOf(baseRequest).rain_stress_factor
+    if (factor === null || factor === undefined) {
+      return { kind: 'none' }
+    }
+    if (!isRecord(factor)) {
+      return unreadableFactor()
+    }
+    const { value, unit, provenance } = factor
+    if (value === null) {
+      // As the contract's Value: a missing value carries its missing part.
+      if (!isRecord(factor.missing)) {
+        return unreadableFactor()
+      }
+      return {
+        kind: 'declared_missing',
+        missing: missingPart(factor.missing.reason, factor.missing.detail, 'invalid-rain-stress-factor'),
+      }
+    }
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      typeof unit !== 'string' ||
+      typeof provenance !== 'string'
+    ) {
+      return unreadableFactor()
+    }
+    return { kind: 'present', factor: { value, unit, provenance } }
+  } catch {
+    return unreadableFactor()
+  }
+}
+
+/**
+ * The rain-stress factor the base request declares with a value, or null
+ * otherwise (none, declared missing, or unreadable: readRainFactor tells
+ * which). Never throws.
  */
 export function declaredRainFactor(baseRequest: unknown): DeclaredFactor | null {
-  const factor = questionsOf(baseRequest).rain_stress_factor
-  if (!isRecord(factor)) {
-    return null
+  const read = readRainFactor(baseRequest)
+  return read.kind === 'present' ? read.factor : null
+}
+
+/** What the screen reads of its base request once: whether a request can be built, and its factor. */
+export interface BaseRequestRead {
+  /** False when the request cannot be read: nothing can be sent to the service. */
+  readable: boolean
+  rain: RainFactorRead
+}
+
+/** Reads a base request for the screen. Pure, and never throws. */
+export function readBaseRequest(baseRequest: unknown): BaseRequestRead {
+  let readable = true
+  try {
+    questionsOf(baseRequest)
+  } catch {
+    readable = false
   }
-  const { value, unit, provenance } = factor
-  if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value) ||
-    typeof unit !== 'string' ||
-    typeof provenance !== 'string'
-  ) {
-    return null
-  }
-  return { value, unit, provenance }
+  return { readable, rain: readRainFactor(baseRequest) }
 }
 
 /** What the service answered: the answer, and its rain-stress part. */
@@ -138,10 +206,52 @@ function sameFactor(echoed: unknown, asked: unknown): boolean {
 }
 
 /**
+ * Whether the rain-stress part of the answer is the one the factor asked
+ * calls for, as PlantAnswer._questions of the contract: no factor asked, no
+ * part; a factor with a value, the applied form whose factor is that value
+ * and whose declared factor is the one asked; a factor declared missing, the
+ * missing form with the same reason and detail.
+ */
+function rainStressMatches(part: RainStressPart | null, rawPart: unknown, asked: unknown): boolean {
+  if (asked === null || asked === undefined) {
+    return part === null
+  }
+  if (part === null || !isRecord(asked)) {
+    return false
+  }
+  if (asked.value === null) {
+    const missing = isRecord(asked.missing) ? asked.missing : null
+    return (
+      part.kind === 'missing' &&
+      missing !== null &&
+      part.missing.reason === missing.reason &&
+      (part.missing.detail ?? null) === (missing.detail ?? null)
+    )
+  }
+  return (
+    part.kind === 'applied' &&
+    part.factor === asked.value &&
+    isRecord(rawPart) &&
+    sameFactor(rawPart.declared, asked)
+  )
+}
+
+/** The case_id and field_id of the request's site, or null when it has none. */
+function siteOf(request: unknown): { case_id: unknown; field_id: unknown } | null {
+  if (!isRecord(request) || !isRecord(request.site)) {
+    return null
+  }
+  return { case_id: request.site.case_id, field_id: request.site.field_id }
+}
+
+/**
  * Read a 2xx body as the answer to this request. The questions it echoes must
  * be those asked (strictness, margin_of and the factor, as
- * check_answer_against_request requires); otherwise, or when the parser
- * refuses it, ApiError UNEXPECTED.
+ * check_answer_against_request requires), its rain-stress part the one the
+ * factor asked calls for, its case_id and field_id those of the request's
+ * site, and it is example data when the request is (fix round 1, PROPOSED,
+ * as check_answer_against_request); otherwise, or when the parser refuses
+ * it, ApiError UNEXPECTED.
  */
 export function readPlantServiceAnswer(body: unknown, request: unknown): PlantServiceAnswer {
   try {
@@ -156,7 +266,21 @@ export function readPlantServiceAnswer(body: unknown, request: unknown): PlantSe
     ) {
       throw new Error('invalid-plant-answer:questions-not-those-asked')
     }
-    return { answer, rainStress: parseRainStress(raw.rain_stress ?? null) }
+    if (raw.rain_stress === undefined) {
+      throw new Error('invalid-plant-answer:no-rain-stress')
+    }
+    const rainStress = parseRainStress(raw.rain_stress)
+    if (!rainStressMatches(rainStress, raw.rain_stress, asked.rain_stress_factor)) {
+      throw new Error('invalid-plant-answer:rain-stress-not-the-factor-asked')
+    }
+    const site = siteOf(request)
+    if (site === null || raw.case_id !== site.case_id || raw.field_id !== site.field_id) {
+      throw new Error('invalid-plant-answer:another-field')
+    }
+    if ((request as Record<string, unknown>).example_data === true && answer.example_data !== true) {
+      throw new Error('invalid-plant-answer:example-request-not-example-answer')
+    }
+    return { answer, rainStress }
   } catch {
     throw new ApiError('UNEXPECTED')
   }
@@ -179,5 +303,17 @@ export function plantQueryOptions(base: string, request: Record<string, unknown>
     retry: false as const,
     staleTime: Infinity,
     refetchOnWindowFocus: false as const,
+  }
+}
+
+/**
+ * The query of the screen (fix round 1 of S-021, PROPOSED): the options of
+ * one call, enabled only with a backend configured and a request to send
+ * (service mode). Disabled, it never calls.
+ */
+export function plantScreenQueryOptions(base: string | null, request: Record<string, unknown> | null) {
+  return {
+    ...plantQueryOptions(base ?? '', request ?? {}),
+    enabled: base !== null && request !== null,
   }
 }

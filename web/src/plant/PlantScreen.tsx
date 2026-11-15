@@ -1,17 +1,17 @@
 import { useMemo, useReducer } from 'react'
 import type { ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { QueryClient, useQuery } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
 import { ApiError } from '../seam/runRotationApi'
 import type { ApiErrorCode } from '../seam/runRotationApi'
 import type { ProvenanceLabel } from '../components/ValueDisplay'
 import {
   configuredApiBase,
-  declaredRainFactor,
-  plantQueryOptions,
   plantRequestFor,
+  plantScreenQueryOptions,
+  readBaseRequest,
 } from './plantRoute'
-import type { DeclaredFactor, PlantServiceAnswer } from './plantRoute'
+import type { BaseRequestRead, DeclaredFactor, PlantServiceAnswer } from './plantRoute'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { barScale, drawnSoilVerdict } from './optionBars'
@@ -73,10 +73,13 @@ import type {
  * the saved example answers and also offers "Ask the service": the example
  * plant request, with the questions chosen (how strict, the kind of year,
  * heavier rain on or off), goes to POST /api/plant/run, one call per distinct
- * request (cached, no retry, no refetch on focus). In that mode heavier rain
- * is an enabled checkbox that sends the example request's own declared
- * factor, shown with its unit and its provenance; the answer's rain-stress
- * part is shown. While the call is on its way a pending line, and when it
+ * request (cached, no retry, no refetch on focus). With a backend, heavier
+ * rain is an enabled checkbox in both modes (fix round 1, PROPOSED; in example
+ * mode a line says it applies to the next service answer, the saved example
+ * having no stress test) that sends the example request's own declared
+ * factor, shown with its unit and its provenance; a factor the request
+ * declares missing keeps it disabled with the declared reason. The answer's
+ * rain-stress part is shown. While the call is on its way a pending line, and when it
  * fails an error panel with its code in plain words, are shown in place of an
  * answer: no example answer is rendered then. "Back to the saved example"
  * goes back. A line says where the answer shown comes from.
@@ -657,7 +660,16 @@ export interface PlantViewProps {
 export type RainControl =
   | { kind: 'unavailable' }
   | { kind: 'no_factor' }
-  | { kind: 'available'; on: boolean; factor: DeclaredFactor; onRain?: (on: boolean) => void }
+  /** The factor declared missing by the request (its own reason), or the request unreadable (MISSING_INPUT). */
+  | { kind: 'factor_missing'; missing: MissingPart }
+  | {
+      kind: 'available'
+      on: boolean
+      factor: DeclaredFactor
+      /** Example mode with a backend: the factor applies to the next service answer. */
+      nextAnswer?: boolean
+      onRain?: (on: boolean) => void
+    }
 
 const RAIN_UNAVAILABLE: RainControl = { kind: 'unavailable' }
 
@@ -791,6 +803,11 @@ function RainQuestion({ rain }: { rain: RainControl }) {
             />
             {strings['plant.q.rain_control']}
           </label>
+          {rain.nextAnswer === true ? (
+            <p data-testid="plant-rain-next-answer" className="text-xs text-slate-500">
+              {strings['plant.service.rain_next_answer']}
+            </p>
+          ) : null}
           {rain.on ? (
             <div>
               <p data-testid="plant-rain-factor" className="text-sm">
@@ -813,9 +830,11 @@ function RainQuestion({ rain }: { rain: RainControl }) {
           <MissingLine
             what={strings['plant.q.rain_control']}
             missing={
-              rain.kind === 'no_factor'
-                ? { reason: 'NOT_DECLARED', detail: strings['plant.service.rain_no_factor_detail'] }
-                : { reason: 'NOT_AVAILABLE', detail: strings['plant.q.rain_unavailable_detail'] }
+              rain.kind === 'factor_missing'
+                ? rain.missing
+                : rain.kind === 'no_factor'
+                  ? { reason: 'NOT_DECLARED', detail: strings['plant.service.rain_no_factor_detail'] }
+                  : { reason: 'NOT_AVAILABLE', detail: strings['plant.q.rain_unavailable_detail'] }
             }
           />
         </div>
@@ -1062,19 +1081,88 @@ export function plantScreenReducer(state: PlantScreenState, action: PlantAction)
   }
 }
 
-/** The request the screen sends: the example request with the questions chosen, in service mode only. */
+/**
+ * What the screen reads of the example request, once at module load (fix
+ * round 1 of S-021): whether it can be read, and its rain-stress factor.
+ * Never throws: a request that cannot be read is a typed absence on the rain
+ * control, and the rest of the screen still renders.
+ */
+const EXAMPLE_REQUEST_READ: BaseRequestRead = readBaseRequest(rawPlantRequest)
+
+function readOf(baseRequest: unknown): BaseRequestRead {
+  return baseRequest === rawPlantRequest ? EXAMPLE_REQUEST_READ : readBaseRequest(baseRequest)
+}
+
+/**
+ * Whether the request sends the factor: heavier rain on and a factor with a
+ * value. PROPOSED (fix round 1): a factor the request declares missing is not
+ * sent; the control stays disabled, showing the declared reason.
+ */
+function sendsRain(state: PlantScreenState, read: BaseRequestRead): boolean {
+  return state.rain && read.rain.kind === 'present'
+}
+
+/**
+ * The request the screen sends: the example request with the questions
+ * chosen, in service mode only; null when the request cannot be read.
+ */
 export function serviceRequestOf(
   state: PlantScreenState,
   baseRequest: unknown = rawPlantRequest,
 ): Record<string, unknown> | null {
-  if (state.mode !== 'service') {
+  const read = readOf(baseRequest)
+  if (state.mode !== 'service' || !read.readable) {
     return null
   }
   return plantRequestFor(baseRequest, {
     strictness: state.strictness,
     marginOf: state.marginOf,
-    rain: state.rain,
+    rain: sendsRain(state, read),
   })
+}
+
+/**
+ * The key the price looked at belongs to: the three questions as sent.
+ * Cheap (no copy of the request); one key per distinct request.
+ */
+export function priceKeyOf(state: PlantScreenState, read: BaseRequestRead = EXAMPLE_REQUEST_READ): string {
+  return `${state.strictness}|${state.marginOf}|${sendsRain(state, read) ? 'rain' : 'no_rain'}`
+}
+
+/**
+ * The heavier-rain control for a state (fix round 1 of S-021, PROPOSED).
+ * Without a backend: unavailable, as before S-021. With one, in either mode:
+ * the factor the request declares, enabled when it has a value (in example
+ * mode with the line that it applies to the next service answer); disabled
+ * with the request's own reason when declared missing, NOT_DECLARED when the
+ * request has no factor, MISSING_INPUT when it cannot be read. The checkbox
+ * shows what will be sent.
+ */
+function rainControlOf(
+  state: PlantScreenState,
+  apiBase: string | null,
+  read: BaseRequestRead,
+  dispatch: (action: PlantAction) => void,
+): RainControl {
+  if (apiBase === null) {
+    return RAIN_UNAVAILABLE
+  }
+  const factor = read.rain
+  switch (factor.kind) {
+    case 'none':
+      return { kind: 'no_factor' }
+    case 'declared_missing':
+    case 'unreadable':
+      return { kind: 'factor_missing', missing: factor.missing }
+    case 'present':
+      return {
+        kind: 'available',
+        on: sendsRain(state, read),
+        factor: factor.factor,
+        nextAnswer: state.mode === 'example',
+        onRain: (on) => dispatch({ type: 'rain', on }),
+      }
+  }
 }
 
 /** The state of a service call, as the view renders it. */
@@ -1099,23 +1187,23 @@ export function servicePhaseOf(query: {
   return { phase: 'answered', answer: query.data }
 }
 
-/** The factor the example request declares (example data), or null. */
-const DECLARED_FACTOR: DeclaredFactor | null = declaredRainFactor(rawPlantRequest)
-
 /**
  * The screen for a state: a pure function of the state, the configured
- * backend (null: none) and, in service mode, the phase of the call.
+ * backend (null: none), what is read of the base request (the example
+ * request by default) and, in service mode, the phase of the call.
  */
 export function PlantScreenView({
   state,
   apiBase,
   service,
   dispatch = ignore,
+  read = EXAMPLE_REQUEST_READ,
 }: {
   state: PlantScreenState
   apiBase: string | null
   service: ServicePhase | null
   dispatch?: (action: PlantAction) => void
+  read?: BaseRequestRead
 }) {
   const handlers = {
     strictness: state.strictness,
@@ -1123,27 +1211,21 @@ export function PlantScreenView({
     onStrictness: (value: Strictness) => dispatch({ type: 'strictness', value }),
     onMarginOf: (value: MarginOf) => dispatch({ type: 'margin_of', value }),
   }
+  const rain = rainControlOf(state, apiBase, read, dispatch)
   if (state.mode === 'example' || apiBase === null || service === null) {
+    // PROPOSED (fix round 1): a request that cannot be read is not offered to the service.
     return (
       <PlantView
         set={plantExamples}
         price={state.price}
         onPrice={(price) => dispatch({ type: 'price', price, key: null })}
-        onAskService={apiBase !== null ? () => dispatch({ type: 'ask' }) : undefined}
+        onAskService={apiBase !== null && read.readable ? () => dispatch({ type: 'ask' }) : undefined}
+        rain={rain}
         {...handlers}
       />
     )
   }
-  const key = JSON.stringify(serviceRequestOf(state))
-  const rain: RainControl =
-    DECLARED_FACTOR === null
-      ? { kind: 'no_factor' }
-      : {
-          kind: 'available',
-          on: state.rain,
-          factor: DECLARED_FACTOR,
-          onRain: (on) => dispatch({ type: 'rain', on }),
-        }
+  const key = priceKeyOf(state, read)
   const common = {
     ...handlers,
     rain,
@@ -1172,35 +1254,49 @@ export function PlantScreenView({
   )
 }
 
-/** Without a backend: the example answers only, nothing called. */
-function PlantScreenWithoutService() {
-  const [state, dispatch] = useReducer(plantScreenReducer, undefined, initialPlantState)
-  return <PlantScreenView state={state} apiBase={null} service={null} dispatch={dispatch} />
-}
-
-/** With a backend: the example answers first, and the call of the route in service mode. */
-function PlantScreenWithService({ apiBase }: { apiBase: string }) {
-  const [state, dispatch] = useReducer(plantScreenReducer, undefined, initialPlantState)
-  const request = serviceRequestOf(state)
-  const query = useQuery({
-    ...plantQueryOptions(apiBase, request ?? {}),
-    enabled: request !== null,
-  })
-  return (
-    <PlantScreenView
-      state={state}
-      apiBase={apiBase}
-      service={request === null ? null : servicePhaseOf(query)}
-      dispatch={dispatch}
-    />
-  )
-}
+/**
+ * The query client used when no backend is configured (fix round 1 of S-021,
+ * PROPOSED): the query is then disabled and never calls, and the screen
+ * renders without a QueryClientProvider, as before S-021.
+ */
+const NO_SERVICE_CLIENT = new QueryClient()
 
 /**
  * The screen at #/plant. The backend is the configured one (VITE_API_URL,
  * configuredApiBase) unless given: null means none, and the screen shows the
- * example answers only and calls nothing, as before S-021.
+ * example answers only and calls nothing, as before S-021. One component for
+ * both: the query is disabled without a backend or outside service mode.
+ * initialState (PROPOSED, for tests) is the first state; the example answers
+ * by default.
  */
-export default function PlantScreen({ apiBase = configuredApiBase() }: { apiBase?: string | null }) {
-  return apiBase === null ? <PlantScreenWithoutService /> : <PlantScreenWithService apiBase={apiBase} />
+export default function PlantScreen({
+  apiBase = configuredApiBase(),
+  initialState,
+}: {
+  apiBase?: string | null
+  initialState?: PlantScreenState
+}) {
+  const [state, dispatch] = useReducer(
+    plantScreenReducer,
+    initialState ?? null,
+    (first: PlantScreenState | null) => first ?? initialPlantState(),
+  )
+  // Built once per (mode, strictness, margin_of, heavier rain): the price
+  // looked at does not copy the request again.
+  const request = useMemo(
+    () => (apiBase === null ? null : serviceRequestOf(state)),
+    [apiBase, state.mode, state.strictness, state.marginOf, state.rain],
+  )
+  const query = useQuery(
+    plantScreenQueryOptions(apiBase, request),
+    apiBase === null ? NO_SERVICE_CLIENT : undefined,
+  )
+  return (
+    <PlantScreenView
+      state={state}
+      apiBase={apiBase}
+      service={apiBase === null || request === null ? null : servicePhaseOf(query)}
+      dispatch={dispatch}
+    />
+  )
 }

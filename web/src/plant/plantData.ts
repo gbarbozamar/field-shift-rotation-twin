@@ -185,8 +185,12 @@ function record(value: unknown, what: string): Record<string, unknown> {
   return value
 }
 
-/** A reason code and its optional detail, from the reason and detail fields. */
-function missingPart(reason: unknown, detail: unknown, what: string): MissingPart {
+/**
+ * A reason code and its optional detail, from the reason and detail fields.
+ * Exported for the rain-stress factor of a request (plantRoute.ts, fix round
+ * 1 of S-021).
+ */
+export function missingPart(reason: unknown, detail: unknown, what: string): MissingPart {
   if (!oneOf(reason, REASON_CODES)) {
     throw new Error(`${what}:reason-not-a-code`)
   }

@@ -11,11 +11,18 @@ import PlantScreen, {
   PlantScreenView,
   initialPlantState,
   plantScreenReducer,
+  priceKeyOf,
   serviceRequestOf,
   servicePhaseOf,
 } from './PlantScreen'
 import type { PlantScreenState, ServicePhase } from './PlantScreen'
-import { plantRequestFor, runPlant } from './plantRoute'
+import {
+  plantQueryOptions,
+  plantRequestFor,
+  readBaseRequest,
+  readPlantServiceAnswer,
+  runPlant,
+} from './plantRoute'
 
 /**
  * Acceptance test of "Ask the service" on the screen "What should I plant?"
@@ -271,5 +278,205 @@ describe('the questions change the request in service mode (7)', () => {
     const off = plantScreenReducer(serviceState(), { type: 'rain', on: false })
     const request = serviceRequestOf(off) as { questions: { rain_stress_factor: unknown } }
     expect(request.questions.rain_stress_factor).toBeNull()
+  })
+})
+
+/**
+ * Fix round 1 of S-021 (PROPOSED). Expected values from the example files,
+ * expected texts from strings.ts; the only literals are a reason code of the
+ * contract list and a marker text that stands for a declared detail.
+ */
+
+function withFactorMissing(reason: string, detail: string): unknown {
+  const request = structuredClone(rawRequest) as { questions: { rain_stress_factor: unknown } }
+  request.questions.rain_stress_factor = {
+    value: null,
+    unit: rawRequest.questions.rain_stress_factor.unit,
+    missing: { reason, detail },
+  }
+  return request
+}
+
+describe('fix 1: a factor the request declares missing shows its declared reason', () => {
+  const read = readBaseRequest(withFactorMissing('NOT_APPLICABLE', 'DECLARED_DETAIL_MARKER'))
+  const declared = missingPatternText(strings['plant.q.rain_control'], {
+    reason: 'NOT_APPLICABLE',
+    detail: 'DECLARED_DETAIL_MARKER',
+  })
+
+  it('in example and in service mode, the control is disabled with the declared reason, never NOT_DECLARED', () => {
+    for (const state of [initialPlantState(), serviceState()]) {
+      const service: ServicePhase | null = state.mode === 'service' ? { phase: 'pending' } : null
+      const html = renderToString(<PlantScreenView state={state} apiBase={BASE} service={service} read={read} />)
+      const rain = section(html, 'plant-q-rain')
+      expect(rain).toMatch(/disabled=""/)
+      expect(visibleText(rain)).toContain(declared)
+      expect(visibleText(rain)).not.toContain(strings['plant.service.rain_no_factor_detail'])
+    }
+  })
+
+  it('a declared-missing factor is not sent: heavier rain on still sends null', () => {
+    const request = serviceRequestOf(serviceState(), withFactorMissing('NOT_APPLICABLE', 'DECLARED_DETAIL_MARKER')) as {
+      questions: { rain_stress_factor: unknown }
+    }
+    expect(request.questions.rain_stress_factor).toBeNull()
+  })
+
+  it('NOT_DECLARED stays for a request with no factor object at all', () => {
+    const none = structuredClone(rawRequest) as { questions: { rain_stress_factor: unknown } }
+    none.questions.rain_stress_factor = null
+    const html = renderToString(
+      <PlantScreenView state={initialPlantState()} apiBase={BASE} service={null} read={readBaseRequest(none)} />,
+    )
+    expect(visibleText(section(html, 'plant-q-rain'))).toContain(
+      missingPatternText(strings['plant.q.rain_control'], {
+        reason: 'NOT_DECLARED',
+        detail: strings['plant.service.rain_no_factor_detail'],
+      }),
+    )
+  })
+})
+
+describe('fix 4: the request is built once, and the price key is cheap', () => {
+  it('the view copies no request, and the screen copies it once per render', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, rawAnswer)))
+    const state = serviceState()
+    const answered = await runPlant(BASE, serviceRequestOf(state)!)
+    const clones = vi.spyOn(globalThis, 'structuredClone')
+    try {
+      view(state, { phase: 'answered', answer: answered })
+      expect(clones).not.toHaveBeenCalled()
+      serviceRequestOf(state)
+      const perRequest = clones.mock.calls.length
+      expect(perRequest).toBeGreaterThan(0)
+      clones.mockClear()
+      renderToString(
+        <QueryClientProvider client={new QueryClient()}>
+          <PlantScreen apiBase={BASE} initialState={state} />
+        </QueryClientProvider>,
+      )
+      expect(clones).toHaveBeenCalledTimes(perRequest)
+    } finally {
+      clones.mockRestore()
+    }
+  })
+
+  it('one price key per distinct request; the price looked at does not change it', () => {
+    const state = serviceState()
+    expect(priceKeyOf(state)).toBe(priceKeyOf(plantScreenReducer(state, { type: 'price', price: 0, key: null })))
+    expect(priceKeyOf(state)).not.toBe(priceKeyOf(plantScreenReducer(state, { type: 'strictness', value: 'every_kind' })))
+    expect(priceKeyOf(state)).not.toBe(priceKeyOf(plantScreenReducer(state, { type: 'margin_of', value: 'la_nina' })))
+    expect(priceKeyOf(state)).not.toBe(priceKeyOf(plantScreenReducer(state, { type: 'rain', on: false })))
+  })
+})
+
+describe('fix 6: with a backend, heavier rain is enabled in example mode too', () => {
+  it('the checkbox is enabled, a line says it applies to the next service answer, never "this page does not call"', () => {
+    const html = renderToString(<PlantScreenView state={initialPlantState()} apiBase={BASE} service={null} />)
+    const rain = section(html, 'plant-q-rain')
+    expect(rain).not.toMatch(/disabled=""/)
+    expect(visibleText(section(html, 'plant-rain-next-answer'))).toContain(strings['plant.service.rain_next_answer'])
+    expect(visibleText(rain)).not.toContain(strings['plant.q.rain_unavailable_detail'])
+    // The example answers are still shown.
+    expect(count(html, 'plant-card')).toBe(1)
+  })
+
+  it('the checkbox shows what will be sent: off, then on with the factor, and the request asked carries it', () => {
+    const off = initialPlantState()
+    const rainOf = (html: string) => section(html, 'plant-q-rain').split('</fieldset>')[0]
+    const offRain = rainOf(renderToString(<PlantScreenView state={off} apiBase={BASE} service={null} />))
+    expect(offRain).toContain('type="checkbox"')
+    expect(offRain).not.toMatch(/checked=""/)
+    const on = plantScreenReducer(off, { type: 'rain', on: true })
+    const onHtml = renderToString(<PlantScreenView state={on} apiBase={BASE} service={null} />)
+    expect(rainOf(onHtml)).toMatch(/checked=""/)
+    expect(count(onHtml, 'plant-rain-factor')).toBe(1)
+    const asked = serviceRequestOf(plantScreenReducer(on, { type: 'ask' })) as typeof rawRequest
+    expect(asked.questions.rain_stress_factor).toEqual(rawRequest.questions.rain_stress_factor)
+  })
+
+  it('in service mode there is no next-answer line', () => {
+    const html = view(serviceState(), { phase: 'pending' })
+    expect(count(html, 'plant-rain-next-answer')).toBe(0)
+  })
+
+  it('without a backend: unchanged, disabled with its reason and no next-answer line', () => {
+    const html = renderToString(<PlantScreen apiBase={null} />)
+    expect(section(html, 'plant-q-rain')).toMatch(/disabled=""/)
+    expect(count(html, 'plant-rain-next-answer')).toBe(0)
+  })
+})
+
+describe('fix 7: a request that cannot be read is a typed absence on the rain control', () => {
+  const unreadable = { contract: 'plant_request', questions: 'not-an-object' }
+  const read = readBaseRequest(unreadable)
+  const absence = missingPatternText(strings['plant.q.rain_control'], {
+    reason: 'MISSING_INPUT',
+    detail: strings['plant.service.rain_request_invalid_detail'],
+  })
+
+  it('with a backend: MISSING_INPUT with its detail, no "Ask the service", and the example screen renders', () => {
+    expect(read.readable).toBe(false)
+    const html = renderToString(<PlantScreenView state={initialPlantState()} apiBase={BASE} service={null} read={read} />)
+    const rain = section(html, 'plant-q-rain')
+    expect(rain).toMatch(/disabled=""/)
+    expect(visibleText(rain)).toContain(absence)
+    expect(count(html, 'plant-service-ask')).toBe(0)
+    expect(count(html, 'plant-card')).toBe(1)
+    expect(count(html, 'plant-option')).toBe(rawAnswer.options.length)
+    expect(serviceRequestOf(serviceState(), unreadable)).toBeNull()
+  })
+
+  it('without a backend: the control is unchanged and the example screen renders', () => {
+    const html = renderToString(<PlantScreenView state={initialPlantState()} apiBase={null} service={null} read={read} />)
+    expect(visibleText(section(html, 'plant-q-rain'))).toContain(
+      missingPatternText(strings['plant.q.rain_control'], {
+        reason: 'NOT_AVAILABLE',
+        detail: strings['plant.q.rain_unavailable_detail'],
+      }),
+    )
+    expect(count(html, 'plant-card')).toBe(1)
+  })
+})
+
+describe('fix 8: the real screen in service mode reads the answer from its query', () => {
+  it('with the cache pre-filled for the service request, the answer and the origin line are rendered, no call made', () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const state = serviceState()
+    const request = serviceRequestOf(state)!
+    const client = new QueryClient()
+    client.setQueryData(plantQueryOptions(BASE, request).queryKey, readPlantServiceAnswer(rawAnswer, request))
+    const html = renderToString(
+      <QueryClientProvider client={client}>
+        <PlantScreen apiBase={BASE} initialState={state} />
+      </QueryClientProvider>,
+    )
+    expect(fetch).not.toHaveBeenCalled()
+    expect(count(html, 'plant-service-pending')).toBe(0)
+    expect(visibleText(section(html, 'plant-chosen'))).toContain(rawAnswer.chosen)
+    expect(count(html, 'plant-source')).toBe(rawAnswer.sources.length)
+    expect(visibleText(section(html, 'plant-origin'))).toContain(
+      formatString(strings['plant.service.origin_service'], { api: BASE }),
+    )
+    expect(count(html, 'plant-rain-stress')).toBe(1)
+  })
+
+  it('a cache filled for another request leaves the screen pending: the key is the request sent', () => {
+    vi.stubGlobal('fetch', vi.fn())
+    const state = serviceState()
+    const other = serviceRequestOf(plantScreenReducer(state, { type: 'rain', on: false }))!
+    const client = new QueryClient()
+    client.setQueryData(
+      plantQueryOptions(BASE, other).queryKey,
+      readPlantServiceAnswer(rawAnswer, serviceRequestOf(state)!),
+    )
+    const html = renderToString(
+      <QueryClientProvider client={client}>
+        <PlantScreen apiBase={BASE} initialState={state} />
+      </QueryClientProvider>,
+    )
+    expect(count(html, 'plant-service-pending')).toBe(1)
+    expect(count(html, 'plant-card')).toBe(0)
   })
 })

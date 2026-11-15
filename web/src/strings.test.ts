@@ -281,6 +281,10 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.service.rain_what': 'Heavier rain, {label}',
   'plant.service.rain_applied': 'Heavier rain, {label}: {detail}',
   'plant.service.rain_not_applied': 'Heavier rain, {label}, not applied: {detail}',
+  // PROPOSED (fix round 1 of S-021): heavier rain with a backend in example
+  // mode, and a request that cannot be read.
+  'plant.service.rain_next_answer': 'Applies to the next answer from the service; the saved example answers have no stress test.',
+  'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
 }
 
 /** Source of the shell page as it was before the strings unit. */

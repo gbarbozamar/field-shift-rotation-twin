@@ -11,8 +11,13 @@ import {
   plantQueryOptions,
   plantRequestFor,
   plantRunUrl,
+  plantScreenQueryOptions,
+  readBaseRequest,
+  readPlantServiceAnswer,
+  readRainFactor,
   runPlant,
 } from './plantRoute'
+import { strings } from '../strings'
 
 /**
  * Acceptance test of the service call of "What should I plant?" (S-021).
@@ -192,6 +197,196 @@ describe('runPlant: the route, with fetch stubbed', () => {
       rain: false,
     })
     expect(((await caughtError(runPlant(BASE, noRain))) as ApiError).code).toBe('UNEXPECTED')
+  })
+})
+
+/**
+ * Fix round 1 of S-021 (PROPOSED). Every expected value is read from the
+ * example files; the only literals are a reason code of the contract list and
+ * a marker text that stands for a detail.
+ */
+// A copy of example JSON, edited in place for one case.
+type Json = Record<string, any>
+
+function clone<T>(value: T): T {
+  return structuredClone(value)
+}
+
+/** The example request with its factor declared missing, with this reason and detail. */
+function requestWithMissingFactor(reason: string, detail: string): Json {
+  const request = clone(rawRequest) as Json
+  request.questions.rain_stress_factor = {
+    value: null,
+    unit: rawRequest.questions.rain_stress_factor.unit,
+    missing: { reason, detail },
+  }
+  return request
+}
+
+describe('fix 1: readRainFactor tells a declared-missing factor from no factor', () => {
+  it('a present factor is read as declared', () => {
+    const factor = rawRequest.questions.rain_stress_factor
+    expect(readRainFactor(rawRequest)).toEqual({
+      kind: 'present',
+      factor: { value: factor.value, unit: factor.unit, provenance: factor.provenance },
+    })
+  })
+
+  it('a factor declared missing keeps its own reason and detail, never NOT_DECLARED', () => {
+    const request = requestWithMissingFactor('NOT_APPLICABLE', 'DECLARED_DETAIL_MARKER')
+    expect(readRainFactor(request)).toEqual({
+      kind: 'declared_missing',
+      missing: { reason: 'NOT_APPLICABLE', detail: 'DECLARED_DETAIL_MARKER' },
+    })
+    expect(declaredRainFactor(request)).toBeNull()
+  })
+
+  it('no factor object at all (null or absent) is none', () => {
+    const none = clone(rawRequest) as Json
+    none.questions.rain_stress_factor = null
+    expect(readRainFactor(none)).toEqual({ kind: 'none' })
+    delete none.questions.rain_stress_factor
+    expect(readRainFactor(none)).toEqual({ kind: 'none' })
+  })
+
+  it('a request that cannot be read is MISSING_INPUT with its detail key, never an exception', () => {
+    const unreadable = {
+      kind: 'unreadable',
+      missing: { reason: 'MISSING_INPUT', detail: strings['plant.service.rain_request_invalid_detail'] },
+    }
+    expect(readRainFactor({ contract: 'something_else' })).toEqual(unreadable)
+    expect(readRainFactor(null)).toEqual(unreadable)
+    const badReason = requestWithMissingFactor('NOT_A_REASON_CODE', 'DECLARED_DETAIL_MARKER')
+    expect(readRainFactor(badReason)).toEqual(unreadable)
+    expect(readBaseRequest({ contract: 'something_else' })).toEqual({ readable: false, rain: unreadable })
+    expect(readBaseRequest(rawRequest).readable).toBe(true)
+  })
+})
+
+describe('fix 2: the rain-stress part of the answer is the one the factor asked calls for', () => {
+  const asked = { strictness: rawAnswer.questions.strictness, marginOf: rawAnswer.questions.margin_of } as {
+    strictness: 'on_average'
+    marginOf: 'average'
+  }
+  const rainOn = plantRequestFor(rawRequest, { ...asked, rain: true })
+  const rainOff = plantRequestFor(rawRequest, { ...asked, rain: false })
+
+  function expectUnexpected(body: unknown, request: unknown) {
+    let caught: unknown = null
+    try {
+      readPlantServiceAnswer(body, request)
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(ApiError)
+    expect((caught as ApiError).code).toBe('UNEXPECTED')
+  }
+
+  it('the contract example answer is read for its own request', () => {
+    expect(readPlantServiceAnswer(rawAnswer, rainOn).rainStress?.kind).toBe('applied')
+  })
+
+  it('rain off: an answer with a rain-stress part is UNEXPECTED', () => {
+    const body = clone(rawAnswer) as Json
+    body.questions.rain_stress_factor = null
+    expectUnexpected(body, rainOff)
+    body.rain_stress = null
+    expect(readPlantServiceAnswer(body, rainOff).rainStress).toBeNull()
+  })
+
+  it('rain on: an answer without a rain-stress part, or with none at all, is UNEXPECTED', () => {
+    const body = clone(rawAnswer) as Json
+    body.rain_stress = null
+    expectUnexpected(body, rainOn)
+    delete body.rain_stress
+    expectUnexpected(body, rainOn)
+  })
+
+  it('rain on: an applied factor other than the one asked is UNEXPECTED', () => {
+    const body = clone(rawAnswer) as Json
+    const other = rawAnswer.rain_stress.factor * 2
+    body.rain_stress.factor = other
+    body.rain_stress.declared.value = other
+    expectUnexpected(body, rainOn)
+  })
+
+  it('rain on: the missing form for a factor with a value is UNEXPECTED', () => {
+    const body = clone(rawAnswer) as Json
+    body.rain_stress = {
+      missing: { reason: 'NOT_APPLICABLE' },
+      detail: rawAnswer.rain_stress.detail,
+      label: rawAnswer.rain_stress.label,
+    }
+    expectUnexpected(body, rainOn)
+  })
+
+  it('a factor declared missing: the missing form with the same reason is read, another reason is UNEXPECTED', () => {
+    const request = requestWithMissingFactor('NOT_APPLICABLE', 'DECLARED_DETAIL_MARKER')
+    const body = clone(rawAnswer) as Json
+    body.questions.rain_stress_factor = clone(request.questions.rain_stress_factor)
+    body.rain_stress = {
+      missing: { reason: 'NOT_APPLICABLE', detail: 'DECLARED_DETAIL_MARKER' },
+      detail: rawAnswer.rain_stress.detail,
+      label: rawAnswer.rain_stress.label,
+    }
+    expect(readPlantServiceAnswer(body, request).rainStress).toEqual({
+      kind: 'missing',
+      missing: { reason: 'NOT_APPLICABLE', detail: 'DECLARED_DETAIL_MARKER' },
+      detail: rawAnswer.rain_stress.detail,
+      label: rawAnswer.rain_stress.label,
+    })
+    body.rain_stress.missing.reason = 'NOT_DECLARED'
+    expectUnexpected(body, request)
+  })
+})
+
+describe('fix 3: the answer is for the field of the request, and example data when the request is', () => {
+  const request = plantRequestFor(rawRequest, {
+    strictness: rawAnswer.questions.strictness as 'on_average',
+    marginOf: rawAnswer.questions.margin_of as 'average',
+    rain: true,
+  })
+
+  function code(body: unknown): string | null {
+    try {
+      readPlantServiceAnswer(body, request)
+      return null
+    } catch (error) {
+      return (error as ApiError).code
+    }
+  }
+
+  it('the example answer names the field of the example request', () => {
+    expect(rawAnswer.case_id).toBe(rawRequest.site.case_id)
+    expect(rawAnswer.field_id).toBe(rawRequest.site.field_id)
+    expect(code(rawAnswer)).toBeNull()
+  })
+
+  it('another case_id or field_id is UNEXPECTED', () => {
+    const otherCase = clone(rawAnswer) as Json
+    otherCase.case_id = `${rawAnswer.case_id}-other`
+    expect(code(otherCase)).toBe('UNEXPECTED')
+    const otherField = clone(rawAnswer) as Json
+    otherField.field_id = `${rawAnswer.field_id}-other`
+    expect(code(otherField)).toBe('UNEXPECTED')
+  })
+
+  it('an answer to an example request that is not marked example data is UNEXPECTED', () => {
+    expect(rawRequest.example_data).toBe(true)
+    const body = clone(rawAnswer) as Json
+    body.example_data = false
+    expect(code(body)).toBe('UNEXPECTED')
+  })
+})
+
+describe('fix 5 and 8: the query of the screen is enabled only with a backend and a request', () => {
+  const request = plantRequestFor(rawRequest, { strictness: 'on_average', marginOf: 'average', rain: true })
+
+  it('enabled with both, disabled without a backend or without a request', () => {
+    expect(plantScreenQueryOptions(BASE, request).enabled).toBe(true)
+    expect(plantScreenQueryOptions(null, request).enabled).toBe(false)
+    expect(plantScreenQueryOptions(BASE, null).enabled).toBe(false)
+    expect(plantScreenQueryOptions(BASE, request).queryKey).toEqual(plantQueryOptions(BASE, request).queryKey)
   })
 })
 
