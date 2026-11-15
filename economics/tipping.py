@@ -8,9 +8,10 @@ takes over and how far today's declared price is from it, in percent. A
 tipping price, never a forecast. The rules are arithmetic, not parameters; see
 ``README.md`` in this folder.
 
-The engines are reused, never copied: the margin at a price comes from
-``compute_rotation_margin`` on a copy of the facts with the soybean price
-replaced, and the answer at a price from ``choose_rotation``. No network call,
+The engines are reused, never copied: the margin of each rotation comes from
+``compute_rotation_margin`` at the two ends of the range, on a copy of the
+facts with the soybean price replaced, and is linear in that price between
+them; the answer at a price comes from ``choose_rotation``. No network call,
 no price, range or threshold in the code. A missing input gives a missing
 tipping point with its reason (C3.2 of contracts/CONVENTIONS.md), never zero.
 """
@@ -21,6 +22,7 @@ import math
 import numbers
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Literal, get_args
 
 from contracts.economic_facts import (
@@ -29,7 +31,6 @@ from contracts.economic_facts import (
     EconomicFacts,
     GrainCrop,
 )
-from contracts.economic_facts.economic_facts import DECLARED
 from contracts.inputs.common import ReasonCode
 
 from .decide import Answer, Decision, RotationOption, Strictness, choose_rotation
@@ -45,8 +46,10 @@ MARGINS_OF: tuple[str, ...] = ("average", *KINDS_OF_YEAR)
 NO_CHANGE = "no price in this range changes the answer"
 
 # PROPOSED: a price tried by the search is written into the copy of the facts
-# as a declared value (the contract admits only DECLARED), with a source that
-# says what it is.
+# as a declared value, with a source that says what it is. "DECLARED" is the
+# provenance that GrainCrop.price of contracts.economic_facts admits for a
+# present value (C4.1).
+_TRIED_PROVENANCE = "DECLARED"
 _TRIED_SOURCE = (
     "a soybean price tried inside the price range the user declared "
     "(tipping price search, not a forecast)"
@@ -164,7 +167,7 @@ class TippingPrice:
 
     ``decision`` is the answer at today's declared price. ``reason`` and
     ``detail`` are set when both tipping points are missing for one shared
-    cause (today's price missing or outside the range, or a margin missing).
+    cause (today's price missing or outside the range).
     """
 
     today: float | None
@@ -189,17 +192,26 @@ class TippingPrice:
 
 def _check_soybean_ids(
     soybean_crop_ids: Collection[str], facts: EconomicFacts
-) -> tuple[str, ...]:
+) -> dict[str, GrainCrop]:
+    """The named grain crops by crop_id, in the order named, once each."""
     # A str is a Collection[str]: it would be read letter by letter.
+    # ValueError, not TypeError: one exception type for every misuse.
     if isinstance(soybean_crop_ids, str):
         raise ValueError("soybean_crop_ids: a collection of crop_ids, not a text")  # noqa: TRY004
-    ids = tuple(dict.fromkeys(soybean_crop_ids))
+    try:
+        named = list(soybean_crop_ids)
+    except TypeError:
+        raise ValueError("soybean_crop_ids: a collection of crop_ids") from None
+    # Checked before any hashing, so an unhashable item is a ValueError too.
+    for crop_id in named:
+        if not isinstance(crop_id, str):
+            raise ValueError("soybean_crop_ids: a crop_id is a text")  # noqa: TRY004
+    ids = tuple(dict.fromkeys(named))
     if not ids:
         raise ValueError("soybean_crop_ids: at least one crop_id")
     crops = {crop.crop_id: crop for crop in facts.crops}
+    matched: dict[str, GrainCrop] = {}
     for crop_id in ids:
-        if not isinstance(crop_id, str):
-            raise ValueError("soybean_crop_ids: a crop_id is a text")  # noqa: TRY004
         crop = crops.get(crop_id)
         if crop is None:
             raise ValueError(
@@ -211,15 +223,15 @@ def _check_soybean_ids(
                 f"soybean_crop_ids: {crop_id!r} is a {crop.kind} crop, not a grain "
                 "crop with a price"
             )
-    return ids
+        matched[crop_id] = crop
+    return matched
 
 
 def _todays_price(
-    facts: EconomicFacts, ids: tuple[str, ...]
+    soybeans: Mapping[str, GrainCrop],
 ) -> tuple[float | None, str | None]:
     """Today's soybean price, or None with the detail of what is missing."""
-    crops = {crop.crop_id: crop for crop in facts.crops}
-    prices = {crop_id: crops[crop_id].price for crop_id in ids}
+    prices = {crop_id: crop.price for crop_id, crop in soybeans.items()}
     present = {price.value for price in prices.values() if price.value is not None}
     if len(present) > 1:
         raise ValueError(
@@ -246,7 +258,7 @@ def _todays_price(
 
 
 def _facts_at(
-    facts: EconomicFacts, ids: tuple[str, ...], price: float
+    facts: EconomicFacts, ids: Collection[str], price: float
 ) -> EconomicFacts:
     """A copy of ``facts`` with every named crop at ``price``; the input is kept."""
     data = facts.model_dump(mode="json")
@@ -255,7 +267,7 @@ def _facts_at(
             crop["price"] = {
                 "value": price,
                 "unit": PRICE_UNIT,
-                "provenance": DECLARED,
+                "provenance": _TRIED_PROVENANCE,
                 "source": _TRIED_SOURCE,
                 "range_missing": {
                     "reason": "NOT_APPLICABLE",
@@ -357,8 +369,9 @@ def find_tipping_price(
         raise ValueError(f"margin_of: one of {MARGINS_OF}")
     if not isinstance(price_range, PriceRange):
         raise ValueError("price_range: a PriceRange")  # noqa: TRY004
-    ids = _check_soybean_ids(soybean_crop_ids, facts)
-    today, today_missing = _todays_price(facts, ids)
+    soybeans = _check_soybean_ids(soybean_crop_ids, facts)
+    today, today_missing = _todays_price(soybeans)
+    # The decision at today's price: the real engine on the facts as declared.
     decision = _decide(
         options, _margins(options, facts, year_counts, margin_of), strictness
     )
@@ -385,69 +398,72 @@ def find_tipping_price(
             f"declared range ({price_range.text()})",
         )
 
-    at_low = _margins(options, _facts_at(facts, ids, low), year_counts, margin_of)
-    at_high = _margins(options, _facts_at(facts, ids, high), year_counts, margin_of)
-    missing = []
-    for option, m_low, m_high in zip(options, at_low, at_high, strict=True):
-        absent = m_low if m_low.value is None else m_high
-        if absent.value is None:
-            missing.append(
-                f"{option.rotation_id!r} ({_reason_text(absent.reason, absent.detail)})"
-            )
-    if missing:
-        return shared(
-            "MISSING_INPUT",
-            "the margin of a rotation is missing at the soybean prices tried, "
-            "so its line over the price is not known: " + "; ".join(missing),
-        )
+    # The only two engine evaluations on a copy of the facts: at both ends.
+    at_low = _margins(options, _facts_at(facts, soybeans, low), year_counts, margin_of)
+    at_high = _margins(
+        options, _facts_at(facts, soybeans, high), year_counts, margin_of
+    )
 
     # The margin is linear in the price (price * yield - cost, summed and
-    # averaged): its slope and intercept from the two evaluations.
-    lines = []
+    # averaged): its intercept and slope from the two evaluations.
+    # PROPOSED (fix round 1): a margin missing at an end is missing for a
+    # reason other than the soybean price, so it is missing at every price.
+    # It gets no line and travels unchanged into choose_rotation, whose own
+    # rules say whether it blocks the answer.
+    lines: list[tuple[float, float] | None] = []
     for m_low, m_high in zip(at_low, at_high, strict=True):
+        if m_low.value is None or m_high.value is None:
+            lines.append(None)
+            continue
         slope = (m_high.value - m_low.value) / (high - low)
         lines.append((m_low.value - slope * low, slope))
+    absent = [
+        m_low if m_low.value is None else m_high
+        for m_low, m_high in zip(at_low, at_high, strict=True)
+    ]
+
+    def answer_at(price: float) -> Decision:
+        # The margin at a price from its line; no new copy of the facts.
+        margins = [
+            missing if line is None else MarginResult(value=line[0] + line[1] * price)
+            for line, missing in zip(lines, absent, strict=True)
+        ]
+        return _decide(options, margins, strictness)
+
+    present = [line for line in lines if line is not None]
     crossings = set()
-    for i, (a_i, b_i) in enumerate(lines):
-        for a_j, b_j in lines[i + 1 :]:
+    for i, (a_i, b_i) in enumerate(present):
+        for a_j, b_j in present[i + 1 :]:
             if b_i != b_j:
                 price = (a_j - a_i) / (b_i - b_j)
                 if low < price < high:
                     crossings.add(price)
     breakpoints = sorted(crossings)
-    edges = [low, *breakpoints, high]
-    here = (decision.answer, decision.chosen)
-
-    def answer_between(left: float, right: float) -> Decision:
-        # Evaluated strictly between two edges, never at a breakpoint, where
-        # an exact tie is not resolved by design.
-        middle = (left + right) / 2
-        margins = _margins(
-            options, _facts_at(facts, ids, middle), year_counts, margin_of
-        )
-        return _decide(options, margins, strictness)
-
+    here = (decision.answer, decision.chosen, decision.tied)
     no_change = f"{NO_CHANGE} ({price_range.text()})"
 
-    # PROPOSED: a breakpoint at today's price itself counts in both
-    # directions (today's answer is then a tie, not resolved).
-    up = _missing_point("up", "NOT_APPLICABLE", no_change)
-    for k, point in enumerate(breakpoints, start=1):
-        if point < today:
-            continue
-        after = answer_between(point, edges[k + 1])
-        if (after.answer, after.chosen) != here:
-            up = _found_point("up", point, after, today)
-            break
-    down = _missing_point("down", "NOT_APPLICABLE", no_change)
-    for k in range(len(breakpoints), 0, -1):
-        point = edges[k]
-        if point > today:
-            continue
-        after = answer_between(edges[k - 1], point)
-        if (after.answer, after.chosen) != here:
-            down = _found_point("down", point, after, today)
-            break
+    def search(direction: Direction, beyond: list[float], end: float) -> TippingPoint:
+        """The first edge, from today outwards, past which the answer differs.
+
+        ``beyond`` holds the breakpoints strictly beyond today, nearest first.
+        The answer is evaluated in the middle of each interval, never at a
+        breakpoint (an exact tie there is not resolved by design). PROPOSED
+        (fix round 1): the first interval starts at today itself, so when the
+        answer right next to today differs from today's (today's price is on
+        a crossing), the tipping point is today, distance 0. No breakpoint is
+        compared with today for equality.
+        """
+        edges = [today, *beyond, end]
+        for near, far in pairwise(edges):
+            if near == far:
+                continue  # today at the end of the range: nothing beyond it
+            after = answer_at((near + far) / 2)
+            if (after.answer, after.chosen, after.tied) != here:
+                return _found_point(direction, near, after, today)
+        return _missing_point(direction, "NOT_APPLICABLE", no_change)
+
+    up = search("up", [b for b in breakpoints if b > today], high)
+    down = search("down", [b for b in reversed(breakpoints) if b < today], low)
     return TippingPrice(
         today=today,
         price_range=price_range,
