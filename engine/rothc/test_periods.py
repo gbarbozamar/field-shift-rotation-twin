@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from contracts.carbon_balance import CarbonBalance, FlowSeries, StepValue, StockSeries
+from contracts.carbon_balance import CarbonBalance, StepValue, StockSeries
 from contracts.carbon_forcing import CarbonForcing
 from contracts.inputs.common import Missing as InputMissing
 from contracts.inputs.common import Value
@@ -48,7 +48,11 @@ from engine.rothc.pools import MONTHS_PER_YEAR
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
 FORCING_EXAMPLE = (
-    ROOT / "contracts" / "carbon_forcing" / "examples" / "PLACEHOLDER_carbon_forcing.json"
+    ROOT
+    / "contracts"
+    / "carbon_forcing"
+    / "examples"
+    / "PLACEHOLDER_carbon_forcing.json"
 )
 MARK = "PLACEHOLDER"
 UNMARKED = "UNMARKED_TEST_ONLY"
@@ -192,9 +196,7 @@ def _build_forcing(
         "end": {"year": end.year, "month": end.month},
     }
     q = {name: qty for name, (_, qty) in FORCING_QUANTITIES.items()}
-    rainfall_vals: list[float | dict] = [
-        22.2 + (i % 5) for i in range(month_count)
-    ]
+    rainfall_vals: list[float | dict] = [22.2 + (i % 5) for i in range(month_count)]
     if rainfall_override:
         for idx, missing_spec in rainfall_override.items():
             rainfall_vals[idx] = {"value": None, **missing_spec}
@@ -465,9 +467,7 @@ def test_cycles_aggregate_full_blocks_and_reconcile_with_ag_years() -> None:
         assert cycle.carbon_input_sum == pytest.approx(
             math.fsum(float(y.carbon_input_sum) for y in pair)
         )
-        assert cycle.co2_sum == pytest.approx(
-            math.fsum(float(y.co2_sum) for y in pair)
-        )
+        assert cycle.co2_sum == pytest.approx(math.fsum(float(y.co2_sum) for y in pair))
 
     # Mass balance over the first cycle from initial_state.
     initial = float(balance.total_stock.initial.value)  # type: ignore[arg-type]
@@ -544,7 +544,9 @@ def test_cycles_missing_step_inside_second_cycle_propagates_missing() -> None:
         start,
         48,
         rainfall_override={
-            30: {"missing": {"reason": "SOURCE_UNAVAILABLE", "detail": f"{MARK}: outage"}}
+            30: {
+                "missing": {"reason": "SOURCE_UNAVAILABLE", "detail": f"{MARK}: outage"}
+            }
         },
     )
     balance = run_rothc(forcing, parameters=_catalogue())
@@ -602,7 +604,7 @@ def test_g1_periods_module_holds_no_domain_constants_or_io_imports() -> None:
         and isinstance(node.value, (int, float, complex))
         and not isinstance(node.value, bool)
     }
-    assert numbers <= {0, 1, 0.0, 1.0}, numbers
+    assert numbers <= {0, 1}, numbers
 
 
 def test_signatures_have_keyword_only_parameters_and_no_defaults() -> None:

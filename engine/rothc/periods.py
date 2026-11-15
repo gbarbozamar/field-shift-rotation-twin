@@ -207,9 +207,7 @@ def _no_coverage(
 def _first_missing_in_steps(
     steps: Sequence[StepValue], quantity: str, label: str
 ) -> ResultMissing | None:
-    missing_steps = [
-        (step.start, step.missing) for step in steps if step.value is None
-    ]
+    missing_steps = [(step.start, step.missing) for step in steps if step.value is None]
     if not missing_steps:
         return None
     first_month, first_missing = missing_steps[0]
