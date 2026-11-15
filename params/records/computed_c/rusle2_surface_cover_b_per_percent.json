@@ -12,5 +12,5 @@
   },
   "transcribed_by": "AI session (D34 of issue #77)",
   "checked_by": "gbarbozamar",
-  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15, chosen among printed candidates (AH703 p. 159: 0.035 'for typical cropland erosion conditions'; S1: 0.031 mulch till, 0.04 no-till, 0.058 net). Verbatim S1 pp. 141-142: «the b values used in equation 6.6 as used in RUSLE1 were 0.031 for the mulch till systems and 0.04 for the no-till systems». S1 p. 141 defines b as «a coefficient (percent-1)». PC-1."
+  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15 (D144 of issue #77), chosen among printed candidates (AH703 p. 159: 0.035 'for typical cropland erosion conditions'; S1: 0.031 mulch till, 0.04 no-till, 0.058 net). Verbatim S1 pp. 141-142: «the b values used in equation 6.6 as used in RUSLE1 were 0.031 for the mulch till systems and 0.04 for the no-till systems». S1 p. 141 defines b as «a coefficient (percent-1)». PC-1."
 }

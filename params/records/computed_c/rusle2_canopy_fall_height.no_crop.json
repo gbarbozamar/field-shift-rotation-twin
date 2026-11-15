@@ -14,5 +14,5 @@
   },
   "transcribed_by": "AI session (D34 of issue #77)",
   "checked_by": "gbarbozamar",
-  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15 for the days no crop covers (OPEN 36 of engine/erosion/SOIL_LOSS.md): no canopy. With S1 Eq. 6.2, c_c = 1 − f_ec exp(−0.1 h_f), a canopy cover of 0 gives c_c = 1 whatever the fall height."
+  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15 for the days no crop covers (D143 of issue #77; OPEN 36 of engine/erosion/SOIL_LOSS.md): no canopy. With S1 Eq. 6.2, c_c = 1 − f_ec exp(−0.1 h_f), a canopy cover of 0 gives c_c = 1 whatever the fall height."
 }
