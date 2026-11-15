@@ -2,6 +2,8 @@
 
 `engine/erosion/equation.py`: the product of the five factors of `docs/METHODS.md` M1.1, with a unit guard. Unit `l0/erosion-equation` (issue #72), first unit of the erosion engine in blueprint section 8, Block 1.
 
+**[E8] and [E9] are decided.** [D226 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893024804) says what each one checks: E8, the unit guard, is cases EQ6, EQ8 and EQ10 of `engine/erosion/test_equation.py`; E9, the invariants, is cases EQ1 to EQ5 and EQ7. The entries [E8](../../docs/VALIDATION.md#e8) and [E9](../../docs/VALIDATION.md#e9) of `docs/VALIDATION.md` were written by [#367](https://github.com/gbarbozamar/field-shift-rotation-twin/pull/367). In the third recorded run of the suite, at commit `9410a92` (#405), their cases ran and passed: 154 results of E8 and 218 of E9 in `validation/results/`. Their logic is DECIDED under D161; acceptance by a science reviewer is pending. The questions D226 leaves open are still in [OPEN](#open). See [Relation to entries E8 and E9](#relation-to-entries-e8-and-e9-of-the-validation-protocol).
+
 ## How to read this file
 
 - This file, the module and its test were written by a builder session (blueprint section 3.7). Everything marked `PROPOSED` is a proposal of the session and takes effect only when a person approves the pull request. It is a science-class change (blueprint section 3.6), so it also needs a science reviewer.
@@ -120,13 +122,17 @@ Not tested, on purpose: a negative factor (OPEN 4), an empty unit string (OPEN 9
 
 ## Relation to entries E8 and E9 of the validation protocol
 
-`docs/VALIDATION.md` gives E8 the wording "unit guard [E8]" and E9 the wording "invariants [E9]", both gating this unit. In both entries the definition, the expected value, the tolerance and the source are `OPEN`, and the status is `not defined`. The science reviewers own that file.
+`docs/VALIDATION.md` gives E8 the wording "unit guard [E8]" and E9 the wording "invariants [E9]", both gating this unit.
+
+**Decided by [D226 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893024804)** (15 November 2026, taken by the orchestrating AI session under the delegation of D161, before any result on real data was seen): "E8 is cases EQ6, EQ8 and EQ10 of `engine/erosion/test_equation.py`; E9 is cases EQ1 to EQ5 and EQ7." D226 names these cases as the definition and changes no case. The entries [E8](../../docs/VALIDATION.md#e8) and [E9](../../docs/VALIDATION.md#e9) of `docs/VALIDATION.md`, written by [#367](https://github.com/gbarbozamar/field-shift-rotation-twin/pull/367), give each its definition, its test functions and its status: logic DECIDED under D161, acceptance by a science reviewer pending. D226 leaves open the accepted unit strings (OPEN 1), the reason code of the guard (OPEN 2, Q11) and a negative factor (OPEN 4).
+
+*As first written, before D226:* In both entries the definition, the expected value, the tolerance and the source are `OPEN`, and the status is `not defined`. The science reviewers own that file.
 
 - Cases EQ6a to EQ6f, with EQ8 and EQ10, are the design this unit proposes for what "unit guard" checks.
 - Cases EQ1 to EQ5 and EQ7 are the design this unit proposes for what "invariants" checks.
 - EQ9 and EQ11 belong to neither wording: they check the brief (types, purity, no number and no unit in the module).
 
-These cases do not define E8 or E9, and passing them does not make either entry pass: a science reviewer says whether these cases are what each code means, or writes the definition. This unit did not edit `docs/VALIDATION.md` and wrote no record under `validation/`. Neither entry can hold an expected value from this unit: every number in the test is a placeholder.
+*As first written, before D226:* These cases do not define E8 or E9, and passing them does not make either entry pass: a science reviewer says whether these cases are what each code means, or writes the definition. This unit did not edit `docs/VALIDATION.md` and wrote no record under `validation/`. Neither entry can hold an expected value from this unit: every number in the test is a placeholder.
 
 ## OPEN
 
@@ -154,7 +160,7 @@ Each item is a question a person can answer. The role that answers it is named a
 
 11. **How do the accepted unit strings reach the function at run time?** They are written in the parameter catalogue (M1.7), and how values of the catalogue reach an engine is Q3 of `contracts/ENTRYPOINTS.md`. For the lead developer and the platform developer.
 
-12. **What do E8 and E9 mean?** See the section above. For the science reviewers.
+12. **What do E8 and E9 mean?** **Answered by [D226](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893024804):** E8 is cases EQ6, EQ8 and EQ10, E9 is cases EQ1 to EQ5 and EQ7 (the entries in `docs/VALIDATION.md`, [#367](https://github.com/gbarbozamar/field-shift-rotation-twin/pull/367)). Still open: acceptance by a science reviewer, and OPEN 1, 2 and 4, which D226 leaves open. *As first written:* See the section above. For the science reviewers.
 
 ## Not covered by this unit
 
