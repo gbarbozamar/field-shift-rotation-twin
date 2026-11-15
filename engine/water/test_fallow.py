@@ -1,4 +1,6 @@
 """Acceptance test of ``fallow.py``, unit l1/water-fallow-residue (issue #217).
+Unit l1/water-ep3-repeat-d47 (issue #253) gives ``following_crop`` the sowings
+of the repeated rotation as plain dates, in place of a calendar.
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases of the fallow"; a test checks that the
@@ -21,7 +23,6 @@ from pathlib import Path
 
 import pytest
 
-from contracts.inputs.rotation_calendar import RotationCalendar
 from contracts.results.models import Missing
 from engine.water import fallow
 
@@ -51,10 +52,6 @@ def mulched(cover, *, tew=PLACEHOLDER_TEW, reduction=PLACEHOLDER_REDUCTION):
     )
 
 
-def calendar() -> RotationCalendar:
-    return RotationCalendar.model_validate(json.loads(EXAMPLE.read_text("utf-8")))
-
-
 def components(document: dict) -> list[tuple[dt.date, dt.date, str]]:
     return [
         (
@@ -66,12 +63,21 @@ def components(document: dict) -> list[tuple[dt.date, dt.date, str]]:
     ]
 
 
+def sowings(document: dict) -> list[tuple[dt.date, str]]:
+    """The start date and the crop of every component: what the entry point
+    gives ``following_crop`` for the components with a start date."""
+    return [(start, crop) for start, _, crop in components(document)]
+
+
+ONE_DAY = dt.timedelta(days=1)
+
+
 # --- the crop that follows a fallow day -----------------------------------------
 
 
 def test_following_crop_is_the_crop_of_the_next_sowing():
     document = json.loads(EXAMPLE.read_text("utf-8"))
-    following = fallow.following_crop(calendar())
+    following = fallow.following_crop(sowings(document), [])
     dated = sorted(components(document))
     calendar_start = dt.date.fromisoformat(document["start_date"])
     # Every day before each sowing, back to the end of the component before
@@ -91,12 +97,72 @@ def test_following_crop_is_the_crop_of_the_next_sowing():
 def test_no_sowing_after_the_day_is_missing_input_naming_open_31():
     document = json.loads(EXAMPLE.read_text("utf-8"))
     last_end = max(end for _, end, _ in components(document))
-    found = fallow.following_crop(calendar())(last_end + dt.timedelta(days=1))
+    found = fallow.following_crop(sowings(document), [])(last_end + ONE_DAY)
     assert isinstance(found, Missing)
     assert found.reason == "MISSING_INPUT"
     assert found.detail == fallow.NO_FOLLOWING_CROP
     assert "OPEN 31" in found.detail
     assert "D110" in found.detail and "D115" in found.detail
+    # With no sowing at all, every day is such a day.
+    assert fallow.following_crop([], [])(last_end).detail == fallow.NO_FOLLOWING_CROP
+
+
+def test_a_sowing_of_the_next_cycle_follows_the_last_fallow_of_a_cycle():
+    # What the repeated rotation gives (unit #253): the sowings of one cycle
+    # and of the next. The day after the last component of the first cycle
+    # is followed by the first sowing of the next cycle.
+    document = json.loads(EXAMPLE.read_text("utf-8"))
+    one_cycle = sorted(sowings(document))
+    last_end = max(end for _, end, _ in components(document))
+    PLACEHOLDER_CYCLE = dt.timedelta(days=3333)
+    next_cycle = [(start + PLACEHOLDER_CYCLE, crop) for start, crop in one_cycle]
+    following = fallow.following_crop([*next_cycle, *one_cycle], [])
+    first_start, first_crop = one_cycle[0]
+    assert first_start + PLACEHOLDER_CYCLE > last_end
+    day = last_end + ONE_DAY
+    while day < first_start + PLACEHOLDER_CYCLE:
+        assert following(day) == first_crop
+        day += dt.timedelta(days=111)
+    # The order in which the sowings are given does not matter.
+    assert fallow.following_crop([*one_cycle, *next_cycle], [])(
+        last_end + ONE_DAY
+    ) == following(last_end + ONE_DAY)
+
+
+def test_a_component_without_a_start_date_that_could_be_sown_first_leaves_the_crop_unknown():
+    document = json.loads(EXAMPLE.read_text("utf-8"))
+    (first_start, first_crop), (second_start, second_crop), *_ = sorted(
+        sowings(document)
+    )
+    day = first_start - ONE_DAY
+    name = "PLACEHOLDER-component-undated"
+
+    def found(first_possible: dt.date, last_possible: dt.date):
+        return fallow.following_crop(
+            sowings(document), [(first_possible, last_possible, name)]
+        )(day)
+
+    # It can be sown after the day and on or before the next dated sowing:
+    # the crop that follows the fallow is not known.
+    for first_possible, last_possible in (
+        (day - ONE_DAY, day + ONE_DAY),
+        (day + ONE_DAY, second_start),
+        (first_start, first_start),
+    ):
+        unknown = found(first_possible, last_possible)
+        assert isinstance(unknown, Missing)
+        assert unknown.reason == "MISSING_INPUT"
+        assert unknown.detail.startswith(fallow.SOWING_NOT_KNOWN)
+        assert repr(name) in unknown.detail
+        assert "D110" in unknown.detail and "D115" in unknown.detail
+    # Its last possible day is the day or before it: it was sown before.
+    assert found(day - ONE_DAY, day) == first_crop
+    # Its first possible day comes after the next dated sowing.
+    assert found(first_start + ONE_DAY, second_start) == first_crop
+    # With no dated sowing after the day, it alone leaves the crop unknown.
+    alone = fallow.following_crop([], [(day + ONE_DAY, second_start, name)])(day)
+    assert alone.detail.startswith(fallow.SOWING_NOT_KNOWN)
+    assert second_crop  # the example has a second sowing
 
 
 def test_two_crops_on_the_next_sowing_are_not_computable():
@@ -107,14 +173,14 @@ def test_two_crops_on_the_next_sowing_are_not_computable():
     twin["crop_id"] = "PLACEHOLDER-crop-other"
     document["components"].append(twin)
     sowing = dt.date.fromisoformat(first["start"]["date"])
-    following = fallow.following_crop(RotationCalendar.model_validate(document))
+    following = fallow.following_crop(sowings(document), [])
     found = following(sowing - dt.timedelta(days=1))
     assert isinstance(found, Missing)
     assert found.reason == "NOT_COMPUTABLE"
     assert found.detail == fallow.TWO_FOLLOWING_CROPS
     # The same crop sown twice on one date is one crop.
     twin["crop_id"] = first["crop_id"]
-    same = fallow.following_crop(RotationCalendar.model_validate(document))
+    same = fallow.following_crop(sowings(document), [])
     assert same(sowing - dt.timedelta(days=1)) == first["crop_id"]
 
 

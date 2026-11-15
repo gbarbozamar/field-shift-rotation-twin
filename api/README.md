@@ -14,6 +14,7 @@ under [Decided](#decided), with its decision number of issue #77.
 |---|---|
 | `GET /health` | Liveness. Unchanged, at the root |
 | `POST /api/rotations/run` | One rotation for one field, end to end. Synchronous, JSON in and JSON out |
+| `POST /api/decisions/run` | Two rotations of one field and the decision output of the pair (#268). Synchronous, JSON in and JSON out. **PROPOSED** |
 
 Every product route lives under `/api`.
 
@@ -107,6 +108,162 @@ A valid request always answers `200`, also when nothing could be computed:
   `sources` is written once, at the top, because every phase has the same
   inputs. There is always at least one item. Every non-null `result` loads
   into `ResultsPerRotation`.
+
+## `POST /api/decisions/run` (PROPOSED, unit `l2/decision-route`)
+
+The route issue #268 waits for: it serves a decision output document. Shape
+from option 1 of the proposal the lead developer chose on 15 November 2026
+(the decision on issue #77 that records it is cited in the pull request). The
+interface developer accepts or corrects it as consumer. Code:
+`api/decisions.py`, `api/results_table.py`, `api/decision_layer.py`.
+
+Request body (unknown fields are errors):
+
+```json
+{
+  "site": { "case_id": "...", "field_id": "...", "latitude": 0, "longitude": 0 },
+  "rotations": [
+    { "...": "one item of the Rotation definition contract, unchanged" },
+    { "...": "a second item, same case_id and field_id, another rotation_id" }
+  ]
+}
+```
+
+- `site` is the `SiteReference` of `POST /api/rotations/run`.
+- `rotations` holds **exactly two** items (PROPOSED: one pair). No limit, no
+  tolerance of "equal" and no sweep are taken.
+
+What the route does, in order: each rotation through the `RotationValidator`;
+the identifiers checked (below); the climate and the soil and slope asked for
+**once**, for the site; each rotation run through the same `RotationEngines`
+as `POST /api/rotations/run`, on those same inputs; the results table built
+from the runs; the decision layer asked for the document.
+
+A valid request always answers `200`:
+
+```json
+{
+  "decision": { "...": "DecisionOutput of contracts/decision_output/, every null kept" },
+  "decision_missing": null,
+  "scenarios": [
+    { "scenario_id": "phase_1+phase_2",
+      "phases": [ { "rotation_id": "...", "phase": "phase_1" },
+                  { "rotation_id": "...", "phase": "phase_2" } ] }
+  ],
+  "rotations": [
+    { "rotation_id": "...", "outcome": "partial", "result_missing": null,
+      "modules": [ "... as in POST /api/rotations/run" ],
+      "phases": [ { "scenario_id": "phase_1", "first_ag_year": 0, "outcome": "partial", "result_missing": null } ] }
+  ],
+  "sources": [ "... as in POST /api/rotations/run, written once" ]
+}
+```
+
+- `decision` is the `DecisionOutput` of `contracts/decision_output/`,
+  serialised with `model_dump(mode="json")`, every null kept, never
+  `exclude_none`. `decision_missing` is non-null exactly when `decision` is
+  null (the rule of `result` and `result_missing`).
+- `rotations`: one item per rotation of the request, in order: the top-level
+  `outcome`, `result_missing` and `modules` of its run (those of `phase_1`,
+  as `POST /api/rotations/run` gives them) and how each phase ended. The
+  calendar and the result are not repeated: that route serves them, and they
+  weigh several MB per phase.
+- `scenarios`: the legend of the scenarios of the results table, and so of
+  the decision; empty when no table was built.
+- `example_data` of the document is true when either rotation definition,
+  the climate or the soil and slope says `example_data: true`: the mark each
+  input carries itself, not the `state` of its source, as
+  `api/carbon_forcing.py` marks the forcing.
+
+**The results table (`api/results_table.py`; Q15 (b) of
+`contracts/ENTRYPOINTS.md`, PROPOSED).** Built by the platform from the runs,
+copying each value unchanged (indicator, direction, value, unit, range or
+`range_missing`, `missing`, provenance, source, assumption mark): annual soil
+loss per agricultural year (no monthly rows), water on its own time basis,
+the soil carbon trend per rotation with its carbon model and computation.
+Nothing is computed, converted, filled or left out.
+
+- **Pairing the phases (D109, D132).** A one-year rotation has `phase_1`; a
+  two-year rotation has `phase_1` and `phase_2`; every rotation of a table
+  has the same cells, `scenario_id` included. **Every combination of one
+  phase of each rotation is one scenario**, named by its phases in the order
+  of the request joined by `+` (`phase_1+phase_2`). A pair of rotations of N
+  and M phases has N × M scenarios. The rule is D172 of issue #77, which
+  leaves the form of the name to this unit: PROPOSED here.
+- **No table**, and so `decision` null with `decision_missing`, when: a phase
+  of a rotation has no result (its reason is copied); a part is in the
+  not-built form of D12 (`NOT_AVAILABLE`: `ResultsTable` has no form for it,
+  `contracts/results/README.md` question 14); the runs of one scenario do not
+  hold the same cells (`NOT_COMPUTABLE`). The detail names the rotation by its
+  position in the request (`rotation 2 of the request`), never by an
+  identifier the request carried.
+
+**The decision layer (`api/decision_layer.py`, PROPOSED).** The producer of
+the document is sub-lane L2b (`decision/`, `contracts/decision_output/README.md`).
+The route depends on the interface `DecisionLayer` (in `api/ports.py`, with
+the other interfaces), never on `decision/` itself. The default
+implementation finds one function **by name**, as the runner finds an engine
+(`import_named`, the rule of `_import_function`):
+
+    decision.output.assemble_decision_output(table: ResultsTable, *, example_data: bool) -> DecisionOutput
+
+Module path, name and signature are PROPOSED, for the interface developer to
+accept or rename (one constant each). The default, `DiscoveredDecisionLayer`,
+looks it up **on each request, never when the app starts**
+(`create_app(..., decision_layer=None)`; tests inject their own): every merge
+to `main` redeploys the service before CI ends, so nothing of `decision/` (nor
+`contracts.decision_output`) is imported at start-up. Building the app adds
+only `api.decisions`, `api.results_table` and `api.decision_layer` to what it
+imports.
+
+- Not found: `200`, `decision` null, `decision_missing` `NOT_AVAILABLE`
+  naming the function.
+- What it returns is checked by the route itself (`check_document`), whatever
+  the implementation: a `DecisionOutput`, validated again, of the case and
+  field of the table, with its rotations and scenarios, and the example mark
+  it was given.
+- **A decision layer that fails** (its module does not import, the function
+  raises, or what it returns does not pass the check): `200`, `decision`
+  null, `decision_missing` `NOT_AVAILABLE` with the kind of error in the
+  detail (`the decision layer failed (TypeError) ...`); the error itself goes
+  to the log, never to the answer. Start-up and the other routes are never
+  affected. PROPOSED.
+
+**Invalid requests (`422`; nothing is called):**
+
+| Case | `error.code` | `details[].path`, `code` |
+|---|---|---|
+| Not exactly two rotations; an item that is not an object; an unknown field (except one named `rotation`, which `api/errors.py` classes as `ROTATION_INVALID`) | `INVALID_REQUEST` | as validation gives them |
+| Every validation error inside `site` | `SITE_INVALID` | `site...` |
+| A problem the `RotationValidator` reports | `ROTATION_INVALID` | `rotations.<index>.<path>`, its code |
+| A rotation whose `case_id` or `field_id` is not that of `site` | `ROTATION_INVALID` | `rotations.<index>.case_id` or `.field_id`, `not_the_site` (PROPOSED) |
+| A `rotation_id` given twice | `ROTATION_INVALID` | `rotations.<index>.rotation_id` of the second, `repeated` (PROPOSED) |
+
+A message names the field, never the value the request carried.
+
+**Defects (`500` `INTERNAL_ERROR`, CORS headers kept, no exception text):** an
+engine that raises, an envelope that breaks the rules of
+`POST /api/rotations/run`, a run whose result carries other identifiers than
+its request. The decision layer is not among them (above).
+
+**Cost.** Two runs, each `N` runs of EP1, EP3, EP4 and EP5 (one per phase),
+sequential, plus the table and the decision; the climate is asked for once.
+Measured in process on a laptop with other work running (not on the host):
+3 to 10 s per phase. Whether a request fits the host's timeout is not
+measured (OPEN below).
+
+**OPEN for this route:**
+
+- More than two rotations in one document: the decision output contract has
+  one set of scenarios for all its rotations, so each pair would be read over
+  the phases of the others too. Not decided.
+- Limits, a tolerance of "equal" and the sweep of D3 in the request (they
+  need the test plan contract and person-declared values).
+- Saved cases and run identifiers (#251): the route stores nothing.
+- The time of one request on the host, and its request timeout.
+- Whether `ResultsTable` gains a wholly missing form (question 14 of
+  `contracts/results/README.md`): until then a part not built gives no
+  decision.
 
 ## Errors (`api/errors.py`)
 
@@ -252,7 +409,8 @@ uv run uvicorn api.main:app --reload
 
 The route depends only on these interfaces. `create_app(cors_origins, *,
 climate=None, soil_slope=None, engines=None, rotation_validator=None,
-settings=None)` receives the implementations; `None` means the default.
+settings=None, parameters=None, decision_layer=None)` receives the
+implementations; `None` means the default.
 
 | Interface | Defined in | Default | Default behaviour | Still to come |
 |---|---|---|---|---|
@@ -260,6 +418,7 @@ settings=None)` receives the implementations; `None` means the default.
 | `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is wired by `SOIL_SLOPE_EXAMPLE_FILE` and serves the example for any field (D38); `adapters.soil_tables.SoilTableSource(table_paths, groups_path)` is wired by `SOIL_TABLE_FILES` and `SOIL_GROUPS_FILE` (soil by soil group, D48, D49; slope not built). Then slope from an elevation model (D48) |
 | `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; a soil-loss or water engine that is not found gives its part in the not-built form (D12) | Nothing in `api/`: each engine is picked up when its lane lands it |
 | `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
+| `DecisionLayer` (PROPOSED) | `api/ports.py` | `DiscoveredDecisionLayer()` (`api/decision_layer.py`) | Looks `decision.output.assemble_decision_output` up on each request, calls it and checks what it returns; when it is absent or fails, a typed absence, `NOT_AVAILABLE` | The function, in sub-lane L2b (`decision/`) |
 
 The engine stand-in `EnginesNotBuilt` and the validator stand-in
 `AcceptAnyRotation` are **removed**: no test needs them. The runner reports an

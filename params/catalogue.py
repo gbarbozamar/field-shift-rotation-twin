@@ -27,6 +27,9 @@ CITATION_NEEDED = "CITATION NEEDED"
 
 RECORDS_FOLDER = "records"
 EXAMPLES_FOLDER = "examples"
+# PROPOSED: records taken out of the catalogue and kept. Never loaded with
+# ``records/``; still checked as records (``check_layout``).
+WITHDRAWN_FOLDER = "withdrawn"
 RECORD_SUFFIX = ".json"
 FOLDER_README = "README.md"
 
@@ -509,26 +512,46 @@ def check_folder(folder: Any) -> list[str]:
     return problems + check_catalogue(records)
 
 
+def _check_withdrawn(folder: Path) -> list[str]:
+    """The problems of the records under ``withdrawn/``, named from ``params/``."""
+    records, problems = load_folder(folder)
+    prefix = f"{WITHDRAWN_FOLDER}/"
+    named = {prefix + name: record for name, record in records.items()}
+    return [prefix + problem for problem in problems] + check_catalogue(named)
+
+
 def check_layout(params_folder: Any) -> list[str]:
     """Return every problem of the whole ``params/`` folder.
 
     The catalogue under ``records/`` is checked with ``check_folder``, and
     its problems name each file relative to ``records/``. A ``.json`` file
-    anywhere else, other than under ``examples/``, is reported with its
-    path relative to ``params/``: it would never be checked or read.
+    anywhere else, other than under ``withdrawn/`` or ``examples/``, is
+    reported with its path relative to ``params/``: it would never be
+    checked or read.
+
+    The records under ``withdrawn/`` (PROPOSED) are not part of the
+    catalogue: ``load_folder`` on ``records/`` never returns them. They are
+    still checked, each one as a record and together as a set, by the same
+    rules as ``check_folder``, and their problems name each file relative to
+    ``params/``. The folder may be absent.
     """
     root, problems = _as_folder(params_folder)
     if root is None:
         return problems
     files, _, problems = _walk(root)
+    known = (RECORDS_FOLDER, WITHDRAWN_FOLDER, EXAMPLES_FOLDER)
     for path in files:
         relative = path.relative_to(root)
         if path.suffix.lower() != RECORD_SUFFIX:
             continue
-        if relative.parts[0] in (RECORDS_FOLDER, EXAMPLES_FOLDER) and len(relative.parts) > 1:
+        if relative.parts[0] in known and len(relative.parts) > 1:
             continue
         problems.append(
-            f"{relative.as_posix()}: a record file outside {RECORDS_FOLDER}/ "
-            f"and {EXAMPLES_FOLDER}/"
+            f"{relative.as_posix()}: a record file outside {RECORDS_FOLDER}/, "
+            f"{WITHDRAWN_FOLDER}/ and {EXAMPLES_FOLDER}/"
         )
-    return problems + check_folder(root / RECORDS_FOLDER)
+    problems += check_folder(root / RECORDS_FOLDER)
+    withdrawn = root / WITHDRAWN_FOLDER
+    if withdrawn.is_dir():
+        problems += _check_withdrawn(withdrawn)
+    return problems
