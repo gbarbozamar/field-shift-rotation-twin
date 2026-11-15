@@ -90,7 +90,7 @@ Follow section 3.3 of the blueprint. In short:
 3. A second, fresh session verifies: it runs the acceptance test and reads the diff. It does not edit.
 4. You read the diff, open the pull request and link the issue.
 5. CI passes, the consumer of the seam approves, then squash merge.
-6. Add one line to [AI_USE_LOG.md](../AI_USE_LOG.md), and a row to [ATTRIBUTIONS.md](../ATTRIBUTIONS.md) for anything new you used.
+6. Add a row to [ATTRIBUTIONS.md](../ATTRIBUTIONS.md) for anything new you used; AI assistance governance and traceability live in [CLAUDE.md](../CLAUDE.md), [ATTRIBUTIONS.md](../ATTRIBUTIONS.md), and pull request metadata / commit history (`AI_USE_LOG.md` was retired on `main`).
 
 Limits: at most three builders in flight; no new unit in a lane while two units of that lane wait for acceptance, with L2a and L2b counted separately; nothing runs unattended against `main`.
 

@@ -1,10 +1,10 @@
 # Model Cards and Declared Limits
 
-**Snapshot:** repository state `49504ac` (`main`).
+**Snapshot:** repository state `8ccc65e` (`main`, synced through `#557`, Wave 4 `W4-01`..`W4-13`, and Frontier Rev13 `F-01`..`F-25`).
 
-**Scope:** standardized technical model cards, verification status, parameter readiness, and declared limits for every engine entry point (`EP1`–`EP6`), the platform runner and climate classification (`api/`, `adapters/`, `kinds_of_year/`), the table decision layer (`decision/`), and the plant/economics evaluation layer (`economics/`, `api/plant.py`).
+**Scope:** standardized technical model cards, verification status, parameter readiness, and declared limits for every engine entry point (`EP1`–`EP6`), the platform runner and climate classification (`api/`, `adapters/`, `kinds_of_year/`), the table decision layer (`decision/`), the plant/economics evaluation layer (`economics/`, `api/plant.py`), and the strictly isolated `PROPOSED` Wave 4 standalone helpers and Wave 5 Frontier Rev13 (`F-01`..`F-25`) governance (`Card 10`).
 
-> **Strict grounding notice:** Every file path, function signature, parameter count, validation code, and decision reference below reflects only what is present on `main` (`49504ac`). No parameter value is invented, and no water or soil-carbon output is simulated here. Where design choices or contract items await formal sign-off, they are marked **`PROPOSED`** or **`OPEN`** (blueprint §3.7).
+> **Strict grounding notice:** Every file path, function signature, parameter count, validation code, and decision reference below reflects only what is present on `main` (`8ccc65e`). No parameter value is invented, and no water or soil-carbon output is simulated here. Core `P0` baseline claims (Cards 1–9) are strictly separated from `PROPOSED` Wave 4 standalone helpers and Frontier Rev13 (`F-01`..`F-25`) capabilities across all four Rev13 axes (`method_maturity`, `implementation_status`, `data_availability`, `local_validation_status`; [FRONTIER_VISION_REV13.md](FRONTIER_VISION_REV13.md)). Where design choices or contract items await formal sign-off, they are marked **`PROPOSED`** or **`OPEN`** (blueprint §3.7).
 
 ---
 
@@ -16,11 +16,12 @@
   - **`OPEN`** — unresolved scientific, parameter, or contract question requiring human judgment.
   - **`CITATION NEEDED`** — modelling assumption recorded for human literature/source verification.
 - **Entry-Point Numbering Note:** In [ENTRYPOINTS.md](../contracts/ENTRYPOINTS.md), `EP1`–`EP6` are `compute_soil_loss` (`EP1`), `build_rotation_calendar` (`EP2`), `compute_water_deficit_exposure` (`EP3`), `build_residue_ledger` (`EP4`), `run_amg` (`EP5`), and `run_rothc` (`EP6`), alongside two unnumbered public L1 helpers (`daily_reference_evapotranspiration` and `live_crop_by_day`). Platform orchestration (`api/`, `adapters/`) and climate year classification (`kinds_of_year/`) are documented in Card 7 immediately after `EP6`.
-- **Parameter Catalogue Snapshot (`49504ac`):**
+- **Parameter Catalogue Snapshot (`8ccc65e`):**
   - `params/records/` holds **132 signed JSON records**: **26** root erosion records, **6** shared residue/yield records in `params/records/residues/`, and **100** water records in `params/records/water/` (`45` from `#262`, `43` from `#417`, `12` from `#446`).
   - `params/withdrawn/computed_c/` holds **61 withdrawn** signed computed-`C` records moved out of the deployed catalogue under `D148`/`D158`/`D164`.
-  - **`params/drafts/` does not exist on `main` (`49504ac`).** Unsigned parameter values reside outside the repository until person-checked and signed (`D34`, `D66`); parameter identifiers and unit expectations are documented in engine READMEs and [params/README.md](../params/README.md).
-- **Validation Snapshot (`49504ac`):** Four protocol runs are recorded in `validation/runs/`. The latest, [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json), records **498** protocol-store results (**497** passed, **1** skipped `[H8]`) and **6,507** full-suite pytest passes (**16** skipped, **3** xfailed). Active test codes in [VALIDATION.md](VALIDATION.md) are `[E0, E1a, E1b, E2, E3, E7, E8, E9]`, `[H0, H1, H2, H5, H7, H8, H10]`, `[D0, D1, D2, D3, D4, D5, D6, D7, D10, D12]`, plus uncoded context checks (`EP4` Paysandu context; `AMG` vs. `LEELP1` exploratory contrast). Codes `E4`–`E6`, `E10`–`E11`, `H3`–`H4`, `H6`, `H9`, `H11`–`H12`, and `W0` do not exist in [VALIDATION.md](VALIDATION.md).
+  - **`params/drafts/` does not exist on `main` (`8ccc65e`).** Unsigned parameter values reside outside the repository until person-checked and signed (`D34`, `D66`); parameter identifiers and unit expectations are documented in engine READMEs and [params/README.md](../params/README.md).
+- **Validation Snapshot (`8ccc65e`):** Six protocol runs are recorded across `validation/runs/`. Validation Run #6 at `8ccc65e` (`validation/runs/run-20261115T232512Z-8ccc65e.json`, landing in parallel PR `l0/validation-run-6`) records **498** protocol-store results (**497** passed, **0** failed, **1** `not_evaluated` `[H8]`), **9,131** non-`ci/` pytest passes (**15** skipped, **3** xfailed across **9,149** items), and **26** `web/` test files (**450** tests passed, **113** Vite modules built). Active test codes in [VALIDATION.md](VALIDATION.md) are `[E0, E1a, E1b, E2, E3, E7, E8, E9]`, `[H0, H1, H2, H5, H7, H8, H10]`, `[D0, D1, D2, D3, D4, D5, D6, D7, D10, D12]`, plus uncoded context checks (`EP4` Paysandu context; `AMG` vs. `LEELP1` exploratory contrast) and EP3 phase-1 closure / FAO-56 Example 35 (`#509`, `#515`). Codes `E4`–`E6`, `E10`–`E11`, `H3`–`H4`, `H6`, `H9`, `H11`–`H12`, and `W0` do not exist in [VALIDATION.md](VALIDATION.md).
+- **Frontier Rev13 Inventory (`8ccc65e`, `PROPOSED`):** [validation/frontier_governance.py](../validation/frontier_governance.py) registers **46** inventory lines (`L01`–`L46`) across 10 domains and `F-01`..`F-25` (`0/46` `VALIDATED` locally; `31` `UNVALIDATED`, `8` `EXPLORATORY_ONLY`, `6` `PARTIAL`, `1` `BLOCKED_NOT_EVALUATED`), strictly isolated from `P0` baseline claims ([FRONTIER_VISION_REV13.md](FRONTIER_VISION_REV13.md)).
 
 ---
 
@@ -57,26 +58,26 @@ Estimates sheet and rill water erosion (`soil_loss`) per agricultural year and p
 ### Scientific Basis & Decisions (`#77`)
 - **Method (`M1.1`–`M1.8` in [METHODS.md](METHODS.md)):**
   - **Main route (`D69`, `D84`, `D101`, `D129`):** Annual `R` is the mean annual `rusle_r_factor` (`USER-G`); monthly `R` splits the annual value using 12 climatological monthly erosivity fractions (`D84`, `D101`, GloREDa); `LS` follows AH703 Table 4-1 / Renard et al. (1997) with slope-break piecewise exponent (`D68`, `ls.py`); `K` uses the Uruguayan mixed-model class mean (`D70`, `D100`, `D112`); `P` is read from `parameters` (no hardcoded no-till default `1` in code).
-  - **Computed `C` vs. Fallback (`D125`, `D129`, `D148`, `D158`, `D164`, `D213`):** Main route attempts computed `C` from crop canopy series (`day_<N>`), no-crop canopy records (`D143`), residue mass/decay, `rusle2_residue_yield_ratio`, `rusle2_crop_yield`, and unit conversion (`D129`). When any computed-`C` record is missing (including the deployed `49504ac` catalogue after `D158`/`D164`), it falls back to declared `rusle_c_factor` (`D125`), yielding **`2.365 t ha-1 yr-1`** across phases for both La Estanzuela demonstration rotations (`D146`, `D148`, `D213`), with all 67 computed-`C` records still verified together in memory.
+  - **Computed `C` vs. Fallback (`D125`, `D129`, `D148`, `D158`, `D164`, `D213`):** Main route attempts computed `C` from crop canopy series (`day_<N>`), no-crop canopy records (`D143`), residue mass/decay, `rusle2_residue_yield_ratio`, `rusle2_crop_yield`, and unit conversion (`D129`). When any computed-`C` record is missing (including the deployed `8ccc65e` catalogue after `D158`/`D164`), it falls back to declared `rusle_c_factor` (`D125`), yielding **`2.365 t ha-1 yr-1`** across phases for both La Estanzuela demonstration rotations (`D146`, `D148`, `D213`), with all 67 computed-`C` records still verified together in memory.
   - **Required D148 Label (carries on real values in Plant answer per `D250`):**
     `"based on a Uruguayan no-till measurement; overestimates about 6 times the loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)"`.
   - **Off-main-path daily index (`PC-1`–`PC-3`, `PC-7`):** Uses `r_factor/` daily threshold/exponent and `c_factor/` daily ratio (`S1` Eq. 6.5–6.6), averaged by month (`PC-3`), omitting the `M1.2` control regression (`PC-7`).
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - **Signed in `params/records/` (32 erosion/shared records):**
   - **26** root erosion records (`scope {}`): `10` `LS` records (`rusle_ls_*` + `rusle_s_break_*`), `rusle_r_factor` (Colonia), `12` GloREDa monthly `rusle_r_monthly_erosivity_<month>`, `rusle_k_factor` (`T Brunosol`), `rusle_c_factor` (declared fallback `D125`), `rusle_p_factor`.
   - **6** shared records in `params/records/residues/`: `rusle2_crop_yield` and `rusle2_residue_yield_ratio` for `soybean`, `wheat`, `maize` (`D164`).
 - **Withdrawn (`params/withdrawn/computed_c/`):** **61** signed computed-`C` records moved out of the deployed catalogue by `D148`/`D158`/`D164` (`D213`), keeping computed `C` inactive in the deployed service while testable in memory.
 - **Outside catalogue:** User-declared soil-loss limits (`soil_loss_tolerance` / `DeclaredLimit`) are per-field user inputs, not catalogue records.
 
-### Validation Status (`49504ac`)
-- **Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):**
+### Validation Status (`8ccc65e`)
+- **Passing in Run #6 (`validation/runs/run-20261115T232512Z-8ccc65e.json`):**
   - `[E0]` (erosion trivial comparator logic & ordering rules, `D211`)
   - `[E2]` (order between systems logic & comparator, `D225`)
   - `[E3]` (`engine/erosion/ls.py` vs. AH703 **Tables 4-2 and 4-5**, `91` `LS` cells and `19` `m` values in signed fixture `e3_ah703_tables.json`, `D124`)
   - `[E8]` (`annual_soil_loss` unit guard — `EQ6`, `EQ8`, `EQ10`, `D226`)
   - `[E9]` (`annual_soil_loss` mathematical invariants — `EQ1`–`EQ5`, `EQ7`, `D226`)
-- **Not evaluated / No result record in Run #4 (`df43899`):**
+- **Not evaluated / No result record in Run #6 (`8ccc65e`):**
   - `[E1a]` (official national erosion program comparison) and `[E1b]` (published plot ratios): **`not evaluated in this release (D254)`** (no test and no result record).
   - `[E7]` (runoff-plot plausibility observation, `D252`/`D148`): **`2.365 t ha-1 yr-1`** (declared `C`) vs. **`0.392 t ha-1 yr-1`** measured on La Estanzuela plots in 2017–2019; reported as an observation with **no pass rule** and **no test / result record** (`137Cs` national-context citation recorded, not numerically asserted).
 - **Not defined in `VALIDATION.md`:** `E4`–`E6`, `E10`–`E11`.
@@ -86,6 +87,7 @@ Estimates sheet and rill water erosion (`soil_loss`) per agricultural year and p
 - Computed `C` (`~24.4 t ha-1 yr-1` with withdrawn `C` records) and declared `C` (`2.365 t ha-1 yr-1`) both substantially exceed the Grahmann et al. (2022) La Estanzuela no-till measurement (`0.392 t ha-1 yr-1`, `[E7]`); `EP1` carries no uncertainty range (`Q6`).
 - `soil_slope` example ([la_estanzuela_soil_slope.json](../data/demo/la_estanzuela_soil_slope.json)) uses Wischmeier plot geometry (`22.1 m`, `4.5 %`) paired with `T Brunosol` class mean `K` (`0.03`, `±1 SD` `0.019`–`0.041`), not a site-measured `K` (`D70`, `D112`), and carries `"example_data": true`.
 - Unit checking on `LS` coefficients and daily-index exponent is not enforced (`OPEN 15`); `example_data` flag does not propagate into `SoilLossResults` (`OPEN 10`).
+- Standalone `PROPOSED` Wave 4 (`W4-02` `engine/erosion/dynamic_ls.py`, `#525`) and Frontier (`F-01` `normative_exploratory.py`, `F-02` `storm_erosivity.py`, `F-03` `sediment_connectivity.py`, `F-04` `observed_residue_cover.py`) helpers exist on `8ccc65e` and are **not wired** into `EP1` or `/api/rotations/run` (see Card 10).
 
 ---
 
@@ -116,14 +118,14 @@ Resolves a producer's `RotationDefinition` (month/day components) into concrete 
 - **`D47`, `D109`, `D132`:** Repeats one cycle over the entire climate record; exposes `N` phases (`phase_1`..`phase_N`) each starting in the first agricultural year of the record so downstream engines remain phase-agnostic (`D56`).
 - **`D141` (amends `D133`) & `D188` part 2 (`#403`):** Every phase `0..N-1` runs without refusal; components crossing into phase `p`'s first agricultural year keep missing start/end dates (`NOT_COMPUTABLE`, naming `D141`), while `repeat_over_record` lays out a lead-in cycle whenever the first cycle starts after the first day of the record's agricultural years (`D188` part 2).
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - Reads **0** parameter catalogue records.
 
-### Validation Status (`49504ac`)
+### Validation Status (`8ccc65e`)
 - Covered by unit tests (`engine/calendar/`) and runner chain tests (`CH01`–`CH07` in `validation/test_chain_examples.py`). No standalone `[E]/[H]/[D]` code in [VALIDATION.md](VALIDATION.md).
 
 ### Declared Non-Claims & Limits
-- **No agronomic feasibility rules on `main` (`49504ac`):** Only `harvest_not_before_sowing` and `positions_number_the_components` are enforced (`OPEN 1`–`18`); overlapping components, minimum gaps, or agronomic sequence constraints are not checked.
+- **No agronomic feasibility rules on `EP2` (`8ccc65e`):** Only `harvest_not_before_sowing` and `positions_number_the_components` are enforced (`OPEN 1`–`18`); `engine/calendar/overlap.py` (`#497`, D72) provides an opt-in overlap check, and Frontier `F-10` (`thermal_phenology.py`) / `F-11` (`sowing_window_sweep.py`) remain standalone `PROPOSED` helpers (see Card 10).
 - **`repeats` flag ignored in repetition (`OPEN`):** `repeat_over_record` repeats a rotation even if `RotationDefinition.repeats` is false.
 - **Leap day handling (`OPEN`):** `29 February` maps to `28 February` in non-leap years.
 - **Crossing multi-year components (`D190`):** A component spanning across two cycles (e.g., 24-month alfalfa) cannot be placed whole in phases where it crosses the start boundary and comes back `NOT_COMPUTABLE` (`phase_calendar`), making those phases uncomputable in `EP3` (`D190`).
@@ -153,7 +155,7 @@ Computes agricultural-year dimensionless water deficit exposure (`water_transpir
   - `engine.water.daily_reference_evapotranspiration(climate: SiteClimate, *, parameters: dict[str, dict]) -> dict[date, float | Missing]` (`D256`, **`DECIDED` interface / `PROPOSED` implementation**).
   - `engine.water.living_crop.live_crop_by_day(calendar: RotationCalendar, record_start: date, record_end: date, *, parameters: Mapping[str, dict]) -> dict[date, bool | Missing]` (`D222`, `PROPOSED`).
 - **Inputs:**
-  - `calendar`: repeated via `repeat_over_record` (`D47`); `soil_slope` is checked for `case_id`/`field_id` parity only (`soil_slope` physical fields are not read by `EP3` on `49504ac`, `OPEN 7`).
+  - `calendar`: repeated via `repeat_over_record` (`D47`); `soil_slope` is checked for `case_id`/`field_id` parity only (`soil_slope` physical fields are not read by `EP3` on `8ccc65e`, `OPEN 7`).
   - `climate`: daily `precipitation`, `air_temperature_max_2m`, `air_temperature_min_2m`, `dew_point_2m`, `wind_speed_2m`, `solar_radiation` (`CQ1`–`CQ7`).
   - `parameters`: keyword-only `dict[str, dict]`.
 - **Outputs:**
@@ -168,22 +170,22 @@ Computes agricultural-year dimensionless water deficit exposure (`water_transpir
 - **Fallow Mulch & Evaporation (`D106`, `D110`, `D111`, `D115`, `D185`, `D186`):** Surface residue cover reduces `TEW` by `5 %` per `10 %` cover (`D186`), keeping depletion across transitions (`D185`). No `Kcb` climatic adjustment (`FAO-56` Eq. 70) is implemented (`OPEN 4`, blocked on daily `RH_min` in `OPEN 3`).
 - **Initial States & Restart (`D44`, `D189`):** Chain starts on the first day covered by all climate series from `initial_storage` and `initial_depletion` without pre-record spin-up (`D189`). Any refused/missing day turns `NOT_COMPUTABLE`/`MISSING_INPUT` and **never restarts** the balance for subsequent days (`OPEN 10`, `OPEN 41`). Zero annual demand yields `NOT_COMPUTABLE` (`D214`).
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - **Signed in `params/records/water/` (`100` records total):**
   - `45` from `#262` (FAO-56 `et0/` constants & bounds + `Kcb` tables).
   - `43` from `#417` (site initial states, `minimum_relative_humidity`, `column_capacity`, `column_depth`, `field_capacity_water_content`, `wilting_point_water_content`, mulch reduction/increment, `soybean` stage lengths & parameters, `no_crop` parameters).
   - `12` from `#446` (`wheat` and `maize` `T1`–`T6` / `M1`–`M6`: `initial_root_depth`, `maximum_root_depth`, `readily_available_fraction`, `crop_height`, `cover_fraction_exponent`, `curve_number`).
-- **Unsigned / Pending (`10` records in `#433`):** `wheat` and `maize` remain **`MISSING_INPUT`** on `49504ac` because `4` `fao56_stage_length_*` records for `wheat` + `4` for `maize` (`8`) and `2` `surface_residue_cover` fallow records before `wheat` and `maize` await signature (`#433`).
+- **Unsigned / Pending (`10` records in `#433`):** `wheat` and `maize` remain **`MISSING_INPUT`** on `8ccc65e` because `4` `fao56_stage_length_*` records for `wheat` + `4` for `maize` (`8`) and `2` `surface_residue_cover` fallow records before `wheat` and `maize` await signature (`#433`).
 
-### Validation Status (`49504ac`)
-- **Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):**
+### Validation Status (`8ccc65e`)
+- **Passing in Run #6 (`validation/runs/run-20261115T232512Z-8ccc65e.json`):**
   - `[H0]` (water trivial comparator logic & ordering rules, `D212`)
   - `[H1]` (`engine/water/balance/` `run_balance` vs. FAO-56 Ch. 8 Ex. 37 signed fixture `h1_fao56_example37.json`, `D228`)
   - `[H2]` (`engine/water/et0/` `reference_evapotranspiration_day` vs. FAO-56 Example 18 signed fixture `h2_example18.json`, `D124`/`D138`)
   - `[H7]` (daily balance mass closure `ΔS = P − Q − E − T − D`, `D227`)
-- **Partial pass / 1 skipped in Run #4 (`df43899`):**
-  - **`[H8]`** (daily balance invariants `D227` — `19` passing invariant checks + **`1` skipped** `test_h8_invariants_numeric_criteria`, recorded as `not_evaluated` in Run #4).
-- **Not run / No result record in Run #4 (`df43899`):**
+- **Partial pass / 1 `not_evaluated` in Run #6 (`8ccc65e`):**
+  - **`[H8]`** (daily balance invariants `D227` — `19` passing invariant checks + **`1` `not_evaluated`** `test_h8_invariants_numeric_criteria`).
+- **Not run / No result record in Run #6 (`8ccc65e`):**
   - `[H5]` (NASA POWER `GWETROOT` qualitative contrast, `D107`/`D253`): **no pass rule** and **`not run`** in this release (`CQ7` not wired; no result record).
   - `[H10]` (Grahmann et al. 2022 Table 5 yearly runoff contrast, `D229`/`D230`): comparator machinery (`validation/h10_runoff.py`) and synthetic tests exist, and `validation/fixtures/h10_grahmann2022_runoff.json` now holds the signed numeric transcription (`checked_by: gbarbozamar`, verified by `validation/test_h10_fixture_gate.py`); however **`[H10]` remains `not evaluated`** (`BLOCKED_NOT_EVALUATED`) while the five open human gates (`CALENDAR_COTEJO` dates, 35-vs-6-day interval conflict, `year_basis_checked_by`, rainfall forcing route, and plot HSG/CN & soil profile) and an actual `EP3` plot run remain open (no result record).
   - **FAO-56 Chapter 7 Example 35 (surface-layer evaporation):** `validation/fixtures/fao56_example35_surface_layer.json` (`#515`, `checked_by: gbarbozamar`) and `early_wetting_step` (`early_wetting_option`, `wetting_ordering: de_after_wetting`, `full_precision_interpolation`, `half_digit_criterion`, `surface_only_scope`) were accepted by `gbarbozamar` **after** viewing results (`results_seen_before_acceptance: true`, `retroactive_preregistration: false`, `full_ep3_reproduction: false`), with `test_fao56_chapter_7_worked_example` unskipped and passing. `engine/water/evaporation/surface_layer.py` `step` remains unchanged pending L1 integration review (D185, dryland regression, and column balance).
@@ -191,12 +193,13 @@ Computes agricultural-year dimensionless water deficit exposure (`water_transpir
 - **Unverified on real demo run:** No simulated real water deficit exposure outputs are published or validated yet; D189 convergence check (empty vs. full initial state across phases) is not built (`OPEN 14`); REW×Ze sensitivity grid (`D102`) is not run (`OPEN 24`).
 
 ### Declared Non-Claims & Limits
-- **Zero outputs for rotations with `wheat` or `maize` on `49504ac`:** Missing `#433` records force `MISSING_INPUT` from the first `wheat`/`maize` day onward (`balance` never restarts).
+- **Zero outputs for rotations with `wheat` or `maize` on `8ccc65e`:** Missing `#433` records force `MISSING_INPUT` from the first `wheat`/`maize` day onward (`balance` never restarts).
 - **End-of-record fallow (`D187`, `OPEN 41`):** The final fallow/tail whose next sowing lies past the record end has no following crop and turns `MISSING_INPUT` for the remainder of the last agricultural year.
 - **No `RH_min` daily series (`OPEN 3`) & no `Kcb` wind/humidity adjustment (`OPEN 4`):** Site-constant `minimum_relative_humidity` is used in `evaporation/`.
-- **No per-crop output (`D217`):** Only one combined agricultural-year ratio is reported (`C1.3`); critical-period windows (`D191`: soybean R4–R6, maize R1 ± 15 d) and sowing-window soil-moisture descriptors (`D50`, `C1.4`) are not built (`OPEN 16`).
+- **No per-crop output (`D217`):** Only one combined agricultural-year ratio is reported (`C1.3`); critical-period windows (`D191`: soybean R4–R6, maize R1 ± 15 d) and sowing-window soil-moisture descriptors (`D50`, `C1.4`; standalone `engine/water/sowing_water.py`, `#476`) are not wired into `EP3`.
 - **Alfalfa/perennial caveat (`D190`):** Multi-year perennials receive one stage cycle and behave as fallow thereafter (understating transpiration), and phases where they cross the start boundary fail (`OPEN 29`, `OPEN 40`).
 - **No fallback to single-`Kc` (`D44`):** Missing dual-`Kc` or surface-layer parameters leave years missing (`OPEN 15`). Unit strings in water parameter records are not checked by `EP3` (`OPEN 9`).
+- **Standalone Wave 4 & Frontier water helpers (`8ccc65e`, `PROPOSED`, unwired from `EP3`):** `engine/water/frost_heat.py` (`#478`), `engine/water/thermal_counts.py` (`W4-01`, `#519`), `engine/water/root_zone_contrast.py` + `validation/h5_soil_moisture.py` (`W4-03`, `#526`), `engine/water/yearly_runoff.py` (`#501`), and Frontier `F-05`..`F-09`, `F-14` (`surface_moisture_wcm.py`, `enkf_assimilation.py`, `pedotransfer.py`, `synthetic_weather.py`, `fao_yield_response.py`, `twin_calibration.py`) do not alter `EP3` outputs (see Card 10).
 
 ---
 
@@ -234,12 +237,12 @@ Maintains residue mass and carbon accounting at harvest and monthly/annual carbo
 - **`D147`:** `EP4` owns the unit conversion to `t C ha-1` so `api/carbon_forcing.py` and `EP5`/`EP6` perform zero arithmetic or unit conversions on inputs.
 - **`D194`, `D221`:** Harvest carbon enters in the harvest month (no surface decay pool in `EP4` feeding RothC, consistent with RothC assumption `D224`); non-harvest covered months emit `0.0 t C ha-1`.
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - Reads **7** crop-scoped (`{"crop": "<crop_id>"}`) parameter identifiers:
   - **Signed in `params/records/residues/` (6 records = 2 IDs × 3 crops):** `rusle2_crop_yield` (`kg ha-1`) and `rusle2_residue_yield_ratio` (`dimensionless`) for `soybean`, `wheat`, `maize` (`D164`).
-  - **Unsigned / Absent from `params/records/` (5 IDs):** `residue_carbon_fraction`, `residue_removed_fraction`, `root_mass_at_harvest`, `root_carbon_fraction`, and `rhizodeposit_carbon` (listed in [engine/residues/README.md](../engine/residues/README.md)). Until signed, `EP4` carbon series remain **`MISSING_INPUT`** on `49504ac`.
+  - **Unsigned / Absent from `params/records/` (5 IDs):** `residue_carbon_fraction`, `residue_removed_fraction`, `root_mass_at_harvest`, `root_carbon_fraction`, and `rhizodeposit_carbon` (listed in [engine/residues/README.md](../engine/residues/README.md)). Until signed, `EP4` carbon series remain **`MISSING_INPUT`** on `8ccc65e`.
 
-### Validation Status (`49504ac`)
+### Validation Status (`8ccc65e`)
 - Covered by unit tests (`engine/residues/`), shared-catalogue guard (`engine/erosion/test_records_shared_with_residues.py`), and uncoded context entry in [VALIDATION.md](VALIDATION.md) (`EP4: context for the annual carbon inputs` — Paysandu long-term residue reference context only; no numeric validation code assigned).
 
 ### Declared Non-Claims & Limits
@@ -281,27 +284,28 @@ Simulates annual soil organic carbon stock dynamics (`t C ha-1`) over whole agri
 - **Formulation (`D80`, `D192`, `D210`):** AMG-A (`Clivot et al. 2019`, Eq. 5 & S7–S13) with `exponential` integration scheme (`D192`) and **6** rate modifiers (`temperature`, `moisture`, `clay`, `carbonate`, `ph`, `soil_cn_ratio`, `D192`/`D193`). Below `0 °C` annual mean temperature, mineralisation is cut to zero (`S8`).
 - **Moisture forcing (`D181`):** Uses `P - ET0` (`IW = 0`), declaring FAO-56 `ET0` as substitute for Penman (1948) PET; Clivot et al. (2019) calibration bounds are `-290` to `595 mm yr-1` (`api/carbon_forcing.py` flags out-of-range years in `source`, still computing).
 
-### Parameter Status (`49504ac`)
-- **0** AMG records in `params/records/` (`49504ac`).
+### Parameter Status (`8ccc65e`)
+- **0** AMG records in `params/records/` (`8ccc65e`).
 - **15** `amg_*` parameter IDs specified in [engine/amg/README.md](../engine/amg/README.md) (`amg_stable_fraction`, `amg_potential_mineralisation_rate`, `amg_humification_coefficient` scoped by `crop=origin`, temperature/moisture/clay/carbonate/pH/C:N parameters) remain outside `params/records/` awaiting transcription verification/signature (`D34`, `D66`).
 - **Site properties missing on demo (`D120`, `D121`, `D182`, `D193`):** [la_estanzuela_soil_slope.json](../data/demo/la_estanzuela_soil_slope.json) carries only `rusle_k_factor` (`clay_content`, `carbonate_content`, `ph`, `soil_cn_ratio`, and starting `soil_organic_carbon` in `t C ha-1` are absent).
 
-### Validation Status (`49504ac`)
+### Validation Status (`8ccc65e`)
 - Core tests (`engine/amg/test_amg.py`, `test_entry.py`, `test_runner_response.py`) use `PLACEHOLDER` numbers only (worked-example tests skipped in absence of signed constants).
 - **`AMG against LEELP1 (exploratory contrast)` ([VALIDATION.md](VALIDATION.md), `D234`):** Exploratory runs of the project's AMG functions against `LEELP1` (`González-Sosa et al. 2024`) were executed outside the repository and reproduced read-only on `main` using unsigned AMGv2 defaults (`65%` and `40%` stable fractions), `ET0` standing in for PET, and post-hoc filtering; recorded strictly as an exploratory observation with no pass rule and **explicitly NOT a validation of the project**. Zero AMG outputs are reachable through the deployed service (`params/records/` holds `0` AMG records).
 
 ### Declared Non-Claims & Limits
-- **`AMG-M` (monthly variant) is NOT built (`OPEN 1`).**
+- **`AMG-M` (`engine/amg/monthly.py`, `monthly_entry.py` `run_amg_monthly`, `variant="amg_m"`, `#477`/`#467`) is built only as a standalone experimental `PROPOSED` helper:** it is **not** wired into `api/engines.py` and casts no carbon vote under D80.
 - **Zero AMG trend values are reachable in the deployed service today** because neither the `15` `amg_*` records nor `EP4` unsigned residue parameters nor `D120`/`D121`/`D193` site soil carbon properties exist in `params/records/` or the demo soil file.
 - **No uncertainty range (`Q6`) and no `mean_over_cycles` (`OPEN 6`).**
 - **Stock/flow time series not returned in `/api/rotations/run` (`api/README.md` `OPEN`):** Only the 3 `soil_carbon_trend` rows enter `ResultsPerRotation`.
+- **Frontier `F-12` (`engine/amg/model_comparison.py`, `#547`) is standalone `PROPOSED`:** checks side-by-side `AMG-A`/`AMG-M`/`RothC` trajectories without altering `EP5` (see Card 10).
 
 ---
 
 ## Card 6 — `EP6`: Soil Organic Carbon — RothC (`engine/rothc/`)
 
-- **Status:** **`PROPOSED`** in `engine/rothc/` & `api/engines.py` (listed as **`OPEN`** in [ENTRYPOINTS.md](../contracts/ENTRYPOINTS.md) status row pending L0 update; [engine/rothc/README.md](../engine/rothc/README.md)). Lane: `L1` / `L2`.
-- **Primary Modules:** `engine/rothc/entry.py`, `pools.py`, `modifiers.py`, `equilibrium.py`, `trend.py`.
+- **Status:** **`PROPOSED`** across `engine/rothc/`, `api/engines.py`, and [ENTRYPOINTS.md](../contracts/ENTRYPOINTS.md) (reconciled in `W4-09`, `#521`; [engine/rothc/README.md](../engine/rothc/README.md)). Lane: `L1` / `L2`.
+- **Primary Modules:** `engine/rothc/entry.py`, `pools.py`, `modifiers.py`, `equilibrium.py`, `trend.py` (plus standalone `W4-11` helper `engine/rothc/periods.py`, `#554`, and Frontier `F-13` `engine/rothc/millennial_erosion.py`, `#548`).
 
 ### Purpose
 Simulates monthly soil organic carbon turnover (`t C ha-1`) across five pools (`DPM`, `RPM`, `BIO`, `HUM`, `IOM`) using standard **RothC-26.3** (`1990` formulation, `D64`), with inverse equilibrium spin-up (`D218`/`D219`) when only starting total `SOC` is supplied, returning monthly series and three rotation trend summaries (`t C ha-1 yr-1`).
@@ -329,16 +333,16 @@ Simulates monthly soil organic carbon turnover (`t C ha-1`) across five pools (`
 - **Equilibrium Mode (`D218`, `D219`):** Sets `IOM` via Falloon et al. (1998) (`p. 16`), computes the analytic fixed point of the cycled horizon (matching a 10,000-year run), and scales inputs by `(SOC - IOM) / (SOC_sim - IOM)` (`GSOCseq` eq. 5.1). Requires `total_carbon` present with none of the 5 pools (`OPEN 14`) and nonzero cycle decomposition/inputs.
 - **Bare-soil TSMD (`D223`) & PET Adaptation (`D80`, `D220`):** Applies bare-soil TSMD divisor (`BareSMD`) only on bare drying months (`OPEN 15`); divides monthly FAO-56 `ET0` by `rothc_pan_evaporation_factor` (`0.75`) when pan evaporation is absent.
 
-### Parameter Status (`49504ac`)
-- **0** RothC records in `params/records/` (`49504ac`).
+### Parameter Status (`8ccc65e`)
+- **0** RothC records in `params/records/` (`8ccc65e`).
 - **24** global `rothc_*` constants (`PARAMETERS` in `engine/rothc/entry.py`) plus **4** origin-scoped `rothc_input_*` composition parameters (`INPUT_PARAMETERS`, scoped by `crop=origin`) are transcribed in [engine/rothc/README.md](../engine/rothc/README.md) (`D63`/`D134`) but remain outside `params/records/` awaiting signed record creation (`OPEN 8`).
 - Radiocarbon inert-pool alternative is not built (`OPEN 5`).
 
-### Validation Status (`49504ac`)
+### Validation Status (`8ccc65e`)
 - Reference-case test (`engine/rothc/test_reference_case.py`) verifies RothC Model Description (Feb 2024) §2.2 Jan 1852 reference pools to within printed rounding bound **`1e-4`** (`OPEN 10` resolved: max gaps `DPM 6.29e-05`, `RPM 5.23e-05`, `BIO 5.3e-06`, `HUM 5.0e-06`) and fixed-point convergence against a 10,000-year forward run (`test_equilibrium.py`). Uses transcribed constants in test memory only; **no Uruguay/La Estanzuela RothC simulations or `[E]/[H]/[D]` codes exist.**
 
 ### Declared Non-Claims & Limits
-- **Zero RothC values are reachable on `49504ac`:** Missing `params/records/` RothC records, unsigned `EP4` parameters, and missing `soil_organic_carbon`/`clay_content` leave every RothC output `MISSING_INPUT`.
+- **Zero RothC values are reachable on `8ccc65e`:** Missing `params/records/` RothC records, unsigned `EP4` parameters, and missing `soil_organic_carbon`/`clay_content` leave every RothC output `MISSING_INPUT`.
 - **Single-day gap propagation:** A single missing daily rain or `ET0` day makes that entire calendar month—and all later months, plus equilibrium initial pools—missing (`D220`, `engine/rothc/README.md`).
 - **No surface-residue pool & fallow-as-bare (`D222`, `D224`):** Under no-till, harvest residue enters soil immediately in the harvest month, and fallow covered with dead residue is treated as bare (`0.0`, `Cover=1.0` only when >50% of days have a living crop).
 - **Large missing-detail payload (`api/README.md` `OPEN`):** Because `fitted_slope` lists every missing monthly stock (`277` months on `2001`–`2024`), uncomputed `rothc` missing rows expand `/api/rotations/run` responses (~`550,085` chars detail in `fitted_slope`, growing example JSON from ~`2.47 MB` to ~`3.58 MB`).
@@ -363,8 +367,10 @@ Orchestrates validation, site climate/soil retrieval, `N`-phase calendar expansi
 - **Climate Adapter (`adapters/power.py`):** Fetches 7 daily series (`CQ1`–`CQ7`, `2001-01-01` to `2024-12-31` per `D23`–`D35`) from NASA POWER (`AG` community), caching on disk (`CLIMATE_CACHE_DIR`), mapping fill values to missing `NO_COVERAGE` (`D31`, `D36`). Requires explicit `POWER_SETTINGS_FILE` and `CLIMATE_*` env vars (no defaults, `ConfigError` on misconfiguration).
 - **Soil Adapters (`adapters/`):** `ExampleSoilSlopeSource` (`D38`, serves example soil under any requested `case_id`/`field_id`, marking source `state="example"`), `SoilTableSource` (`D48`/`D49`, JSON tables + field group mapping; no real national tables committed due to licence/open questions).
 - **ENSO Classification (`kinds_of_year/`):**
-  - `load_record(path)` (no default path, **no ONI file in repo**), `classify_agricultural_years(record, start_month, first_year, last_year) -> list[KindOfYear]` (`el_nino`, `neutral`, `la_nina` or `NO_COVERAGE`/`MISSING_INPUT`), `count_kinds`, `deciding_season`.
+  - `load_record(path)` (no default path), `classify_agricultural_years(record, start_month, first_year, last_year) -> list[KindOfYear]` (`el_nino`, `neutral`, `la_nina` or `NO_COVERAGE`/`MISSING_INPUT`), `count_kinds`, `deciding_season`.
   - `mean_by_kind`, `series_from_results` (`aggregate.py`) compute arithmetic unweighted means (`MeansByKind`) on `ag_year` series without ranges (`OPEN`).
+  - Signed `PROPOSED` ONI record [kinds_of_year/records/oni_v6.json](../kinds_of_year/records/oni_v6.json) (`#510`, signed after source verification, 312 seasons `DJF 2000`–`NDJ 2025`) is on `8ccc65e`, opt-in via `KINDS_OF_YEAR_RECORD_FILE` and off by default while NOAA/NWS terms in [ATTRIBUTIONS.md](../ATTRIBUTIONS.md) stay `OPEN`.
+- **Green-Cover & Frontier Adapters (`adapters/`, `PROPOSED`, unwired from `api/`):** `adapters/green_cover.py` (`W4-13`, `#523`, paired with `contracts/green_cover/` `W4-12`, `#528`), `adapters/future_climate_projections.py` (`F-23`, `#544`), and `adapters/earth_observation_frontier.py` (`F-24`, `#545`) remain standalone `PROPOSED` adapters not wired into the product routes (see Card 10).
 
 ### Scientific Basis & Decisions (`#77`)
 - **Phase Runner (`D109`, `D117`, `D132`, `D141`, `D255`):** `EP2` runs once; `EP1`, `EP3`, `EP4`, `EP5`, `EP6` run on each `phase_calendar` (`phase_1` = unmoved `EP2` calendar). Pairwise `ResultsTable` compares every `phase_i+phase_j` combination (`D172`), requiring identical start month (`D255`).
@@ -377,17 +383,17 @@ Orchestrates validation, site climate/soil retrieval, `N`-phase calendar expansi
   - Applies threshold to the **`printed`** 1-decimal table value stored explicitly in the record—**never** rounding 2-decimal `oni.ascii.txt` `anom` in code (`D240 (2)`, `D258`: half-away-from-zero disagrees on 50 of 89 `.x5` entries 1950–2025). Missing `printed` raises `MISSING_INPUT` (`D258`).
   - Agricultural year `Y` is decided by the 3-month season centred 6 months after `start_month` (`D240 (3)`, e.g. `DJF` of `Y+1` for July start, `CITATION NEEDED`).
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - `api/config.py` loads `params/records/` (**132** signed records) at app start-up when run as service; empty `{}` if omitted in `EntryPointEngines`.
 - `adapters/settings/nasa_power.json` exists; template placeholders exist under `adapters/examples/`. No national soil-group tables are committed (`SoilTableSource` unpopulated).
-- **`oni_v6` ONI record is NOT in the repository (`49504ac`):** Marked `UNSIGNED_AI_PRECHECK` elsewhere awaiting human verification of `printed` values against the CPC v6 table (`D240 (5)`, `D258`, `D34`, `D66`).
+- **`oni_v6` ONI record ([kinds_of_year/records/oni_v6.json](../kinds_of_year/records/oni_v6.json), `#510`, `PROPOSED`)** is on `main` (`8ccc65e`, signed after source verification), opt-in via `KINDS_OF_YEAR_RECORD_FILE` and unset by default while NOAA CPC ONI attribution terms in [ATTRIBUTIONS.md](../ATTRIBUTIONS.md) remain `OPEN`.
 
-### Validation Status (`49504ac`)
+### Validation Status (`8ccc65e`)
 - Tested by unit suites (`api/`, `adapters/`, `kinds_of_year/`), schema round-trip checks, and `validation/test_chain_examples.py` (`CH01`–`CH07` placeholder chain wiring).
 - No deployed live NASA POWER call latency/timeout benchmark recorded yet (`api/README.md` `OPEN`).
 
 ### Declared Non-Claims & Limits
-- **`outcome == "complete"` is unreachable on `49504ac`:** Because `EP4`, `EP5`, and `EP6` lack signed parameters and `D120`/`D121`/`D193` site soil properties, `soil_carbon_trend` rows are missing, capping `POST /api/rotations/run` at `partial` or `no_result`.
+- **`outcome == "complete"` is unreachable on `8ccc65e`:** Because `EP4`, `EP5`, and `EP6` lack signed parameters and `D120`/`D121`/`D193` site soil properties, `soil_carbon_trend` rows are missing, capping `POST /api/rotations/run` at `partial` or `no_result`.
 - **Two rotations only in `/api/decisions/run` (`api/README.md`):** Multi-rotation (`>2`) decision documents and stored run IDs (`#251`) are not implemented.
 - **No uncertainty ranges in `MeansByKind` (`kinds_of_year/` `OPEN`):** Only arithmetic means are computed; ONI vs. NWS Relative ONI (`RONI`, NWS PIS 26-05) stays `OPEN` (`D240 (4)`).
 - **2-month NWS revision window (`kinds_of_year/README.md`):** Recent CPC ONI values remain provisional for up to two months.
@@ -429,18 +435,19 @@ Evaluates one `ResultsTable` (rotations × scenarios × indicators) under bounde
   - Only `end_minus_start` carbon trend enters `pair_state` (`D173`); `amg` and `rothc` counts are never pooled (`D169`).
 - **Scenario Summaries (`D96`):** Only `minimum`, `maximum`, and `scenario_of_the_minimum` of years within limits—no mean, share, or percentage across scenarios.
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - Holds **0** catalogue parameters (`0` is the only numeric rule boundary `D74`/`D93`/`D98`).
-- In `POST /api/decisions/run` (`assemble_decision_output`), `limits`, `equal_tolerances`, and `UncertainInput` mappings are **all absent (`NOT_DECLARED`)** on `49504ac` because the route request carries no user limits, tolerances, or uncertainty sweep declarations (`decision/output.py` docstring).
+- In `POST /api/decisions/run`, `limits` and `equal_tolerances` are absent (`NOT_DECLARED`); `W4-05` (`#524`) adds optional `uncertain_inputs` (`UncertainInputIn` in `api/decisions.py` and `decision/output.py`) for `D4` `measure_first` sweeps, which still default to empty (`NOT_DECLARED`) when `uncertain_inputs` is omitted (as in the default UI request).
 
-### Validation Status (`49504ac`)
-- **Implemented & Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):** All 10 decision protocol codes `[D0]` (trivial point-mean comparator divergence vs. `decision/`), `[D1]` (limit counts), `[D2]` (paired differences & interval bounds), `[D3]` (tipping-point bracketing), `[D4]` (measurement priority), `[D5]` (non-separation under uncertainty), `[D6]` (missingness preservation), `[D7]` (state naming exactness), `[D10]` (recompute consistency), `[D12]` (measurement consistency). Note `[D0]`–`[D12]` fixtures use person-approved synthetic/table cases (`#223`), not field outcomes.
+### Validation Status (`8ccc65e`)
+- **Implemented & Passing:** All 10 decision protocol codes `[D0]` (trivial point-mean comparator divergence vs. `decision/`, plus service-connected `validation/service_comparators.py` `W4-04`, `#522`), `[D1]` (limit counts), `[D2]` (paired differences & interval bounds), `[D3]` (tipping-point bracketing), `[D4]` (measurement priority), `[D5]` (non-separation under uncertainty), `[D6]` (missingness preservation), `[D7]` (state naming exactness), `[D10]` (recompute consistency), `[D12]` (measurement consistency). Note `[D0]`–`[D12]` fixtures use person-approved synthetic/table cases (`#223`), not field outcomes.
 
 ### Declared Non-Claims & Limits
 - **`DecisionOutput.state` (overall document state) is `None`:** No rule exists yet aggregating multiple pair states into a single document-level verdict (`contracts/decision_output/README.md` `OPEN 5`).
 - **`admissibility` vs. user `DeclaredLimit` (`D89`):** Admissibility against a verified soil-loss tolerance `T` has no field in `DecisionOutput` (`OPEN 3`).
-- **`measure_first` is empty in `/api/decisions/run`:** Requires user/case `UncertainInput` parameter mappings not passed by `POST /api/decisions/run`.
-- **No numerical resolution on `49504ac` routes:** With `EP1` emitting equal fallback `soil_loss` across rotations, missing `soil_loss` ranges (`range_missing`), and `EP3`–`EP6` returning missing/unvalidated outputs on demo inputs, pairs via `/api/decisions/run` cannot yield `"Robust preference"` on real demo runs.
+- **`measure_first` is empty by default in `/api/decisions/run`:** Requires optional `uncertain_inputs` declarations (`W4-05`, `#524`); when omitted (including the default UI request), `measure_first` returns empty (`NOT_DECLARED` in `DecisionSection.tsx`, `W4-10`, `#557`).
+- **No numerical resolution on `8ccc65e` routes:** With `EP1` emitting equal fallback `soil_loss` across rotations, missing `soil_loss` ranges (`range_missing`), and `EP3`–`EP6` returning missing/unvalidated outputs on demo inputs, pairs via `/api/decisions/run` cannot yield `"Robust preference"` on real demo runs.
+- **Frontier decision modules (`F-20` `multi_objective_nsga2.py`, `F-21` `scenario_discovery.py`, `F-22` `grounded_explainer.py`)** are standalone `PROPOSED` modules not altering `/api/decisions/run` (see Card 10).
 
 ---
 
@@ -474,32 +481,60 @@ Answers *"What should I plant?"* across 3–5 rotations for one field (`POST /ap
   - **Switched OFF by default (`RAIN_STRESS_TEST != "on"`):** Declared `rain_stress_factor` is echoed with `applied=False`; `EP1` runs unscaled.
   - **Switched ON (`RAIN_STRESS_TEST=on`):** Multiplies only `rusle_r_factor` (`scope {}`) and its range bounds in a deep copy of `parameters`, labelled `"stress test"` (never `"forecast"`).
 
-### Parameter Status (`49504ac`)
+### Parameter Status (`8ccc65e`)
 - **`economics/` holds 0 catalogue parameters and 0 price/yield/limit constants:** All economic facts (`USD` only), `soil_loss_limit`, `soybean_price_range`, and `rain_stress_factor` must be user-declared in `PlantRequest`.
-- **`POST /api/plant/run` depends on `KINDS_OF_YEAR_RECORD_FILE` (`oni_v6`):** Because no ONI record is shipped on `main` (`49504ac`), unconfigured runs classify every year as missing `NOT_AVAILABLE`, making `margin.average`, kind-stratified `soil_loss`, and `every_kind` decision checks unresolved unless a person supplies a signed ONI file.
+- **`POST /api/plant/run` depends on `KINDS_OF_YEAR_RECORD_FILE` (`oni_v6`):** Signed `PROPOSED` record [kinds_of_year/records/oni_v6.json](../kinds_of_year/records/oni_v6.json) (`#510`) is on `main` (`8ccc65e`), opt-in via `KINDS_OF_YEAR_RECORD_FILE` and **unset by default** while NOAA CPC ONI attribution terms in [ATTRIBUTIONS.md](../ATTRIBUTIONS.md) stay `OPEN`; unconfigured runs classify every year as missing `NOT_AVAILABLE`.
 
-### Validation Status (`49504ac`)
+### Validation Status (`8ccc65e`)
 - Verified via pure unit tests (`economics/test_margin.py`, `test_limit.py`, `test_decide.py`, `test_tipping.py`, `test_plant.py`), contract mirror/mutation tests (`contracts/plant_answer/test_examples.py`, `test_plant_answer_mutants.py` covering `D148`/`D245`/`D249`/`D250`/`D259`), and route tests (`api/test_plant.py`, `api/test_rain_stress.py`, `api/test_rain_stress_switch.py`). All economic test fixtures use **invented test data** (`README` notice); `PLACEHOLDER_plant_answer.json` is flagged `example_data: true`.
 
 ### Declared Non-Claims & Limits
 - **Water & soil carbon are excluded (`D245`):** `PlantAnswer` ranks solely on margin and `EP1` soil loss.
 - **Phase 1 only (`D250`):** Only `phase_1` (`phase 0`) of each rotation enters `PlantAnswer`, ignoring multi-phase shift variance.
-- **Equal soil loss across rotations with deployed `EP1` (`D213`):** On `49504ac`, `EP1` uses declared `rusle_c_factor`, so all rotations on a site receive identical `soil_loss` in `POST /api/plant/run` (either all meet or none meets a given uniform limit).
+- **Equal soil loss across rotations with deployed `EP1` (`D213`):** On `8ccc65e`, `EP1` uses declared `rusle_c_factor`, so all rotations on a site receive identical `soil_loss` in `POST /api/plant/run` (either all meet or none meets a given uniform limit).
 - **No margin uncertainty ranges (`C2`, `economics/` `OPEN`):** `MarginResult`, `LimitCost`, and `TippingPoint` propagate no input uncertainty ranges (`range_missing: NOT_AVAILABLE`); `choose_rotation` therefore cannot apply the uncertainty non-separation band of `decision/` (`OPEN 1` of `decide.py`).
-- **Unimplemented economics features:** `USD` currency only; empty fallow years in `years` refused (`ValueError`); declared-margin crops cannot share a year with another crop; no price/yield correlation across crops; `rain_stress_factor`'s own uncertainty is not propagated into `R` (`api/rain_stress.py`).
+- **Unimplemented economics features in `POST /api/plant/run`:** `USD` currency only; empty fallow years in `years` refused (`ValueError`); declared-margin crops cannot share a year with another crop; no price/yield correlation across crops; `rain_stress_factor`'s own uncertainty is not propagated into `R` (`api/rain_stress.py`). Frontier `F-15`..`F-19` modules (`economics/accounts.py`, `input_cost_ledger.py`, `temporal_valuation.py`, `livestock.py`, `soil_degradation.py`) are standalone `PROPOSED` Rev13 evaluators (see Card 10).
 
 ---
 
-## Cross-Cutting Summary: Parameter & Validation Readiness (`main` @ `49504ac`)
+## Card 10 — Wave 4 Standalone Extensions & Frontier Vision Rev13 (`F-01`..`F-25`)
 
-| Component | Entry / Route | Status | Signed Records Used (`params/records/`) | Missing / Unsigned / External Dependencies | Validation Codes (`VALIDATION.md`) | Key Release Limit on `49504ac` |
+- **Status:** **`PROPOSED`** (Blueprint §3.7 — strictly separated from `P0` baseline claims; see [FRONTIER_VISION_REV13.md](FRONTIER_VISION_REV13.md)).
+- **Primary Governance Module:** [validation/frontier_governance.py](../validation/frontier_governance.py) (`F-25`, `#556`), tested by [validation/test_frontier_governance.py](../validation/test_frontier_governance.py).
+
+### Purpose & Four-Axis Separation
+Under Rev13, every capability in the 46-line §14 research inventory (`L01`–`L46`, 10 domains) tracks **four independent state axes** so literature maturity never impersonates local field validation:
+- `method_maturity`: `23` `ESTABLISHED`, `16` `FRONTIER`, `7` `HYPOTHESIS`.
+- `implementation_status`: `38` `FRONTIER_IMPLEMENTED`, `6` `CORE_IMPLEMENTED`, `2` `NOT_IMPLEMENTED` (`L06`, `L16`).
+- `data_availability`: `15` `LOCAL_MEASUREMENT_REQUIRED`, `13` `SITE_DECLARED_REQUIRED`, `13` `AVAILABLE_PUBLIC`, `4` `PROVISIONAL_OR_PAUSED`, `1` `RESTRICTED_OR_ABSENT`.
+- `local_validation_status`: **`0` `VALIDATED`**, `31` `UNVALIDATED`, `8` `EXPLORATORY_ONLY`, `6` `PARTIAL`, `1` `BLOCKED_NOT_EVALUATED`.
+
+### Implemented Modules on `8ccc65e` (All `PROPOSED`, Non-Overwriting)
+- **Wave 4 standalone modules (`W4-01`..`W4-13`):** `engine/water/thermal_counts.py` (`W4-01`), `engine/erosion/dynamic_ls.py` (`W4-02`), `engine/water/root_zone_contrast.py` & `validation/h5_soil_moisture.py` (`W4-03`), `validation/service_comparators.py` (`W4-04`), `W4-05` `uncertain_inputs` sweep in `api/decisions.py` & `decision/output.py`, `#/print` (`PrintSheetScreen.tsx`), `#/saved` (`SavedCaseScreen.tsx`, `W4-08`), `contracts/ENTRYPOINTS.md` reconciliation (`W4-09`), `DecisionSection.tsx` `measure_first` & `named_years` (`W4-10`), `engine/rothc/periods.py` (`W4-11`), `contracts/green_cover/` (`W4-12`), and `adapters/green_cover.py` (`W4-13`).
+- **Wave 5 Frontier modules (`F-01`..`F-25`):**
+  - Erosion (`L0`): `normative_exploratory.py` (`F-01`), `storm_erosivity.py` (`F-02`), `sediment_connectivity.py` (`F-03`), `observed_residue_cover.py` (`F-04`).
+  - Water, Phenology, Twin & Carbon (`L1`/`L2b`): `surface_moisture_wcm.py` (`F-05`), `enkf_assimilation.py` (`F-06`), `pedotransfer.py` (`F-07`), `synthetic_weather.py` (`F-08`), `fao_yield_response.py` (`F-09`), `thermal_phenology.py` (`F-10`), `sowing_window_sweep.py` (`F-11`), `engine/amg/model_comparison.py` (`F-12`), `engine/rothc/millennial_erosion.py` (`F-13`), `twin_calibration.py` (`F-14`).
+  - Economics & Decision (`L2b`): `economics/accounts.py` (`F-15`), `input_cost_ledger.py` (`F-16`), `temporal_valuation.py` (`F-17`), `livestock.py` (`F-18`), `soil_degradation.py` (`F-19`), `decision/multi_objective_nsga2.py` (`F-20`), `scenario_discovery.py` (`F-21`), `grounded_explainer.py` (`F-22`).
+  - Adapters & Governance (`L2a`/`L0`): `adapters/future_climate_projections.py` (`F-23`), `adapters/earth_observation_frontier.py` (`F-24`), `validation/frontier_governance.py` (`F-25`).
+
+### Declared Non-Claims & Limits
+- **Zero local validation (`0/46` `VALIDATED`):** `assert_maturity_validation_independence` rejects any inventory entry claiming `VALIDATED` without `local_evidence_verified=True` and a non-empty `validation_evidence_ref`.
+- **Mandatory promotion gates:** New layers must pass the §7 layer-ablation gate (`evaluate_layer_ablation`) and §5.7/§6 national-grid full-physics finalist recalculation gate (`run_national_grid_cells`, rejecting unverified `"EMULATOR_APPROXIMATION"` finalists with `CONTROL_FAILED`).
+- **Strict `P0` isolation:** No Frontier module alters `P0` defaults, injects synthetic/CMIP6 series into `OBSERVED` records, or bypasses typed `Missing` propagation (`C3.1`–`C3.2`).
+
+---
+
+## Cross-Cutting Summary: Parameter & Validation Readiness (`main` @ `8ccc65e`)
+
+| Component | Entry / Route | Status | Signed Records Used (`params/records/`) | Missing / Unsigned / External Dependencies | Validation Codes (`VALIDATION.md`) | Key Release Limit on `8ccc65e` |
 |---|---|---|---|---|---|---|
-| **`EP1` Erosion** | `engine.erosion.compute_soil_loss` | `PROPOSED` | `26` root (`LS`, `R`, `K`, `C`, `P`) + `6` shared (`residues/`) = `32` | `61` computed-`C` records in `params/withdrawn/computed_c/` | `[E0, E2, E3, E8, E9]` pass; `[E1a, E1b]` not evaluated (`D254`); `[E7]` observation only (no pass rule/test) | Declared-`C` fallback (`2.365` vs `0.392` measured t/ha/yr, no rotation contrast) |
-| **`EP2` Calendar** | `engine.calendar.build_rotation_calendar` | `PROPOSED` | `0` | None | `CH01`–`CH07` chain + unit tests | No agronomic/overlap rules; multi-cycle perennials fail crossing phases (`D190`) |
-| **`EP3` Water** | `engine.water.compute_water_deficit_exposure` (+ `D256`, `D222`) | `PROPOSED` | `100` (`45` `#262` + `43` `#417` + `12` `#446`) | `10` wheat/maize stage & cover records (`#433`) | `[H0, H1, H2, H7]` pass; `[H8]` `19` pass + `1` skipped (`test_h8_invariants_numeric_criteria`); `[H5]` not run; `[H10]` `not evaluated` (numeric fixture signed, 5 human gates open); E35 surface-layer fixture (`#515`, `results_seen_before_acceptance: true`, `full_ep3_reproduction: false`; `step` unchanged) | `wheat`/`maize` missing; end-of-record fallow missing (`D187`); no `RH_min`/`Kcb` adj.; no `D189` spin-up convergence check run |
-| **`EP4` Residues** | `engine.residues.build_residue_ledger` | `PROPOSED` | `6` (`rusle2_crop_yield`, `rusle2_residue_yield_ratio`) | `5` unsigned IDs (C/root fractions) | Paysandu context (uncoded) | Grain carbon series blocked until 5 IDs signed; `cover`/`pasture` `NOT_COMPUTABLE` |
-| **`EP5` AMG** | `engine.amg.run_amg` | `PROPOSED` | `0` | `15` `amg_*` constants + `EP4` + site `SOC`/`clay`/`carb`/`pH`/`C:N` | `LEELP1` exploratory note (uncoded) | Zero computed values reachable; French arable calibration (`9.9`–`13.5 °C`), `AMG-M` unbuilt |
-| **`EP6` RothC** | `engine.rothc.run_rothc` | `OPEN` (`ENTRYPOINTS.md`) / `PROPOSED` (code) | `0` | `24` `rothc_*` + `4` `rothc_input_*` constants + `EP4` + site `SOC`/`clay` | Reference case (`1e-4` tol) in unit tests | Zero computed values reachable; single missing climate day stalls rest of run; large `fitted_slope` error string |
-| **Runner / Climate / Kinds** | `api/`, `adapters/`, `kinds_of_year/` | `PROPOSED` | Loads `params/records/` (`132`) | Signed `oni_v6` ONI file (`D240 (5)`), `POWER_SETTINGS_FILE`, soil tables (`D48`/`D49`) | Unit suites + `CH01`–`CH07` | `outcome="complete"` unreachable; `2`-month NWS ONI revision window; no deployed call benchmark |
-| **Decision** | `decision/functions.py`, `output.py` | `DECIDED` (logic) / `PROPOSED` (assembly) | `0` | User `DeclaredLimit`, `equal_tolerances`, `UncertainInput` (`NOT_DECLARED` on route) | `[D0, D1, D2, D3, D4, D5, D6, D7, D10, D12]` | Document `state` always `None`; `measure_first` empty on route; no admissibility field (`D89`) |
-| **Plant & Economics** | `economics/`, `api/plant.py`, `rain_stress.py` | `PROPOSED` | Scales `rusle_r_factor` if `RAIN_STRESS_TEST=on` | User `EconomicFacts` (`USD`), `soil_loss_limit`, price range, `oni_v6` file | Invented-data unit/route suites + `D249`/`D250` checks | Phase 1 only (`D250`); excludes water & carbon (`D245`); equal `EP1` loss across rotations; no margin ranges |
+| **`EP1` Erosion** | `engine.erosion.compute_soil_loss` | `PROPOSED` | `26` root (`LS`, `R`, `K`, `C`, `P`) + `6` shared (`residues/`) = `32` | `61` computed-`C` records in `params/withdrawn/computed_c/` | `[E0, E2, E3, E8, E9]` pass; `[E1a, E1b]` not evaluated (`D254`); `[E7]` observation only (no pass rule/test) | Declared-`C` fallback (`2.365` vs `0.392` measured t/ha/yr, no rotation contrast); `dynamic_ls.py` (`W4-02`) unwired |
+| **`EP2` Calendar** | `engine.calendar.build_rotation_calendar` | `PROPOSED` | `0` | None | `CH01`–`CH07` chain + unit tests | Overlap check opt-in (`overlap.py`); multi-cycle perennials fail crossing phases (`D190`) |
+| **`EP3` Water** | `engine.water.compute_water_deficit_exposure` (+ `D256`, `D222`) | `PROPOSED` | `100` (`45` `#262` + `43` `#417` + `12` `#446`) | `10` wheat/maize stage & cover records (`#433`) | `[H0, H1, H2, H7]` pass; `[H8]` `19` pass + `1` skipped (`test_h8_invariants_numeric_criteria`); `[H5]` contrast helper (`W4-03`, no pass rule); `[H10]` `BLOCKED_NOT_EVALUATED` (fixture signed `#516`, 5 human gates open); E35 fixture (`#515`, `step` unchanged) | `wheat`/`maize` missing; end-of-record fallow missing (`D187`); no `RH_min`/`Kcb` adj.; standalone thermal/runoff helpers unwired |
+| **`EP4` Residues** | `engine.residues.build_residue_ledger` | `PROPOSED` | `6` (`rusle2_crop_yield`, `rusle2_residue_yield_ratio`) | `5` unsigned IDs (C/root fractions) | Paysandu context (uncoded) + mass-conservation tests (`#503`) | Grain carbon series blocked until 5 IDs signed; `cover`/`pasture` `NOT_COMPUTABLE` |
+| **`EP5` AMG** | `engine.amg.run_amg` | `PROPOSED` | `0` | `15` `amg_*` constants + `EP4` + site `SOC`/`clay`/`carb`/`pH`/`C:N` | `LEELP1` exploratory note (uncoded) | Zero computed values reachable; French arable calibration (`9.9`–`13.5 °C`); `AMG-M` (`#477`) standalone/no vote |
+| **`EP6` RothC** | `engine.rothc.run_rothc` | `PROPOSED` | `0` | `24` `rothc_*` + `4` `rothc_input_*` constants + `EP4` + site `SOC`/`clay` | Reference case (`1e-4` tol) in unit tests | Zero computed values reachable; single missing climate day stalls rest of run; `periods.py` (`W4-11`) standalone |
+| **Runner / Climate / Kinds** | `api/`, `adapters/`, `kinds_of_year/` | `PROPOSED` | Loads `params/records/` (`132`) | Signed opt-in `oni_v6.json` (`#510`, unset by default), `POWER_SETTINGS_FILE`, soil tables (`D48`/`D49`) | Unit suites + `CH01`–`CH07` | `outcome="complete"` unreachable; `2`-month NWS ONI revision window; `green_cover.py` (`W4-13`) unwired |
+| **Decision** | `decision/functions.py`, `output.py` | `DECIDED` (logic) / `PROPOSED` (assembly) | `0` | User `DeclaredLimit`, `equal_tolerances`, optional `uncertain_inputs` (`W4-05`, `NOT_DECLARED` if omitted) | `[D0, D1, D2, D3, D4, D5, D6, D7, D10, D12]` + `service_comparators.py` (`W4-04`) | Document `state` always `None`; `measure_first` empty unless `uncertain_inputs` supplied; no admissibility field (`D89`) |
+| **Plant & Economics** | `economics/`, `api/plant.py`, `rain_stress.py` | `PROPOSED` | Scales `rusle_r_factor` if `RAIN_STRESS_TEST=on` | User `EconomicFacts` (`USD`), `soil_loss_limit`, price range, opt-in `oni_v6.json` | Invented-data unit/route suites + `D249`/`D250` checks | Phase 1 only (`D250`); excludes water & carbon (`D245`); equal `EP1` loss across rotations; no margin ranges |
+| **Frontier Rev13 (`F-01`..`F-25`)** | `validation/frontier_governance.py` + 25 modules | `PROPOSED` (isolated from `P0`) | `0` new signed records | Local field/station calibration, EO/climate data licences, §7 & §5.7/§6 gates | Unit & governance tests (`0/46` lines `VALIDATED` locally) | Strictly exploratory/non-normative; never overwrites `P0` baselines |
