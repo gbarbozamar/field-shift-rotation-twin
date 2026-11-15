@@ -4,7 +4,7 @@ The closed list of climate quantities that travel in the contract "Site data: cl
 
 Status of the file: **PROPOSED** (blueprint section 3.7). Nothing here is in force until people approve the pull request: a science reviewer, because sources, units and methods are science-class and data decisions, and the platform developer, whose adapter writes these identifiers and unit strings. The lead developer and the engines developer are the consumers.
 
-The entries marked `DECIDED` record decisions of the lead developer of 14 November 2026, D23 to D32 of issue #77 (the comment "Decisions of 14 November 2026 on the climate quantities"). They are science class: a science reviewer may still review them.
+The entries marked `DECIDED` record decisions of the lead developer of 14 November 2026, D23 to D32 of issue #77 (`CQ7` records D107, D113 and D114) (the comment "Decisions of 14 November 2026 on the climate quantities"). They are science class: a science reviewer may still review them.
 
 ## How to read this file
 
@@ -108,8 +108,9 @@ The entries below are the list; this table repeats them. The status of a quantit
 | `CQ4` | `dew_point_temperature_2m` | Humidity of the air, as dew point | `degC` | 2 m | `OBSERVED` | N2 | `T2MDEW` (D25) | DECIDED (D25) |
 | `CQ5` | `wind_speed_2m` | Mean wind speed of the day | `m s-1` | 2 m | `OBSERVED` | N2 | `WS2M` (D26) | DECIDED (D26) |
 | `CQ6` | `solar_radiation` | Radiation input of the reference evapotranspiration | `MJ m-2 day-1` (community AG, D28) | none | `OBSERVED` | N2 | `ALLSKY_SFC_SW_DWN` (D27) | DECIDED (D27) |
+| `CQ7` | OPEN | Relative saturation of the root zone, 0 to 100 cm, of MERRA-2 (D114); shown as a percentile of the day of the year (D113); context and contrast only (D107) | OPEN | 0 to 100 cm (D114) | OPEN (O15) | Context and contrast of the water axis (D107); no method of N1 to N3 | `GWETROOT` (D107) | SOURCE DECIDED (D107, D113, D114); identifier, unit string and label OPEN |
 
-Five quantities are decided (`CQ1`, `CQ1b`, `CQ4`, `CQ5`, `CQ6`) and two are proposed (`CQ2`, `CQ3`). None is open. The candidates that were not chosen (`relative_humidity_2m`, `specific_humidity_2m`, `wind_speed_10m`) do not enter the list.
+Five quantities are decided (`CQ1`, `CQ1b`, `CQ4`, `CQ5`, `CQ6`) and two are proposed (`CQ2`, `CQ3`). None of `CQ1` to `CQ6` is open. `CQ7` has a decided source and a decided meaning, and its identifier, unit string and label are `OPEN` (O15). The candidates that were not chosen (`relative_humidity_2m`, `specific_humidity_2m`, `wind_speed_10m`) do not enter the list.
 
 ## The quantities
 
@@ -327,6 +328,32 @@ What #15 says that bears on the choice, without choosing:
 
 Question: O3.
 
+### CQ7 Soil moisture of the root zone
+
+Status: SOURCE AND MEANING DECIDED — decided by the lead developer on 14 November 2026, issue #77, D107, D113 and D114; identifier, unit string and provenance label `OPEN` (O15)
+
+| Aspect | Entry |
+|---|---|
+| Identifier | `OPEN` (O15). No decision gives one |
+| What it is | "Relative saturation of the root zone, 0 to 100 cm, from MERRA-2, a reanalysis on a ½° × ⅝° grid." "It is a fraction of porosity, not plant-available water: the screen never calls it 'available water'" ([D114](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886369099)) |
+| Unit string | `OPEN` (O15). D107 says "0 to 1"; D114 cites the parameter manager of the service with the unit `1`. No decision writes a unit string in the notation of R4 |
+| Measurement height | None applies. Its depth is 0 to 100 cm (D114), which is a depth of soil, not a height; R3 is about heights above the ground and this file has no field for a depth. `OPEN` (O15) |
+| Provenance label | `OPEN` (O15). See the clash below |
+| Needed by | No method of N1 to N3. D107: context and contrast of the water axis, "never as a deciding measure" |
+| Source parameter | **`GWETROOT`** of NASA POWER, "through the climate API already used" ([D107](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886058061)) |
+
+How it is used and shown, as the decisions say it (restated, not extended):
+
+- D107: "Yes, as context and contrast, never as a deciding measure." Uses: "a regional context per agricultural year, and a qualitative contrast of the timing of wetting and drying in the balance of the actual rotation (H5). It is never converted to mm, never used as an initial state and never put into the alternative rotations."
+- D113: "As the percentile of the day of the year within its own series, 2001 to 2024", read as "drier or wetter than usual". "The raw value from 0 to 1 is not shown. Still context and contrast only (D107)."
+- D107 had left the depth open (the metadata of the service says 200 cm; an expert of the data centre wrote 0 to 100 cm). D114 closes it: 0 to 100 cm.
+
+Clashes and gaps, listed and not resolved:
+
+- `OPEN`, clash: D107 calls it "a reanalysis, not an observation" and D114 calls MERRA-2 "a reanalysis". Rule R5 of this file says every quantity of the list "carries the label `OBSERVED`, also when the data product is itself modelled (C4.4; decided by the lead developer, acceptance by a science reviewer pending)". Which label `CQ7` carries is not said by any decision of #77. O15.
+- `OPEN`: D113 shows a percentile of the day of the year within the series 2001 to 2024, which is a value computed from the series. This file lists series as they arrive from the source; it does not say where the percentile is computed or under which label (C4.3 gives `DERIVED` to a value aggregated from an `OBSERVED` series). O15.
+- `OPEN`: R1 says the list is closed and "A new quantity is a contract change and is added only at a checkpoint". This row records what the decisions ask for. Adding `CQ7` to the series that `SiteClimate` and the adapter settings carry is a contract change for the platform developer's adapter and for the lead developer, not made here. O15.
+
 ## Latitude and elevation
 
 They are not series and they are not in the list. They are here because the method of N2 needs them; when this section was first written no contract carried them (D9, D18 and D27 below).
@@ -462,6 +489,8 @@ Each item is a question a person can answer. The role that answers it is named a
 **O14. Should the documentation be checked against the service before the settings are written?** #15 reports several points as `NOT FOUND` or inconsistent and says they could be settled "by a person making one documented request or by reading the `/configuration` and Manager API outputs, which this scout did not call" (#15, decision 10). The points that touch this list: which parameters the chosen community accepts at daily level; the unit and aggregation of `IMERG_PRECTOT`; the unit label of `ALLSKY_SFC_SW_DWN` under AG and HY; the codes of the radiation and pressure parameters whose entries were not opened. A session never calls the real service. For the science reviewers and the platform developer.
 
 **O14 DECIDED** (lead developer, 14 November 2026, issue #77, D32): **Done.** One documented request was made by the orchestrating AI session on the lead developer's instruction; the recorded response may be committed under D17. What it settles and what it does not: [The documented request](#the-documented-request). Of the points listed in this item: the community `ag` accepts `IMERG_PRECTOT` at daily level; the unit label of `IMERG_PRECTOT` is `mm/day` and its aggregation stays `OPEN` (O5); the unit label of `ALLSKY_SFC_SW_DWN` under `ag` is `MJ/m^2/day`. The request asked for no clear-sky, top-of-atmosphere or pressure parameter, so their codes are not read.
+
+**O15. How does `GWETROOT` enter the list?** D107, D113 and D114 of issue #77 decide the source parameter, what it is, its depth and how it is shown, and no decision writes its identifier, unit string, measurement field or provenance label. (a) Which identifier and which unit string (D107 says "0 to 1"; D114 cites the unit `1`)? (b) Which provenance label, given that the decisions call it a reanalysis and R5 labels every quantity `OBSERVED`? (c) Where is the percentile of D113 computed, and under which label? (d) Does the depth of 0 to 100 cm travel as a field, and does R3 change? (e) Is `CQ7` added to the closed list by the contract change that R1 requires? For the lead developer; the science reviewers for (b) and (c); the platform developer for (e), whose adapter writes the identifiers.
 
 ### Questions of other files that this list depends on
 
