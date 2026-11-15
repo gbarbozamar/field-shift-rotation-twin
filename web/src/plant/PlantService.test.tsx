@@ -166,7 +166,6 @@ describe('no backend configured (1)', () => {
     const figures = (html.match(/data-testid="plant-value"[^>]*>[^<]*Soil loss/g) ?? []).length
     expect(figures).toBeGreaterThan(0)
     expect(count(html, 'plant-soil-loss-label')).toBe(figures)
-    expect(strings['plant.service.origin_example']).toContain('PLACEHOLDER')
   })
 
   it('the card components keep the heavier-rain control disabled with its reason by default', () => {
@@ -185,7 +184,7 @@ describe('no backend configured (1)', () => {
     )
   })
 
-  it('with a backend configured the screen still opens on the example, offers the service, and calls nothing yet', () => {
+  it('with a backend configured the screen opens on the questions and "Ask the service", no example answer, and calls nothing yet (D251)', () => {
     vi.stubGlobal('fetch', fetch)
     const html = renderToString(
       <QueryClientProvider client={new QueryClient()}>
@@ -193,10 +192,59 @@ describe('no backend configured (1)', () => {
       </QueryClientProvider>,
     )
     expect(fetch).not.toHaveBeenCalled()
-    expect(count(html, 'plant-example-banner')).toBe(1)
-    expect(count(html, 'plant-card')).toBe(1)
+    expect(count(html, 'plant-example-banner')).toBe(0)
+    expect(count(html, 'plant-card')).toBe(0)
+    expect(count(html, 'plant-option')).toBe(0)
+    expect(visibleText(section(html, 'plant-origin'))).not.toContain('example answers')
     expect(visibleText(section(html, 'plant-service-ask'))).toContain(strings['plant.service.ask'])
+    expect(visibleText(section(html, 'plant-service-not-asked'))).toContain(strings['plant.service.not_asked'])
+    expect(visibleText(section(html, 'plant-example-inputs'))).toContain(strings['plant.q.example_inputs'])
+    expect(count(html, 'plant-q-kind')).toBe(1)
+    expect(count(html, 'plant-q-strict')).toBe(1)
     expect(count(html, 'plant-service-not-available')).toBe(0)
+  })
+
+  it('with a backend configured, before any answer, no soil-loss figure, margin or rotation name of the examples is rendered (D251)', () => {
+    const html = renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <PlantScreen apiBase={BASE} />
+      </QueryClientProvider>,
+    )
+    const text = visibleText(html)
+    expect(count(html, 'plant-value')).toBe(0)
+    expect(count(html, 'plant-soil-loss-label')).toBe(0)
+    expect(count(html, 'plant-bar-soil')).toBe(0)
+    expect(count(html, 'plant-bar-margin')).toBe(0)
+    expect(text).not.toContain(strings['plant.answer.chosen'])
+    for (const answer of plantExamples.answers) {
+      for (const option of answer.options) {
+        expect(text).not.toContain(option.rotation_id)
+        for (const item of [...Object.values(option.margin), ...Object.values(option.soil_loss)]) {
+          if (item.value !== null) {
+            expect(text).not.toContain(`${displayNumber(item.value)} ${item.unit}`)
+          }
+        }
+      }
+    }
+    for (const rotation of rawRequest.rotations as { label?: string }[]) {
+      if (rotation.label !== undefined) expect(text).not.toContain(rotation.label)
+    }
+  })
+
+  it('after a mocked service answer, the answer is shown, with its origin and no example inputs line', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, rawAnswer)))
+    const state = serviceState()
+    const answered = await runPlant(BASE, serviceRequestOf(state)!)
+    const phase: ServicePhase = { phase: 'answered', answer: answered }
+    const html = view(state, phase)
+    expect(count(html, 'plant-card')).toBe(1)
+    expect(count(html, 'plant-option')).toBe(rawAnswer.options.length)
+    expect(visibleText(section(html, 'plant-chosen'))).toContain(rawAnswer.chosen as string)
+    expect(visibleText(section(html, 'plant-origin'))).toContain(
+      formatString(strings['plant.service.origin_service'], { api: BASE }),
+    )
+    expect(count(html, 'plant-service-not-asked')).toBe(0)
+    expect(count(html, 'plant-example-inputs')).toBe(0)
   })
 })
 
@@ -271,10 +319,12 @@ describe('the service fails', () => {
     const back = plantScreenReducer(state, { type: 'back' })
     expect(back.mode).toBe('example')
     expect(serviceRequestOf(back)).toBeNull()
+    // Back to the questions: no fallback to the example answers (D251).
     const restored = view(back, null)
-    expect(count(restored, 'plant-option')).toBe(rawAnswer.options.length)
+    expect(count(restored, 'plant-option')).toBe(0)
+    expect(count(restored, 'plant-card')).toBe(0)
     expect(count(restored, 'plant-service-error')).toBe(0)
-    expect(visibleText(section(restored, 'plant-origin'))).toContain(strings['plant.service.origin_example'])
+    expect(count(restored, 'plant-service-not-asked')).toBe(1)
   })
 
   it('(5) a failed connection: the panel shows the text of UNEXPECTED', async () => {
@@ -435,8 +485,8 @@ describe('fix 6: with a backend, heavier rain is enabled in example mode too', (
     expect(rain).not.toMatch(/disabled=""/)
     expect(visibleText(section(html, 'plant-rain-next-answer'))).toContain(strings['plant.service.rain_next_answer'])
     expect(visibleText(rain)).not.toContain(strings['plant.q.rain_unavailable_detail'])
-    // The example answers are still shown.
-    expect(count(html, 'plant-card')).toBe(1)
+    // No example answer is shown before the service answers (D251).
+    expect(count(html, 'plant-card')).toBe(0)
   })
 
   it('the checkbox shows what will be sent: off, then on with the factor, and the request asked carries it', () => {
@@ -473,15 +523,15 @@ describe('fix 7: a request that cannot be read is a typed absence on the rain co
     detail: strings['plant.service.rain_request_invalid_detail'],
   })
 
-  it('with a backend: MISSING_INPUT with its detail, no "Ask the service", and the example screen renders', () => {
+  it('with a backend: MISSING_INPUT with its detail, no "Ask the service", and no example answer (D251)', () => {
     expect(read.readable).toBe(false)
     const html = renderToString(<PlantScreenView state={initialPlantState()} apiBase={BASE} service={null} read={read} />)
     const rain = section(html, 'plant-q-rain')
     expect(rain).toMatch(/disabled=""/)
     expect(visibleText(rain)).toContain(absence)
     expect(count(html, 'plant-service-ask')).toBe(0)
-    expect(count(html, 'plant-card')).toBe(1)
-    expect(count(html, 'plant-option')).toBe(rawAnswer.options.length)
+    expect(count(html, 'plant-card')).toBe(0)
+    expect(count(html, 'plant-option')).toBe(0)
     expect(serviceRequestOf(serviceState(), unreadable)).toBeNull()
   })
 

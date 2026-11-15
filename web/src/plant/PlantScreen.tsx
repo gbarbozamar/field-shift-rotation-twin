@@ -69,8 +69,9 @@ import type {
  * disabled and the stress test is not available, with its reason.
  *
  * Ask the service (S-021, PROPOSED). When a backend address is configured
- * (VITE_API_URL set and not blank, plantRoute.ts), the screen still opens on
- * the saved example answers and also offers "Ask the service": the example
+ * (VITE_API_URL set and not blank, plantRoute.ts), the screen opens on the
+ * questions and "Ask the service", with no answer until the service answers
+ * (D251 of #77, read strictly: no sample answer values are shown): the example
  * plant request, with the questions chosen (how strict, the kind of year,
  * heavier rain on or off), goes to POST /api/plant/run, one call per distinct
  * request (cached, no retry, no refetch on focus). With a backend, heavier
@@ -693,7 +694,10 @@ export type AnswerOrigin = { kind: 'example' } | { kind: 'service'; api: string 
 const ORIGIN_EXAMPLE: AnswerOrigin = { kind: 'example' }
 
 /** A service call without an answer to show. */
-export type ServiceStatus = { kind: 'pending' } | { kind: 'failed'; code: ApiErrorCode }
+export type ServiceStatus =
+  | { kind: 'not_asked' }
+  | { kind: 'pending' }
+  | { kind: 'failed'; code: ApiErrorCode }
 
 function ignore() {}
 
@@ -712,7 +716,7 @@ function OriginLine({
       <p className="text-sm text-slate-600">
         {origin.kind === 'service'
           ? formatString(strings['plant.service.origin_service'], { api: origin.api })
-          : strings['plant.service.origin_example']}
+          : null}
       </p>
       {onAskService !== undefined ? (
         <button
@@ -740,6 +744,13 @@ function OriginLine({
 
 /** The pending line, or the error panel with the code in plain words and the raw code. */
 function StatusPanel({ status }: { status: ServiceStatus }) {
+  if (status.kind === 'not_asked') {
+    return (
+      <p data-testid="plant-service-not-asked" className="text-sm text-slate-500">
+        {strings['plant.service.not_asked']}
+      </p>
+    )
+  }
   if (status.kind === 'pending') {
     return (
       <p data-testid="plant-service-pending" className="text-sm text-slate-500">
@@ -971,12 +982,18 @@ export function PlantView(props: PlantViewProps) {
       </h2>
       <p className="mt-1 text-sm text-slate-600">{strings['plant.rule']}</p>
 
-      {set.example_data ? (
+      {set.example_data && status === undefined ? (
         <div role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
           <p data-testid="plant-example-banner" className="text-sm text-amber-900">
             {strings['example.banner']}
           </p>
         </div>
+      ) : null}
+
+      {status !== undefined && status.kind !== 'failed' ? (
+        <p data-testid="plant-example-inputs" className="mt-3 text-sm text-slate-600">
+          {strings['plant.q.example_inputs']}
+        </p>
       ) : null}
 
       <OriginLine origin={origin} onAskService={onAskService} onBackToExample={onBackToExample} />
@@ -1254,12 +1271,15 @@ export function PlantScreenView({
   }
   const rain = rainControlOf(state, apiBase, read, dispatch)
   if (state.mode === 'example' || service === null) {
-    // PROPOSED (fix round 1): a request that cannot be read is not offered to the service.
+    // D251 read strictly: no example answer is shown before the service has
+    // answered; the questions and "Ask the service" only. A request that
+    // cannot be read is not offered to the service (fix round 1).
+    const set: PlantAnswerSet = { example_data: rawPlantRequest.example_data, answers: [] }
     return (
       <PlantView
-        set={plantExamples}
-        price={state.price}
-        onPrice={(price) => dispatch({ type: 'price', price, key: null })}
+        set={set}
+        price={null}
+        status={{ kind: 'not_asked' }}
         onAskService={read.readable ? () => dispatch({ type: 'ask' }) : undefined}
         rain={rain}
         {...handlers}
