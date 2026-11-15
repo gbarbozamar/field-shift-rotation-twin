@@ -11,26 +11,23 @@ How a phase reaches an engine is option (b), "a calendar the runner moves"
 (D132; issue #18, 00:57 UTC): EP1, EP3 and EP5 keep their signatures (D56)
 and get the calendar of the phase. Lane L1 lays the phases out in
 ``engine/calendar/repeat.py`` as ``phase_calendar(calendar, p)`` and
-``list_phases(calendar)`` (issue #221). The runner finds both by name
-(``api.engines.discover_engine_functions``) and holds no copy of their rule:
+``list_phases(calendar)`` (issue #221), and names the components that cross
+into a phase's first year with ``components_crossing_phase(calendar, p)``.
+The runner finds them by name (``api.engines.discover_engine_functions``)
+and holds no copy of their rules, the crossing rule included:
 
-- both found: phase 0 is the calendar of EP2 itself, unchanged; every other
-  phase ``p`` is what ``phase_calendar(calendar, p)`` returns, checked
-  (``phase_calendars``) and used as returned. A ``ValueError`` from it is a
-  defect and propagates (``500``): D141 gives a rule for every phase, so no
-  phase is refused;
+- ``phase_calendar`` and ``list_phases`` found: phase 0 is the calendar of EP2
+  itself, unchanged; every other phase ``p`` is what
+  ``phase_calendar(calendar, p)`` returns, checked (``phase_calendars``) and
+  used as returned. Whatever it raises, a ``ValueError`` included, is a
+  defect and propagates (``500``): under D141 no phase is refused;
 - either one not found (an older engine tree): phase 0 alone, and its
   calendar module says so (PROPOSED);
 - the start month missing: phase 0 alone, and its calendar module says how
-  many phases were not run (``list_phases`` counts them).
-
-D141 (issue #77, amends D133): each phase is laid out as the first one is. A
-component that spans the start of the phase's first year keeps its declared
-dates; the part before the record falls outside the record, inside it the
-component is present from the first day of the record, and whatever would
-need the part before the record stays missing with its reason. The runner
-counts those components on the calendar of EP2 (``crossing_components``) and
-writes the count in the calendar module of the phase, never an identifier.
+  many phases were not run (``list_phases`` counts them);
+- ``components_crossing_phase`` found: the calendar module of phase ``p``
+  gives how many components it names (a count, never an identifier);
+  not found: no count is written.
 
 Pure functions: no file, no network, no clock. This module imports nothing
 from ``engine/`` (the route depends on interfaces only).
@@ -48,7 +45,6 @@ from contracts.inputs import RotationCalendar
 __all__ = [
     "Phase",
     "PhaseFunctions",
-    "crossing_components",
     "first_phase",
     "phase_calendars",
     "scenario_id",
@@ -57,7 +53,6 @@ __all__ = [
 _DAY_BEFORE_LEAP_DAY = 28
 _FEBRUARY = 2
 _LEAP_DAY = 29
-_FIRST_DAY = 1
 
 # PROPOSED: the identifier of phase p (0 to N - 1) is ``phase_{p + 1}``.
 SCENARIO_PREFIX = "phase_"
@@ -79,11 +74,11 @@ PHASE_FUNCTIONS_NOT_FOUND = (
     + " were not found, so the phases of decision D109 are not laid out: only "
     "{phase} (the calendar unchanged) is run"
 )
-CROSSING_D141 = (
-    "{count} component(s) start before the first agricultural year of this "
-    "phase and end inside it or on a missing date; laid out as the first phase "
-    "is (D141, issue #77): what would need the part before the record is "
-    "missing with its reason"
+CROSSING_COUNTED = (
+    "{count} component(s) of the calendar cross into the first agricultural "
+    "year of this phase, as {name}.components_crossing_phase names them; this "
+    "phase runs on the calendar {name}.phase_calendar returned, used as "
+    "returned (D141 of issue #77: no phase is refused)"
 )
 LEAP_DAYS_MOVED = (
     "{count} date(s) on 29 February became 28 February when the calendar was "
@@ -98,22 +93,26 @@ def scenario_id(index: int) -> str:
 
 @dataclass(frozen=True)
 class PhaseFunctions:
-    """The two functions that lay out the phases, with the names and signatures
+    """The functions that lay out the phases, with the names and signatures
     agreed on issue #221: ``phase_calendar(calendar, p) -> RotationCalendar``
-    and ``list_phases(calendar) -> list[int]``."""
+    and ``list_phases(calendar) -> list[int]``; and, when lane L1 has it,
+    ``components_crossing_phase(calendar, p) -> list[str]``."""
 
     phase_calendar: Callable[[RotationCalendar, int], RotationCalendar]
     list_phases: Callable[[RotationCalendar], list[int]]
     name: str  # where they live, for the detail texts
+    components_crossing_phase: Callable[[RotationCalendar, int], list[str]] | None = (
+        None
+    )
 
 
 @dataclass(frozen=True)
 class Phase:
     """One phase of the rotation: the calendar it runs on, and its notes.
 
-    ``first_ag_year`` is the agricultural year (C5.3) of the calendar EP2 built
-    that comes first in this phase, ``None`` without the start month.
-    ``notes`` are details for the calendar module of the phase.
+    ``first_ag_year`` is the agricultural year (C5.3) in which the calendar of
+    the phase starts, ``None`` without the start month. ``notes`` are details
+    for the calendar module of the phase.
     """
 
     index: int
@@ -126,24 +125,6 @@ class Phase:
 def _ag_year_of(day: dt.date, start_month: int) -> int:
     """The agricultural year a day belongs to, by the year in which it begins."""
     return day.year if day.month >= start_month else day.year - 1
-
-
-def crossing_components(calendar: RotationCalendar, p: int) -> int:
-    """How many components of the calendar start before the first day of its
-    agricultural year ``p`` and end on or after it, or on a missing date: the
-    components that span the start of phase ``p``'s first year (D141). Zero
-    for phase 0 and without the start month. Only counted, for the note."""
-    month = calendar.ag_year_start.month
-    if p == 0 or month is None:
-        return 0
-    cut = dt.date(_ag_year_of(calendar.start_date, month) + p, month, _FIRST_DAY)
-    return sum(
-        1
-        for c in calendar.components
-        if c.start.date is not None
-        and c.start.date < cut
-        and (c.end.date is None or c.end.date >= cut)
-    )
 
 
 def first_phase(calendar: RotationCalendar, notes: tuple[str, ...] = ()) -> Phase:
@@ -159,20 +140,22 @@ def first_phase(calendar: RotationCalendar, notes: tuple[str, ...] = ()) -> Phas
     return Phase(0, scenario_id(0), first_ag_year, calendar, notes)
 
 
+def _edges(component: Any) -> list[dt.date | None]:
+    """The dates of a component in a fixed order: start, end, then each
+    period's start and end."""
+    dates = [component.start.date, component.end.date]
+    for period in component.periods:
+        dates += [period.start.date, period.end.date]
+    return dates
+
+
 def _leap_days_moved(calendar: RotationCalendar, moved: RotationCalendar) -> int:
     """Dates on 29 February in the calendar that are 28 February in the moved
     one, matched by component identifier (and period position)."""
-
-    def edges(c: Any) -> list[dt.date | None]:
-        dates = [c.start.date, c.end.date]
-        for period in c.periods:
-            dates += [period.start.date, period.end.date]
-        return dates
-
-    after = {c.component_id: edges(c) for c in moved.components}
+    after = {c.component_id: _edges(c) for c in moved.components}
     count = 0
     for component in calendar.components:
-        for old, new in zip(edges(component), after.get(component.component_id, [])):
+        for old, new in zip(_edges(component), after.get(component.component_id, [])):
             if (
                 old is not None
                 and new is not None
@@ -183,12 +166,24 @@ def _leap_days_moved(calendar: RotationCalendar, moved: RotationCalendar) -> int
     return count
 
 
+def _fills_a_missing_date(calendar: RotationCalendar, moved: RotationCalendar) -> bool:
+    """Whether the moved calendar has a date where the calendar's is missing,
+    matched by component identifier (and period position). A date present in
+    the calendar may become missing (the phase rule may leave it missing with
+    its reason); a missing one never becomes present."""
+    after = {c.component_id: _edges(c) for c in moved.components}
+    return any(
+        old is None and new is not None
+        for component in calendar.components
+        for old, new in zip(_edges(component), after.get(component.component_id, []))
+    )
+
+
 def _what_moving_keeps(calendar: RotationCalendar) -> tuple:
     """Everything of a calendar but its dates: contract, example mark,
     identifiers, start month, feasibility, and the components as a multiset
     of (identifier, crop, period types). A phase calendar changes none of
-    them. Which dates are present may change: the phase rule may leave a
-    date missing with its reason."""
+    them."""
 
     def kept(c: Any) -> tuple:
         return (c.component_id, c.crop_id, tuple(q.period_type for q in c.periods))
@@ -205,6 +200,49 @@ def _what_moving_keeps(calendar: RotationCalendar) -> tuple:
     )
 
 
+def _checked_phase(
+    calendar: RotationCalendar,
+    moved: object,
+    p: int,
+    first_ag_year: int,
+    start_month: int,
+    name: str,
+) -> tuple[RotationCalendar, int]:
+    """What ``phase_calendar(calendar, p)`` returned, checked; with the
+    agricultural year in which it starts. Any failed check is a defect of
+    the phase function: ``TypeError`` (``500``)."""
+    function = f"{name}.phase_calendar"
+    if not isinstance(moved, RotationCalendar):
+        raise TypeError(
+            f"{function} returned {type(moved).__name__}, not RotationCalendar"
+        )
+    moved = RotationCalendar.model_validate(moved.model_dump())
+    if _what_moving_keeps(moved) != _what_moving_keeps(calendar):
+        raise TypeError(f"{function} changed more than the dates of the calendar")
+    if _fills_a_missing_date(calendar, moved):
+        raise TypeError(f"{function} gave a date the calendar has missing")
+    year = _ag_year_of(moved.start_date, start_month)
+    if year != first_ag_year + p:
+        raise TypeError(
+            f"{function} returned a calendar for phase {p} that does not start "
+            f"in agricultural year {p} of the calendar"
+        )
+    return moved, year
+
+
+def _crossing_count(functions: PhaseFunctions, calendar: RotationCalendar, p: int):
+    """How many components lane L1 names as crossing into year ``p``, or
+    ``None`` when it has no such function."""
+    if functions.components_crossing_phase is None:
+        return None
+    named = functions.components_crossing_phase(calendar, p)
+    if isinstance(named, str | bytes) or not isinstance(named, Sequence):
+        raise TypeError(
+            f"{functions.name}.components_crossing_phase returned no sequence"
+        )
+    return len(named)
+
+
 def phase_calendars(
     calendar: RotationCalendar, functions: PhaseFunctions | None
 ) -> tuple[Phase, ...]:
@@ -214,8 +252,10 @@ def phase_calendars(
     when they were not found: phase 0 alone, with a note. Phase 0 is never
     asked of them. Whatever they raise propagates (``500``), a
     ``ValueError`` included. What they return is checked: a list of phases
-    starting at 0, and a calendar that loads into the contract and keeps
-    everything of the calendar but its dates; anything else is a
+    0 to N - 1; for phase ``p``, a calendar that loads into the contract,
+    keeps everything of the calendar but its dates, gives no date the
+    calendar has missing, and starts in the calendar's agricultural year
+    ``p`` (so no phase is misaligned or repeated). Anything else is a
     ``TypeError``.
     """
     if not isinstance(calendar, RotationCalendar):
@@ -232,7 +272,8 @@ def phase_calendars(
     if not indices or indices != list(range(len(indices))):
         raise TypeError(f"{functions.name}.list_phases returned no phases 0 to N - 1")
     first = first_phase(calendar)
-    if first.first_ag_year is None:
+    start_month = calendar.ag_year_start.month
+    if first.first_ag_year is None or start_month is None:
         notes: tuple[str, ...] = ()
         if len(indices) > 1:
             others = len(indices) - 1
@@ -242,25 +283,22 @@ def phase_calendars(
         return (first_phase(calendar, notes),)
     phases = [first]
     for p in indices[1:]:
-        moved = functions.phase_calendar(calendar, p)
-        if not isinstance(moved, RotationCalendar):
-            raise TypeError(
-                f"{functions.name}.phase_calendar returned {type(moved).__name__}, "
-                "not RotationCalendar"
-            )
-        moved = RotationCalendar.model_validate(moved.model_dump())
-        if _what_moving_keeps(moved) != _what_moving_keeps(calendar):
-            raise TypeError(
-                f"{functions.name}.phase_calendar changed more than the dates of "
-                "the calendar"
-            )
+        moved, year = _checked_phase(
+            calendar,
+            functions.phase_calendar(calendar, p),
+            p,
+            first.first_ag_year,
+            start_month,
+            functions.name,
+        )
         notes_of_phase = []
-        crossing = crossing_components(calendar, p)
+        crossing = _crossing_count(functions, calendar, p)
         if crossing:
-            notes_of_phase.append(CROSSING_D141.format(count=crossing))
+            notes_of_phase.append(
+                CROSSING_COUNTED.format(count=crossing, name=functions.name)
+            )
         leap_days = _leap_days_moved(calendar, moved)
         if leap_days:
             notes_of_phase.append(LEAP_DAYS_MOVED.format(count=leap_days))
-        year = first.first_ag_year + p
         phases.append(Phase(p, scenario_id(p), year, moved, tuple(notes_of_phase)))
     return tuple(phases)
