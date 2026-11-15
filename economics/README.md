@@ -149,3 +149,58 @@ def choose_rotation(
 2. **A cost of the limit when a non-meeting margin is missing.** Fix round 1 (PROPOSED): any missing margin among the rotations that do not meet the limit makes the cost missing (`MISSING_INPUT`), even when a known one already beats the chosen rotation, because the missing one could be larger and a lower bound would travel unmarked. Whether a lower bound, marked as such, would be more useful is for the lead developer.
 3. **Reason codes.** `NOT_COMPUTABLE` for an exact tie and `NOT_APPLICABLE` for `none_meets` reuse C3.2 codes; whether a dedicated code is wanted is for the lead developer.
 4. **Which margin ranks.** The caller picks the average or a kind of year; the rule for "every kind" strictness does not change the margin used.
+
+# economics: the tipping price of soybean
+
+Status: **PROPOSED** (blueprint section 3.7). Built by unit `l2/tipping-price` (S-016).
+
+`economics/tipping.py` holds one public pure function, `find_tipping_price`, that says at which soybean price the answer of `choose_rotation` changes: the nearest price above today's declared price and the nearest below, inside a price range the user declares, each with the rotation (or the answer) that takes over and how far today's price is from it, in percent. A tipping price, never a forecast. Where no price in the declared range changes the answer, it says exactly that.
+
+No network call, no price, range or threshold in the code: today's price comes from the declared facts and the range is declared by the user. The engines are reused, never copied. Every number in `test_tipping.py` is invented test data, from no source; every expected value there is worked out by hand in a comment and is PROPOSED.
+
+`decision/functions.py` has a `tipping_point` of its own; it is not used here. It brackets between the admitted values of one uncertain input over the scenario ids of a `ResultsTable`, not over a price, and that module is being rewritten (issue #304), so this module does not import `decision/`.
+
+## Signature (PROPOSED)
+
+```python
+Direction = Literal["up", "down"]
+MARGINS_OF = ("average", *KINDS_OF_YEAR)
+
+def find_tipping_price(
+    options: Sequence[TippingOption],
+    facts: EconomicFacts,
+    year_counts: Mapping[str, int | None] | None,
+    soybean_crop_ids: Collection[str],
+    price_range: PriceRange,
+    strictness: Strictness,
+    margin_of: str = "average",
+) -> TippingPrice
+```
+
+- `TippingOption` (frozen dataclass): `rotation_id`, `years` (as `compute_rotation_margin` takes them), `limit` (a `LimitAssessment`; the limit does not depend on the price).
+- `PriceRange` (frozen dataclass): `low`, `high` (stored as floats), `unit` (`"USD t-1"`). Declared by the user.
+- `TippingPoint` (frozen dataclass): `direction`, `price` (float or `None`), `unit`, `takes_over` (the `rotation_id` chosen just past the price, or `None` when the answer there is `none_meets` or `not_resolved`), `answer_after` (the `Decision.answer` just past the price, or `None` when `price` is `None`), `distance_percent`, `reason`, `detail`.
+- `TippingPrice` (frozen dataclass): `today` (float or `None`), `unit`, `price_range`, `decision` (the `Decision` at today's price), `up`, `down`, `reason`, `detail` (set when both points are missing for one shared cause).
+- `margin_of`: the margin the ranking reads, `"average"` or one kind of `KINDS_OF_YEAR`.
+
+## Rules (PROPOSED)
+
+- The margin at a price `p`: a copy of `facts` (through `model_dump` and `model_validate`; the input is never changed) in which every crop of `soybean_crop_ids` has price `p`, a `DECLARED` value whose source says it is a price tried by the search (the contract admits only `DECLARED`), then `compute_rotation_margin` and the margin of `margin_of`. The answer at a price: `choose_rotation` on those margins and the options' limits.
+- Today's price: the price of the named crops in `facts`. Every named crop must be a grain crop present in the facts; their present prices must be equal (one soybean price is asked). If any named crop has no price, today's price is missing: `today` `None`, `up` and `down` missing `MISSING_INPUT` with a detail naming the crop and the reason its price carries; `reason` and `detail` of the result say the same.
+- Today's price outside `[low, high]`: not a `ValueError`; `up` and `down` missing `NOT_APPLICABLE`, the detail saying today's price is outside the declared range.
+- The margin of each rotation is linear in `p` (price times yield minus cost, summed and averaged): its slope and intercept come from two evaluations at `low` and `high`, without rounding or tolerance. A margin missing at either is missing for a reason other than the price: `up` and `down` missing `MISSING_INPUT`, the detail naming each such rotation and the reason its margin carries.
+- Breakpoints: the prices strictly inside `(low, high)` where two rotations' margin lines cross. The answer is constant between breakpoints.
+- Up: the smallest breakpoint at or above today's price where `choose_rotation`, evaluated at the middle of that breakpoint and the next one (or `high`), gives a different `(answer, chosen)` than at today's price. Down: the largest at or below today's price, symmetric, evaluated at the middle of the breakpoint before (or `low`) and it. The answer is never evaluated at a breakpoint itself, where an exact tie is `not_resolved` by design.
+- Today's price exactly on a breakpoint (today's answer is then a tie, not resolved): that breakpoint counts in both directions, distance 0 (PROPOSED, the option easiest to undo; the brief says only "above" and "below").
+- No breakpoint changes the answer in a direction: `price` `None`, reason `NOT_APPLICABLE`, detail `"no price in this range changes the answer"` followed by the range, for example `(100.0 to 800.0 USD t-1)`. Never a default zero.
+- `distance_percent = (price - today) / today * 100`, negative below today. Today's price zero: `None`, reason `NOT_COMPUTABLE` (the price stays set).
+- The decision at today's price need not be `chosen`: the tipping points are computed the same way and say what `choose_rotation` says past each breakpoint. The limit does not depend on the price, so `none_meets` stays `none_meets`.
+- `ValueError` on structural misuse: `soybean_crop_ids` empty, a text, or holding a non-text; a named crop not in the facts, or not a grain crop (a cover or declared-margin crop); named crops with different present prices; `margin_of` not in `MARGINS_OF`; `price_range` not a `PriceRange`; a `PriceRange` with `low >= high`, a negative or non-finite bound, a boolean or a non-number, or another unit. `options`, `year_counts` and `strictness` are checked by `compute_rotation_margin` and `choose_rotation`.
+- Inputs are not mutated; the results are frozen.
+
+## OPEN
+
+1. **`answer_after` when there is no tipping price.** The brief types it `Answer`; here it is `None` whenever `price` is `None` (nothing lies past a price that does not exist). Whether it should carry today's answer instead is for the interface developer.
+2. **A range on the margin.** As for `choose_rotation`, no range travels, so a breakpoint is exact; a range on prices or yields would make the tipping price a range too.
+3. **One named crop with a price and another without.** Today's price is missing (PROPOSED); whether the present one should be used is for the interface developer.
+4. **The cost of the limit at the tipping price.** Not computed (out of scope).
