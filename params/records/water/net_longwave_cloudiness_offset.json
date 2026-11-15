@@ -1,0 +1,16 @@
+{
+  "id": "net_longwave_cloudiness_offset",
+  "scope": {},
+  "value": 0.35,
+  "unit": "dimensionless (not printed)",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 3, Eq. 39, `x0490e18.gif` (check sheet row 180, block B7)",
+    "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «The effect of cloudiness is expressed by (1.35 Rs/Rso - 0.35)» Value as printed: 0.35."
+}

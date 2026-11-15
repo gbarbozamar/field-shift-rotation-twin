@@ -2,7 +2,7 @@
 
 Where crop and rotation parameters are stored, each with its unit, its uncertainty range, its citation, who transcribed it and the person who checked it.
 
-It holds the layout, the record format, the check that rejects a malformed record, and in `records/` the first parameters: 93 records, all checked or declared by the lead developer under D34 and D66: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), and in `records/computed_c/` the 67 records of the computed `C` (unit l0/c-records; D129, D131, D142 to D145).
+It holds the layout, the record format, the check that rejects a malformed record, and in `records/` the first parameters: 138 records, all checked or declared by the lead developer under D34 and D66: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), in `records/computed_c/` the 67 records of the computed `C` (unit l0/c-records; D129, D131, D142 to D145), and in `records/water/` the 45 water records of FAO-56 (unit l0/water-records-signed): the 31 constants of the reference evapotranspiration, the two bounds of PC-4 (D82) and the 12 basal crop coefficients of Table 17.
 
 > **Status: PROPOSED.** The record format, the scope keys and the test cases below were written by a builder session (blueprint section 3.7). They take effect only when a person approves the pull request. Items marked `OPEN` need an answer from a person.
 
@@ -12,7 +12,7 @@ Values, ranges and citations are science class (blueprint sections 3.5 and 3.6),
 
 | Path | Content |
 |---|---|
-| `records/` | The catalogue: one JSON file per parameter record. Today: the records of the demonstration point La Estanzuela |
+| `records/` | The catalogue: one JSON file per parameter record. Today: the records of the demonstration point La Estanzuela, of the computed `C` (`computed_c/`) and of the water engine (`water/`) |
 | `examples/` | Two placeholder records that show the format. Never read as parameters |
 | `catalogue.py` | The record checks. Standard library only |
 | `test_layout.py` | The acceptance test. It also checks the whole folder: every file under `records/`, and that no record file lies anywhere else |

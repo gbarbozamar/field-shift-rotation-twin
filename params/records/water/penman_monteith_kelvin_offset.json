@@ -1,0 +1,16 @@
+{
+  "id": "penman_monteith_kelvin_offset",
+  "scope": {},
+  "value": 273.0,
+  "unit": "K (not printed; T in [°C])",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 2, Eq. 6 (check sheet row 147, block B7)",
+    "url": "https://www.fao.org/4/X0490E/x0490e06.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image of Eq. 6: «T+273» Value as printed: 273. The equation images were read by the AI pre-check of 14 November 2026 (forms F17, F20, F22, F27, F28 of the validation package); compare with the image at the locator."
+}

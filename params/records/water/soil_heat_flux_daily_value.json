@@ -1,0 +1,16 @@
+{
+  "id": "soil_heat_flux_daily_value",
+  "scope": {},
+  "value": 0.0,
+  "unit": "MJ m-2 day-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 3, «Soil heat flux», daily case (check sheet row 182, block B7)",
+    "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Gday » 0» y «it may be ignored» Value as printed: ≈ 0. The source prints «≈ 0» and says it may be ignored for day periods; the value 0 is read from that."
+}

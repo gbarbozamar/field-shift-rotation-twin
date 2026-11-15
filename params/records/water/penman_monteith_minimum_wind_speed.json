@@ -1,0 +1,16 @@
+{
+  "id": "penman_monteith_minimum_wind_speed",
+  "scope": {},
+  "value": 0.5,
+  "unit": "m s-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 3, end of «Missing wind speed data» (check sheet row 186, block B7)",
+    "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «wind speed at 2 m, u2, should be limited to about u2 ≥ 0.5 m/s when used in the ETo equation (Equation 6)» Value as printed: 0.5. Decision PC-4: lane L1 applies this bound where Eq. 6 is used. Identifier PROPOSED; not yet read by EP3."
+}

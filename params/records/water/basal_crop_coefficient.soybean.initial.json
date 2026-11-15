@@ -1,0 +1,19 @@
+{
+  "id": "basal_crop_coefficient",
+  "scope": {
+    "crop": "soybean",
+    "stage": "initial"
+  },
+  "value": 0.15,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, Table 17",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: Legumes group row «e. Lugumes (Leguminosae) | 0.15 | 1.10 | 0.50» (Kcb ini of the group); row «Soybeans | | 1.10 | 0.30». Column headers (images x0490e2n/o/p.gif): «Kcb ini», «Kcb mid», «Kcb end». Decision USER-AR: transferred reference, with climatic adjustment (Eq. 70) and sensitivity; no local calibration claimed. Scope key stage is in params/README.md, but EP3 reads one value per crop today (EXPOSURE.md OPEN 4). Kcb ini from the group row of legumes (the Soybeans row leaves it blank)."
+}

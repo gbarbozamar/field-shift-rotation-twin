@@ -1,0 +1,16 @@
+{
+  "id": "inverse_relative_distance_offset",
+  "scope": {},
+  "value": 1.0,
+  "unit": "dimensionless (not printed)",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 3, Eq. 23, image x0490e0w.gif",
+    "url": "https://www.fao.org/4/X0490E/x0490e07.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «dr = 1 + 0.033 cos(2π J/365)» No row of the check sheet holds this term; it was read in the image of Eq. 23 by the AI pre-check (form F27)."
+}
