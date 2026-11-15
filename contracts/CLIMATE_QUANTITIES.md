@@ -108,7 +108,7 @@ The entries below are the list; this table repeats them. The status of a quantit
 | `CQ4` | `dew_point_temperature_2m` | Humidity of the air, as dew point | `degC` | 2 m | `OBSERVED` | N2 | `T2MDEW` (D25) | DECIDED (D25) |
 | `CQ5` | `wind_speed_2m` | Mean wind speed of the day | `m s-1` | 2 m | `OBSERVED` | N2 | `WS2M` (D26) | DECIDED (D26) |
 | `CQ6` | `solar_radiation` | Radiation input of the reference evapotranspiration | `MJ m-2 day-1` (community AG, D28) | none | `OBSERVED` | N2 | `ALLSKY_SFC_SW_DWN` (D27) | DECIDED (D27) |
-| `CQ7` | OPEN | Relative saturation of the root zone, 0 to 100 cm, of MERRA-2 (D114); shown as a percentile of the day of the year (D113); context and contrast only (D107) | OPEN | 0 to 100 cm (D114) | OPEN (O15) | Context and contrast of the water axis (D107); no method of N1 to N3 | `GWETROOT` (D107) | SOURCE DECIDED (D107, D113, D114); identifier, unit string and label OPEN |
+| `CQ7` | `OPEN` | Relative saturation of the root zone, 0 to 100 cm, of MERRA-2 (D114); shown as a percentile of the day of the year (D113); context and contrast only (D107) | `OPEN` | 0 to 100 cm (D114) | OPEN (O15) | Context and contrast of the water axis (D107); no method of N1 to N3 | `GWETROOT` (D107) | SOURCE DECIDED (D107, D113, D114); identifier, unit string and label OPEN |
 
 Five quantities are decided (`CQ1`, `CQ1b`, `CQ4`, `CQ5`, `CQ6`) and two are proposed (`CQ2`, `CQ3`). None of `CQ1` to `CQ6` is open. `CQ7` has a decided source and a decided meaning, and its identifier, unit string and label are `OPEN` (O15). The candidates that were not chosen (`relative_humidity_2m`, `specific_humidity_2m`, `wind_speed_10m`) do not enter the list.
 
