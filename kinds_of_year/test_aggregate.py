@@ -243,7 +243,7 @@ def water(time_basis, ag_year, value=0.5):
 def test_series_from_annual_soil_loss():
     series = series_from_results([annual(2001, 1.5), annual(2002, None)])
     assert series == {
-        2001: YearValue(value=1.5, reason=None, detail=None),
+        2001: YearValue(value=1.5, reason=None, detail=None, assumption=True),
         2002: YearValue(
             value=None, reason="NOT_COMPUTABLE", detail="invented test case"
         ),
@@ -252,7 +252,134 @@ def test_series_from_annual_soil_loss():
 
 def test_series_from_ag_year_water():
     series = series_from_results([water("ag_year", 2001)])
-    assert series == {2001: YearValue(value=0.5, reason=None, detail=None)}
+    assert series == {
+        2001: YearValue(value=0.5, reason=None, detail=None, assumption=True)
+    }
+
+
+def test_series_from_results_copies_the_source():
+    item = AnnualSoilLoss(
+        indicator="soil_loss",
+        direction="lower_is_better",
+        value=1.5,
+        unit=UNIT_SOIL_LOSS_ANNUAL,
+        range_missing={"reason": "NOT_AVAILABLE"},
+        provenance="DERIVED",
+        source="invented test source",
+        ag_year=2001,
+    )
+    assert series_from_results([item]) == {
+        2001: YearValue(
+            value=1.5,
+            reason=None,
+            detail=None,
+            source="invented test source",
+            assumption=False,
+        )
+    }
+
+
+# --- fix round 1 ---------------------------------------------------------------
+
+
+def test_kind_without_classified_year_names_the_unclassified_years():
+    kinds = {year: k for year, k in SIX_KINDS.items() if k.kind != LA_NINA}
+    kinds[2003] = no_kind()
+    series = {year: SIX_VALUES[year] for year in (*kinds, 2006)}
+    result = mean_by_kind(INDICATOR, UNIT, series, kinds)
+    la_nina = result.by_kind[LA_NINA]
+    assert la_nina.value is None
+    assert la_nina.reason == "NO_COVERAGE"
+    assert la_nina.n_years == 0
+    assert la_nina.detail == (
+        "no agricultural year of the record is classified la_nina; "
+        "agricultural year(s) 2003, 2006 have no kind of year"
+    )
+    assert result.unclassified_years == (2003, 2006)
+
+
+def test_keys_of_kinds_must_be_int_years():
+    for key in (True, "2001", 2001.0):
+        with pytest.raises(ValueError):
+            mean_by_kind(INDICATOR, UNIT, SIX_VALUES, {key: kind(EL_NINO)})
+
+
+def test_missing_input_detail_keeps_each_years_own_detail():
+    series = dict(SIX_VALUES)
+    series[2003] = absent("MISSING_INPUT", "precipitation of June missing")
+    series[2006] = absent("NOT_COMPUTABLE")
+    la_nina = mean_by_kind(INDICATOR, UNIT, series, SIX_KINDS).by_kind[LA_NINA]
+    assert "2003 (MISSING_INPUT: precipitation of June missing)" in la_nina.detail
+    assert "2006 (NOT_COMPUTABLE)" in la_nina.detail
+
+
+def test_present_year_value_carries_no_detail_and_missing_no_provenance():
+    with pytest.raises(ValueError):
+        YearValue(value=1.0, reason=None, detail="a detail")
+    with pytest.raises(ValueError):
+        YearValue(value=None, reason="NOT_COMPUTABLE", detail=None, source="s")
+    with pytest.raises(ValueError):
+        YearValue(value=None, reason="NOT_COMPUTABLE", detail=None, assumption=True)
+
+
+def test_kind_mean_carries_sources_and_assumption():
+    series = {
+        2001: YearValue(1.0, None, None, source="invented source b"),
+        2002: YearValue(2.0, None, None, source="invented source a"),
+        2004: YearValue(3.0, None, None, source="invented source b"),
+        2005: YearValue(6.0, None, None, assumption=True),
+    }
+    result = mean_by_kind(INDICATOR, UNIT, series, SIX_KINDS)
+    assert result.by_kind[EL_NINO].sources == ("invented source b",)
+    assert result.by_kind[EL_NINO].assumption is False
+    assert result.by_kind[NEUTRAL].sources == ("invented source a",)
+    assert result.by_kind[NEUTRAL].assumption is True
+    assert result.record.sources == ("invented source a", "invented source b")
+    assert result.record.assumption is True
+    assert result.by_kind[LA_NINA].sources == ()
+    assert not hasattr(result.record, "range")
+
+
+def a_mean(**changes):
+    fields = {
+        "value": 1.0,
+        "unit": UNIT,
+        "n_years": 1,
+        "ag_years": (2001,),
+        "reason": None,
+        "detail": None,
+    }
+    fields.update(changes)
+    return KindMean(**fields)
+
+
+def test_means_by_kind_checks_its_parts():
+    good = {name: a_mean() for name in KINDS_OF_YEAR}
+    MeansByKind(INDICATOR, UNIT, good, a_mean(), ())
+    with pytest.raises(ValueError):
+        MeansByKind(INDICATOR, UNIT, {**good, EL_NINO: 1.0}, a_mean(), ())
+    with pytest.raises(ValueError):
+        MeansByKind(INDICATOR, UNIT, {**good, EL_NINO: a_mean(unit="x")}, a_mean(), ())
+    with pytest.raises(ValueError):
+        MeansByKind(INDICATOR, UNIT, good, a_mean(unit="x"), ())
+    for years in ((2002, 2001), (2001, 2001), (True,), [2001]):
+        with pytest.raises(ValueError):
+            MeansByKind(INDICATOR, UNIT, good, a_mean(), years)
+
+
+def test_result_supports_asdict_and_deepcopy():
+    result = mean_by_kind(INDICATOR, UNIT, SIX_VALUES, SIX_KINDS)
+    as_dict = dataclasses.asdict(result)
+    assert set(as_dict["by_kind"]) == set(KINDS_OF_YEAR)
+    assert copy.deepcopy(result) == result
+
+
+def test_kind_mean_checks_its_years():
+    for years in ((2001, 2001), (True,), (2002, 2001)):
+        with pytest.raises(ValueError):
+            a_mean(n_years=len(years), ag_years=years)
+    with pytest.raises(ValueError):
+        a_mean(n_years=0, ag_years=())
 
 
 def test_series_from_results_refuses_rotation_basis_and_mixtures():
@@ -355,8 +482,6 @@ def test_inputs_are_not_mutated_and_results_are_frozen():
         result.unit = "other"
     with pytest.raises(dataclasses.FrozenInstanceError):
         result.record.value = 0.0
-    with pytest.raises(TypeError):
-        result.by_kind[EL_NINO] = result.record
     with pytest.raises(dataclasses.FrozenInstanceError):
         present(1.0).value = 2.0
 
