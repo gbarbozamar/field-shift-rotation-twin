@@ -114,6 +114,18 @@ function reasonPhrase(missing: MissingPart): string {
  * ribbon. Pure: it invents no phrase and fills no gap.
  */
 export function missingPatternText(what: string, missing: MissingPart): string {
+  // Same render as missingPattern (the seam's name for it); two names, one
+  // pattern, so every absence in the interface reads identically.
+  return missingPattern(what, missing)
+}
+
+/**
+ * The missing-value pattern of C3.1 for a missing part that travels outside a
+ * value item (a whole result, a dated event): the supplied pattern with the
+ * reason phrase of its reason code. Exported so other parts of the interface
+ * render an absence with exactly the wording of the value display.
+ */
+export function missingPattern(what: string, missing: MissingPart): string {
   return formatString(strings['missing.pattern'], {
     what,
     [REASON_PHRASE_PLACEHOLDER]: reasonPhrase(missing),
@@ -125,7 +137,7 @@ export function ValueDisplay({ what, item }: ValueDisplayProps) {
     return (
       <div className="text-sm leading-5">
         <p data-testid="missing-line" className="italic text-slate-500">
-          {missingPatternText(what, item.missing)}
+          {missingPattern(what, item.missing)}
         </p>
       </div>
     )
