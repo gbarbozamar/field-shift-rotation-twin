@@ -185,8 +185,12 @@ function record(value: unknown, what: string): Record<string, unknown> {
   return value
 }
 
-/** A reason code and its optional detail, from the reason and detail fields. */
-function missingPart(reason: unknown, detail: unknown, what: string): MissingPart {
+/**
+ * A reason code and its optional detail, from the reason and detail fields.
+ * Exported for the rain-stress factor of a request (plantRoute.ts, fix round
+ * 1 of S-021).
+ */
+export function missingPart(reason: unknown, detail: unknown, what: string): MissingPart {
   if (!oneOf(reason, REASON_CODES)) {
     throw new Error(`${what}:reason-not-a-code`)
   }
@@ -770,6 +774,64 @@ export function answerAtPrice(tipping: TippingPrice, price: number): AnswerAtPri
   }
   const beyond = point.direction === 'up' ? price > point.price : price < point.price
   return beyond ? { kind: 'past', point } : { kind: 'same', point }
+}
+
+/**
+ * The rain-stress part of one answer (S-021, PROPOSED): the applied form
+ * (RainStressApplied: the declared factor, its unit, the detail, the label
+ * and whether it was applied) or the missing form (RainStressMissingOut: the
+ * reason, the detail, the label); null when no factor was asked.
+ *
+ * Read for the answer of one service request only (plantRoute.ts); the
+ * example set does not read it, so parsePlantAnswer is unchanged. Pure:
+ * value in, typed part out, or an Error with a technical code.
+ */
+export type RainStressPart =
+  | { kind: 'applied'; factor: number; unit: string; detail: string; label: string; applied: boolean }
+  | { kind: 'missing'; missing: MissingPart; detail: string; label: string }
+
+export function parseRainStress(value: unknown, what = 'invalid-rain-stress'): RainStressPart | null {
+  if (value === null) {
+    return null
+  }
+  const item = record(value, what)
+  if (!isNonEmptyString(item.detail)) {
+    throw new Error(`${what}:detail-empty`)
+  }
+  if (!isNonEmptyString(item.label)) {
+    throw new Error(`${what}:label-empty`)
+  }
+  if (item.missing !== undefined) {
+    const missing = record(item.missing, `${what}:missing`)
+    return {
+      kind: 'missing',
+      missing: missingPart(missing.reason, missing.detail, `${what}:missing`),
+      detail: item.detail,
+      label: item.label,
+    }
+  }
+  if (!isFiniteNumber(item.factor)) {
+    throw new Error(`${what}:factor-not-a-number`)
+  }
+  if (typeof item.applied !== 'boolean') {
+    throw new Error(`${what}:applied-not-a-flag`)
+  }
+  const declared = record(item.declared, `${what}:declared`)
+  // As RainStressApplied: the factor is the declared value.
+  if (declared.value !== item.factor) {
+    throw new Error(`${what}:factor-not-the-declared-value`)
+  }
+  if (!isNonEmptyString(declared.unit)) {
+    throw new Error(`${what}:declared:unit-empty`)
+  }
+  return {
+    kind: 'applied',
+    factor: item.factor,
+    unit: declared.unit,
+    detail: item.detail,
+    label: item.label,
+    applied: item.applied,
+  }
 }
 
 /** The example answers of the screen. */
