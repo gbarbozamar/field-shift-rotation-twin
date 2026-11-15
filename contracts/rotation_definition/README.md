@@ -80,7 +80,7 @@ The calendar month in which the agricultural year of the case begins (C5.3, C5.4
 | `provisional` is required when the month is present and absent when it is missing | `provisional` is always required | Follows from the row above: the month is always present |
 | `provenance` is required when the month is present | `provenance` is always required | The same |
 
-Source or assumption mark, the four labels and the month numbers 1 to 12 are the same rules as in the calendar. The calendar engine copies the start month into the calendar (D8); that copy is a later unit of lane L1.
+Source or assumption mark, the four labels and the month numbers 1 to 12 are the same rules as in the calendar. The calendar engine copies the start month into the calendar (D8): `_copy_start_month` of `engine/calendar/build.py` does it on `main`, since #129 (`fc6d2e2`).
 
 ### `RotationComponent`: one component of the cycle
 
