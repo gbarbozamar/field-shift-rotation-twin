@@ -49,9 +49,18 @@ export default function FieldsScreen() {
       <h2 id="fields-screen-title" className="text-lg font-semibold">
         {strings['identity.title']}
       </h2>
-      <p className="mt-1 text-sm text-fs-muted">
-        {strings['identity.case_label']}: {exampleCase.label}
-      </p>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-fs-muted">
+          {strings['identity.case_label']}: {exampleCase.label}
+        </p>
+        <a
+          href="#/print"
+          data-testid="fields-print-link"
+          className="inline-flex items-center rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-medium text-fs-primary transition hover:bg-fs-bg"
+        >
+          {strings['print.open_link']}
+        </a>
+      </div>
 
       <StageRail />
 

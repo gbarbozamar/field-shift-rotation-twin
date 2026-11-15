@@ -148,3 +148,19 @@ h4 {
     scroll-behavior: auto;
   }
 }
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+}
