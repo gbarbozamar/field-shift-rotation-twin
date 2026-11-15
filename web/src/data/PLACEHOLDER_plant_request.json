@@ -1,0 +1,375 @@
+{
+  "contract": "plant_request",
+  "example_data": true,
+  "site": {
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "latitude": 1.0,
+    "longitude": 2.0
+  },
+  "rotations": [
+    {
+      "contract": "rotation_definition",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "rotation_id": "example-rotation-soybean",
+      "label": "Example rotation: soybean every year",
+      "ag_year_start": {
+        "month": 7,
+        "provisional": true,
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "repeats": true,
+      "components": [
+        {
+          "component_id": "c1",
+          "position": 1,
+          "crop_id": "PLACEHOLDER_soybean",
+          "purpose": "grain",
+          "sowing": {
+            "date": "2027-11-15",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "harvest": {
+            "date": "2028-04-10",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "management": {
+            "residue": "left_on_surface",
+            "grazing": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            },
+            "termination": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "contract": "rotation_definition",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "rotation_id": "example-rotation-soybean-cover",
+      "label": "Example rotation: soybean and a cover crop every year",
+      "ag_year_start": {
+        "month": 7,
+        "provisional": true,
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "repeats": true,
+      "components": [
+        {
+          "component_id": "c1",
+          "position": 1,
+          "crop_id": "PLACEHOLDER_soybean",
+          "purpose": "grain",
+          "sowing": {
+            "date": "2027-11-15",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "harvest": {
+            "date": "2028-04-10",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "management": {
+            "residue": "left_on_surface",
+            "grazing": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            },
+            "termination": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            }
+          }
+        },
+        {
+          "component_id": "c2",
+          "position": 2,
+          "crop_id": "PLACEHOLDER_cover_crop",
+          "purpose": "cover",
+          "sowing": {
+            "date": "2028-04-20",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "harvest": {
+            "date": null,
+            "missing": {
+              "reason": "NOT_APPLICABLE",
+              "detail": "cover crop is terminated, not harvested"
+            }
+          },
+          "management": {
+            "residue": "left_on_surface",
+            "grazing": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            },
+            "termination": {
+              "date": "2028-08-15",
+              "method": "chemical"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "contract": "rotation_definition",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "rotation_id": "example-rotation-soybean-cover-pasture",
+      "label": "Example rotation: soybean and a cover crop, then a year of pasture",
+      "ag_year_start": {
+        "month": 7,
+        "provisional": true,
+        "provenance": "DECLARED",
+        "source": "user"
+      },
+      "repeats": true,
+      "components": [
+        {
+          "component_id": "c1",
+          "position": 1,
+          "crop_id": "PLACEHOLDER_soybean",
+          "purpose": "grain",
+          "sowing": {
+            "date": "2027-11-15",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "harvest": {
+            "date": "2028-04-10",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "management": {
+            "residue": "left_on_surface",
+            "grazing": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            },
+            "termination": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            }
+          }
+        },
+        {
+          "component_id": "c2",
+          "position": 2,
+          "crop_id": "PLACEHOLDER_cover_crop",
+          "purpose": "cover",
+          "sowing": {
+            "date": "2028-04-20",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "harvest": {
+            "date": null,
+            "missing": {
+              "reason": "NOT_APPLICABLE",
+              "detail": "cover crop is terminated, not harvested"
+            }
+          },
+          "management": {
+            "residue": "left_on_surface",
+            "grazing": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            },
+            "termination": {
+              "date": "2028-08-15",
+              "method": "chemical"
+            }
+          }
+        },
+        {
+          "component_id": "c3",
+          "position": 3,
+          "crop_id": "PLACEHOLDER_pasture",
+          "purpose": "pasture",
+          "sowing": {
+            "date": "2028-08-20",
+            "provenance": "DECLARED",
+            "source": "user"
+          },
+          "harvest": {
+            "date": null,
+            "missing": {
+              "reason": "NOT_APPLICABLE",
+              "detail": "a pasture is grazed, not harvested"
+            }
+          },
+          "management": {
+            "residue": "left_on_surface",
+            "grazing": {
+              "intensity": "PLACEHOLDER_light"
+            },
+            "termination": {
+              "missing": {
+                "reason": "NOT_DECLARED"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "economic_facts": {
+    "contract": "economic_facts",
+    "example_data": true,
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "currency": "USD",
+    "crops": [
+      {
+        "crop_id": "PLACEHOLDER_soybean",
+        "kind": "grain",
+        "price": {
+          "value": 400.0,
+          "unit": "USD t-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "cost": {
+          "value": 600.0,
+          "unit": "USD ha-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "yield": {
+          "el_nino": {
+            "value": 2.6,
+            "unit": "t ha-1",
+            "provenance": "DECLARED",
+            "source": "user",
+            "range_missing": {
+              "reason": "NOT_DECLARED"
+            }
+          },
+          "neutral": {
+            "value": 3.0,
+            "unit": "t ha-1",
+            "provenance": "DECLARED",
+            "source": "user",
+            "range_missing": {
+              "reason": "NOT_DECLARED"
+            }
+          },
+          "la_nina": {
+            "value": 1.6,
+            "unit": "t ha-1",
+            "provenance": "DECLARED",
+            "source": "user",
+            "range_missing": {
+              "reason": "NOT_DECLARED"
+            }
+          }
+        }
+      },
+      {
+        "crop_id": "PLACEHOLDER_cover_crop",
+        "kind": "cover",
+        "cost": {
+          "value": 90.0,
+          "unit": "USD ha-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        }
+      },
+      {
+        "crop_id": "PLACEHOLDER_pasture",
+        "kind": "declared_margin",
+        "declared_margin": {
+          "el_nino": {
+            "value": 198.0,
+            "unit": "USD ha-1 yr-1",
+            "provenance": "DECLARED",
+            "source": "user",
+            "range_missing": {
+              "reason": "NOT_DECLARED"
+            }
+          },
+          "neutral": {
+            "value": 180.0,
+            "unit": "USD ha-1 yr-1",
+            "provenance": "DECLARED",
+            "source": "user",
+            "range_missing": {
+              "reason": "NOT_DECLARED"
+            }
+          },
+          "la_nina": {
+            "value": 126.0,
+            "unit": "USD ha-1 yr-1",
+            "provenance": "DECLARED",
+            "source": "user",
+            "range_missing": {
+              "reason": "NOT_DECLARED"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "soil_loss_limit": {
+    "value": 6.0,
+    "unit": "t ha-1 yr-1",
+    "provenance": "DECLARED",
+    "source": "user",
+    "range_missing": {
+      "reason": "NOT_DECLARED"
+    }
+  },
+  "questions": {
+    "soybean_crop_ids": [
+      "PLACEHOLDER_soybean"
+    ],
+    "soybean_price_range": {
+      "low": 200.0,
+      "high": 600.0,
+      "unit": "USD t-1"
+    },
+    "margin_of": "average",
+    "rain_stress_factor": {
+      "value": 1.2,
+      "unit": "dimensionless",
+      "provenance": "DECLARED",
+      "source": "user",
+      "range_missing": {
+        "reason": "NOT_DECLARED"
+      }
+    },
+    "strictness": "on_average"
+  }
+}

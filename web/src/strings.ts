@@ -229,6 +229,42 @@ export const strings = {
   // PROPOSED (S-019 code review fixes): the attribution a source of the
   // answer carries. Wording is a person's decision.
   'plant.source.attribution': 'Attribution: {attribution}',
+  // PROPOSED (S-020, l2/plant-options-rows): the option rows of the screen
+  // "What should I plant?" (the strip of crops year by year, the bars, the
+  // state in plain words). Wording is a person's decision; the operator
+  // approves it. No month is called winter or summer: the season of a month
+  // depends on the hemisphere and is OPEN.
+  'plant.month.1': 'January',
+  'plant.month.2': 'February',
+  'plant.month.3': 'March',
+  'plant.month.4': 'April',
+  'plant.month.5': 'May',
+  'plant.month.6': 'June',
+  'plant.month.7': 'July',
+  'plant.month.8': 'August',
+  'plant.month.9': 'September',
+  'plant.month.10': 'October',
+  'plant.month.11': 'November',
+  'plant.month.12': 'December',
+  'plant.strip.what': 'Crops year by year',
+  'plant.strip.no_definition_detail': 'the request holds no definition of this rotation',
+  'plant.strip.year': 'Year {n}: {crops}',
+  'plant.strip.year_empty': 'Year {n}: no crop declared in it',
+  'plant.strip.year_label': 'Year {n}',
+  'plant.strip.year_join': '; ',
+  'plant.strip.crop_join': ', then ',
+  'plant.strip.crop': '{crop} sown {sowing}, harvested {harvest}',
+  'plant.strip.crop_kept': '{crop} kept from its sowing in {sowing}, harvested {harvest}',
+  'plant.strip.crop_harvest_missing': '{crop} sown {sowing}, {harvest}',
+  'plant.strip.harvest': 'harvest',
+  'plant.strip.month_of_year': '{month} of year {n}',
+  'plant.strip.purpose': 'purpose: {purpose}',
+  'plant.strip.unplaced': 'Sowing date of {crop}, placed in no year',
+  'plant.bar.limit_line': 'Limit line',
+  'plant.state.every_kind_meets': 'Meets the limit in every kind of year in the record',
+  'plant.state.on_average_only': 'Meets the limit on average, but not in: {kinds}',
+  'plant.state.out_by': 'Out, by this check: {check}',
+  'plant.state.why': 'Why it is not resolved',
 } as const
 
 /**
