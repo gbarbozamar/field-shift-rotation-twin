@@ -2,8 +2,8 @@
 ``docs/VALIDATION.md``; decision D211 of issue #77; unit
 l0/trivial-comparator-e0-d211, issue #311).
 
-EXAMPLE DATA. The calendars, the twelve monthly erosivity values and the
-tables below are written by hand for this test. Their numbers mean nothing:
+EXAMPLE DATA. The sets of living months, the twelve monthly erosivity values
+and the tables below are written by hand for this test. Their numbers mean nothing:
 they describe no real place, field, crop, climate or producer, and every
 source string says PLACEHOLDER. They are chosen only so that each order can be
 counted by hand line by line.
@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from contracts.inputs.common import Missing as InputMissing
 from contracts.results.models import Missing, ResultsTable, ResultsTableRow
 from validation import trivial_comparator_erosion
 from validation.trivial_comparator_erosion import (
@@ -57,8 +58,9 @@ MONTHLY_EROSIVITY = {
 # The same total spread evenly: every month 1/12.
 UNIFORM_EROSIVITY = {month: 1.0 for month in range(1, 13)}
 
-# The hand-made calendars, the same in both agricultural years: the months in
-# which a living crop is on the field, whole months only.
+# The hand-made sets of living months, the same in both agricultural years: the
+# months in which a living crop is on the field, whole months only. The daily
+# flags are laid from them over a hand-made record of days (``flags``).
 LIVING_MONTHS = {
     "A": {12, 1, 2, 3},  # bare April to November
     "B": {6, 7, 8, 9, 10, 11},  # bare December to May
@@ -88,7 +90,7 @@ UNWEIGHTED_ORDER = ("C", "B", "A")
 
 
 def flags(living_months, first=FIRST_DAY, last=LAST_DAY):
-    """The daily flags of a living crop of one hand-made calendar."""
+    """The daily flags of a living crop of one hand-made set of living months."""
     days = {}
     day = first
     while day <= last:
@@ -297,6 +299,146 @@ def test_each_scenario_is_read_on_its_own():
         for item in erosion_orders(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
     }
     assert orders == {"phase_1": ("C", "A", "B"), "phase_2": ("C", "B", "A")}
+
+
+# --- the mean is the one of D211 -------------------------------------------------
+#
+# Three agricultural years (2020, 2021 and 2022, each of 365 days). The set of
+# living months of P changes in the last year; that of Q does not. With the
+# shares counted above (C 0.02, A 0.17, B 0.90):
+#   P: 0.02, 0.02, 0.90   mean 0.94 / 3 = 0.313   median 0.02   first year 0.02
+#   Q: 0.17, 0.17, 0.17   mean 0.17               median 0.17   first year 0.17
+# By the mean, lower is better: Q, P. By the median or by the first year
+# alone: P, Q. So an order taken by either of those would fail this case.
+THREE_YEARS = (2020, 2021, 2022)
+THREE_YEARS_LAST_DAY = dt.date(2023, 6, 30)
+BY_YEAR = {
+    "P": {2020: LIVING_MONTHS["C"], 2021: LIVING_MONTHS["C"], 2022: LIVING_MONTHS["B"]},
+    "Q": {year: LIVING_MONTHS["A"] for year in THREE_YEARS},
+}
+BY_YEAR_SHARES = {"P": (0.02, 0.02, 0.90), "Q": (0.17, 0.17, 0.17)}
+MEAN_ORDER = ("Q", "P")
+MEDIAN_ORDER = FIRST_YEAR_ORDER = ("P", "Q")
+
+
+def flags_by_year(months_of_year, first=FIRST_DAY, last=THREE_YEARS_LAST_DAY):
+    """The daily flags of one rotation whose set of living months is chosen per
+    agricultural year (the year starts in START_MONTH)."""
+    days = {}
+    day = first
+    while day <= last:
+        ag_year = day.year if day.month >= START_MONTH else day.year - 1
+        days[day] = day.month in months_of_year[ag_year]
+        day += dt.timedelta(days=1)
+    return days
+
+
+def test_the_order_is_by_the_mean_and_not_by_the_median_or_the_first_year():
+    data = {
+        (rotation_id, SCENARIO): flags_by_year(BY_YEAR[rotation_id])
+        for rotation_id in BY_YEAR
+    }
+    shares = year_shares(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    for rotation_id, expected in BY_YEAR_SHARES.items():
+        found = [item for item in shares if item.rotation_id == rotation_id]
+        assert [item.ag_year for item in found] == list(THREE_YEARS)
+        assert [item.share for item in found] == pytest.approx(list(expected))
+    (order,) = erosion_orders(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    assert dict(order.means) == pytest.approx({"P": 0.94 / 3, "Q": 0.17})
+    assert order.order == MEAN_ORDER
+    assert order.order != MEDIAN_ORDER and order.order != FIRST_YEAR_ORDER
+
+
+# --- what a flag can be ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "flag", [None, 0, 1, 0.0, "yes"], ids=["None", "0", "1", "0.0", "text"]
+)
+def test_a_flag_that_is_neither_a_bool_nor_a_missing_raises_type_error(flag):
+    data = living()
+    data[("A", SCENARIO)][dt.date(2020, 9, 1)] = flag
+    with pytest.raises(TypeError, match="True, False or a Missing"):
+        year_shares(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    with pytest.raises(TypeError, match="True, False or a Missing"):
+        erosion_orders(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    with pytest.raises(TypeError, match="True, False or a Missing"):
+        compare_with_soil_loss(
+            data,
+            MONTHLY_EROSIVITY,
+            soil_table({"A": 2.0, "B": 4.0, "C": 1.0}),
+            start_month=START_MONTH,
+        )
+
+
+@pytest.mark.parametrize("shape", [Missing, InputMissing], ids=["results", "inputs"])
+def test_the_missing_of_either_contract_is_a_missing_flag(shape):
+    data = living()
+    data[("B", SCENARIO)][dt.date(2020, 9, 1)] = shape(
+        reason="NOT_DECLARED", detail="example data: not given"
+    )
+    shares = {
+        (item.rotation_id, item.ag_year): item
+        for item in year_shares(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    }
+    assert shares[("B", 2020)].share is None
+    assert shares[("B", 2020)].missing.reason == "NOT_DECLARED"
+    assert shares[("B", 2021)].share == pytest.approx(HAND_SHARES["B"])
+    (order,) = erosion_orders(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    assert order.order is None
+    assert "'B' in 2020 (NOT_DECLARED)" in order.reason
+
+
+def test_a_scenario_whose_rotations_all_have_empty_flags_gives_no_order():
+    data = {("A", SCENARIO): {}, ("B", SCENARIO): {}}
+    assert year_shares(data, MONTHLY_EROSIVITY, start_month=START_MONTH) == ()
+    (order,) = erosion_orders(data, MONTHLY_EROSIVITY, start_month=START_MONTH)
+    assert (order.scenario_id, order.order, order.means) == (SCENARIO, None, None)
+    assert "'A', 'B'" in order.reason and "empty" in order.reason
+    (alone,) = erosion_orders(
+        {("A", SCENARIO): {}}, MONTHLY_EROSIVITY, start_month=START_MONTH
+    )
+    assert alone.order is None and "one rotation" in alone.reason
+
+
+# --- the counts of the report --------------------------------------------------------
+
+
+def test_the_trivial_count_is_zero_when_the_trivial_side_gives_no_order():
+    # The trivial side has a missing year (a missing flag of B), so it gives no
+    # order although it holds three rotations.
+    data = living()
+    data[("B", SCENARIO)][dt.date(2020, 9, 1)] = Missing(
+        reason="MISSING_INPUT", detail="example data: the stage of the day is unknown"
+    )
+    (item,) = compare_with_soil_loss(
+        data,
+        MONTHLY_EROSIVITY,
+        soil_table({"A": 2.0, "B": 4.0, "C": 1.0}),
+        start_month=START_MONTH,
+    )
+    assert item.trivial.order is None and item.full.order == HAND_ORDER
+    assert item.outcome == "no order from the trivial comparator"
+    assert (item.trivial_rotations_ordered, item.full_rotations_ordered) == (0, 3)
+    # Both sides without an order: the full method ties.
+    (item,) = compare_with_soil_loss(
+        data,
+        MONTHLY_EROSIVITY,
+        soil_table({"A": 2.0, "B": 2.0, "C": 2.0}),
+        start_month=START_MONTH,
+    )
+    assert item.outcome == "no order from either"
+    assert (item.trivial_rotations_ordered, item.full_rotations_ordered) == (0, 0)
+    # The empty flags of every rotation: no order on the trivial side either.
+    empty = {(rotation_id, SCENARIO): {} for rotation_id in "ABC"}
+    (item,) = compare_with_soil_loss(
+        empty,
+        MONTHLY_EROSIVITY,
+        soil_table({"A": 2.0, "B": 4.0, "C": 1.0}),
+        start_month=START_MONTH,
+    )
+    assert item.outcome == "no order from the trivial comparator"
+    assert (item.trivial_rotations_ordered, item.full_rotations_ordered) == (0, 3)
 
 
 # --- the functions are pure and hold no value of the method -----------------------
