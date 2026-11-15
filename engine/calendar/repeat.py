@@ -44,23 +44,73 @@ are listed under OPEN at the end of this docstring and in OPEN 2 of
    ``end_date`` is not used as that bound: it is the last date the calendar
    places, and a component without an end date may run past it.
 
+The phases of a rotation (unit l1/calendar-phases-d109, issue #221).
+Decision D109 of issue #77: each phase of a rotation is a scenario, each
+phase starting in the first agricultural year of the record, cycles
+repeating, a cycle that does not fit whole cut at the end; a one-year
+rotation has one phase. Decision D132: a phase reaches the engines as a
+calendar the runner moves with ``phase_calendar`` and ``list_phases``; EP1,
+EP3 and EP5 take the moved ``RotationCalendar`` unchanged (D56), and
+``repeat_over_record`` then lays the calendar's year ``p`` on the first
+agricultural year of the record. Decision D133: a component that starts
+before the first agricultural year of the record and ends inside it gets no
+rule in this release; its days in the record are missing with their reason,
+never guessed. (D117, how the phases nest in the one-input sweep, and the
+``scenario_id`` of each phase are the runner's.) The form, PROPOSED (blueprint
+section 3.7):
+
+8. The phases of a calendar are 0 to ``cycle_length_years - 1`` (point 3),
+   so a one-year rotation has one phase (D109).
+9. The years of the calendar are its agricultural years (C5.3), counted from
+   the one that holds its ``start_date`` (year 0). A component belongs to the
+   year of its start date, or of its end date when the start is missing; a
+   component with neither date stays where it is.
+10. ``phase_calendar(calendar, p)`` keeps the components of years ``p`` and
+    later and moves those of earlier years one cycle later (point 3 length),
+    each date keeping its month and day as ``shifted_date`` moves it
+    (point 2). The kept components come first, then the moved ones, each
+    group in the calendar's order. Phase 0 returns the calendar unchanged.
+11. A component of a year before ``p`` with a date on or after the first day
+    of year ``p`` crosses the boundary between years ``p - 1`` and ``p``.
+    Moved, that date would fall in the next cycle. It is not moved and not
+    guessed (D133): it becomes missing with reason ``NOT_COMPUTABLE`` and a
+    detail naming D133, the component's other dates are moved, and
+    ``components_crossing_phase`` names the component. No error is raised:
+    the phase runs, and the days that depend on that date are missing.
+12. The moved calendar's ``start_date`` is the calendar's ``start_date`` moved
+    ``p`` years, or the day after the last date of a crossing component in
+    year ``p`` if that is later (so those days lie before the first cycle in
+    the record and between cycles inside the bound of point 7, never on days
+    with no component), or the earliest date it places if that is earlier.
+    Its ``end_date`` is the latest date it places, or its ``start_date`` moved
+    ``cycle length - 1`` years if that is later, so its cycle length is the
+    calendar's (point 3). ``feasibility``, the identifiers and the start month
+    are copied unchanged, and the result is a valid ``RotationCalendar``.
+
 OPEN, for the lead developer and the science reviewers (Q5 of
 contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
 
-- Point 4, where the first cycle starts, and the phases of D109 (issue #77,
-  published after the brief of #207): "each phase of a rotation is a
-  scenario", each phase starting in the first agricultural year of the
-  record, cycles repeating, a cycle that does not fit whole cut at the end;
-  the runner (L2a) makes one call per phase. This helper lays out the phase
-  that starts with the calendar's first year only. Not built here: a start
-  phase needs an explicit argument with no default, and EP1's signature
-  cannot carry it (ENTRYPOINTS, D56), so how a phase reaches an engine (a
-  field of the calendar, or a calendar the runner moves) is for the lead
-  developer and the platform developer first. A candidate form: phase ``p``
-  (0 to ``cycle_length - 1``) lays the calendar's year ``p`` on the first
-  agricultural year of the record (shift reduced by ``p``); the components of
-  the first cycle that end before the record are then not laid out, and one
-  that starts before and ends inside it needs a rule.
+- Point 4, where the first cycle starts: decided for the phases by D109 and
+  D132 and built in ``phase_calendar`` (points 8 to 12). EP1 keeps calling
+  ``repeat_over_record``; the runner (L2a) passes it the moved calendar.
+- Point 11, the rule for a component that crosses into year ``p``: none in
+  this release (D133). Which date to cut, or a lead-in, stays for a later
+  release (asked on #18).
+- Point 11, a component of a year before ``p`` whose end date is missing and
+  that has no dated period on or after year ``p``: it may cross the boundary
+  but cannot be shown to, so it is moved with its end still missing (point
+  7). A component of year ``p`` or later whose start date is missing may have
+  started before the boundary: it is kept, its start still missing.
+- Point 12, an ``end_date`` later than every date the moved calendar places
+  (only when a year holds nothing near its end), set so the cycle length of
+  point 3 holds.
+- Point 10, a 29 February moved twice (one cycle here, then the shift of
+  point 4) can become 28 February in a leap year of the record, and the moved
+  calendar cannot say a date was moved (``leap_day_moved`` stays false).
+- Point 10, a moved date keeps the provenance and source of the calendar's
+  date.
+- Point 9, a calendar whose start month is missing: ``phase_calendar``
+  raises ``ValueError`` for a phase above 0, as its years are not known.
 - Point 6, the residue and the crop before the first cycle. Laying out one
   cycle before the record (a lead-in) would give the first year a last
   harvest; the residue ledger (Q12) is the other candidate. Not done: no
@@ -98,7 +148,10 @@ __all__ = [
     "RepeatedComponent",
     "RepeatedPeriod",
     "RepeatedRotation",
+    "components_crossing_phase",
     "cycle_length_years",
+    "list_phases",
+    "phase_calendar",
     "repeat_over_record",
     "shifted_date",
 ]
@@ -111,6 +164,21 @@ START_MONTH_MISSING = (
     "the start month of the agricultural year (calendar.ag_year_start.month) is "
     "missing, so the agricultural years of the record cannot be laid out and the "
     "rotation cannot be repeated over them (decision D47 of issue #77)"
+)
+
+# Point 11: the reason (C3.2) of a date that crosses into the phase's year.
+CROSSING_REASON = "NOT_COMPUTABLE"
+_CROSSING_DETAIL = (
+    "phase {phase}: component {component_id!r} starts before year {phase} of "
+    "the calendar and this date falls in that year or later; with the calendar "
+    "moved (decision D132 of issue #77) the date would fall in the next cycle, "
+    "and a component that crosses into the first year of a phase gets no rule "
+    "in this release (decision D133), so the date is missing, never guessed"
+)
+_PHASE_START_MONTH_MISSING = (
+    "the start month of the agricultural year (calendar.ag_year_start.month) is "
+    "missing, so the years of the calendar are not known and phase {phase} "
+    "cannot be laid out (decisions D109 and D132 of issue #77)"
 )
 
 
@@ -283,6 +351,158 @@ def repeat_over_record(
         cycles=tuple(cycles),
         components=tuple(components),
     )
+
+
+def list_phases(calendar: RotationCalendar) -> list[int]:
+    """The phases of the calendar's rotation, 0 to ``cycle_length_years - 1``
+    (point 8). A one-year rotation has one phase (D109). PROPOSED.
+
+    Raises ``TypeError`` when ``calendar`` is not a ``RotationCalendar``.
+    """
+    _check_calendar(calendar)
+    return list(range(cycle_length_years(calendar)))
+
+
+def phase_calendar(calendar: RotationCalendar, p: int) -> RotationCalendar:
+    """The calendar moved so that its year ``p`` comes first (points 9 to 12;
+    D109, D132, D133). A valid ``RotationCalendar``: EP1, EP3 and EP5 take it
+    unchanged, and ``repeat_over_record`` lays its year ``p`` on the first
+    agricultural year of the record. PROPOSED.
+
+    A component that crosses into year ``p`` does not raise: the crossing
+    date is missing with its reason (point 11) and
+    ``components_crossing_phase`` names it.
+
+    Raises ``TypeError`` when ``calendar`` is not a ``RotationCalendar``;
+    ``ValueError`` when ``p`` is not one of ``list_phases(calendar)``, and for
+    a phase above 0 when the start month is missing.
+    """
+    length, boundary = _phase_bounds(calendar, p)
+    if p == 0:
+        return calendar.model_copy(deep=True)
+    first_year = _ag_year_of(calendar.start_date, calendar.ag_year_start.month)
+    one_day = boundary.replace(day=_SECOND) - boundary
+
+    kept: list[dict] = []
+    moved: list[dict] = []
+    floor = shifted_date(calendar.start_date, p)[0]
+    for component in calendar.components:
+        year = _year_of_component(component, calendar.ag_year_start.month)
+        if year is None or year - first_year >= p:
+            kept.append(component.model_dump())
+            continue
+        crossing = [day for day in _known_dates(component) if day >= boundary]
+        if crossing:
+            floor = max(floor, max(crossing) + one_day)
+        detail = _CROSSING_DETAIL.format(phase=p, component_id=component.component_id)
+        moved.append(_moved(component, length, boundary, detail))
+
+    components = kept + moved
+    placed = [day for item in components for day in _known_dates_of_dump(item)]
+    start = min([floor, *placed])
+    end = max([shifted_date(start, length - _FIRST)[0], *placed])
+    document = calendar.model_dump()
+    document.update(start_date=start, end_date=end, components=components)
+    return RotationCalendar.model_validate(document)
+
+
+def components_crossing_phase(calendar: RotationCalendar, p: int) -> list[str]:
+    """The components of years before ``p`` with a date in year ``p`` or later
+    (point 11): the ones ``phase_calendar(calendar, p)`` leaves with a missing
+    date. Empty for phase 0. PROPOSED.
+
+    Raises as ``phase_calendar`` does.
+    """
+    _, boundary = _phase_bounds(calendar, p)
+    if p == 0:
+        return []
+    month = calendar.ag_year_start.month
+    first_year = _ag_year_of(calendar.start_date, month)
+    found = []
+    for component in calendar.components:
+        year = _year_of_component(component, month)
+        if year is None or year - first_year >= p:
+            continue
+        if any(day >= boundary for day in _known_dates(component)):
+            found.append(component.component_id)
+    return found
+
+
+def _check_calendar(calendar: object) -> None:
+    if not isinstance(calendar, RotationCalendar):
+        raise TypeError(
+            f"calendar: expected a RotationCalendar, got {type(calendar).__name__}"
+        )
+
+
+def _phase_bounds(calendar: RotationCalendar, p: object) -> tuple[int, IsoDate]:
+    """The cycle length and the first day of year ``p`` (the start date for
+    phase 0), after checking the arguments."""
+    phases = list_phases(calendar)
+    if type(p) is not int or p not in phases:
+        raise ValueError(
+            f"p: expected a whole number from 0 to {phases[-_FIRST]} "
+            "(the cycle length of the calendar less one)"
+        )
+    if p == 0:
+        return len(phases), calendar.start_date
+    month = calendar.ag_year_start.month
+    if month is None:
+        raise ValueError(_PHASE_START_MONTH_MISSING.format(phase=p))
+    first_year = _ag_year_of(calendar.start_date, month)
+    boundary = calendar.start_date.replace(year=first_year + p, month=month, day=_FIRST)
+    return len(phases), boundary
+
+
+def _year_of_component(component: CalendarComponent, start_month: int) -> int | None:
+    """Point 9: the agricultural year of the start date, else of the end date."""
+    for day in (component.start.date, component.end.date):
+        if day is not None:
+            return _ag_year_of(day, start_month)
+    return None
+
+
+def _known_dates(component: CalendarComponent) -> list[IsoDate]:
+    days = [component.start.date, component.end.date]
+    for period in component.periods:
+        days += [period.start.date, period.end.date]
+    return [day for day in days if day is not None]
+
+
+def _known_dates_of_dump(component: dict) -> list[IsoDate]:
+    days = [component["start"]["date"], component["end"]["date"]]
+    for period in component["periods"]:
+        days += [period["start"]["date"], period["end"]["date"]]
+    return [day for day in days if day is not None]
+
+
+def _moved(
+    component: CalendarComponent, years: int, boundary: IsoDate, detail: str
+) -> dict:
+    """The component one cycle later (point 10); a date on or after the
+    boundary becomes missing (point 11)."""
+
+    def move(value: dict) -> dict:
+        day = value["date"]
+        if day is None:
+            return value
+        if day >= boundary:
+            return {
+                "date": None,
+                "missing": {"reason": CROSSING_REASON, "detail": detail},
+                "provenance": None,
+                "source": None,
+                "assumption": False,
+            }
+        return {**value, "date": shifted_date(day, years)[0]}
+
+    item = component.model_dump()
+    item["start"] = move(item["start"])
+    item["end"] = move(item["end"])
+    for period in item["periods"]:
+        period["start"] = move(period["start"])
+        period["end"] = move(period["end"])
+    return item
 
 
 def _ag_year_of(day: IsoDate, start_month: int) -> int:
