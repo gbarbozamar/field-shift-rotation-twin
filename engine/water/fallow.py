@@ -1,8 +1,9 @@
 """The surface layer on a fallow day of EP3 (decisions D110, D111, D115, D116 of #77).
 
 Unit ``l1/water-fallow-residue`` (issue #217). A fallow day is a day of the
-calendar on which no component carries a crop. On such a day the water entry
-point (``engine/water/exposure.py``):
+rotation, repeated over the years of the climate record (D47), on which no
+component carries a crop. On such a day the water entry point
+(``engine/water/exposure.py``):
 
 - treats the fallow as weed-free (D111, declared as an assumption): no crop
   reaches the balance, so the balance transpires nothing;
@@ -15,6 +16,12 @@ point (``engine/water/exposure.py``):
 The cover is one value per fallow, constant over the fallow (D110, D115), read
 from one record that both engines read (D116). The fallow is named by the crop
 that follows it: the cover of D115 is the cover at the sowing of that crop.
+
+Unit ``l1/water-ep3-repeat-d47`` (issue #253): ``following_crop`` takes the
+sowings of the repeated rotation instead of a calendar, so the fallow after
+the last component of a cycle is followed by the first sowing of the next
+cycle. The repetition itself is ``engine.calendar.repeat_over_record``; this
+module holds no rule of it and is given plain dates.
 
 This module holds the three pure steps of that day; ``exposure.py`` reads the
 records and chains them. Status: PROPOSED (blueprint section 3.7); see
@@ -29,13 +36,13 @@ from __future__ import annotations
 
 import datetime as dt
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
-from contracts.inputs.rotation_calendar import RotationCalendar
 from contracts.results.models import Missing
 
 __all__ = [
     "NO_FOLLOWING_CROP",
+    "SOWING_NOT_KNOWN",
     "TWO_FOLLOWING_CROPS",
     "following_crop",
     "mulched_total_evaporable_water",
@@ -47,10 +54,19 @@ Number = float | Missing
 # --- detail texts: PROPOSED, English for developers -------------------------
 
 NO_FOLLOWING_CROP = (
-    "the fallow of the day has no crop that follows it in the calendar, so the "
-    "record of its surface residue cover cannot be named: the cover of a fallow "
-    "is read by the crop sown after it (decisions D110 and D115 of issue #77, "
-    "scope PROPOSED, OPEN 31 of engine/water/EXPOSURE.md)"
+    "the fallow of the day has no crop that follows it in the rotation repeated "
+    "over the years of the climate record (decision D47 of issue #77): no "
+    "component of the calendar has a start date, so the record of its surface "
+    "residue cover cannot be named: the cover of a fallow is read by the crop "
+    "sown after it (decisions D110 and D115 of issue #77, scope PROPOSED, OPEN "
+    "31 of engine/water/EXPOSURE.md)"
+)
+SOWING_NOT_KNOWN = (
+    "the crop that follows the fallow of the day is not known: a component of "
+    "the calendar has no start date and could be sown before the first dated "
+    "sowing after the day, so the record of the surface residue cover of the "
+    "fallow, read by the crop sown after it (decisions D110 and D115 of issue "
+    "#77), cannot be named"
 )
 TWO_FOLLOWING_CROPS = (
     "two components with different crops start on the first sowing after the "
@@ -62,29 +78,52 @@ TWO_FOLLOWING_CROPS = (
 # --- the fallow and the crop that follows it -----------------------------------
 
 
-def following_crop(calendar: RotationCalendar) -> Callable[[dt.date], str | Missing]:
-    """The crop identifier of the component that follows a fallow day, or why there is none.
+def following_crop(
+    sowings: Iterable[tuple[dt.date, str]],
+    undated_sowings: Iterable[tuple[dt.date, dt.date, str]],
+) -> Callable[[dt.date], str | Missing]:
+    """The crop identifier of the component sown first after a fallow day, or why it is not known.
 
-    PROPOSED (choice 19 of EXPOSURE.md). The day is one on which no component
-    carries a crop. The fallow it belongs to ends the day before the next
-    sowing: the start date of the dated component that starts first after the
-    day. Its crop names the fallow. No component starts after the day:
-    ``MISSING_INPUT`` with NO_FOLLOWING_CROP; components with different crops
-    start on that date: ``NOT_COMPUTABLE`` with TWO_FOLLOWING_CROPS. A
-    component with a missing date is not read: the entry point gives a day no
-    crop only when every component is dated.
+    PROPOSED (choice 19 of EXPOSURE.md). ``sowings`` holds the start date and
+    the crop identifier of every component of the repeated rotation whose
+    start date is known; ``undated_sowings`` holds, for every component whose
+    start date is missing, the first and the last day it can be sown on and
+    its component identifier. The entry point builds both from
+    ``engine.calendar.repeat_over_record`` (unit #253); nothing of the
+    repetition is computed here.
+
+    The day is one on which no component carries a crop. The fallow it
+    belongs to ends the day before the next sowing: the first start date
+    after the day. Its crop names the fallow.
+
+    - a component with no start date that can be sown after the day, and on
+      or before that sowing (or when there is none): ``MISSING_INPUT`` with
+      SOWING_NOT_KNOWN and the component identifiers;
+    - no sowing after the day: ``MISSING_INPUT`` with NO_FOLLOWING_CROP;
+    - components with different crops on that date: ``NOT_COMPUTABLE`` with
+      TWO_FOLLOWING_CROPS.
     """
-    dated = [
-        (component.start.date, component.crop_id)
-        for component in calendar.components
-        if component.start.date is not None and component.end.date is not None
-    ]
+    dated = sorted(sowings)
+    undated = list(undated_sowings)
 
     def crop(day: dt.date) -> str | Missing:
         later = [(start, crop_id) for start, crop_id in dated if start > day]
-        if not later:
+        sowing = min((start for start, _ in later), default=None)
+        unknown = sorted(
+            {
+                component_id
+                for first, last, component_id in undated
+                if last > day and (sowing is None or first <= sowing)
+            }
+        )
+        if unknown:
+            names = ", ".join(repr(name) for name in unknown)
+            return Missing(
+                reason="MISSING_INPUT",
+                detail=f"{SOWING_NOT_KNOWN}: component(s) {names}",
+            )
+        if sowing is None:
             return Missing(reason="MISSING_INPUT", detail=NO_FOLLOWING_CROP)
-        sowing = min(start for start, _ in later)
         crops = sorted({crop_id for start, crop_id in later if start == sowing})
         if len(crops) != 1:
             return Missing(reason="NOT_COMPUTABLE", detail=TWO_FOLLOWING_CROPS)
