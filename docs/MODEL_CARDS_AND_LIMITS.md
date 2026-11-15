@@ -70,7 +70,15 @@ Estimates sheet and rill water erosion (`soil_loss`) per agricultural year and p
 - **Outside catalogue:** User-declared soil-loss limits (`soil_loss_tolerance` / `DeclaredLimit`) are per-field user inputs, not catalogue records.
 
 ### Validation Status (`49504ac`)
-- **Implemented & Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):** `[E0]` (RUSLE factor product), `[E1a]`, `[E1b]` (slope-length/steepness & break-slope `LS`), `[E2]` (daily `R` index), `[E3]` (AH703 Table 4-1 `LS` fixture `e3_ah703_tables.json`), `[E7]` (runoff-plot plausibility check: **`2.365 t ha-1 yr-1`** predicted vs. **`0.392 t ha-1 yr-1`** measured on La Estanzuela plots in 2017–2019; 137Cs national-context citation recorded, not numerically asserted), `[E8]` (`c_factor/` sub-factors), `[E9]` (full-catalogue `EP1` through runner `CH06` on placeholders).
+- **Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):**
+  - `[E0]` (erosion trivial comparator logic & ordering rules, `D211`)
+  - `[E2]` (order between systems logic & comparator, `D225`)
+  - `[E3]` (`engine/erosion/ls.py` vs. AH703 **Tables 4-2 and 4-5**, `91` `LS` cells and `19` `m` values in signed fixture `e3_ah703_tables.json`, `D124`)
+  - `[E8]` (`annual_soil_loss` unit guard — `EQ6`, `EQ8`, `EQ10`, `D226`)
+  - `[E9]` (`annual_soil_loss` mathematical invariants — `EQ1`–`EQ5`, `EQ7`, `D226`)
+- **Not evaluated / No result record in Run #4 (`df43899`):**
+  - `[E1a]` (official national erosion program comparison) and `[E1b]` (published plot ratios): **`not evaluated in this release (D254)`** (no test and no result record).
+  - `[E7]` (runoff-plot plausibility observation, `D252`/`D148`): **`2.365 t ha-1 yr-1`** (declared `C`) vs. **`0.392 t ha-1 yr-1`** measured on La Estanzuela plots in 2017–2019; reported as an observation with **no pass rule** and **no test / result record** (`137Cs` national-context citation recorded, not numerically asserted).
 - **Not defined in `VALIDATION.md`:** `E4`–`E6`, `E10`–`E11`.
 
 ### Declared Non-Claims & Limits
@@ -95,10 +103,10 @@ Resolves a producer's `RotationDefinition` (month/day components) into concrete 
   build_rotation_calendar(rotation: RotationDefinition) -> RotationCalendar
   ```
 - **Additional Public Helpers (`engine/calendar/repeat.py`, `PROPOSED`):**
-  - `repeat_over_record(calendar: RotationCalendar, record_start: date, record_end: date) -> RepeatedCalendar`
+  - `repeat_over_record(calendar: RotationCalendar, record_start: IsoDate, record_end: IsoDate) -> RepeatedRotation | Missing`
   - `list_phases(calendar: RotationCalendar) -> list[int]`
-  - `phase_calendar(calendar: RotationCalendar, phase: int) -> RotationCalendar`
-  - `components_crossing_phase(calendar: RotationCalendar, phase: int) -> list[str]`
+  - `phase_calendar(calendar: RotationCalendar, p: int) -> RotationCalendar`
+  - `components_crossing_phase(calendar: RotationCalendar, p: int) -> list[str]`
 - **Inputs:** `RotationDefinition` (`case_id`, `field_id`, `rotation_id`, `components`, `ag_year_start`, optional `planting_windows` / `notes`). Takes **no `parameters`** (`D56`).
 - **Outputs:** `RotationCalendar` with `start_date`, `end_date`, `ag_year_start` (copied from `rotation` `P6`), `components` (`start_date`, `end_date`, `crop_id`, `period_type`, or missing reasons `C3.2`), and `feasibility` (`feasible: bool`, `violations`).
 - **Failure / Refusal behavior:** Raises `TypeError` if argument is not `RotationDefinition`; raises `NoValidCalendarForm` when `ag_year_start` is missing (`D7`, `D8`) or a component's start/end date is missing (`P1`–`P12`). No internal exception is swallowed; invalid rule combinations return `feasibility.feasible = False`.
@@ -128,7 +136,7 @@ Resolves a producer's `RotationDefinition` (month/day components) into concrete 
 - **Primary Modules:** `engine/water/exposure.py`, `reference_et0.py`, `living_crop.py`, `stages.py`, `fallow.py`, `et0/`, `runoff/`, `evaporation/`, `balance/`.
 
 ### Purpose
-Computes agricultural-year dimensionless water deficit exposure (`1 - sum(T_actual) / sum(T_potential)` over living-crop days `D157`) by chaining daily FAO-56 Penman-Monteith `ET0`, NEH-630 runoff, FAO-56 dual crop-coefficient surface-layer evaporation (with residue mulch reduction), and single-column soil water balance. Also exports daily `ET0` (`D256`) and daily living-crop state (`D222`) for `CarbonForcing`.
+Computes agricultural-year dimensionless water deficit exposure (`water_transpired / water_demanded` = `sum(T_actual) / sum(T_potential)` over living-crop days `D157`, where `1.0` means full demanded transpiration met) by chaining daily FAO-56 Penman-Monteith `ET0`, NEH-630 runoff, FAO-56 dual crop-coefficient surface-layer evaporation (with residue mulch reduction), and single-column soil water balance. Also exports daily `ET0` (`D256`) and daily living-crop state (`D222`) for `CarbonForcing`.
 
 ### Contract Inputs & Outputs
 - **Entry Point (`PROPOSED`):**
@@ -149,9 +157,9 @@ Computes agricultural-year dimensionless water deficit exposure (`1 - sum(T_actu
   - `climate`: daily `precipitation`, `air_temperature_max_2m`, `air_temperature_min_2m`, `dew_point_2m`, `wind_speed_2m`, `solar_radiation` (`CQ1`–`CQ7`).
   - `parameters`: keyword-only `dict[str, dict]`.
 - **Outputs:**
-  - `list[WaterDeficitExposure]` on `time_basis="ag_year"` (`dimensionless`, `lower_is_better`), or a single `rotation`-basis `Missing` item if `ag_year_start` or `precipitation` is absent (`OPEN 2`).
+  - `list[WaterDeficitExposure]` on `time_basis="ag_year"` (`dimensionless`, `higher_is_better` per `DIRECTION_OF` / `C1.3`), or a single `rotation`-basis `Missing` item if `ag_year_start` or `precipitation` is absent (`OPEN 2`).
   - Provenance: `SIMULATED` (`D215`, `C4.1`); `range_missing`: `NOT_AVAILABLE` (`D216`).
-  - **Required D162/D215 Source Label Prefix:** carries the verbatim FAO-56 / `D105` method label followed by method clauses; does not list individual parameter record IDs or crop IDs (`OPEN 44`).
+  - **Required D162/D215 Source Label Prefix:** starts verbatim with `"whole cycle, not critical period"` (`WINDOW_LABEL`, `D105`, `D162`), followed by the D157/D215 method clauses; does not list individual parameter record IDs or crop IDs (`OPEN 44`).
 
 ### Scientific Basis & Decisions (`#77`)
 - **ET0 (`D44`, `D82`, `D256`, `PC-4`):** FAO-56 Penman-Monteith daily step with temperature/radiation bounds (`Et0Bounds`), `dew_point_2m` for actual vapour pressure (`D25`), and `elevation` fallback if atmospheric pressure is derived (`D30`, `M2.1`). `Tew` (`PC-6`) omitted as an unneeded control parameter.
@@ -168,8 +176,16 @@ Computes agricultural-year dimensionless water deficit exposure (`1 - sum(T_actu
 - **Unsigned / Pending (`10` records in `#433`):** `wheat` and `maize` remain **`MISSING_INPUT`** on `49504ac` because `4` `fao56_stage_length_*` records for `wheat` + `4` for `maize` (`8`) and `2` `surface_residue_cover` fallow records before `wheat` and `maize` await signature (`#433`).
 
 ### Validation Status (`49504ac`)
-- **Implemented & Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):** `[H0]` (water deficit exposure `0` to `1` consistency), `[H1]` (`et0/` vs. FAO-56 Example 37 fixture `h1_fao56_example37.json`), `[H2]` (`et0/` vs. FAO-56 Example 18 fixture `h2_example18.json`), `[H5]` (runoff & infiltration checks), `[H7]` (surface evaporation & stage-2 reduction checks), `[H10]` (end-to-end daily balance mass conservation & chain wiring).
-- **Skipped (`1`):** **`[H8]`** (`run_stages` / `place_stages` against signed external fixture — skipped until local phenology/wheat-maize stage check is finalized).
+- **Passing in [run-20261115T170110Z-df43899.json](../validation/runs/run-20261115T170110Z-df43899.json):**
+  - `[H0]` (water trivial comparator logic & ordering rules, `D212`)
+  - `[H1]` (`engine/water/balance/` `run_balance` vs. FAO-56 Ch. 8 Ex. 37 signed fixture `h1_fao56_example37.json`, `D228`)
+  - `[H2]` (`engine/water/et0/` `reference_evapotranspiration_day` vs. FAO-56 Example 18 signed fixture `h2_example18.json`, `D124`/`D138`)
+  - `[H7]` (daily balance mass closure `ΔS = P − Q − E − T − D`, `D227`)
+- **Partial pass / 1 skipped in Run #4 (`df43899`):**
+  - **`[H8]`** (daily balance invariants `D227` — `19` passing invariant checks + **`1` skipped** `test_h8_invariants_numeric_criteria`, recorded as `not_evaluated` in Run #4).
+- **Not run / No result record in Run #4 (`df43899`):**
+  - `[H5]` (NASA POWER `GWETROOT` qualitative contrast, `D107`/`D253`): **no pass rule** and **`not run`** in this release (`CQ7` not wired; no result record).
+  - `[H10]` (Grahmann et al. 2022 Table 5 yearly runoff contrast, `D229`/`D230`): comparator machinery (`validation/h10_runoff.py`) and synthetic tests exist, but **no signed fixture (`h10_grahmann2022_runoff.json` absent)** and **no `EP3` plot run** (no result record).
 - **Not defined in `VALIDATION.md`:** `H3`, `H4`, `H6`, `H9`, `H11`, `H12`, `W0`.
 - **Unverified on real demo run:** No simulated real water deficit exposure outputs are published or validated yet; D189 convergence check (empty vs. full initial state across phases) is not built (`OPEN 14`); REW×Ze sensitivity grid (`D102`) is not run (`OPEN 24`).
 
@@ -271,7 +287,7 @@ Simulates annual soil organic carbon stock dynamics (`t C ha-1`) over whole agri
 
 ### Validation Status (`49504ac`)
 - Core tests (`engine/amg/test_amg.py`, `test_entry.py`, `test_runner_response.py`) use `PLACEHOLDER` numbers only (worked-example tests skipped in absence of signed constants).
-- **`LEELP1` Exploratory Contrast ([VALIDATION.md](VALIDATION.md)):** Uncoded, exploratory literature comparison notes that **no simulated AMG outputs have been computed or validated for Uruguay/La Estanzuela**; French arable calibration (`9.9`–`13.5 °C`, `-290` to `595 mm yr-1`) is uncalibrated locally (`D192`, `D210`).
+- **`AMG against LEELP1 (exploratory contrast)` ([VALIDATION.md](VALIDATION.md), `D234`):** Exploratory runs of the project's AMG functions against `LEELP1` (`González-Sosa et al. 2024`) were executed outside the repository and reproduced read-only on `main` using unsigned AMGv2 defaults (`65%` and `40%` stable fractions), `ET0` standing in for PET, and post-hoc filtering; recorded strictly as an exploratory observation with no pass rule and **explicitly NOT a validation of the project**. Zero AMG outputs are reachable through the deployed service (`params/records/` holds `0` AMG records).
 
 ### Declared Non-Claims & Limits
 - **`AMG-M` (monthly variant) is NOT built (`OPEN 1`).**
@@ -477,9 +493,9 @@ Answers *"What should I plant?"* across 3–5 rotations for one field (`POST /ap
 
 | Component | Entry / Route | Status | Signed Records Used (`params/records/`) | Missing / Unsigned / External Dependencies | Validation Codes (`VALIDATION.md`) | Key Release Limit on `49504ac` |
 |---|---|---|---|---|---|---|
-| **`EP1` Erosion** | `engine.erosion.compute_soil_loss` | `PROPOSED` | `26` root (`LS`, `R`, `K`, `C`, `P`) + `6` shared (`residues/`) = `32` | `61` computed-`C` records in `params/withdrawn/computed_c/` | `[E0, E1a, E1b, E2, E3, E7, E8, E9]` | Declared-`C` fallback (`2.365` vs `0.392` measured t/ha/yr, no rotation contrast) |
+| **`EP1` Erosion** | `engine.erosion.compute_soil_loss` | `PROPOSED` | `26` root (`LS`, `R`, `K`, `C`, `P`) + `6` shared (`residues/`) = `32` | `61` computed-`C` records in `params/withdrawn/computed_c/` | `[E0, E2, E3, E8, E9]` pass; `[E1a, E1b]` not evaluated (`D254`); `[E7]` observation only (no pass rule/test) | Declared-`C` fallback (`2.365` vs `0.392` measured t/ha/yr, no rotation contrast) |
 | **`EP2` Calendar** | `engine.calendar.build_rotation_calendar` | `PROPOSED` | `0` | None | `CH01`–`CH07` chain + unit tests | No agronomic/overlap rules; multi-cycle perennials fail crossing phases (`D190`) |
-| **`EP3` Water** | `engine.water.compute_water_deficit_exposure` (+ `D256`, `D222`) | `PROPOSED` | `100` (`45` `#262` + `43` `#417` + `12` `#446`) | `10` wheat/maize stage & cover records (`#433`) | `[H0, H1, H2, H5, H7, H10]`; **`[H8]` skipped** | `wheat`/`maize` missing; end-of-record fallow missing (`D187`); no `RH_min`/`Kcb` adj.; no `D189` spin-up convergence check run |
+| **`EP3` Water** | `engine.water.compute_water_deficit_exposure` (+ `D256`, `D222`) | `PROPOSED` | `100` (`45` `#262` + `43` `#417` + `12` `#446`) | `10` wheat/maize stage & cover records (`#433`) | `[H0, H1, H2, H7]` pass; `[H8]` `19` pass + `1` skipped (`test_h8_invariants_numeric_criteria`); `[H5]`/`[H10]` not run | `wheat`/`maize` missing; end-of-record fallow missing (`D187`); no `RH_min`/`Kcb` adj.; no `D189` spin-up convergence check run |
 | **`EP4` Residues** | `engine.residues.build_residue_ledger` | `PROPOSED` | `6` (`rusle2_crop_yield`, `rusle2_residue_yield_ratio`) | `5` unsigned IDs (C/root fractions) | Paysandu context (uncoded) | Grain carbon series blocked until 5 IDs signed; `cover`/`pasture` `NOT_COMPUTABLE` |
 | **`EP5` AMG** | `engine.amg.run_amg` | `PROPOSED` | `0` | `15` `amg_*` constants + `EP4` + site `SOC`/`clay`/`carb`/`pH`/`C:N` | `LEELP1` exploratory note (uncoded) | Zero computed values reachable; French arable calibration (`9.9`–`13.5 °C`), `AMG-M` unbuilt |
 | **`EP6` RothC** | `engine.rothc.run_rothc` | `OPEN` (`ENTRYPOINTS.md`) / `PROPOSED` (code) | `0` | `24` `rothc_*` + `4` `rothc_input_*` constants + `EP4` + site `SOC`/`clay` | Reference case (`1e-4` tol) in unit tests | Zero computed values reachable; single missing climate day stalls rest of run; large `fitted_slope` error string |
