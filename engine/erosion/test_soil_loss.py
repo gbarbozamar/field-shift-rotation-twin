@@ -73,9 +73,10 @@ from contracts.results.models import (
     ReasonCode,
     SoilLossResults,
 )
+from engine.calendar.repeat import list_phases, phase_calendar
 from engine.erosion import equation, ls
 from engine.erosion import soil_loss as module
-from params.catalogue import check_catalogue, load_folder
+from params.catalogue import check_catalogue, load_folder, read_value
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
@@ -2299,23 +2300,163 @@ def test_year_without_a_last_harvest_leaves_only_its_c_missing_without_fallback(
 
 
 RECORDS = ROOT / "params" / "records"
+# The records of the computed C, taken out of the catalogue the service loads
+# (D148 and D158 of issue #77; unit l0/computed-c-out-of-catalogue).
+WITHDRAWN_C_RECORDS = ROOT / "params" / "withdrawn" / "computed_c"
 DEMO_SOIL = ROOT / "data" / "demo" / "la_estanzuela_soil_slope.json"
 
 
-# The crop words of the records of params/records/ (unit l0/c-records): the
+# The crop words of the records of the computed C (unit l0/c-records): the
 # crop_id of the demonstration calendars of D128 must be the same words.
 REPOSITORY_CROP_WORDS = {SOY: "soybean", WHEAT: "wheat", MAIZE: "maize"}
 
+# The headline soil loss of the demonstration point as decisions D146 and D148
+# of issue #77 print it, in t ha-1 yr-1, to the three decimals they give.
+# Transcribed from the decisions, not computed here.
+HEADLINE_SOIL_LOSS_D148 = 2.365
 
-def test_records_on_main_compute_c_for_both_demo_rotations():
-    """The catalogue of params/records/ holds the records of the computed C
-    (unit l0/c-records, D129): the guard of #218 (OPEN 39) is updated. With the
-    demonstration soil file and both rotations of D128, whose crops carry the
-    words of the records, every covered year is a number computed through
-    c_factor/, none falls back to the declared record, and the two rotations
-    do not give the same soil loss. No expected value is asserted."""
+
+def service_catalogue() -> dict[str, dict]:
+    """The catalogue the service loads: every record under params/records/,
+    as ``load_folder`` returns it (api/config.py), loaded and checked."""
     records, problems = load_folder(RECORDS)
     assert problems == [] and check_catalogue(records) == []
+    return records
+
+
+def withdrawn_c_records() -> dict[str, dict]:
+    """The records of params/withdrawn/computed_c/, loaded by the path of that
+    folder and checked, under the keys they had under params/records/."""
+    records, problems = load_folder(WITHDRAWN_C_RECORDS)
+    assert problems == [] and check_catalogue(records) == []
+    return {f"computed_c/{name}": record for name, record in records.items()}
+
+
+def repository_demo_inputs() -> tuple[
+    SiteSoilSlope, SiteClimate, dict[str, RotationCalendar]
+]:
+    """The demonstration soil file, a computable record of ``daily_years``
+    with its identity, and both rotations of D128 as the PLACEHOLDER calendars
+    of ``demo_calendar``, their crops carrying the words of the records."""
+    soil_document_ = json.loads(DEMO_SOIL.read_text("utf-8"))
+    identity = {k: soil_document_[k] for k in ("case_id", "field_id")}
+    climate_document_ = climate_document()
+    climate_document_.update(identity)
+    span = daily_years()
+    calendars = {}
+    for rotation in DEMO_ROTATIONS:
+        document = demo_calendar(rotation, ag_year_of(span[0])).model_dump(mode="json")
+        document.update(identity)
+        for item in document["components"]:
+            item["crop_id"] = REPOSITORY_CROP_WORDS[item["crop_id"]]
+        calendars[rotation] = RotationCalendar.model_validate(document)
+    return (
+        SiteSoilSlope.model_validate(soil_document_),
+        climate_with(rain_series(*span), climate_document_),
+        calendars,
+    )
+
+
+def repository_declared_product(
+    records: dict[str, dict], soil_: SiteSoilSlope
+) -> float:
+    """R K LS C P of the main route with the declared C (D125), computed again
+    from the records of the repository with the empty scope, each in the unit
+    its record states, and the slope of ``soil_``, through equation.py and
+    ls.py, without calling the entry point."""
+    by_id = {r["id"]: r for r in records.values() if r["scope"] == {}}
+
+    def number(pid: str) -> float:
+        value = read_value(by_id[pid])
+        assert isinstance(value, float), pid
+        return value
+
+    def factor(pid: str) -> equation.Factor:
+        return equation.Factor(number(pid), by_id[pid]["unit"])
+
+    slope_unit = ls.SlopeUnit(soil_.slope_steepness.unit)
+    steepness = ls.slope_steepness_factor(
+        slope_steepness=soil_.slope_steepness.value,
+        slope_unit=slope_unit,
+        s_break=number(module.S_BREAK_ID),
+        s_break_unit=ls.SlopeUnit(by_id[module.S_BREAK_ID]["unit"]),
+        **{name: number(pid) for name, pid in module.S_COEFFICIENTS.items()},
+    )
+    length = ls.slope_length_factor(
+        slope_length=soil_.slope_length.value,
+        slope_length_unit=soil_.slope_length.unit,
+        lambda_unit=number(module.LAMBDA_UNIT_ID),
+        lambda_unit_unit=by_id[module.LAMBDA_UNIT_ID]["unit"],
+        slope_steepness=soil_.slope_steepness.value,
+        slope_unit=slope_unit,
+        **{name: number(pid) for name, pid in module.L_COEFFICIENTS.items()},
+    )
+    assert isinstance(steepness, float) and isinstance(length, float)
+    accepted = module.ACCEPTED_UNITS
+    product = equation.annual_soil_loss(
+        r=factor(module.R_ID),
+        k=factor(module.K_ID),
+        ls=equation.Factor(length * steepness, accepted.ls),
+        c=factor(module.C_ID),
+        p=factor(module.P_ID),
+        accepted_units=accepted,
+        unit_guard_reason=module.UNIT_NOT_ACCEPTED,
+    )
+    assert isinstance(product, float)
+    return product
+
+
+def test_service_catalogue_gives_the_declared_c_for_both_demo_rotations_in_every_phase():
+    """The catalogue the service loads, params/records/, holds no record of
+    the computed C (D148, D158). With it, the demonstration soil file
+    and both rotations of D128, their crops carrying the words of the
+    withdrawn records, every covered year of every phase (D109, D141) is the
+    declared product: R K LS C P with the declared rusle_c_factor (D125),
+    computed again here from the records; the source says DECLARED, D125 and
+    the fallback, and never the computed C. That product is the headline
+    figure D146 and D148 print, to the decimals they give."""
+    records = service_catalogue()
+    c_only_ids = {record["id"] for record in withdrawn_c_records().values()}
+    assert c_only_ids
+    assert c_only_ids.isdisjoint(record["id"] for record in records.values())
+    soil_, climate_, calendars = repository_demo_inputs()
+    expected = repository_declared_product(records, soil_)
+    assert round(expected, 3) == HEADLINE_SOIL_LOSS_D148
+    span = daily_years()
+    phases_of = {}
+    for rotation, calendar_ in calendars.items():
+        phases_of[rotation] = list_phases(calendar_)
+        for phase in phases_of[rotation]:
+            result = run(phase_calendar(calendar_, phase), climate_, soil_, records)
+            assert isinstance(result, SoilLossResults)
+            covered = covered_only(result, span)
+            assert sorted(covered) == covered_ag_years(span) and len(covered) > 1
+            for item in covered.values():
+                where = (rotation, phase, item.ag_year)
+                assert item.missing is None, (where, item.missing)
+                assert item.value == expected, where
+                assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+                assert "PROPOSED fallback of brief #218" in item.source, where
+                assert "DECLARED" in item.source and "D125" in item.source
+                assert f"'{module.C_ID}' with scope {{}}" in item.source
+                assert module.COMPUTED_C not in item.source, where
+    # A one-year rotation has one phase; the other has one per year (D109).
+    assert [len(phases_of[rotation]) for rotation in DEMO_ROTATIONS] == [1, 2]
+
+
+def test_withdrawn_c_records_added_to_the_catalogue_compute_c_for_both_demo_rotations():
+    """The capability of #229 stays tested after D148: the records of the
+    computed C (unit l0/c-records, D129) are loaded from
+    params/withdrawn/computed_c/ by its path and added, in memory, to the
+    catalogue the service loads. With the demonstration soil file and both
+    rotations of D128, whose crops carry the words of the records, every
+    covered year is a number computed through c_factor/, none falls back to
+    the declared record, and the two rotations do not give the same soil
+    loss. No expected value is asserted."""
+    service, withdrawn = service_catalogue(), withdrawn_c_records()
+    assert set(service).isdisjoint(withdrawn)
+    records = {**service, **withdrawn}
+    assert check_catalogue(records) == []
     c_ids = {
         *module.MAIN_C_CROP_ONLY_IDS,
         *module.MAIN_C_SITE_ONLY_IDS,
@@ -2323,24 +2464,12 @@ def test_records_on_main_compute_c_for_both_demo_rotations():
         *module.MAIN_C_RESIDUE_IDS,
         *module.MAIN_C_SITE_IDS,
     }
-    present = {r["id"] for r in records.values() if r["id"] in c_ids}
-    assert present == c_ids
-    soil_document_ = json.loads(DEMO_SOIL.read_text("utf-8"))
-    identity = {k: soil_document_[k] for k in ("case_id", "field_id")}
-    soil_ = SiteSoilSlope.model_validate(soil_document_)
-    climate_document_ = climate_document()
-    climate_document_.update(identity)
+    assert {r["id"] for r in withdrawn.values()} == c_ids
+    soil_, climate_, calendars = repository_demo_inputs()
     span = daily_years()
-    climate_ = climate_with(rain_series(*span), climate_document_)
     by_rotation = {}
     for rotation in DEMO_ROTATIONS:
-        document = demo_calendar(rotation, ag_year_of(span[0])).model_dump(mode="json")
-        document.update(identity)
-        for item in document["components"]:
-            item["crop_id"] = REPOSITORY_CROP_WORDS[item["crop_id"]]
-        result = run(
-            RotationCalendar.model_validate(document), climate_, soil_, records
-        )
+        result = run(calendars[rotation], climate_, soil_, records)
         assert isinstance(result, SoilLossResults)
         covered = covered_only(result, span)
         assert covered
