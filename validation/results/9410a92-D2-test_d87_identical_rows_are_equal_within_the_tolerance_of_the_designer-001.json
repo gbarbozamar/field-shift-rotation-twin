@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "9410a92-D2-test_d87_identical_rows_are_equal_within_the_tolerance_of_the_designer-001",
+  "run_id": "run-20261115T122846Z-9410a92",
+  "test_code": "D2",
+  "expected": {
+    "missing_reason": "the entry D2 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_d87_identical_rows_are_equal_within_the_tolerance_of_the_designer"
+  },
+  "notes": "Test decision/test_decision.py::test_d87_identical_rows_are_equal_within_the_tolerance_of_the_designer. Placed under D2: under the heading of D2 in decision/test_decision.py, as the first and second runs placed it."
+}

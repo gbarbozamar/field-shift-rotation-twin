@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "9410a92-E9-test_eq7b_a_zero_factor_does_not_turn_a_non_finite_factor_into_zero-002",
+  "run_id": "run-20261115T122846Z-9410a92",
+  "test_code": "E9",
+  "expected": {
+    "missing_reason": "the entry E9 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_equation.py::test_eq7b_a_zero_factor_does_not_turn_a_non_finite_factor_into_zero[nan-pair1]"
+  },
+  "notes": "Test engine/erosion/test_equation.py::test_eq7b_a_zero_factor_does_not_turn_a_non_finite_factor_into_zero[nan-pair1]. Placed under E9: listed by name on the 'Test' line of entry E9 of docs/VALIDATION.md."
+}

@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "9410a92-D0-test_each_scenario_is_read_on_its_own-001",
+  "run_id": "run-20261115T122846Z-9410a92",
+  "test_code": "D0",
+  "expected": {
+    "missing_reason": "the entry D0 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for validation/test_trivial_comparator.py::test_each_scenario_is_read_on_its_own"
+  },
+  "notes": "Test validation/test_trivial_comparator.py::test_each_scenario_is_read_on_its_own. Placed under D0: a test of validation/test_trivial_comparator.py, the test file of entry D0, under the heading '(d) what entry D0 does not say: no order, with the reason' (rule of the second run, PROPOSED: every test of the file except the one under the heading 'the functions are pure and hold no value of the method')."
+}
