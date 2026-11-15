@@ -4,12 +4,13 @@ import { formatString } from './lib/format'
 import { strings } from './strings'
 import EntryScreen from './entry/EntryScreen'
 import FieldsScreen from './identity/FieldsScreen'
+import PlantScreen from './plant/PlantScreen'
 
 export default function App() {
   const route = useHashRoute()
   // The entry screen opens the case as the default view at "/"; the fields
-  // screen (map above the list) follows at "/fields". Other routes keep the
-  // placeholder page.
+  // screen (map above the list) follows at "/fields"; "What should I plant?"
+  // is at "/plant" (S-019, PROPOSED). Other routes keep the placeholder page.
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -22,6 +23,8 @@ export default function App() {
           <EntryScreen />
         ) : route === '/fields' ? (
           <FieldsScreen />
+        ) : route === '/plant' ? (
+          <PlantScreen />
         ) : (
           <>
             <p>{strings['home.shell']}</p>

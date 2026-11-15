@@ -1,0 +1,5117 @@
+{
+  "example_data": true,
+  "answers": [
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "average",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "on_average"
+      },
+      "answer": "chosen",
+      "chosen": "example-rotation-soybean-cover",
+      "reason": null,
+      "detail": null,
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "chosen",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "meets",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": 90.0,
+        "against": "example-rotation-soybean",
+        "costs_nothing": false,
+        "reason": null,
+        "detail": null,
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": 375.2631578947369,
+          "takes_over": null,
+          "answer_after": "not_resolved",
+          "distance_percent": -6.1842105263157805,
+          "reason": null,
+          "detail": null,
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "el_nino",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "on_average"
+      },
+      "answer": "chosen",
+      "chosen": "example-rotation-soybean-cover",
+      "reason": null,
+      "detail": null,
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "chosen",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "meets",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": 90.0,
+        "against": "example-rotation-soybean",
+        "costs_nothing": false,
+        "reason": null,
+        "detail": null,
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": 341.53846153846155,
+          "takes_over": null,
+          "answer_after": "not_resolved",
+          "distance_percent": -14.615384615384613,
+          "reason": null,
+          "detail": null,
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "neutral",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "on_average"
+      },
+      "answer": "chosen",
+      "chosen": "example-rotation-soybean-cover",
+      "reason": null,
+      "detail": null,
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "chosen",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "meets",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": 90.0,
+        "against": "example-rotation-soybean",
+        "costs_nothing": false,
+        "reason": null,
+        "detail": null,
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": 290.0,
+          "takes_over": null,
+          "answer_after": "not_resolved",
+          "distance_percent": -27.500000000000004,
+          "reason": null,
+          "detail": null,
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "la_nina",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "on_average"
+      },
+      "answer": "not_resolved",
+      "chosen": null,
+      "reason": "MISSING_INPUT",
+      "detail": "whether these rotations meet the limit is not resolved, and they could be the answer: example-rotation-soybean-cover-pasture: its margin 38.0 is at least the best margin that meets the limit, -50.0; the limit check: the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)",
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "meets",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "meets",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": null,
+        "against": null,
+        "costs_nothing": false,
+        "reason": "NOT_COMPUTABLE",
+        "detail": "no rotation is chosen (the answer is not resolved), so the cost of meeting the limit is not computed",
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": 510.0,
+          "takes_over": "example-rotation-soybean-cover",
+          "answer_after": "chosen",
+          "distance_percent": 27.500000000000004,
+          "reason": null,
+          "detail": null,
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "average",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "every_kind"
+      },
+      "answer": "not_resolved",
+      "chosen": null,
+      "reason": "MISSING_INPUT",
+      "detail": "no rotation is known to meet the limit, and whether these meet it is not resolved: example-rotation-soybean-cover-pasture (the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value))",
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": null,
+        "against": null,
+        "costs_nothing": false,
+        "reason": "NOT_COMPUTABLE",
+        "detail": "no rotation is chosen (the answer is not resolved), so the cost of meeting the limit is not computed",
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "el_nino",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "every_kind"
+      },
+      "answer": "not_resolved",
+      "chosen": null,
+      "reason": "MISSING_INPUT",
+      "detail": "no rotation is known to meet the limit, and whether these meet it is not resolved: example-rotation-soybean-cover-pasture (the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value))",
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": null,
+        "against": null,
+        "costs_nothing": false,
+        "reason": "NOT_COMPUTABLE",
+        "detail": "no rotation is chosen (the answer is not resolved), so the cost of meeting the limit is not computed",
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "neutral",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "every_kind"
+      },
+      "answer": "not_resolved",
+      "chosen": null,
+      "reason": "MISSING_INPUT",
+      "detail": "no rotation is known to meet the limit, and whether these meet it is not resolved: example-rotation-soybean-cover-pasture (the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value))",
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": null,
+        "against": null,
+        "costs_nothing": false,
+        "reason": "NOT_COMPUTABLE",
+        "detail": "no rotation is chosen (the answer is not resolved), so the cost of meeting the limit is not computed",
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    },
+    {
+      "contract": "plant_answer",
+      "example_data": true,
+      "case_id": "example-case",
+      "field_id": "example-field-1",
+      "questions": {
+        "soybean_crop_ids": [
+          "PLACEHOLDER_soybean"
+        ],
+        "soybean_price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "margin_of": "la_nina",
+        "rain_stress_factor": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "strictness": "every_kind"
+      },
+      "answer": "not_resolved",
+      "chosen": null,
+      "reason": "MISSING_INPUT",
+      "detail": "no rotation is known to meet the limit, and whether these meet it is not resolved: example-rotation-soybean-cover-pasture (the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value))",
+      "tied": [],
+      "options": [
+        {
+          "rotation_id": "example-rotation-soybean",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 312.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 440.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 600.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 40.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 14.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 11.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 8.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino",
+              "neutral",
+              "la_nina"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover",
+          "state": "does_not_meet",
+          "margin": {
+            "average": {
+              "value": 222.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 350.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 510.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": -50.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": 5.2,
+              "unit": "t ha-1 yr-1",
+              "n_years": 10,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 6.5,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 5.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2017,
+                2020,
+                2021,
+                2022
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "meets",
+              "reason": null,
+              "detail": null
+            },
+            "every_kind": {
+              "verdict": "does_not_meet",
+              "reason": null,
+              "detail": null
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "does_not_meet",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              }
+            },
+            "kinds_not_met": [
+              "el_nino"
+            ],
+            "kinds_not_resolved": [],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "does_not_meet",
+            "reason": null,
+            "detail": null
+          }
+        },
+        {
+          "rotation_id": "example-rotation-soybean-cover-pasture",
+          "state": "not_resolved",
+          "margin": {
+            "average": {
+              "value": 193.8,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "el_nino": {
+              "value": 274.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "neutral": {
+              "value": 345.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            },
+            "la_nina": {
+              "value": 38.0,
+              "unit": "USD ha-1 yr-1",
+              "reason": null,
+              "detail": null
+            }
+          },
+          "soil_loss": {
+            "average": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 9,
+              "ag_years": [
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2023,
+                2024
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "el_nino": {
+              "value": 4.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 4,
+              "ag_years": [
+                2015,
+                2018,
+                2019,
+                2023
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "neutral": {
+              "value": 3.0,
+              "unit": "t ha-1 yr-1",
+              "n_years": 2,
+              "ag_years": [
+                2016,
+                2024
+              ],
+              "reason": null,
+              "detail": null,
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            },
+            "la_nina": {
+              "value": null,
+              "unit": "t ha-1 yr-1",
+              "n_years": 3,
+              "ag_years": [
+                2017,
+                2020,
+                2021
+              ],
+              "reason": "MISSING_INPUT",
+              "detail": "agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value",
+              "sources": [
+                "PLACEHOLDER: example data, not computed by an engine"
+              ],
+              "assumption": false
+            }
+          },
+          "limit": {
+            "limit": 6.0,
+            "unit": "t ha-1 yr-1",
+            "on_average": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the soil loss on average is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of the record have no value)"
+            },
+            "every_kind": {
+              "verdict": "not_resolved",
+              "reason": "MISSING_INPUT",
+              "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+            },
+            "by_kind": {
+              "el_nino": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "neutral": {
+                "verdict": "meets",
+                "reason": null,
+                "detail": null
+              },
+              "la_nina": {
+                "verdict": "not_resolved",
+                "reason": "MISSING_INPUT",
+                "detail": "the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+              }
+            },
+            "kinds_not_met": [],
+            "kinds_not_resolved": [
+              "la_nina"
+            ],
+            "kinds_not_in_record": []
+          },
+          "limit_check": {
+            "verdict": "not_resolved",
+            "reason": "MISSING_INPUT",
+            "detail": "the limit is not resolved in the kind of year la_nina: the soil loss in the la_nina kind of year is missing (MISSING_INPUT: agricultural year(s) 2022 (MISSING_INPUT: PLACEHOLDER: example of a soil loss the engine did not give) of kind la_nina have no value)"
+          }
+        }
+      ],
+      "limit_cost": {
+        "value": null,
+        "against": null,
+        "costs_nothing": false,
+        "reason": "NOT_COMPUTABLE",
+        "detail": "no rotation is chosen (the answer is not resolved), so the cost of meeting the limit is not computed",
+        "unit": "USD ha-1 yr-1"
+      },
+      "tipping_price": {
+        "today": 400.0,
+        "unit": "USD t-1",
+        "price_range": {
+          "low": 200.0,
+          "high": 600.0,
+          "unit": "USD t-1"
+        },
+        "up": {
+          "direction": "up",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "down": {
+          "direction": "down",
+          "price": null,
+          "takes_over": null,
+          "answer_after": null,
+          "distance_percent": null,
+          "reason": "NOT_APPLICABLE",
+          "detail": "no price in this range changes the answer (200.0 to 600.0 USD t-1)",
+          "unit": "USD t-1"
+        },
+        "reason": null,
+        "detail": null
+      },
+      "rain_stress": {
+        "factor": 1.2,
+        "declared": {
+          "value": 1.2,
+          "unit": "dimensionless",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
+        "detail": "rain erosivity multiplied by 1.2 as a stress test of heavier rain; not a forecast",
+        "label": "stress test",
+        "applied": true
+      },
+      "erosivity": "mean_annual",
+      "kinds_of_year": {
+        "source": "oni_v6",
+        "start_month": 7,
+        "years": [
+          {
+            "ag_year": 2015,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2016
+          },
+          {
+            "ag_year": 2016,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2017
+          },
+          {
+            "ag_year": 2017,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2018
+          },
+          {
+            "ag_year": 2018,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2019
+          },
+          {
+            "ag_year": 2019,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2020
+          },
+          {
+            "ag_year": 2020,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2021
+          },
+          {
+            "ag_year": 2021,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2022
+          },
+          {
+            "ag_year": 2022,
+            "kind": "la_nina",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2023
+          },
+          {
+            "ag_year": 2023,
+            "kind": "el_nino",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2024
+          },
+          {
+            "ag_year": 2024,
+            "kind": "neutral",
+            "missing_reason": null,
+            "detail": null,
+            "season": "DJF",
+            "season_year": 2025
+          }
+        ],
+        "counts": {
+          "el_nino": 4,
+          "neutral": 2,
+          "la_nina": 4
+        }
+      },
+      "sources": [
+        {
+          "id": "example_soil_loss",
+          "contract": "results",
+          "state": "example",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": null,
+          "missing_reason": null,
+          "detail": "PLACEHOLDER: the soil loss of every rotation is example data"
+        },
+        {
+          "id": "oni_v6",
+          "contract": "kinds_of_year_record",
+          "state": "cached",
+          "retrieved_at": null,
+          "time_zone": null,
+          "request": null,
+          "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+          "missing_reason": null,
+          "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+        }
+      ]
+    }
+  ]
+}

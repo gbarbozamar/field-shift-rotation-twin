@@ -149,6 +149,86 @@ export const strings = {
   // Approved by the interface developer, 15/11/2026.
   'soil_loss.withdrawn_c':
     'Not shown: the computed cover factor of this release overestimates the measured loss (see the check in docs/VALIDATION.md).',
+  // PROPOSED (S-019, l2/plant-screen): the screen "What should I plant?".
+  // Wording is a person's decision; the operator approves it. No kind of
+  // year is called "dry": which kind is dry is OPEN.
+  'plant.title': 'What should I plant?',
+  'plant.rule':
+    'The rule: the most margin per hectare and year among the rotations that do not lose more soil than the limit. Soil loss is a limit, not a cost.',
+  'plant.questions': 'Four questions',
+  'plant.q.price': 'What is soybean worth?',
+  'plant.q.price_hint': 'A tipping price, not a forecast: the screen shows where the answer changes.',
+  'plant.q.price_looked_at': 'Price looked at: {price} {unit}',
+  'plant.q.price_today': 'Today: {price} {unit}',
+  'plant.q.price_range': 'Range: {low} to {high} {unit}',
+  'plant.q.kind': 'Which kind of year?',
+  'plant.q.rain': 'And if the rain is heavier?',
+  'plant.q.rain_control': 'Heavier rain stress test',
+  'plant.q.rain_unavailable_detail': 'the stress test needs the service, which this page does not call',
+  'plant.q.strict': 'How strict?',
+  'plant.kind.average': 'average of the record',
+  'plant.kind.el_nino': 'El Nino',
+  'plant.kind.neutral': 'neutral',
+  'plant.kind.la_nina': 'La Nina',
+  'plant.strict.on_average': 'Meet the limit on average',
+  'plant.strict.every_kind': 'Meet the limit in every kind of year',
+  'plant.answer.heading': 'The answer at the price of today',
+  'plant.answer.chosen': 'Plant this rotation',
+  'plant.answer.none_meets': 'None of the rotations meets the soil-loss limit',
+  'plant.answer.not_resolved': 'Not resolved: the data cannot pick one rotation',
+  'plant.answer.why': 'Why',
+  'plant.answer.tied': 'Tied: {rotations}',
+  'plant.answer.missing_what': 'Answer to these questions',
+  'plant.answer.missing_detail': 'no example answer holds these questions',
+  'plant.value_line': '{what}: {value} {unit}',
+  'plant.margin_of': 'Margin, {kind}',
+  'plant.soil_loss_of': 'Soil loss, {kind}',
+  'plant.limit': 'Soil-loss limit',
+  'plant.by_kind': 'Margin in each kind of year',
+  'plant.check.on_average': 'Limit check on average',
+  'plant.check.every_kind': 'Limit check in every kind of year',
+  'plant.check_line': '{check}: {verdict}',
+  'plant.verdict.meets': 'meets the limit',
+  'plant.verdict.does_not_meet': 'does not meet the limit',
+  'plant.cost.heading': 'What meeting the limit costs',
+  'plant.cost.what': 'Cost of meeting the limit',
+  'plant.cost.value': 'Meeting the limit costs {value} {unit} against {against}, the rotation outside the limit with the most margin',
+  'plant.cost.nothing': 'Meeting the limit costs nothing: no rotation outside the limit has more margin',
+  'plant.tip.heading': 'Tipping price',
+  'plant.tip.up': 'If soybean rises',
+  'plant.tip.down': 'If soybean falls',
+  'plant.tip.point': 'At {price} {unit} the answer becomes: {after}',
+  'plant.tip.distance': '{distance} % from the price of today',
+  'plant.tip.distance_what': 'Distance from the price of today',
+  'plant.after.chosen': '{rotation} is chosen',
+  'plant.after.none_meets': 'none of the rotations meets the limit',
+  'plant.after.not_resolved': 'not resolved',
+  'plant.price.today': 'This is the price of today.',
+  'plant.price.same':
+    'No tipping price lies between this price and the price of today: the answer is the one at the price of today. The margins shown are at the price of today.',
+  'plant.price.past':
+    'Past the tipping price of {price} {unit} the answer becomes: {after}. Whether it changes again further from today is not computed. The margins shown are at the price of today.',
+  'plant.price.unknown_what': 'Answer at {price} {unit}',
+  'plant.options.heading': 'Each option',
+  'plant.state.chosen': 'Chosen: the most margin among the rotations within the limit',
+  'plant.state.meets': 'Meets the soil-loss limit',
+  'plant.state.does_not_meet': 'Loses more soil than the limit: left out',
+  'plant.state.not_resolved': 'Not resolved: the data cannot tell whether it meets the limit',
+  'plant.kinds.not_met': 'Kinds of year over the limit: {kinds}',
+  'plant.kinds.not_resolved': 'Kinds of year not resolved: {kinds}',
+  'plant.kinds.not_in_record': 'Kinds of year not in the record: {kinds}',
+  'plant.kinds.none': 'none',
+  'plant.sources.heading': 'Sources',
+  'plant.source_line': '{id}: {detail}',
+  'plant.source.economics':
+    'margins, the cost of meeting the limit and the tipping price, computed by the economics functions from the economic facts of this answer',
+  // PROPOSED (S-019 fix round 1): the mark of a value the user declares in
+  // the request (the soil-loss limit, the soybean prices). Wording is a
+  // person's decision.
+  'plant.declared': 'Declared by the user in the request (example data)',
+  // PROPOSED (S-019 code review fixes): the attribution a source of the
+  // answer carries. Wording is a person's decision.
+  'plant.source.attribution': 'Attribution: {attribution}',
 } as const
 
 /**
