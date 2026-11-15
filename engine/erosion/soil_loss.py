@@ -375,16 +375,21 @@ OUTSIDE_RECORD = (
 )
 BEFORE_FIRST_CYCLE = (
     "the day lies before the first cycle of the rotation repeated over the years of "
-    "the climate record (decision D47 of issue #77; engine/calendar/repeat.py), so "
-    "the calendar does not describe it: nothing is laid out before the first cycle "
-    "(OPEN 2 of engine/erosion/SOIL_LOSS.md)"
+    "the climate record (decision D47 of issue #77; engine/calendar/repeat.py), and "
+    "the cycle before the first is not laid out, because none of its components has "
+    "an end date on or after the first day of the record's years (decision D141 of "
+    "issue #77; point 13 of engine/calendar/repeat.py), so the calendar does not "
+    "describe the day (OPEN 2 of engine/erosion/SOIL_LOSS.md)"
 )
 NO_HARVEST_BEFORE = (
-    "no component of the rotation, repeated over the years of the climate record "
-    "from its first agricultural year (decision D47 of issue #77; "
-    "engine/calendar/repeat.py), ends before the day, so the residue on the surface "
-    "is not known: the residue left before the record begins is not laid out "
-    "(OPEN 2 of engine/erosion/SOIL_LOSS.md; the residue ledger, Q12 of "
+    "no component laid out for the rotation repeated over the years of the climate "
+    "record (decision D47 of issue #77; engine/calendar/repeat.py) has an end date "
+    "before the day, so the residue on the surface is not known: a harvest before "
+    "the first day of the record's years is not laid out, and of the cycle before "
+    "the first only the components that can reach that day are laid out (decision "
+    "D141 of issue #77; point 13 of engine/calendar/repeat.py), so the residue left "
+    "before the record stays missing (OPEN 2 and OPEN 40 of "
+    "engine/erosion/SOIL_LOSS.md; the residue ledger, Q12 of "
     "contracts/ENTRYPOINTS.md)"
 )
 TOLERANCE_NOT_SUPPLIED = Missing(
