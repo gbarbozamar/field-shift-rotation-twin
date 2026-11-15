@@ -103,13 +103,26 @@ def test_the_catalogues_hold_only_the_records_of_the_level() -> None:
     from params.catalogue import check_catalogue, load_folder
 
     service = load_folder(real.PARAMETERS_FOLDER)[0]
-    # The service catalogue drafts no cover record (engine/water/EXPOSURE.md:
-    # "no record drafted"); only the demo's in-memory catalogues hold them.
-    assert not any(
-        record.get("id") == "surface_residue_cover" for record in service.values()
-    )
+    # The water lane ships the lower level of the soybean fallow itself
+    # (D208: both levels of D115 as one range, soybean, no crop); every
+    # other cover record lives in the demo's in-memory catalogues alone.
+    shipped = {
+        key: record
+        for key, record in service.items()
+        if record.get("id") == "surface_residue_cover"
+    }
+    assert list(shipped) == ["water/surface_residue_cover.soybean.no_crop.json"]
+    assert shipped["water/surface_residue_cover.soybean.no_crop.json"][
+        "value"
+    ] == 0.0
     lower, upper = real.catalogue_at(0.0), real.catalogue_at(0.40)
     assert check_catalogue(lower) == [] and check_catalogue(upper) == []
+    # The shipped record wins at the lower level (its value is the level's);
+    # the level's declaration replaces it at the upper level.
+    assert "water/surface_residue_cover.soybean.no_crop.json" in lower
+    assert "demo/surface_residue_cover.0.0.soybean.json" not in lower
+    assert "water/surface_residue_cover.soybean.no_crop.json" not in upper
+    assert "demo/surface_residue_cover.0.4.soybean.json" in upper
     records_of = lambda catalogue: {  # noqa: E731
         (record["id"], tuple(sorted(record["scope"].items())))
         for record in catalogue.values()
@@ -248,8 +261,9 @@ def test_every_row_of_the_route_is_missing_with_its_reason() -> None:
     # On the repository's own inputs (the chain examples) the route answers
     # no number: the ls factor is not computable (the example soil's
     # slope-length unit is the example's, not the metre of the LS records),
-    # and the water and carbon records are not drafted. Missing with its
-    # reason, never zero — the honest state of the route today.
+    # and the daily inputs of the water balance and the carbon records are
+    # not drafted (the cover record itself is, since D208). Missing with
+    # its reason, never zero — the honest state of the route today.
     table, _ = real.level_table(0.0)
     for row in table.rows:
         assert row.value is None
@@ -261,7 +275,15 @@ def test_every_row_of_the_route_is_missing_with_its_reason() -> None:
     water_rows = [
         row for row in table.rows if row.indicator == "water_deficit_exposure"
     ]
-    assert all("no record in parameters" in row.missing.detail for row in water_rows)
+    # The shipped cover record (D208) no longer blocks the balance; the
+    # undrafted daily inputs do, and no detail blames the cover.
+    assert all(
+        "the daily water balance has no value" in row.missing.detail
+        for row in water_rows
+    )
+    assert all(
+        "surface_residue_cover" not in row.missing.detail for row in water_rows
+    )
 
 
 def test_the_sweep_reads_both_levels_with_the_phases_nested() -> None:
