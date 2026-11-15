@@ -286,10 +286,9 @@ export const strings = {
   // error panel (one text per error code of api/errors.py, plus UNEXPECTED),
   // the factor heavier rain sends, and the rain-stress part of the answer.
   'plant.service.origin_example': 'Saved PLACEHOLDER example answers, no service called: not a real answer',
-  // Issue #425 (P4): without a configured service the screen says so
-  // and keeps the saved examples labelled PLACEHOLDER.
-  'plant.service.not_available':
-    'The service is not available: no answer from it is shown. What follows is PLACEHOLDER example data, not a real answer.',
+  // D251 (#77): without a configured service the screen says so and shows
+  // no example values in place of an answer.
+  'plant.service.not_available': 'The service is not available: no answer can be shown.',
   'plant.service.origin_service': 'Answer from the service at {api}',
   'plant.service.ask': 'Ask the service',
   'plant.service.back': 'Back to the saved example',

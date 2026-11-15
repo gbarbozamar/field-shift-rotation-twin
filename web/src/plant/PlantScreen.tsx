@@ -668,8 +668,6 @@ export interface PlantViewProps {
   status?: ServiceStatus
   /** The rain-stress part of a service answer (S-021), shown beside it. */
   rainStress?: RainStressPart | null
-  /** No service is configured (issue #425): the screen says it is not available. */
-  serviceUnavailable?: boolean
 }
 
 /** The heavier-rain control: unavailable without the service, or the factor the request declares. */
@@ -964,7 +962,6 @@ export function PlantView(props: PlantViewProps) {
     onBackToExample,
     status,
     rainStress = null,
-    serviceUnavailable = false,
   } = props
   const answer = status === undefined ? selectAnswer(set, strictness, marginOf) : null
   return (
@@ -980,12 +977,6 @@ export function PlantView(props: PlantViewProps) {
             {strings['example.banner']}
           </p>
         </div>
-      ) : null}
-
-      {serviceUnavailable ? (
-        <p data-testid="plant-service-not-available" className="mt-3 text-sm font-medium text-slate-700">
-          {strings['plant.service.not_available']}
-        </p>
       ) : null}
 
       <OriginLine origin={origin} onAskService={onAskService} onBackToExample={onBackToExample} />
@@ -1211,6 +1202,29 @@ export function servicePhaseOf(query: {
 }
 
 /**
+ * The screen with no service configured (D251 of #77): it says the service
+ * is not available and shows nothing of the example answers (no answer card,
+ * no options, no questions drawn from their prices). The example answers stay
+ * test fixtures only.
+ */
+export function PlantNoServiceView() {
+  return (
+    <section aria-labelledby="plant-title" className="mx-auto max-w-5xl">
+      <h2 id="plant-title" className="text-2xl font-semibold">
+        {strings['plant.title']}
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">{strings['plant.rule']}</p>
+      <p data-testid="plant-service-not-available" className="mt-3 text-sm font-medium text-slate-700">
+        {strings['plant.service.not_available']}
+      </p>
+      <p data-testid="plant-disclaimer" className="mt-6 text-xs text-slate-500">
+        {strings['disclaimer.full']}
+      </p>
+    </section>
+  )
+}
+
+/**
  * The screen for a state: a pure function of the state, the configured
  * backend (null: none), what is read of the base request (the example
  * request by default) and, in service mode, the phase of the call.
@@ -1234,17 +1248,20 @@ export function PlantScreenView({
     onStrictness: (value: Strictness) => dispatch({ type: 'strictness', value }),
     onMarginOf: (value: MarginOf) => dispatch({ type: 'margin_of', value }),
   }
+  if (apiBase === null) {
+    // D251: no service, no answer; the example answers are not shown.
+    return <PlantNoServiceView />
+  }
   const rain = rainControlOf(state, apiBase, read, dispatch)
-  if (state.mode === 'example' || apiBase === null || service === null) {
+  if (state.mode === 'example' || service === null) {
     // PROPOSED (fix round 1): a request that cannot be read is not offered to the service.
     return (
       <PlantView
         set={plantExamples}
         price={state.price}
         onPrice={(price) => dispatch({ type: 'price', price, key: null })}
-        onAskService={apiBase !== null && read.readable ? () => dispatch({ type: 'ask' }) : undefined}
+        onAskService={read.readable ? () => dispatch({ type: 'ask' }) : undefined}
         rain={rain}
-        serviceUnavailable={apiBase === null}
         {...handlers}
       />
     )
@@ -1287,8 +1304,9 @@ const NO_SERVICE_CLIENT = new QueryClient()
 
 /**
  * The screen at #/plant. The backend is the configured one (VITE_API_URL,
- * configuredApiBase) unless given: null means none, and the screen shows the
- * example answers only and calls nothing, as before S-021. One component for
+ * configuredApiBase) unless given: null means none, and the screen says the
+ * service is not available, shows no example answer and calls nothing (D251
+ * of #77; PlantNoServiceView). One component for
  * both: the query is disabled without a backend or outside service mode.
  * initialState (PROPOSED, for tests) is the first state; the example answers
  * by default.

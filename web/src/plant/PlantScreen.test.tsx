@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import rawExample from '../data/PLACEHOLDER_plant_answer.json'
 import App from '../App'
-import PlantScreen, { PlantView } from './PlantScreen'
+import PlantScreen, { PlantNoServiceView, PlantView } from './PlantScreen'
 import { parsePlantAnswers, plantExamples } from './plantData'
 import type { MarginOf, PlantAnswerSet, Strictness } from './plantData'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
@@ -184,20 +184,8 @@ describe('PlantScreen: the chosen rotation (1)', () => {
     expect(rain).toMatch(/disabled=""/)
   })
 
-  it('the default screen renders the example answer of the questions it starts with', () => {
-    // Without a configured service the screen also says the service is not
-    // available (issue #425).
-    expect(renderToString(<PlantScreen apiBase={null} />)).toBe(
-      renderToString(
-        <PlantView
-          set={plantExamples}
-          strictness="on_average"
-          marginOf="average"
-          price={rawExample.tipping_price.today}
-          serviceUnavailable
-        />,
-      ),
-    )
+  it('without a configured service the screen is the not-available view only (D251)', () => {
+    expect(renderToString(<PlantScreen apiBase={null} />)).toBe(renderToString(<PlantNoServiceView />))
   })
 })
 
@@ -364,7 +352,9 @@ describe('PlantScreen: the route #/plant', () => {
   it('renders the screen at #/plant', () => {
     vi.stubGlobal('window', { location: { hash: '#/plant' } })
     const html = renderToString(<App />)
-    expect(html).toContain('data-testid="plant-card"')
+    // No service is configured in the tests: the screen says it is not available (D251).
+    expect(html).toContain('data-testid="plant-service-not-available"')
+    expect(html).not.toContain('data-testid="plant-card"')
     expect(visibleText(html)).toContain(strings['plant.title'])
   })
 })

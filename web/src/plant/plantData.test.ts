@@ -562,3 +562,51 @@ describe('the parser reads the D249 labels of #424 strictly', () => {
     expect(() => parsePlantAnswer(answer)).toThrow('price-range-not-declared')
   })
 })
+
+describe('the parser reads the D249 labels of #424 strictly: four more checks', () => {
+  it('refuses a missing value that carries labels', () => {
+    const answer = exampleCopy()
+    const item = answer.options[0].margin.average
+    item.value = null
+    item.reason = 'NOT_COMPUTABLE'
+    item.detail = 'PLACEHOLDER detail'
+    delete item.source
+    // provenance and range_missing are kept: a missing value carries none of them
+    expect(() => parsePlantAnswer(answer)).toThrow('margin:average:missing-value-with-labels')
+  })
+
+  it("refuses a missing tipping point's distance that carries labels", () => {
+    const answer = exampleCopy()
+    const down = answer.tipping_price.down
+    expect(down.price).not.toBeNull()
+    down.distance_percent = null
+    down.reason = 'NOT_COMPUTABLE'
+    down.detail = 'PLACEHOLDER detail'
+    // distance_provenance and distance_range_missing are kept
+    expect(() => parsePlantAnswer(answer)).toThrow('down:distance:missing-value-with-labels')
+    delete down.distance_provenance
+    delete down.distance_range_missing
+    const parsed = parsePlantAnswer(answer).tipping_price.down
+    expect(parsed.price === null ? 'no price' : parsed.distance_labels).toBeNull()
+  })
+
+  it("reads the labels of today's price", () => {
+    const parsed = parsePlantAnswer(exampleCopy()).tipping_price
+    const raw = rawExample.tipping_price
+    expect(parsed.today).toBe(raw.today)
+    expect(parsed.today_labels).toEqual({
+      provenance: raw.provenance,
+      range: null,
+      range_missing: raw.range_missing,
+    })
+  })
+
+  it('refuses a value outside its range', () => {
+    const answer = exampleCopy()
+    delete answer.limit_cost.range_missing
+    answer.limit_cost.range = { low: answer.limit_cost.value + 1, high: answer.limit_cost.value + 2, kind: 'PLACEHOLDER_kind' }
+    expect(() => parsePlantAnswer(answer)).toThrow('limit-cost:value-outside-its-range')
+    answer.limit_cost.range = { low: answer.limit_cost.value - 1, high: answer.limit_cost.value + 1, kind: 'PLACEHOLDER_kind' }
+    expect(parsePlantAnswer(answer).limit_cost).toMatchObject({ kind: 'value' })
+  })
+})

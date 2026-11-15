@@ -8,7 +8,9 @@ import { formatString } from '../lib/format'
 import { ApiError } from '../seam/runRotationApi'
 import { strings } from '../strings'
 import PlantScreen, {
+  PlantNoServiceView,
   PlantScreenView,
+  PlantView,
   initialPlantState,
   plantScreenReducer,
   priceKeyOf,
@@ -16,6 +18,7 @@ import PlantScreen, {
   servicePhaseOf,
 } from './PlantScreen'
 import type { PlantScreenState, ServicePhase } from './PlantScreen'
+import { plantExamples } from './plantData'
 import {
   plantQueryOptions,
   plantRequestFor,
@@ -106,29 +109,54 @@ afterEach(() => {
 describe('no backend configured (1)', () => {
   const fetch = vi.fn()
 
-  it('opens on the example answers with the banner, makes no call, offers no service', () => {
+  it('says the service is not available, makes no call, and shows nothing of the example answers (D251)', () => {
     vi.stubGlobal('fetch', fetch)
     const html = renderToString(<PlantScreen apiBase={null} />)
     expect(fetch).not.toHaveBeenCalled()
-    expect(count(html, 'plant-example-banner')).toBe(1)
-    expect(count(html, 'plant-card')).toBe(1)
-    expect(count(html, 'plant-option')).toBe(rawAnswer.options.length)
-    expect(count(html, 'plant-service-ask')).toBe(0)
-    expect(visibleText(section(html, 'plant-origin'))).toContain(strings['plant.service.origin_example'])
-  })
-
-  it('says the service is not available and keeps the examples labelled PLACEHOLDER (issue #425)', () => {
-    const html = renderToString(<PlantScreen apiBase={null} />)
+    expect(html).toBe(renderToString(<PlantNoServiceView />))
     expect(visibleText(section(html, 'plant-service-not-available'))).toContain(
       strings['plant.service.not_available'],
     )
-    expect(strings['plant.service.not_available']).toContain('not available')
-    expect(strings['plant.service.not_available']).toContain('PLACEHOLDER')
-    expect(strings['plant.service.origin_example']).toContain('PLACEHOLDER')
+    for (const testid of [
+      'plant-example-banner',
+      'plant-origin',
+      'plant-card',
+      'plant-option',
+      'plant-options',
+      'plant-service-ask',
+      'plant-q-price',
+      'plant-q-rain',
+    ]) {
+      expect(count(html, testid), testid).toBe(0)
+    }
   })
 
-  it('never says "Plant this rotation" (D245) and labels every soil-loss figure (D148)', () => {
+  it('with no service, no soil-loss figure, no margin and no rotation name of the examples is rendered', () => {
     const html = renderToString(<PlantScreen apiBase={null} />)
+    const text = visibleText(html)
+    expect(count(html, 'plant-value')).toBe(0)
+    expect(count(html, 'plant-soil-loss-label')).toBe(0)
+    expect(count(html, 'plant-bar-soil')).toBe(0)
+    expect(count(html, 'plant-bar-margin')).toBe(0)
+    for (const answer of plantExamples.answers) {
+      for (const option of answer.options) {
+        expect(text).not.toContain(option.rotation_id)
+        for (const item of [...Object.values(option.margin), ...Object.values(option.soil_loss)]) {
+          if (item.value !== null) {
+            expect(text).not.toContain(`${displayNumber(item.value)} ${item.unit}`)
+          }
+        }
+      }
+    }
+    for (const rotation of rawRequest.rotations as { label?: string }[]) {
+      if (rotation.label !== undefined) expect(text).not.toContain(rotation.label)
+    }
+  })
+
+  it('the example answers, injected into the card components, never say "Plant this rotation" (D245) and label every soil-loss figure (D148)', () => {
+    const html = renderToString(
+      <PlantView set={plantExamples} strictness="on_average" marginOf="average" price={rawAnswer.tipping_price.today} />,
+    )
     const text = visibleText(html)
     expect(text).not.toContain('Plant this rotation')
     expect(text).toContain(strings['plant.answer.chosen'])
@@ -138,10 +166,16 @@ describe('no backend configured (1)', () => {
     const figures = (html.match(/data-testid="plant-value"[^>]*>[^<]*Soil loss/g) ?? []).length
     expect(figures).toBeGreaterThan(0)
     expect(count(html, 'plant-soil-loss-label')).toBe(figures)
+    expect(strings['plant.service.origin_example']).toContain('PLACEHOLDER')
   })
 
-  it('keeps the heavier-rain control disabled with its reason', () => {
-    const rain = section(renderToString(<PlantScreen apiBase={null} />), 'plant-q-rain')
+  it('the card components keep the heavier-rain control disabled with its reason by default', () => {
+    const rain = section(
+      renderToString(
+        <PlantView set={plantExamples} strictness="on_average" marginOf="average" price={rawAnswer.tipping_price.today} />,
+      ),
+      'plant-q-rain',
+    )
     expect(rain).toMatch(/disabled=""/)
     expect(visibleText(rain)).toContain(
       missingPatternText(strings['plant.q.rain_control'], {
@@ -424,9 +458,9 @@ describe('fix 6: with a backend, heavier rain is enabled in example mode too', (
     expect(count(html, 'plant-rain-next-answer')).toBe(0)
   })
 
-  it('without a backend: unchanged, disabled with its reason and no next-answer line', () => {
+  it('without a backend: no rain control and no next-answer line, only the not-available view (D251)', () => {
     const html = renderToString(<PlantScreen apiBase={null} />)
-    expect(section(html, 'plant-q-rain')).toMatch(/disabled=""/)
+    expect(count(html, 'plant-q-rain')).toBe(0)
     expect(count(html, 'plant-rain-next-answer')).toBe(0)
   })
 })
@@ -451,15 +485,9 @@ describe('fix 7: a request that cannot be read is a typed absence on the rain co
     expect(serviceRequestOf(serviceState(), unreadable)).toBeNull()
   })
 
-  it('without a backend: the control is unchanged and the example screen renders', () => {
+  it('without a backend: the not-available view, whatever the request (D251)', () => {
     const html = renderToString(<PlantScreenView state={initialPlantState()} apiBase={null} service={null} read={read} />)
-    expect(visibleText(section(html, 'plant-q-rain'))).toContain(
-      missingPatternText(strings['plant.q.rain_control'], {
-        reason: 'NOT_AVAILABLE',
-        detail: strings['plant.q.rain_unavailable_detail'],
-      }),
-    )
-    expect(count(html, 'plant-card')).toBe(1)
+    expect(html).toBe(renderToString(<PlantNoServiceView />))
   })
 })
 
