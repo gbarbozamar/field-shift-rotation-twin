@@ -628,10 +628,11 @@ The two context blocks of this section (soil loss measured with ¹³⁷Cs, and t
 
 - What it is: an exploratory contrast of the project's AMG functions (EP5, `engine/amg/`) against the soil organic carbon (SOC) measured in the long-term experiment LEELP1 at La Estanzuela. [D234 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893292145) records it here with no code, no tolerance and no pass rule, reported as an observation. **It is not a validation of the project.**
 - How it came about, per D234: another AI session, outside this repository, ran the project's AMG functions against the published data of LEELP1. An independent AI session then reproduced every figure with its own code on `main` and read the article raw. **The results were seen before D234 was taken.** That is why this entry has no pass rule and is called exploratory.
+- Lane: L0 Core (EP5); the run was made outside this repository, and reproduced by an AI session, read-only.
 - Class (blueprint section 3.6): Science — PROPOSED
 - Source, as D234 gives it (read raw on 15 November 2026):
   - González-Sosa et al. (2024), SOIL 10:467, https://doi.org/10.5194/soil-10-467-2024, CC BY 4.0: section 2.1 (site, soil survey of 1985, mean rainfall), and the methods for residue, root inputs and sampling depth;
-  - the data on Zenodo, record 11116986, `LEELP1_DATA.xlsx`, CC BY 4.0: the sheets of SOC, yields, `precip_68_2022` and CLIMATE. D234 prints no DOI or URL for the record, and none is written here;
+  - the data on Zenodo, record 11116986, https://doi.org/10.5281/zenodo.11116986, CC BY 4.0: the file `CODE_AND_DATA.zip`, whose data workbook is `CODE_AND_DATA_v2/DATA.xlsx` ([correction to D234](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893619285)). The run used a copy named `LEELP1_DATA.xlsx`, with the sheets of SOC, yields, `precip_68_2022` and CLIMATE; whether that copy is identical to `DATA.xlsx` is OPEN;
   - Clivot et al. (2019) and the AMGv2 parameter dataset (Clivot et al. 2023), as cited in D184 and D199.
   - The data are not redistributed: no data file, fixture or parameter value from them is in this repository (D234).
 - What is source and what is a modelling choice, per D234:
