@@ -207,7 +207,21 @@ If the crop parameters of the dual coefficient or the values of the surface laye
 
 ### M2.4 What is built today
 
-No value of the water axis is reported today: EP3 chains the four parts day by day, but convention C1.4 is incomplete, so every year is missing with its reason (D61), and `params/records/` holds no parameter.
+No value of the water axis is reported today. EP3 chains the four parts day by day. On `main` a year whose daily balance was computed on every day is still missing with reason `NOT_AVAILABLE`, because the definition of C1.4 was incomplete (D61; `_definition_incomplete` in `engine/water/exposure.py`). Any other year is missing with its own reason.
+
+**The indicator, decided by D157, not built yet.** [Issue #77, D157](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888807199), 15 November 2026, amends D61. The indicator is defined in C1.4 of `contracts/CONVENTIONS.md`, where D157 is quoted whole. D157 is a science decision taken by the lead developer as scientific lead; a science reviewer may still review it. As D157 states it:
+
+- **When it is a number.** "EP3 reports `water_deficit_exposure` as a number when the daily balance was computed on every day of the agricultural year." "This amends D61: `NOT_AVAILABLE` no longer applies to a year the chain computed."
+- **The two quantities of the ratio.** "**Water transpired** is the transpiration of the daily balance; **water demanded** is the basal crop coefficient times the reference evapotranspiration (FAO-56 chapter 8, Eq. 80: the stress coefficient acts on transpiration only)." FAO-56 is S10.
+- **The ratio and its window.** "The ratio is the sum of the first over the sum of the second, over the days with a living crop (D105, D106, D136)." Those days are the whole cycle of each crop (D105), without the days with no crop (D106) and without the tail of D136 (M2.2).
+- **Time basis.** "**One value per agricultural year (D47)**: the crop days of that year are summed together, and a cycle that crosses the start of the year is split by day. A year with no day with a living crop is `NOT_APPLICABLE`."
+- **Label.** "Every value carries the label "whole cycle, not critical period" (D105)." Where it travels: [D162](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6889471148) (under the delegation of D161), "In the `source` text of each water value, written by EP3, verbatim. No contract change." Decided, not built yet. The results models reject a `source` on a missing value (`contracts/results/models.py`), so the label can travel only on a value that is a number, never on a year that is missing or `NOT_APPLICABLE`.
+- **Still `OPEN`.** "The critical period of each crop stays OPEN and replaces the window when a traceable phenology exists (D79). The state the descriptive measures use stays OPEN."
+- **Backed by a source:** "which quantity the stress coefficient reduces (FAO-56 chapter 8, Eq. 80 and the text next to Eq. 81)".
+- **Modelling choices, not stated by a source** (D157): "transpiration rather than evapotranspiration in the ratio (D79), the sum per agricultural year, and the split by day of a cycle that crosses the start of the year."
+- D157 also says: "This decision does not by itself make the water axis give a number", and "a year the chain cannot compute keeps its own reason." The comment of D157 gives the build to lane L1, in `engine/water/exposure.py`. On `main` that module does not apply D157 yet.
+
+The catalogue: the comment of D157 (03:52 UTC) says "the catalogue still holds no water record". Since then pull request #262 (merged 04:12 UTC) loaded 45 signed records into `params/records/water/`: the reference-evapotranspiration constants, the bounds of PC-4 and the basal crop coefficients. Whether they are every record the daily chain needs is not stated here.
 
 | Part | Where | State |
 |---|---|---|
@@ -215,7 +229,7 @@ No value of the water axis is reported today: EP3 chains the four parts day by d
 | Daily water balance (M2.2) | `engine/water/balance/`, pull request #116 | One layer, as in the fallback of M2.3. Every coefficient is an argument with no default |
 | Curve Number runoff (M2.2) | `engine/water/runoff/`, pull request #150 | The forms of finding 8; its source is still `OPEN` |
 | Surface-layer evaporation `Ke` (M2.2) | `engine/water/evaporation/`, pull request #151 | The daily balance of the surface layer; Tew left out (finding 6) |
-| Entry point EP3 of `contracts/ENTRYPOINTS.md` | `engine/water/exposure.py`, pull requests #135 and #165 | Chains the reference evapotranspiration, runoff, `Ke` and the balance day by day with `parameters` (D44, D46, D56); the growth stages of each crop period are placed by `engine/water/stages.py`, with the cut and the tail of D135 and D136, as the comment of those decisions plans (`engine/water/EXPOSURE.md`, OPEN 4, lists what the stages do not cover yet). It reports no number while C1.4 is incomplete (D61) |
+| Entry point EP3 of `contracts/ENTRYPOINTS.md` | `engine/water/exposure.py`, pull requests #135 and #165 | Chains the reference evapotranspiration, runoff, `Ke` and the balance day by day with `parameters` (D44, D46, D56); the growth stages of each crop period are placed by `engine/water/stages.py`, with the cut and the tail of D135 and D136, as the comment of those decisions plans (`engine/water/EXPOSURE.md`, OPEN 4, lists what the stages do not cover yet). It reports no number: a year computed on every day is still `NOT_AVAILABLE` (D61). D157 is decided and not built yet (above) |
 
 ## Sources
 
