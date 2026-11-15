@@ -6,17 +6,22 @@ each computed by its own function::
 
     rate coefficient     k     = potential_rate * product of the modifiers
     temperature          f_T   = shape / (1 + (shape - 1) * exp(sensitivity * (reference_temperature - temperature)))
+                                 above a temperature of zero; zero at or below it
     moisture             f_W   = 1 / (1 + shape * exp(-sensitivity * water_balance))
     clay                 f_A   = exp(-sensitivity * clay_content)
     carbonate            f_CaCO3 = 1 / (1 + sensitivity * carbonate_content)
     pH                   f_pH  = exp(-sensitivity * (ph - optimum_ph) * (ph - optimum_ph))
+    C:N ratio            f_CN  = minimum + (1 - minimum) * exp(-sensitivity * (cn_ratio - optimum_cn_ratio) * (cn_ratio - optimum_cn_ratio))
 
-Every form is PROPOSED. **Its source is to be confirmed by a person**: the
-session that wrote this module read no source of AMG, wrote the forms as
-candidates only, and wrote no coefficient of the method here, in a default, a
-test or a comment. Which modifiers the source has, and whether it has others
-(for example one for the carbon to nitrogen ratio of the soil), is OPEN
-(README.md of this folder).
+Every form is PROPOSED. Decision D192 of issue #77 names the source: AMGv2 as
+printed in Clivot et al. (2019), Environmental Modelling & Software
+118:99-113, https://doi.org/10.1016/j.envsoft.2019.04.004, equation 5 and
+Appendix A, equations S7 to S13: the rate coefficient is the potential rate
+times these six modifiers. The cut of the temperature modifier is S8 and the
+C:N form is S13, as D192 and D199 state them. **Each form is still to be
+compared with the source by a person**: no session that wrote this module read
+the publication, and none wrote a coefficient of the method here, in a
+default, a test or a comment (README.md of this folder).
 
 Every constant is an argument with no default; the caller supplies it, read
 from the parameter catalogue once its records exist (README.md, "Constants a
@@ -42,6 +47,7 @@ from ._numbers import (
     check_text,
     check_types,
     finite,
+    is_fraction,
     is_not_negative,
     no_finite_result,
     numbers_or_missing,
@@ -53,6 +59,7 @@ from ._numbers import (
 __all__ = [
     "carbonate_modifier",
     "clay_modifier",
+    "cn_ratio_modifier",
     "moisture_modifier",
     "ph_modifier",
     "rate_coefficient",
@@ -66,8 +73,11 @@ def _modifier(
     not_negative: tuple[str, ...],
     units: Mapping[str, str] | None,
     form: Callable[[dict[str, float]], float],
+    fractions: tuple[str, ...] = (),
 ) -> float | ResultMissing:
     """The checks every modifier makes, in the order of README.md, then its form.
+
+    ``fractions`` names the arguments that must lie from zero to one.
 
     A modifier that the form makes negative is refused with ``NOT_COMPUTABLE``:
     it would make the rate coefficient negative and the active pool grow by
@@ -80,6 +90,9 @@ def _modifier(
     if isinstance(values, ResultMissing):
         return values
     refused = outside(values, not_negative, is_not_negative, "is negative")
+    if refused is not None:
+        return refused
+    refused = outside(values, fractions, is_fraction, "is outside zero to one")
     if refused is not None:
         return refused
     if units:
@@ -110,11 +123,23 @@ def temperature_modifier(
 ) -> float | ResultMissing:
     """The temperature modifier ``f_T`` of the rate coefficient. PROPOSED form.
 
-    ``f_T = shape / (1 + (shape - 1) * exp(sensitivity * (reference_temperature - temperature)))``.
-    At the reference temperature ``f_T`` is one, whatever the two coefficients.
+    ``f_T = shape / (1 + (shape - 1) * exp(sensitivity * (reference_temperature - temperature)))``
+    when ``temperature`` is above zero, and ``f_T = 0`` when it is zero or
+    below (the cut of equation S8 of the source, decision D192 of issue #77).
+    At a reference temperature above zero ``f_T`` is one, whatever the two
+    coefficients.
 
-    - ``temperature``: the temperature of the step (which one, air or soil,
-      and over which period it is averaged, is OPEN).
+    The cut assumes a Celsius scale: it is written at zero of the
+    temperature's own unit, nothing is converted and no unit text is read for
+    it. The source gives the mean annual air temperature in degrees Celsius
+    (S7), and D195 of issue #77 fixes the unit text ``degC``. In a scale whose
+    zero is not the freezing point of water the cut would be at the wrong
+    temperature (README.md, OPEN). The zero is the value of ``f_T`` in the
+    source, not a fill: the checks below come first, so a missing or refused
+    argument is still missing.
+
+    - ``temperature``: the temperature of the step: the mean annual air
+      temperature (S7; D118 of issue #77).
     - ``reference_temperature``, ``shape_coefficient``,
       ``sensitivity_coefficient``: constants of the method.
     - The three unit strings must be the same text: the sensitivity is per
@@ -124,6 +149,19 @@ def temperature_modifier(
     ``NOT_COMPUTABLE`` (an argument is not finite, the unit strings differ,
     or the form gives no finite real number or a negative one).
     """
+
+    def form(v: dict[str, float]) -> float:
+        if v["temperature"] <= 0:
+            return 0.0
+        return v["shape_coefficient"] / (
+            1
+            + (v["shape_coefficient"] - 1)
+            * math.exp(
+                v["sensitivity_coefficient"]
+                * (v["reference_temperature"] - v["temperature"])
+            )
+        )
+
     return _modifier(
         "temperature_modifier",
         {
@@ -138,17 +176,7 @@ def temperature_modifier(
             "reference_temperature_unit": reference_temperature_unit,
             "sensitivity_coefficient_per_unit": sensitivity_coefficient_per_unit,
         },
-        lambda v: (
-            v["shape_coefficient"]
-            / (
-                1
-                + (v["shape_coefficient"] - 1)
-                * math.exp(
-                    v["sensitivity_coefficient"]
-                    * (v["reference_temperature"] - v["temperature"])
-                )
-            )
-        ),
+        form,
     )
 
 
@@ -292,6 +320,54 @@ def ph_modifier(
             * (v["ph"] - v["optimum_ph"])
             * (v["ph"] - v["optimum_ph"])
         ),
+    )
+
+
+def cn_ratio_modifier(
+    *,
+    cn_ratio: NumberOrMissing,
+    optimum_cn_ratio: NumberOrMissing,
+    sensitivity_coefficient: NumberOrMissing,
+    minimum: NumberOrMissing,
+) -> float | ResultMissing:
+    """The C:N modifier ``f_CN`` of the rate coefficient. PROPOSED form.
+
+    ``f_CN = minimum + (1 - minimum) * exp(-sensitivity * (cn_ratio - optimum_cn_ratio) * (cn_ratio - optimum_cn_ratio))``:
+    equation S13 of the source as decisions D192 and D199 of issue #77 state
+    it, with its lower bound as the constant ``minimum`` and the factor of
+    the exponential written as one minus that bound. At the optimum C:N ratio
+    ``f_CN`` is one, whatever the minimum; far from it ``f_CN`` tends to the
+    minimum.
+
+    - ``cn_ratio``: the ratio of organic carbon to total nitrogen of the soil,
+      zero or more; a negative ratio is ``NOT_COMPUTABLE``, named. A ratio has
+      no unit, so no unit string is compared (as ``ph_modifier``).
+    - ``optimum_cn_ratio``, ``sensitivity_coefficient``, ``minimum``:
+      constants of the method. ``minimum`` lies from zero to one; outside it
+      is ``NOT_COMPUTABLE``, named.
+
+    Returns ``f_CN``, or ``MISSING_INPUT`` or ``NOT_COMPUTABLE``.
+    """
+    return _modifier(
+        "cn_ratio_modifier",
+        {
+            "cn_ratio": cn_ratio,
+            "optimum_cn_ratio": optimum_cn_ratio,
+            "sensitivity_coefficient": sensitivity_coefficient,
+            "minimum": minimum,
+        },
+        ("cn_ratio",),
+        None,
+        lambda v: (
+            v["minimum"]
+            + (1 - v["minimum"])
+            * math.exp(
+                -v["sensitivity_coefficient"]
+                * (v["cn_ratio"] - v["optimum_cn_ratio"])
+                * (v["cn_ratio"] - v["optimum_cn_ratio"])
+            )
+        ),
+        fractions=("minimum",),
     )
 
 
