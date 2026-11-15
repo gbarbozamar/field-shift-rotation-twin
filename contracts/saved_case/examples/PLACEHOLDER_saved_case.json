@@ -1,0 +1,759 @@
+{
+  "contract": "saved_case",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "saved_on": "2026-11-15",
+  "field_identity": {
+    "contract": "field_identity",
+    "example_data": true,
+    "case_id": "example-case",
+    "label": "Example case",
+    "fields": [
+      {
+        "field_id": "example-field-1",
+        "name": "North field",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [-57.0100, -33.0100], [-57.0030, -33.0100],
+            [-57.0030, -33.0160], [-57.0100, -33.0160],
+            [-57.0100, -33.0100]
+          ]]
+        }
+      },
+      {
+        "field_id": "example-field-2",
+        "name": "Long field by the creek",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [-56.9980, -33.0110], [-56.9900, -33.0110],
+            [-56.9900, -33.0130], [-56.9980, -33.0130],
+            [-56.9980, -33.0110]
+          ]]
+        }
+      },
+      {
+        "field_id": "example-field-3",
+        "name": "Small triangle field",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [-57.0060, -33.0190], [-57.0020, -33.0190],
+            [-57.0040, -33.0230], [-57.0060, -33.0190]
+          ]]
+        }
+      }
+    ]
+  },
+  "field_identity_missing": null,
+  "results_table": {
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "rows": [
+      {
+        "rotation_id": "example-rotation-1",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "ag_year",
+        "ag_year": 2001,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 12.0,
+        "unit": "t ha-1 yr-1",
+        "range": {"low": 6.0, "high": 18.0, "kind": "PLACEHOLDER_range_kind"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "rotation_id": "example-rotation-1",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "ag_year",
+        "ag_year": 2002,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"}
+      },
+      {
+        "rotation_id": "example-rotation-1",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "rotation",
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"}
+      },
+      {
+        "rotation_id": "example-rotation-1",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "rotation",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.5,
+        "unit": "t C ha-1 yr-1",
+        "range": {"low": -0.5, "high": 1.5, "kind": "PLACEHOLDER_range_kind"},
+        "provenance": "SIMULATED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "rotation_id": "example-rotation-1",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "rotation",
+        "carbon_model": "rothc",
+        "computation": "end_minus_start",
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "t C ha-1 yr-1",
+        "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "ag_year",
+        "ag_year": 2001,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 8.0,
+        "unit": "t ha-1 yr-1",
+        "range": {"low": 4.0, "high": 12.0, "kind": "PLACEHOLDER_range_kind"},
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "ag_year",
+        "ag_year": 2002,
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"}
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "rotation",
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"}
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "rotation",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": -0.25,
+        "unit": "t C ha-1 yr-1",
+        "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this example gives no range for this value"},
+        "provenance": "SIMULATED",
+        "source": "PLACEHOLDER source: written by hand, not the output of an engine"
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "time_basis": "rotation",
+        "carbon_model": "rothc",
+        "computation": "end_minus_start",
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "t C ha-1 yr-1",
+        "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+      }
+    ]
+  },
+  "results_table_missing": null,
+  "carbon_balances": [
+    {
+      "rotation_id": "example-rotation-1",
+      "carbon_model": "amg",
+      "carbon_balance": {
+        "contract": "carbon_balance",
+        "example_data": true,
+        "case_id": "example-case",
+        "field_id": "example-field-1",
+        "rotation_id": "example-rotation-1",
+        "carbon_model": "amg",
+        "variant": "placeholder_variant",
+        "horizon": {
+          "start": {
+            "year": 2001,
+            "month": 1
+          },
+          "end": {
+            "year": 2002,
+            "month": 12
+          }
+        },
+        "soil_depth": {
+          "value": null,
+          "unit": "PLACEHOLDER_unit",
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER: example of a value nobody has given yet"
+          }
+        },
+        "total_stock": {
+          "quantity": "placeholder_total_stock",
+          "unit": "PLACEHOLDER_unit",
+          "provenance": "SIMULATED",
+          "source": "PLACEHOLDER: example data, no real source",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: the example carries no uncertainty range"
+          },
+          "initial": {
+            "value": 777.7,
+            "unit": "PLACEHOLDER_unit",
+            "provenance": "DERIVED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            }
+          },
+          "steps": [
+            {
+              "start": {
+                "year": 2001,
+                "month": 1
+              },
+              "end": {
+                "year": 2001,
+                "month": 12
+              },
+              "value": 788.8
+            },
+            {
+              "start": {
+                "year": 2002,
+                "month": 1
+              },
+              "end": {
+                "year": 2002,
+                "month": 12
+              },
+              "value": 799.9
+            }
+          ]
+        },
+        "pools": [
+          {
+            "quantity": "placeholder_pool_a",
+            "unit": "PLACEHOLDER_unit",
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            },
+            "initial": {
+              "value": 555.5,
+              "unit": "PLACEHOLDER_unit",
+              "provenance": "DERIVED",
+              "source": "PLACEHOLDER: example data, no real source",
+              "range_missing": {
+                "reason": "NOT_AVAILABLE",
+                "detail": "PLACEHOLDER: the example carries no uncertainty range"
+              }
+            },
+            "steps": [
+              {
+                "start": {
+                  "year": 2001,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2001,
+                  "month": 12
+                },
+                "value": 566.6
+              },
+              {
+                "start": {
+                  "year": 2002,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2002,
+                  "month": 12
+                },
+                "value": 577.7
+              }
+            ]
+          },
+          {
+            "quantity": "placeholder_pool_b",
+            "unit": "PLACEHOLDER_unit",
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            },
+            "initial": {
+              "value": 222.2,
+              "unit": "PLACEHOLDER_unit",
+              "provenance": "DERIVED",
+              "source": "PLACEHOLDER: example data, no real source",
+              "range_missing": {
+                "reason": "NOT_AVAILABLE",
+                "detail": "PLACEHOLDER: the example carries no uncertainty range"
+              }
+            },
+            "steps": [
+              {
+                "start": {
+                  "year": 2001,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2001,
+                  "month": 12
+                },
+                "value": 222.2
+              },
+              {
+                "start": {
+                  "year": 2002,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2002,
+                  "month": 12
+                },
+                "value": 222.2
+              }
+            ]
+          }
+        ],
+        "flows": [
+          {
+            "quantity": "placeholder_flow_in",
+            "unit": "PLACEHOLDER_unit",
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            },
+            "steps": [
+              {
+                "start": {
+                  "year": 2001,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2001,
+                  "month": 12
+                },
+                "value": 22.2
+              },
+              {
+                "start": {
+                  "year": 2002,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2002,
+                  "month": 12
+                },
+                "value": 22.2
+              }
+            ]
+          },
+          {
+            "quantity": "placeholder_flow_out",
+            "unit": "PLACEHOLDER_unit",
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            },
+            "steps": [
+              {
+                "start": {
+                  "year": 2001,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2001,
+                  "month": 12
+                },
+                "value": 11.1
+              },
+              {
+                "start": {
+                  "year": 2002,
+                  "month": 1
+                },
+                "end": {
+                  "year": 2002,
+                  "month": 12
+                },
+                "value": 11.1
+              }
+            ]
+          }
+        ],
+        "soil_carbon_trend": [
+          {
+            "indicator": "soil_carbon_trend",
+            "direction": "higher_is_better",
+            "value": 11.1,
+            "unit": "t C ha-1 yr-1",
+            "carbon_model": "amg",
+            "computation": "end_minus_start",
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            }
+          },
+          {
+            "indicator": "soil_carbon_trend",
+            "direction": "higher_is_better",
+            "value": 11.1,
+            "unit": "t C ha-1 yr-1",
+            "carbon_model": "amg",
+            "computation": "fitted_slope",
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER: example data, no real source",
+            "range_missing": {
+              "reason": "NOT_AVAILABLE",
+              "detail": "PLACEHOLDER: the example carries no uncertainty range"
+            }
+          },
+          {
+            "indicator": "soil_carbon_trend",
+            "direction": "higher_is_better",
+            "value": null,
+            "unit": "t C ha-1 yr-1",
+            "carbon_model": "amg",
+            "computation": "mean_over_cycles",
+            "missing": {
+              "reason": "MISSING_INPUT",
+              "detail": "PLACEHOLDER: example of a trend value whose input is missing"
+            }
+          }
+        ]
+      },
+      "carbon_balance_missing": null
+    },
+    {
+      "rotation_id": "example-rotation-1",
+      "carbon_model": "rothc",
+      "carbon_balance": null,
+      "carbon_balance_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    },
+    {
+      "rotation_id": "example-rotation-2",
+      "carbon_model": "amg",
+      "carbon_balance": null,
+      "carbon_balance_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the example carries one carbon balance, for the first rotation"}
+    },
+    {
+      "rotation_id": "example-rotation-2",
+      "carbon_model": "rothc",
+      "carbon_balance": null,
+      "carbon_balance_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
+    }
+  ],
+  "decision_output": {
+    "contract": "decision_output",
+    "example_data": true,
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "rotations": ["example-rotation-1", "example-rotation-2"],
+    "scenarios": ["PLACEHOLDER_scenario_one"],
+    "limits": [
+      {
+        "indicator": "soil_loss",
+        "limit": {
+          "value": 7.0,
+          "unit": "t ha-1 yr-1",
+          "range_missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER detail: the user declared the limit without a range"
+          },
+          "provenance": "DECLARED",
+          "source": "user"
+        }
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "limit": {
+          "value": null,
+          "unit": "dimensionless",
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER detail: no limit is declared for this indicator"
+          }
+        }
+      }
+    ],
+    "counts_by_year": [
+      {
+        "rotation_id": "example-rotation-1",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_loss",
+        "years_evaluated": 1,
+        "years_within_limits": 0,
+        "not_evaluated": [
+          {
+            "time_basis": "ag_year",
+            "ag_year": 2002,
+            "missing": {
+              "reason": "NO_COVERAGE",
+              "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"
+            }
+          }
+        ]
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_loss",
+        "years_evaluated": 1,
+        "years_within_limits": 0,
+        "not_evaluated": [
+          {
+            "time_basis": "ag_year",
+            "ag_year": 2002,
+            "missing": {
+              "reason": "NO_COVERAGE",
+              "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does"
+            }
+          }
+        ]
+      }
+    ],
+    "range_across_scenarios": [
+      {
+        "rotation_id": "example-rotation-1",
+        "indicator": "soil_loss",
+        "minimum": 0,
+        "maximum": 0,
+        "scenario_of_the_minimum": "PLACEHOLDER_scenario_one"
+      },
+      {
+        "rotation_id": "example-rotation-2",
+        "indicator": "soil_loss",
+        "minimum": 0,
+        "maximum": 0,
+        "scenario_of_the_minimum": "PLACEHOLDER_scenario_one"
+      }
+    ],
+    "paired_differences": [
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2001,
+        "difference": {
+          "value": -4.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -14.0,
+            "high": 6.0,
+            "kind": "PLACEHOLDER_range_kind"
+          },
+          "provenance": "DERIVED",
+          "source": "decision layer"
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2002,
+        "difference": {
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+          }
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "difference": {
+          "value": null,
+          "unit": "dimensionless",
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+          }
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "value": -0.75,
+          "unit": "t C ha-1 yr-1",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER detail: the method that gives a paired difference its range is OPEN (docs/VALIDATION.md, D2), so the difference carries no range"
+          },
+          "provenance": "SIMULATED",
+          "source": "decision layer"
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "carbon_model": "rothc",
+        "computation": "end_minus_start",
+        "difference": {
+          "value": null,
+          "unit": "t C ha-1 yr-1",
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+          }
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      }
+    ],
+    "equal_tolerances": [
+      {
+        "indicator": "soil_loss",
+        "tolerance": {
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range_missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER detail: the designer of the case set the tolerance without a range"
+          },
+          "provenance": "DECLARED",
+          "source": "PLACEHOLDER source: the designer of the case"
+        }
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "tolerance": {
+          "value": null,
+          "unit": "dimensionless",
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER detail: the designer of the case set no tolerance of 'equal' for this indicator"
+          }
+        }
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "tolerance": {
+          "value": null,
+          "unit": "t C ha-1 yr-1",
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "PLACEHOLDER detail: the designer of the case set no tolerance of 'equal' for this indicator"
+          }
+        }
+      }
+    ],
+    "pair_cell_counts": [
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_loss",
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": {
+          "better": 1,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        }
+      },
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "water_deficit_exposure",
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: no tolerance of 'equal' is set for this indicator (D87)"
+        }
+      },
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "scenario_id": "PLACEHOLDER_scenario_one",
+        "indicator": "soil_carbon_trend",
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: no tolerance of 'equal' is set for this indicator (D87)"
+        }
+      }
+    ],
+    "pair_states": [
+      {
+        "pair": ["example-rotation-1", "example-rotation-2"],
+        "value": "Not separated: uncertainty missing",
+        "reason": "a difference without its range",
+        "coverage": {
+          "cells_compared": 2,
+          "cells_of_the_pair": 5
+        }
+      }
+    ],
+    "state": {
+      "value": "OPEN: exact wording by the science reviewers",
+      "indicators_not_resolved": ["soil_carbon_trend", "soil_loss"],
+      "reasons": ["PLACEHOLDER reason: the wording of a reason comes from deterministic templates that are not written yet"]
+    },
+    "measure_first": [
+      {
+        "rank": 1,
+        "what": "residue cover at sowing",
+        "why": "illustrative: moves the soil-loss difference more than the evaluated inputs"
+      }
+    ]
+  },
+  "decision_output_missing": null
+}
