@@ -1,5 +1,6 @@
 """Acceptance test of units l0/erosion-entrypoint (issue #115),
-l0/erosion-ep1-parameters (issue #154) and l0/erosion-ep1-c-r (issue #173).
+l0/erosion-ep1-parameters (issue #154), l0/erosion-ep1-c-r (issue #173) and,
+for the wiring of the repetition of D47, l1/calendar-repeat-d47 (issue #207).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``SOIL_LOSS.md`` under "PROPOSED cases"; a test checks that the two lists
@@ -15,8 +16,17 @@ Every input is built from the PLACEHOLDER examples of
 - a *computable* series repeats ``RAIN`` instead, in ``mm day-1``, with every
   day present;
 - a *computable* calendar places the two PLACEHOLDER crops in every
-  agricultural year, and one harvest before the record begins, so every day
-  of the record has a crop (or none) and a last harvest.
+  agricultural year, from the agricultural year before the record of
+  ``several_full_years``;
+- the daily-index route reads the calendar repeated over the years of the
+  record (D47, ``engine/calendar/repeat.py``), whose first cycle starts in the
+  first agricultural year of the record and has nothing before it. So the
+  record of the daily-route tests (``daily_years``) begins one month before
+  the first agricultural year it covers, as the record of D29 does with a July
+  start: that partly covered year is the computable calendar's first year,
+  laid out unchanged, and every covered day has a crop (or none) and a last
+  harvest. Expected crops and harvests come from the repetition computed again
+  here (``repeated_windows``).
 
 Expected agricultural years are computed from the dates of the series, day by
 day, independently of the module under test. Expected soil loss is computed
@@ -212,6 +222,15 @@ def partial_years() -> tuple[dt.date, dt.date]:
     _, last = several_full_years()
     following = last + ONE_DAY
     return example_start(), month_bounds(following.year, following.month)[1]
+
+
+def daily_years() -> tuple[dt.date, dt.date]:
+    """The years of ``several_full_years`` with the last month before them:
+    the agricultural year before is only partly covered, as the first year of
+    the D29 record is with a July start."""
+    first, last = several_full_years()
+    before = first - ONE_DAY
+    return dt.date(before.year, before.month, 1), last
 
 
 def calendar() -> RotationCalendar:
@@ -628,8 +647,21 @@ def run_computable(
 def run_daily(
     parameters: dict[str, dict] | None = None, **arguments: Any
 ) -> SoilLossResults:
-    """``run_computable`` on the daily-index route."""
-    return run_computable(parameters, daily=True, **arguments)
+    """``run_computable`` on the daily-index route, by default on the record
+    of ``daily_years``. The years the record does not cover whole are checked
+    to be ``NO_COVERAGE`` here and left out of the result returned, so that a
+    test reads only the years the route computes."""
+    arguments.setdefault("climate_", computable_climate(daily_years()))
+    result = run_computable(parameters, daily=True, **arguments)
+    years = covered_ag_years(series_span(arguments["climate_"]))
+    for item in result.annual:
+        if item.ag_year not in years:
+            assert item.value is None and item.missing.reason == "NO_COVERAGE"
+    assert {item.ag_year for item in result.annual} >= set(years)
+    return SoilLossResults(
+        annual=[item for item in result.annual if item.ag_year in years],
+        monthly=[item for item in result.monthly if item.ag_year in years],
+    )
 
 
 def named(pid: str, scope: dict[str, str] | None = None) -> str:
@@ -741,8 +773,48 @@ def expected_r_and_fractions(
     return r, fractions
 
 
+def shifted(day: dt.date, years: int) -> dt.date:
+    """Point 2 of engine/calendar/repeat.py, computed again."""
+    year = day.year + years
+    leap = (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
+    if (day.month, day.day) == (2, 29) and not leap:
+        return dt.date(year, 2, 28)
+    return day.replace(year=year)
+
+
+def repeated_windows(
+    calendar_: RotationCalendar, span: tuple[dt.date, dt.date]
+) -> list[tuple[str, dt.date, dt.date]]:
+    """The dated components of the calendar repeated over the agricultural
+    years of the record ``span``, by points 1 to 5 of engine/calendar/repeat.py,
+    computed again here: the cycle is the smallest whole number of years after
+    which ``start_date`` falls after ``end_date``; the first cycle starts in the
+    first agricultural year of the record; a component is laid out while its
+    start is not after the last day of the record's years."""
+    length = 1
+    while shifted(calendar_.start_date, length) <= calendar_.end_date:
+        length += 1
+    last_day = last_day_of(ag_year_of(span[1]))
+    shift = ag_year_of(span[0]) - ag_year_of(calendar_.start_date)
+    windows = []
+    while shifted(calendar_.start_date, shift) <= last_day:
+        for c in calendar_.components:
+            start = shifted(c.start.date, shift)
+            if start <= last_day:
+                windows.append((c.crop_id, start, shifted(c.end.date, shift)))
+        shift += length
+    return windows
+
+
+def series_span(climate_: SiteClimate) -> tuple[dt.date, dt.date]:
+    (series,) = [s for s in climate_.daily_series if s.quantity == PRECIPITATION]
+    return series.start_date, series.end_date
+
+
 def expected_ratio_of_day(
-    day: dt.date, calendar_: RotationCalendar, numbers: dict[str, float]
+    day: dt.date,
+    windows: list[tuple[str, dt.date, dt.date]],
+    numbers: dict[str, float],
 ) -> float:
     """The daily-index route: the soil-loss ratio of one day by the forms of
     c_factor/README.md under PC-1: the residue cover from the decayed mass of
@@ -750,16 +822,15 @@ def expected_ratio_of_day(
     the canopy sub-factor of the effective canopy cover, the canopy cover
     times one minus the residue cover (S1 Eq. 6.5)."""
     crop = next(
-        (c.crop_id for c in calendar_.components if c.start.date <= day <= c.end.date),
+        (crop_id for crop_id, start, end in windows if start <= day <= end),
         NO_CROP,
     )
-    harvest = max(
-        (c for c in calendar_.components if c.end.date < day),
-        key=lambda c: c.end.date,
+    harvest_crop, _, harvest_end = max(
+        (w for w in windows if w[2] < day), key=lambda w: w[2]
     )
-    mass = CROP_VALUES[(module.RESIDUE_MASS_ID, harvest.crop_id)] * math.exp(
-        -CROP_VALUES[(module.DECAY_COEFFICIENT_ID, harvest.crop_id)]
-        * (day - harvest.end.date).days
+    mass = CROP_VALUES[(module.RESIDUE_MASS_ID, harvest_crop)] * math.exp(
+        -CROP_VALUES[(module.DECAY_COEFFICIENT_ID, harvest_crop)]
+        * (day - harvest_end).days
     )
     residue_cover = 1 - math.exp(-numbers[module.MASS_COVER_COEFFICIENT_ID] * mass)
     surface = math.exp(
@@ -785,12 +856,13 @@ def expected_daily_soil_loss(
     numbers = placeholder_values() if numbers is None else numbers
     r, fractions = expected_r_and_fractions(climate_, numbers)
     product = numbers[module.K_ID] * expected_ls(numbers, soil_) * numbers[module.P_ID]
+    windows = repeated_windows(calendar_, series_span(climate_))
     result = {}
     for year, by_month in fractions.items():
         c = 0.0
         for (y, m), fraction in by_month.items():
             ratios = [
-                expected_ratio_of_day(day, calendar_, numbers)
+                expected_ratio_of_day(day, windows, numbers)
                 for day in days_between(*month_bounds(y, m))
             ]
             c += fraction * sum(ratios) / len(ratios)
@@ -1353,10 +1425,8 @@ def test_daily_index_route_gives_the_product_of_r_factor_and_c_factor():
     expected = expected_daily_soil_loss(climate_, calendar_)
     assert len(expected) > 1
     assert_numbers(result, expected)
+    assert sorted(expected) == [item.ag_year for item in result.annual]
     for item in result.annual:
-        if item.ag_year not in expected:
-            assert item.value is None and item.missing.reason == "NO_COVERAGE"
-            continue
         assert item.provenance == PROVENANCE_OF_SOIL_LOSS
         assert "daily-index route, off the main path" in item.source
         for pid in module.DAILY_ROUTE_PARAMETER_IDS:
@@ -1371,10 +1441,14 @@ def test_daily_index_route_gives_the_product_of_r_factor_and_c_factor():
         assert item.missing.reason in {"NOT_AVAILABLE", "NO_COVERAGE"}
 
 
-def test_daily_index_route_chain_example_climate_gives_r_and_c():
+def test_daily_index_route_chain_example_gives_r_and_names_residue_before_record():
     """The chain example climate (one agricultural year, the same number every
-    day), a complete PLACEHOLDER catalogue and a calendar of the same field:
-    soil loss is equation.py of R from r_factor/ and C from c_factor/."""
+    day, beginning on the first day of the start month), a complete
+    PLACEHOLDER catalogue and a calendar of the same field: R is computed from
+    r_factor/ (the expected R and fractions agree with the forms), and C is
+    missing, naming the residue before the record: the first cycle of the
+    repeated rotation starts in that year (D47) and nothing is laid out before
+    it, so the days before its first harvest have no residue (OPEN 2)."""
     climate_document_ = load("chain_site_climate")
     climate_ = SiteClimate.model_validate(climate_document_)
     identity = {key: climate_document_[key] for key in ("case_id", "field_id")}
@@ -1385,9 +1459,13 @@ def test_daily_index_route_chain_example_climate_gives_r_and_c():
         computable_calendar_document(span, identity)
     )
     result = run_daily(calendar_=calendar_, climate_=climate_, soil_=soil_)
-    expected = expected_daily_soil_loss(climate_, calendar_, soil_=soil_)
-    assert len(expected) == 1
-    assert_numbers(result, expected)
+    (item,) = result.annual
+    assert item.value is None and item.missing.reason == "MISSING_INPUT"
+    detail = item.missing.detail
+    assert "factor 'c' is missing" in detail
+    assert module.NO_HARVEST_BEFORE in detail
+    for factor in ("r", "k", "ls", "p"):
+        assert f"factor '{factor}'" not in detail
     numbers = placeholder_values()
     r, fractions = expected_r_and_fractions(climate_, numbers)
     ((year, by_month),) = fractions.items()
@@ -1475,7 +1553,7 @@ def test_crop_without_residue_type_or_canopy_record_leaves_c_missing_and_names_i
 
 
 def test_year_without_an_erosive_day_leaves_r_and_c_missing_for_that_year():
-    span = several_full_years()
+    span = daily_years()
     years = covered_ag_years(span)
     dry = years[1]
     threshold = CHOSEN[module.R_THRESHOLD_ID]
@@ -1503,7 +1581,7 @@ def test_year_without_an_erosive_day_leaves_r_and_c_missing_for_that_year():
 
 
 def test_missing_day_in_the_series_makes_its_year_missing_and_no_other():
-    span = several_full_years()
+    span = daily_years()
     years = covered_ag_years(span)
     document = rain_series(*span)
     hole = first_day_of(years[0]) + 40 * ONE_DAY
@@ -1523,35 +1601,49 @@ def test_missing_day_in_the_series_makes_its_year_missing_and_no_other():
         assert by_year[year].value is not None
 
 
-def test_day_outside_the_calendar_or_before_the_first_harvest_leaves_c_missing():
+def one_year_calendar_document(
+    first_ag_year: int, undated_end: bool = False
+) -> dict[str, Any]:
+    """A one-year calendar of the two crops of ``crop_windows``, in the
+    agricultural year ``first_ag_year``; with ``undated_end`` crop B has no end
+    date."""
+    document = calendar_document()
+    document["start_date"] = first_day_of(first_ag_year).isoformat()
+    document["end_date"] = last_day_of(first_ag_year).isoformat()
+    document["components"] = [
+        component(
+            f"PLACEHOLDER-c{position}",
+            crop_id,
+            begins,
+            None if undated_end and crop_id == CROP_B else ends,
+        )
+        for position, (crop_id, begins, ends) in enumerate(
+            crop_windows(first_ag_year), start=1
+        )
+    ]
+    return document
+
+
+def test_no_harvest_before_the_first_cycle_or_an_undated_component_leaves_c_missing():
     span = several_full_years()
     years = covered_ag_years(span)
-    document = computable_calendar_document()
-    # No harvest before the record: the calendar begins on its first day.
-    no_harvest = copy.deepcopy(document)
-    no_harvest["start_date"] = span[0].isoformat()
-    no_harvest["components"] = [
-        c for c in document["components"] if c["start"]["date"] >= span[0].isoformat()
-    ]
-    # The calendar ends before the last year of the record.
-    short = copy.deepcopy(document)
-    short["end_date"] = last_day_of(years[-2]).isoformat()
-    short["components"] = [
-        c for c in document["components"] if c["end"]["date"] <= short["end_date"]
-    ]
-    # A component without an end date.
-    undated = copy.deepcopy(document)
-    last = undated["components"][-1]
-    last["end"] = {"date": None, "missing": {"reason": "NOT_DECLARED"}}
-    cases = (
-        (no_harvest, [years[0]], "no component of the rotation calendar ends before"),
-        (short, [years[-1]], module.OUTSIDE_CALENDAR),
-        (undated, [years[-1]], f"'{last['component_id']}'"),
+    # A record that begins on the first day of its first agricultural year:
+    # the first cycle starts there and no harvest precedes its first one.
+    no_harvest = run_daily(
+        climate_=computable_climate(span), calendar_=computable_calendar()
     )
-    for calendar_document_, missing_years, text in cases:
-        result = run_daily(
-            calendar_=RotationCalendar.model_validate(calendar_document_)
+    # A component without an end date, in every cycle of a one-year rotation
+    # dated after the record.
+    undated = run_daily(
+        calendar_=RotationCalendar.model_validate(
+            one_year_calendar_document(ag_year_of(span[1]) + 30, undated_end=True)
         )
+    )
+    cases = (
+        (no_harvest, [years[0]], module.NO_HARVEST_BEFORE),
+        (undated, years, "'PLACEHOLDER-c2'"),
+    )
+    for result, missing_years, text in cases:
         for item in result.annual:
             if item.ag_year in missing_years:
                 assert item.value is None
@@ -1561,6 +1653,34 @@ def test_day_outside_the_calendar_or_before_the_first_harvest_leaves_c_missing()
                 assert "day(s) of the year, the first on" in item.missing.detail
             else:
                 assert item.value is not None, (text, item.ag_year)
+
+
+def test_real_dated_calendar_gives_a_value_per_covered_agricultural_year():
+    """D47 wired into EP1: a calendar dated after the record runs on the years
+    of the record. A one-year calendar and the multi-year computable calendar,
+    both moved past the record, give on the daily-index route a number for
+    every covered agricultural year, the product of R and of C from the
+    rotation repeated over the record, computed again here; the main route
+    gives its number for every covered year too."""
+    span = daily_years()
+    climate_ = computable_climate(span)
+    years = covered_ag_years(span)
+    one_year = RotationCalendar.model_validate(
+        one_year_calendar_document(ag_year_of(span[1]) + 23)
+    )
+    several = moved_past(computable_calendar_document(), span[1])
+    for calendar_ in (one_year, several):
+        assert calendar_.start_date > span[1]
+        result = run_daily(calendar_=calendar_)
+        expected = expected_daily_soil_loss(climate_, calendar_)
+        assert sorted(expected) == years
+        assert_numbers(result, expected)
+        main = run_computable(calendar_=calendar_, climate_=climate_)
+        for item in main.annual:
+            assert (item.value is not None) == (item.ag_year in years)
+    # The multi-year calendar moved by whole leap cycles is laid back on the
+    # record unchanged, so it gives what it gives on the record.
+    assert run_daily(calendar_=several) == run_daily()
 
 
 def test_unit_strings_of_c_records_that_are_not_read_are_not_computed():
@@ -1618,17 +1738,17 @@ def test_value_c_factor_refuses_is_not_computed_and_names_the_day():
 
 
 def test_r_level_threshold_or_series_in_another_unit_is_refused_by_r_factor():
-    document = rain_series(*several_full_years())
+    document = rain_series(*daily_years())
     document["unit"] = unmarked("PLACEHOLDER_unit")
     cases = (
         (
             catalogue_with(site_key(module.R_ID), unit="PLACEHOLDER_unit"),
-            computable_climate(),
+            computable_climate(daily_years()),
             ["r"],
         ),
         (
             catalogue_with(site_key(module.R_THRESHOLD_ID), unit="PLACEHOLDER_unit"),
-            computable_climate(),
+            computable_climate(daily_years()),
             ["r", "c"],
         ),
         (catalogue(), climate_with(document), ["r", "c"]),
@@ -1706,6 +1826,7 @@ def numbers_in(path: Path) -> set[object]:
 
 def test_modules_import_only_allowed_modules_and_hold_only_counting_integers():
     allowed_engine = {
+        "engine.calendar.repeat",
         "engine.erosion",
         "engine.erosion._parameters",
         "engine.erosion.equation",
