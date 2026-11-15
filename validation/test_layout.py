@@ -663,6 +663,15 @@ def test_S26_json_file_outside_the_three_folders_is_listed_and_examples_are_not_
     assert len(store.results) == 3
 
 
+def test_S36_fixtures_folder_below_the_root_is_not_read(tmp_path):
+    write_full_store(tmp_path)
+    write_text(tmp_path / "fixtures" / "PLACEHOLDER-fixture.json", '{"test": "PLACEHOLDER"}')
+    write(tmp_path, protocol_run(), folder="old/fixtures", name="PLACEHOLDER-deeper.json")
+    store = load(tmp_path)
+    assert [path for path, _ in store.problems] == ["old/fixtures/PLACEHOLDER-deeper.json"]
+    assert len(store.results) == 3
+
+
 @pytest.mark.parametrize("depth", [500, 5000, 100000])
 def test_S27_deeply_nested_file_is_listed_and_the_rest_still_loads(tmp_path, depth):
     write_full_store(tmp_path)

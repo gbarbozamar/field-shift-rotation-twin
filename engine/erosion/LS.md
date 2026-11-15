@@ -119,7 +119,7 @@ The identifiers are `PROPOSED`. The proposed `scope` of every record is `{}`: se
 | `b3` | `rusle_l_beta_denominator_sine_exponent` | The exponent of `sin(theta)` in the denominator of `beta` | None: it is an exponent. A person confirms it from the source | S2 or S3: a person says which, with its locator | |
 | `b4` | `rusle_l_beta_denominator_constant` | Added in the denominator of `beta` | As `b1` | S2 or S3: a person says which, with its locator | |
 
-For the science reviewers, before anything is transcribed: `docs/METHODS.md` marks S2 as "located (scanned copy, text not read)" and S3 as "located". Nobody has read either source for this unit.
+For the science reviewers: the ten coefficients above were transcribed from S2 by an AI session on 14 November 2026 under [D34](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622) and are now records in `params/records/` (`rusle_s_*.json`, `rusle_l_*.json`). Each record cites its equation and page in the scanned copy of S2 (Eq. [4-3], p. 105; Eq. [4-4] and [4-5], p. 107; Appendix A, p. 325 for the unit length) and says it was checked by the lead developer against a crop of the source page on 14 November 2026; each is signed `checked_by` `gbarbozamar`. They are among the 26 records of [pull request #203](https://github.com/gbarbozamar/field-shift-rotation-twin/pull/203) (merged 15 November 2026); an AI verifier compared the same pages and reported that every value it could open matched ([comment](https://github.com/gbarbozamar/field-shift-rotation-twin/pull/203#issuecomment-6886548387)). The unit length 22.1 m was chosen over 72.6 ft by [D127](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886945455). S3 is not cited by any of the ten records, and no record of a check of S3 was found: `docs/METHODS.md` still marks it "located". The column "Source" of the table above, "S2 or S3: a person says which", is as it was written before the records existed; the records name S2. The status of S2 and what of it was checked are in `docs/METHODS.md`, sources table.
 
 ## PROPOSED cases
 
@@ -188,7 +188,16 @@ Each case is a test function of `test_ls.py`; a test checks that this list and t
 
 | Case | What it shows |
 |---|---|
-| `test_e3_slope_length_and_steepness_against_published_values` | **Skipped.** [E3] of `docs/VALIDATION.md`: `S` and `L` against the published values. It waits for the coefficients in the parameter catalogue and for the expected values, the tolerance and the source of entry E3, all transcribed by a person and checked by a second person |
+| `test_e3_slope_length_and_steepness_against_published_values` | [E3] of `docs/VALIDATION.md` with decision D124 of issue #77: `LS = S * L` for the 91 cells of AH703 Table 4-2, worked in feet, and `m` for the 19 Moderate cells of Table 4-5, each within the tolerance of D124. Expected values and the unit length in feet come from the signed fixture `validation/fixtures/e3_ah703_tables.json` (format in `validation/fixtures/README.md`), the coefficients from the parameter catalogue. **Skipped** while the fixture is absent or unsigned, with a reason that names the file and what is not signed |
+| `test_e3_absent_fixture_skips_naming_the_file_and_the_signature` | With no fixture, the skip reason names the file and the missing `checked_by` |
+| `test_e3_unsigned_fixture_skips_naming_what_is_not_signed` | A PLACEHOLDER fixture with empty `checked_by`: the reason names the file's signature and the unit length's |
+| `test_e3_unsigned_unit_length_alone_is_enough_to_skip` | A signed file whose unit-length record is not signed still skips |
+| `test_e3_signed_placeholder_fixture_runs_and_passes` | A signed PLACEHOLDER fixture, written to a temporary folder, is read and every cell passes |
+| `test_e3_value_outside_its_tolerance_fails` | One cell of each table moved out of its tolerance: exactly those two cells fail |
+| `test_e3_a_tolerance_other_than_d124_fails` | A tolerance in the fixture that is not the one of D124 is reported |
+| `test_e3_a_cell_count_other_than_d124_fails` | A table with another number of cells than D124 names fails |
+| `test_e3_unit_length_in_another_unit_fails` | A unit length not in feet fails: D124 works Table 4-2 in feet |
+| `test_e3_coefficients_are_read_by_the_identifiers_of_ls_md` | The identifiers the test reads from the catalogue are those of the table above, and the catalogue holds them |
 
 ## OPEN
 
