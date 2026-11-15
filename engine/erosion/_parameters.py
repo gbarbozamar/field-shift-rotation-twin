@@ -13,6 +13,10 @@ Every absence is the ``Missing`` of ``contracts/results/models.py`` with reason
 (G4, the two rows for a parameter). The ``Missing`` of ``params/catalogue.py``
 is rewritten as that one; it is never turned into a number.
 
+``scope_words`` (unit l0/erosion-c-main-route, issue #218) lists the words one
+scope key takes among the records of one id whose scope is otherwise a given
+scope: the days of a stage series (decision D129 of issue #77). PROPOSED.
+
 Pure (G1): no file is read and no argument is changed. ``load_folder`` is
 never called. The one number of this module is the 1 of "more than one record".
 """
@@ -27,7 +31,13 @@ from contracts.results.models import Missing
 from params.catalogue import Missing as CatalogueMissing
 from params.catalogue import identity, read_value
 
-__all__ = ["Parameter", "ParameterReader", "read_parameter", "scope_text"]
+__all__ = [
+    "Parameter",
+    "ParameterReader",
+    "read_parameter",
+    "scope_text",
+    "scope_words",
+]
 
 
 @dataclass(frozen=True)
@@ -58,6 +68,63 @@ def _identity_or_none(record: Any) -> Any:
         return None
 
 
+def _identities(parameters: dict[str, dict]) -> dict[str, Any]:
+    return {
+        key: _identity_or_none(record) for key, record in sorted(parameters.items())
+    }
+
+
+def _not_comparable(named: str, identities: dict[str, Any]) -> Missing | None:
+    """``MISSING_INPUT`` naming every record without a well-formed id and scope."""
+    malformed = [key for key, found in identities.items() if found is None]
+    if not malformed:
+        return None
+    return Missing(
+        reason="MISSING_INPUT",
+        detail=(
+            f"{named} cannot be looked up: the record(s) "
+            f"{', '.join(repr(key) for key in malformed)} have no well-formed "
+            "'id' and 'scope', so they cannot be compared and could be records "
+            "of this parameter (F3c of params/README.md); "
+            "params.catalogue.check_catalogue rejects such a catalogue (G3)"
+        ),
+    )
+
+
+def scope_words(
+    parameters: dict[str, dict],
+    parameter_id: str,
+    scope: dict[str, str],
+    key: str,
+    shown_scope: dict[str, str],
+) -> list[str] | Missing:
+    """The words under ``key`` of every record with this ``id`` whose scope is
+    exactly ``scope`` plus ``key``. PROPOSED (unit l0/erosion-c-main-route).
+
+    The words are returned as ``params.catalogue.identity`` writes them (case
+    and spacing ignored), sorted, each once; a record whose scope has no
+    ``key`` or another key is not one of them. A record anywhere in
+    ``parameters`` without a well-formed ``id`` and ``scope`` gives
+    ``MISSING_INPUT``, as in ``read_parameter``; ``shown_scope`` is how the
+    sought scope is written in that ``detail``. An empty list means that no
+    such record exists: the caller says what is missing.
+    """
+    sought_id, sought_scope = identity({"id": parameter_id, "scope": scope})
+    identities = _identities(parameters)
+    malformed = _not_comparable(_named(parameter_id, shown_scope), identities)
+    if malformed is not None:
+        return malformed
+    words: list[str] = []
+    for found_id, found_scope in identities.values():
+        if found_id != sought_id:
+            continue
+        rest = tuple((name, word) for name, word in found_scope if name != key)
+        words += [
+            word for name, word in found_scope if name == key and rest == sought_scope
+        ]
+    return sorted(dict.fromkeys(words))
+
+
 def read_parameter(
     parameters: dict[str, dict], parameter_id: str, scope: dict[str, str]
 ) -> Parameter:
@@ -81,24 +148,10 @@ def read_parameter(
     """
     sought = identity({"id": parameter_id, "scope": scope})
     named = _named(parameter_id, scope)
-    identities = {
-        key: _identity_or_none(record) for key, record in sorted(parameters.items())
-    }
-    malformed = [key for key, found in identities.items() if found is None]
-    if malformed:
-        return Parameter(
-            Missing(
-                reason="MISSING_INPUT",
-                detail=(
-                    f"{named} cannot be looked up: the record(s) "
-                    f"{', '.join(repr(key) for key in malformed)} have no well-formed "
-                    "'id' and 'scope', so they cannot be compared and could be records "
-                    "of this parameter (F3c of params/README.md); "
-                    "params.catalogue.check_catalogue rejects such a catalogue (G3)"
-                ),
-            ),
-            None,
-        )
+    identities = _identities(parameters)
+    malformed = _not_comparable(named, identities)
+    if malformed is not None:
+        return Parameter(malformed, None)
     matches = [parameters[key] for key, found in identities.items() if found == sought]
     if not matches:
         return Parameter(
