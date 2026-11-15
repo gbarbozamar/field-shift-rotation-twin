@@ -448,7 +448,7 @@ SOIL_SLOPE_EXAMPLE_FILE=<the soil-and-slope example> \
 uv run uvicorn api.main:app --reload
 ```
 
-**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on.
+**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` switches real climate data on by default; `POWER_SETTINGS_FILE= CLIMATE_START_DATE= CLIMATE_END_DATE= docker compose watch` (or `up`) switches it off, as its comments say.
 
 ## Interfaces and their implementations
 

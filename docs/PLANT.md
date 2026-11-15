@@ -116,7 +116,7 @@ All are in the comment linked at the top ([D235 to D251](https://github.com/gbar
 
 A later decision touches the kinds of year: [D258](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6895728653) (the printed values come from the record, not from a rounding rule; `kinds_of_year/README.md`).
 
-The lane's local decisions R1 to R32 are in the body of pull request #310; they are not copied here. Issue #77 records that D235 to D251 are R1 to R17 of that pull request. The code cites some of them by number (for example R10 and R25 in `api/plant.py`).
+The lane's local decisions R1 to R35 are in the body of pull request #310; they are not copied here. Issue #77 records that D235 to D251 are R1 to R17 of that pull request. The code cites some of them by number (for example R10 and R25 in `api/plant.py`).
 
 ## 8. What is not built or not signed
 

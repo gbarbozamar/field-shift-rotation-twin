@@ -37,8 +37,12 @@ services:
       # KINDS_OF_YEAR_RECORD_FILE: no ONI record is shipped until a person
       # checks and signs it (D240 (5) of #77; R26, PROPOSED), so unset, every
       # kind of year of a plant answer is missing NOT_AVAILABLE. A person who
-      # holds a signed record sets the variable to its path as the image sees it:
-      #   KINDS_OF_YEAR_RECORD_FILE=<path> docker compose watch
+      # holds a signed record places it under kinds_of_year/ in the checkout
+      # (copied into the image, synced to /app/kinds_of_year) and gives its
+      # path inside the container, relative to /app (the working directory)
+      # or absolute. A file elsewhere on the host is not mounted; a path that
+      # does not exist stops the server with a ConfigError:
+      #   KINDS_OF_YEAR_RECORD_FILE=kinds_of_year/<file> docker compose watch
       KINDS_OF_YEAR_RECORD_FILE: ${KINDS_OF_YEAR_RECORD_FILE-}
       # RAIN_STRESS_TEST: the heavier-rain stress test stays off unless a
       # person sets exactly `on` (after stripping spaces); any other non-blank
