@@ -609,10 +609,16 @@ def ledger_carbon_inputs(ledger: Any) -> Any:
 def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     """The note on the carbon inputs copied from the ledger (PROPOSED text).
 
-    States the unit question (OPEN 3 of the residue ledger) and how many
-    series carry ``NOT_COMPUTABLE`` years, copied, never left out.
+    States the unit question (OPEN 3 of the residue ledger), that the ledger
+    wrote no series when it wrote none, and how many series carry
+    ``NOT_COMPUTABLE`` years, copied, never left out.
     """
     series = forcing.annual_carbon_inputs
+    if not series:
+        return (
+            f"{_name(RESIDUES)} wrote no carbon-input series, so the forcing "
+            "carries none"
+        )
     units = sorted({item.unit for item in series})
     note = (
         f"{len(series)} carbon-input series copied unchanged from "
@@ -635,9 +641,9 @@ def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     )
     if not_computable:
         note += (
-            f"; {not_computable} series carry NOT_COMPUTABLE years (for example "
-            "a cover or pasture crop, OPEN 5 of the residue ledger) and are "
-            "copied, never left out (PROPOSED)"
+            f"; {not_computable} series carry NOT_COMPUTABLE years, each with "
+            "the reason the series itself gives; they are copied, never left "
+            "out (PROPOSED)"
         )
     return note
 
@@ -920,9 +926,10 @@ class EntryPointEngines:
                 amg_module = module_status_of(AMG.module_id, count_values(amg_rows))
                 if from_ledger:
                     amg_module = _with_note(amg_module, ledger_inputs_detail(forcing))
-            # The per-crop series are written only without a ledger's series.
+            # Whatever the source of the series: the ledger applies the same
+            # identifier filter, so such a crop has no series either way.
             left_out = crops_left_out(calendar)
-            if left_out and not from_ledger:
+            if left_out:
                 amg_module = _with_note(
                     amg_module, crops_left_out_detail(len(left_out))
                 )

@@ -46,7 +46,7 @@ from api.test_engines import (
     soil_result,
     write_package,
 )
-from api.test_phases import THREE_YEARS, _post, _rotation
+from api.test_phases import THREE_YEARS, FakePhases, _post, _rotation
 from contracts.carbon_forcing import AnnualCarbonInputSeries, CarbonForcing
 from contracts.inputs.common import Missing as InputMissing
 from contracts.inputs.common import Value
@@ -342,8 +342,9 @@ def test_the_series_reach_ep5_unchanged_in_their_unit():
     assert LEFT_UNCHANGED in detail
     assert "OPEN 3 of the residue ledger" in detail
     assert producer.STOCK_UNIT in detail
-    # The fallback note on crops is not written for the ledger's series.
-    assert "crop_id is not a quantity identifier" not in detail
+    # The example's crops are not identifiers: the note is kept with a ledger.
+    crops = {c["crop_id"] for c in CALENDAR_DOCUMENT["components"]}
+    assert runner.crops_left_out_detail(len(crops)) in detail
 
 
 def test_series_in_the_unit_amg_requires_carry_no_open_note():
@@ -369,7 +370,8 @@ def test_not_computable_series_are_copied_and_named():
     assert forcing.annual_carbon_inputs == list(items)
     detail = modules(result)["amg"].detail
     assert "1 series carry NOT_COMPUTABLE years" in detail
-    assert "PROPOSED" in detail
+    assert "the reason the series itself gives" in detail
+    assert "cover" not in detail and "PROPOSED" in detail
 
 
 def test_a_series_over_other_years_is_500():
@@ -540,9 +542,84 @@ def test_the_real_ep4_and_ep5_answer_200(monkeypatch):
     answer = _post(_rotation("two_crops"))  # the chain example, the same field
     assert calls and len(calls) == len(answer["scenarios"])
     states = {m["id"]: m for m in answer["modules"]}
-    expected = runner.ledger_status(calls[0])
-    assert (states["residues"]["state"], states["residues"]["reason"]) == (
-        expected.state,
-        expected.reason,
+    # With the empty catalogue no record is there: some values missing, the
+    # reason MISSING_INPUT, never a not-built or another-field answer.
+    assert states["residues"]["state"] in ("degraded", "not_available")
+    assert states["residues"]["reason"] == "MISSING_INPUT"
+    assert runner.NOT_BUILT not in (states["residues"].get("detail") or "")
+    assert runner.OTHER_FIELD not in (states["residues"].get("detail") or "")
+    assert states["amg"]["state"] == "not_available"
+    assert "engine.residues.build_residue_ledger" in (states["amg"].get("detail") or "")
+
+
+# --- 6. remarks of the review ----------------------------------------------------
+
+
+def mixed_crops() -> Any:
+    """The calendar example with one crop an identifier and one not."""
+    document = copy.deepcopy(CALENDAR_DOCUMENT)
+    first = document["components"][0]["crop_id"]
+    for item in document["components"]:
+        if item["crop_id"] == first:
+            item["crop_id"] = "placeholder_crop_a"
+    return type(calendar()).model_validate(document)
+
+
+def test_with_a_ledger_and_no_identifier_crop_the_note_is_kept():
+    amg = Fake(balance())
+    result = run(engine_functions(Fake(ledger()), amg))
+    ((forcing,), _) = amg.calls[0]
+    assert forcing.annual_carbon_inputs == []
+    detail = modules(result)["amg"].detail
+    crops = producer.crops_left_out(calendar())
+    assert crops
+    assert runner.crops_left_out_detail(len(crops)) in detail
+    assert "wrote no carbon-input series" in detail
+
+
+def test_with_a_ledger_and_mixed_crops_the_note_counts_the_others():
+    item = series("placeholder_crop_a_input").model_copy(
+        update={"origin": "placeholder_crop_a"}
     )
-    assert LEFT_UNCHANGED in (states["amg"].get("detail") or "")
+    item = AnnualCarbonInputSeries.model_validate(item.model_dump())
+    amg = Fake(balance())
+    result = run(
+        engine_functions(Fake(ledger(item)), amg, *fakes(calendar_answer=mixed_crops()))
+    )
+    ((forcing,), _) = amg.calls[0]
+    assert forcing.annual_carbon_inputs == [item]
+    detail = modules(result)["amg"].detail
+    left_out = producer.crops_left_out(mixed_crops())
+    assert len(left_out) == 1
+    assert runner.crops_left_out_detail(1) in detail
+    assert LEFT_UNCHANGED in detail
+
+
+def test_ep4_is_not_called_for_site_data_of_another_field():
+    residues = Fake(ledger())
+    other = chain_climate().model_copy(update={"field_id": "PLACEHOLDER_OTHER_FIELD"})
+    result = run(
+        engine_functions(residues, Fake(balance())), climate=climate_result(other)
+    )
+    assert residues.calls == []
+    state = modules(result)["residues"]
+    assert (state.state, state.reason) == ("not_available", "MISSING_INPUT")
+    assert state.detail.startswith(runner.OTHER_FIELD)
+
+
+def test_ep4_is_not_called_for_a_refused_phase():
+    phases = FakePhases(raises=True)
+    calendar_fn, soil_fn, water_fn = fakes()
+    residues = Fake(ledger())
+    functions = replace(
+        engine_functions(residues, Fake(balance()), calendar_fn, soil_fn, water_fn),
+        phase_calendar=phases.phase_calendar,
+        list_phases=phases.list_phases,
+    )
+    result = run(functions)
+    assert len(result.phases) > 1
+    assert len(residues.calls) == len(soil_fn.calls) == 1  # phase 1 only
+    for phase in result.phases[1:]:
+        assert phase.result.calendar is None
+        state = {m.id: m for m in phase.result.modules}["residues"]
+        assert (state.state, state.reason) == ("not_available", "MISSING_INPUT")
