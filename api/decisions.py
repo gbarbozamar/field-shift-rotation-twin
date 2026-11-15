@@ -39,14 +39,21 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
 
 from adapters.ports import ClimateResult, ClimateSource, SoilSlopeResult
-from api.decision_layer import check_document
+from api.decision_layer import accepts_keyword, check_document
 from api.errors import ErrorCode, error_response, join_path
 from api.ports import (
     DecisionLayer,
@@ -56,6 +63,7 @@ from api.ports import (
     RotationValidator,
     RunSettings,
     SoilSlopeSource,
+    UncertainInputSpec,
 )
 from api.results_table import RotationRun, build_results_table
 from api.rotations import (
@@ -94,6 +102,48 @@ NOT_THE_START_MONTH_MESSAGE = (
 # --- request ------------------------------------------------------------------
 
 
+_StrictNonEmptyStr = Annotated[
+    str, StringConstraints(strict=True, min_length=1, pattern=r"\S")
+]
+_StrictFiniteFloat = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+_ScenarioRef = (
+    _StrictNonEmptyStr | Annotated[list[_StrictNonEmptyStr], Field(min_length=1)]
+)
+
+
+class UncertainInputIn(BaseModel):
+    """One uncertain input mapping for D4 ``measure_first`` on ``POST /api/decisions/run``. PROPOSED."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    name: _StrictNonEmptyStr
+    unit: _StrictNonEmptyStr
+    cell: tuple[
+        _StrictNonEmptyStr,
+        _StrictNonEmptyStr,
+        _StrictNonEmptyStr,
+        StrictInt | None,
+        _StrictNonEmptyStr | None,
+        _StrictNonEmptyStr | None,
+    ]
+    values: list[tuple[_StrictFiniteFloat, _ScenarioRef]]
+
+    def to_spec(self) -> UncertainInputSpec:
+        """Convert to the transport-neutral ``UncertainInputSpec`` of ``api/ports.py``."""
+        return UncertainInputSpec(
+            name=self.name,
+            unit=self.unit,
+            cell=self.cell,
+            values=tuple(
+                (
+                    float(value),
+                    entry if isinstance(entry, str) else tuple(entry),
+                )
+                for value, entry in self.values
+            ),
+        )
+
+
 class RunDecisionRequest(BaseModel):
     """Body of ``POST /api/decisions/run``. PROPOSED.
 
@@ -101,6 +151,9 @@ class RunDecisionRequest(BaseModel):
     ``rotations`` holds exactly two items of the "Rotation definition"
     contract, unchanged; here each only has to be a JSON object, and its
     contents are checked by the ``RotationValidator``.
+    ``uncertain_inputs`` is an optional list of D4 uncertain-input mappings
+    used to populate ``measure_first``; when omitted or ``null``, no sweep is
+    passed and ``measure_first`` stays empty.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -109,6 +162,7 @@ class RunDecisionRequest(BaseModel):
     rotations: list[dict[str, Any]] = Field(
         min_length=ROTATIONS_PER_REQUEST, max_length=ROTATIONS_PER_REQUEST
     )
+    uncertain_inputs: list[UncertainInputIn] | None = None
 
 
 # --- response -----------------------------------------------------------------
@@ -194,7 +248,13 @@ def _missing_out(missing: Missing) -> MissingOut:
     return MissingOut(reason=missing.reason, detail=missing.detail)
 
 
-def _decide(layer: DecisionLayer, table: Any, *, example_data: bool) -> Any:
+def _decide(
+    layer: DecisionLayer,
+    table: Any,
+    *,
+    example_data: bool,
+    uncertain_inputs: Sequence[UncertainInputSpec] | None = None,
+) -> Any:
     """The decision layer's answer: a checked document or its typed absence.
 
     ``NOT_AVAILABLE`` comes only from the layer itself, when it is not built
@@ -205,7 +265,16 @@ def _decide(layer: DecisionLayer, table: Any, *, example_data: bool) -> Any:
     are defects: they propagate and the route answers ``500``
     ``INTERNAL_ERROR``, as for an engine that raises.
     """
-    answer = layer.decide(table, example_data=example_data)
+    if uncertain_inputs is None:
+        answer = layer.decide(table, example_data=example_data)
+    elif accepts_keyword(layer.decide, "uncertain_inputs"):
+        answer = layer.decide(
+            table, example_data=example_data, uncertain_inputs=uncertain_inputs
+        )
+    else:
+        raise TypeError(
+            f"{type(layer).__name__}.decide does not accept 'uncertain_inputs'"
+        )
     if isinstance(answer, Missing):
         return answer
     return check_document(answer, table, example_data=example_data)
@@ -337,12 +406,18 @@ def make_decision_router(
                 assert answer.missing is not None
                 decision_missing = _missing_out(answer.missing)
             else:
+                uncertain_inputs = (
+                    None
+                    if body.uncertain_inputs is None
+                    else tuple(item.to_spec() for item in body.uncertain_inputs)
+                )
                 outcome = _decide(
                     decision_layer,
                     answer.table,
                     example_data=example_data_of(
                         body.rotations, climate_result, soil_result
                     ),
+                    uncertain_inputs=uncertain_inputs,
                 )
                 if isinstance(outcome, Missing):
                     decision_missing = _missing_out(outcome)

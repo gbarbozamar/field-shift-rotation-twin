@@ -11,7 +11,12 @@ finds an entry point, and never imports it directly.
 PROPOSED, for the interface developer (sub-lane L2b) to accept or rename: the
 module path, the function name and its signature,
 
-    assemble_decision_output(table: ResultsTable, *, example_data: bool) -> DecisionOutput
+    assemble_decision_output(
+        table: ResultsTable,
+        *,
+        example_data: bool,
+        uncertain_inputs: Sequence[UncertainInputSpec] | None = None,
+    ) -> DecisionOutput
 
 ``table`` is the results table the platform built (``api/results_table.py``);
 the rotations and scenarios of the document are those of the table. No limit
@@ -38,12 +43,13 @@ is ``200`` with ``decision_missing`` ``NOT_AVAILABLE``.
 from __future__ import annotations
 
 import importlib
-from collections.abc import Callable
+import inspect
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 # The interface lives with the other interfaces of the route, in api/ports.py;
 # it is re-exported here for the callers of this module.
-from api.ports import DecisionLayer, Missing
+from api.ports import DecisionLayer, Missing, UncertainInputSpec
 from contracts.results.models import ResultsTable
 
 if TYPE_CHECKING:
@@ -55,6 +61,7 @@ __all__ = [
     "DecisionLayer",
     "DiscoveredDecisionLayer",
     "NamedDecisionLayer",
+    "accepts_keyword",
     "check_document",
     "discover_decision_function",
     "import_named",
@@ -145,6 +152,20 @@ def check_document(
     return document
 
 
+def accepts_keyword(fn: Callable[..., Any], name: str) -> bool:
+    """Whether ``fn`` accepts keyword argument ``name`` (explicitly or via ``**kwargs``)."""
+    parameters = inspect.signature(fn).parameters
+    if name in parameters:
+        return parameters[name].kind in (
+            inspect.Parameter.KEYWORD_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    return any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+
+
 class NamedDecisionLayer:
     """``DecisionLayer`` on the function found by name (``None``: not built)."""
 
@@ -158,11 +179,22 @@ class NamedDecisionLayer:
         return self._function is not None
 
     def decide(
-        self, table: ResultsTable, *, example_data: bool
+        self,
+        table: ResultsTable,
+        *,
+        example_data: bool,
+        uncertain_inputs: Sequence[UncertainInputSpec] | None = None,
     ) -> DecisionOutput | Missing:
         if self._function is None:
             return Missing(reason="NOT_AVAILABLE", detail=NOT_BUILT)
-        document = self._function(table, example_data=example_data)
+        if uncertain_inputs is None:
+            document = self._function(table, example_data=example_data)
+        elif accepts_keyword(self._function, "uncertain_inputs"):
+            document = self._function(
+                table, example_data=example_data, uncertain_inputs=uncertain_inputs
+            )
+        else:
+            raise TypeError(f"{DECISION_NAME} does not accept 'uncertain_inputs'")
         return check_document(document, table, example_data=example_data)
 
 
@@ -182,8 +214,12 @@ class DiscoveredDecisionLayer:
         self._discover = discover
 
     def decide(
-        self, table: ResultsTable, *, example_data: bool
+        self,
+        table: ResultsTable,
+        *,
+        example_data: bool,
+        uncertain_inputs: Sequence[UncertainInputSpec] | None = None,
     ) -> DecisionOutput | Missing:
         return NamedDecisionLayer(self._discover()).decide(
-            table, example_data=example_data
+            table, example_data=example_data, uncertain_inputs=uncertain_inputs
         )
