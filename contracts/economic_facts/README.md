@@ -4,11 +4,13 @@
 
 Status: **PROPOSED** (blueprint section 3.7). Nothing in this folder is in force until people approve the pull request: the lead developer, as owner of `contracts/`, and the interface developer, who collects these facts from the user.
 
+**Current status on `main` (`9f6c2a7`):** Merged in `#392` (`9a2e313`) together with `economics/` (`margin.py`, `limit.py`, `decide.py`, `tipping.py`). Downstream consumers now on `main` are `kinds_of_year/` (`#422` `b09402e`), `contracts/plant_answer/` (`#424` `6a34ba7`), `POST /api/plant/run` (`api/plant.py` and `economics/plant.py`, `#427` `da016c6`), and the `#/plant` screen (`web/`, `#426` `4dc7cb9`). No ONI record is shipped in `kinds_of_year/` until checked and signed (D240 (5), D34, D66). The contract remains `PROPOSED` until formal pull-request approval.
+
 This folder holds Pydantic models and one example of the "economic facts" contract: the economic facts a producer declares for one field.
 
 | Contract | Producer → consumers | Model | Example |
 |---|---|---|---|
-| Economic facts | Interface (what the user declares) → the classification of kinds of year and the margin engine of later units | `economic_facts.EconomicFacts` | `examples/PLACEHOLDER_economic_facts.json` |
+| Economic facts | Interface (what the user declares) → `kinds_of_year/` (`#422` `b09402e`), `economics/` (`#392` `9a2e313`), and `POST /api/plant/run` (`contracts/plant_answer/`, `#424` `6a34ba7`, `#427` `da016c6`) | `economic_facts.EconomicFacts` | `examples/PLACEHOLDER_economic_facts.json` |
 
 A builder session of lane L2 landed it here (unit `l2/contracts-economic-facts`). Identifiers such as C3.1 below refer to `contracts/CONVENTIONS.md`.
 
@@ -68,7 +70,7 @@ The sign rule applies to the number of a present value and to the low bound of i
 
 **Provenance (PROPOSED).** Every present value of this contract is declared by the user: its provenance is `DECLARED`, and any other label is rejected.
 
-**Time basis (PROPOSED).** `cost` (grain and cover) is per hectare for one crop cycle, that is one sowing of that crop; a grain `yield` is per hectare for that cycle. A `declared_margin` is per hectare and agricultural year. The margin engine of a later unit adds the cycles that fall in one agricultural year. The unit strings stay as above.
+**Time basis (PROPOSED).** `cost` (grain and cover) is per hectare for one crop cycle, that is one sowing of that crop; a grain `yield` is per hectare for that cycle. A `declared_margin` is per hectare and agricultural year. `economics/margin.py` (`compute_rotation_margin`, `#392` `9a2e313`) adds the cycles that fall in one agricultural year. The unit strings stay as above.
 
 **`crop_id`.** Not blank, with no leading or trailing white space; unique in the list, compared after removing surrounding white space.
 
@@ -76,7 +78,7 @@ The sign rule applies to the number of a present value and to the low bound of i
 
 ### Kinds of year
 
-`yield` and `declared_margin` each hold exactly one value for each kind of year of `KINDS_OF_YEAR = ("el_nino", "neutral", "la_nina")`, a module constant that later units import. A kind of year left out, or one not in the list, is rejected.
+`yield` and `declared_margin` each hold exactly one value for each kind of year of `KINDS_OF_YEAR = ("el_nino", "neutral", "la_nina")`, a module constant imported by `kinds_of_year/` (`#422` `b09402e`), `economics/` (`#392` `9a2e313`), and `contracts/plant_answer/` (`#424` `6a34ba7`). A kind of year left out, or one not in the list, is rejected.
 
 ## PROPOSED cases
 
@@ -172,10 +174,10 @@ Every case below is a change to the example, made in memory. The invalid ones mu
 
 Each item is a question a person has to answer.
 
-1. **How is a year assigned to a kind of year?** The contract names `el_nino`, `neutral` and `la_nina` and nothing else: which index, which threshold and which source classify a year are not decided here. CITATION NEEDED. For the science reviewers.
+1. **How is a year assigned to a kind of year?** The contract names `el_nino`, `neutral` and `la_nina` and nothing else: which index, which threshold and which source classify a year are not decided here. CITATION NEEDED. **On `main` (`9f6c2a7`):** `kinds_of_year/` (`#422` `b09402e`) implements ONI classification under D240 and D258 (reading printed v6 table values from a caller-supplied record); switching to RONI remains OPEN, and no ONI record is shipped until checked and signed (D240 (5), D34, D66). For the science reviewers.
 2. **Other currencies.** `currency` accepts `"USD"` only, and the unit strings are written in `USD`. C1.1 lists `t`, `ha` and `yr` and does not list a currency; whether C1.1 gains `USD` (and others) is for the lead developer.
-3. **Which crop's price is swept for the tipping price.** Not in this contract: it belongs to the route request of a later unit. For the platform developer.
+3. **Which crop's price is swept for the tipping price.** Not in `EconomicFacts`: it belongs to the route request. **On `main` (`9f6c2a7`):** `contracts/plant_answer/` (`#424` `6a34ba7`) and `POST /api/plant/run` (`api/plant.py`, `#427` `da016c6`) carry `questions.soybean_crop_ids` and `questions.soybean_price_range` in `PlantRequest` (`PROPOSED`). For the platform developer.
 4. **Signs and ranges.** A present price, cost or yield is rejected when negative, and so is a range of one whose low bound is negative; zero is accepted. Whether a zero price or yield is meaningful, and whether the non-negative rule on range bounds stands, is for the lead developer.
 5. **Does a pasture carry a cost?** A `declared_margin` crop carries its margin only and rejects a `cost`, read as a margin net of cost. For the interface developer.
 6. **Which `source` text marks a value the user declared?** The example writes `"user"`, as the brief of this unit proposes. For the lead developer.
-7. **Relationship to the saved case and to the rotation definition.** Whether `crop_id` here must match a `crop_id` of the rotation definition of the same field is not checked. For the lead developer.
+7. **Relationship to the saved case and to the rotation definition.** Whether `crop_id` here must match a `crop_id` of the rotation definition of the same field is not checked in `EconomicFacts` or `SavedCase`. **On `main` (`9f6c2a7`):** `PlantRequest` (`contracts/plant_answer/`, `#424` `6a34ba7`) checks that every crop a rotation sows is declared in `economic_facts` and that each `soybean_crop_ids` entry is a grain crop sown by at least one rotation (`PROPOSED`). For the lead developer.
