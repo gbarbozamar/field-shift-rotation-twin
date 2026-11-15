@@ -647,12 +647,29 @@ def _cover_block_text() -> str:
     ]
     for cover in bounded.COVER_AT_THE_UPPER_LEVEL:
         if cover.upper_percent is not None:
-            lines.append(
-                f"    {cover.rotation_id}, {cover.fallow}: "
-                f"{cover.upper_percent}% (admitted for this rotation alone; "
-                "no table of the three rotations carries it, the contract "
-                "giving every rotation the same cells)"
+            # The "admitted alone" parenthetical is true only where every
+            # fallow of the rotation holds a cap (R1): a rotation with one
+            # uncapped fallow (R2, R3) has its upper level not admitted at
+            # all under D171, whatever this row's own cap says.
+            every_fallow_capped = all(
+                other.upper_missing is None
+                for other in bounded.COVER_AT_THE_UPPER_LEVEL
+                if other.rotation_id == cover.rotation_id
             )
+            if every_fallow_capped:
+                lines.append(
+                    f"    {cover.rotation_id}, {cover.fallow}: "
+                    f"{cover.upper_percent}% (admitted for this rotation alone; "
+                    "no table of the three rotations carries it, the contract "
+                    "giving every rotation the same cells)"
+                )
+            else:
+                lines.append(
+                    f"    {cover.rotation_id}, {cover.fallow}: "
+                    f"{cover.upper_percent}% (the cap of this one fallow; the "
+                    "rotation's upper level is still not admitted - another "
+                    "fallow has no cap, D115)"
+                )
         else:
             lines.append(
                 f"    {cover.rotation_id}, {cover.fallow}: MISSING "
