@@ -2,6 +2,8 @@
 
 For the developers who join a lane. Read this first, then [DEVELOPMENT_BLUEPRINT.md](DEVELOPMENT_BLUEPRINT.md).
 
+To run the tool from a clean clone, with each command and the output it gives, see [WALKTHROUGH.md](WALKTHROUGH.md).
+
 - [All developers](#all-developers)
 - [Enzo: platform developer (sub-lane L2a)](#enzo-platform-developer-sub-lane-l2a)
 - [Martín: interface developer (lane L3 and sub-lane L2b)](#martín-interface-developer-lane-l3-and-sub-lane-l2b)
