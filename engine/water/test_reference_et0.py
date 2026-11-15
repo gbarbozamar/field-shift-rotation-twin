@@ -2,9 +2,7 @@
 
 The public function gives exactly the daily reference evapotranspiration EP3
 uses. EP3's own series is read where EP3 calls the function of
-``engine/water/et0/`` (``exposure.et0_days``), as the test of the runner does
-(``test_d220_the_runner_daily_et0_is_the_et0_of_ep3`` in api/test_engines.py),
-and compared day by day: the same days, the same numbers, the same reasons.
+``engine/water/et0/`` (``exposure.et0_days``), and compared day by day: the same days, the same numbers, the same reasons.
 
 EXAMPLE DATA. The climate, the soil and the calendars are the PLACEHOLDER
 chain examples of ``contracts/inputs/examples/``; the two calendars carry the
