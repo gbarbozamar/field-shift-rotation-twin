@@ -27,7 +27,11 @@ days are missing with the reason. Unit ``l1/water-fallow-residue`` (issue
 with no crop the fallow is weed-free (no crop reaches the balance), the
 surface layer takes the cover and wetted fractions of a day with no crop, and
 its total evaporable water is reduced by the residue cover of the fallow,
-read by the crop sown after it (``engine/water/fallow.py``). The daily chain is
+read by the crop sown after it (``engine/water/fallow.py``). Unit
+``l1/water-stage-tail-d135`` (issue #224) applies D135 and D136: the stages
+are cut at the harvest when their lengths run past it, and the days after the
+end of the late stage up to the harvest (the tail) are days with no living
+crop, which take that fallow day unchanged. The daily chain is
 then reduced to one ``WaterDeficitExposure`` per agricultural year of the
 record (D47). The definition of the indicator is incomplete (convention
 C1.4), so no year carries a number: a year whose daily balance was computed
@@ -85,7 +89,7 @@ from engine.water.runoff import (
 )
 from engine.water.stages import (
     STAGE_LENGTH_PARAMETERS,
-    StageDay,
+    PlacedStages,
     by_stage,
     place_stages,
 )
@@ -531,7 +535,7 @@ class Growth:
 
 def _growth_of_day(
     calendar: RotationCalendar, catalogue: Catalogue
-) -> Callable[[dt.date, str], Growth | Missing]:
+) -> Callable[[dt.date, str], Growth | Missing | None]:
     """The basal crop coefficient and root depth of a day with a crop, or why they are not known.
 
     PROPOSED (issue #206). The day lies in the period of the one dated
@@ -545,7 +549,11 @@ def _growth_of_day(
       ``MISSING_INPUT`` with STAGE_UNKNOWN (D79), and the missing records are
       named by the catalogue (D56);
     - stages that cannot be placed: ``NOT_COMPUTABLE``, as ``place_stages``
-      says why (OPEN 25 of EXPOSURE.md).
+      says why (a stage length that is not a whole number of days);
+    - a day of the tail, after the end of the late stage and up to the
+      harvest (D135, D136): ``None``, a day with no living crop, which the
+      chain treats as a day with no crop. Stages that run past the harvest
+      are cut there by ``place_stages``.
 
     Otherwise the basal crop coefficient of the day is ``stages.by_stage`` of
     the three records of FAO-56 Table 17 (D78), and the root depth is
@@ -559,9 +567,9 @@ def _growth_of_day(
         for component in calendar.components
         if component.start.date is not None and component.end.date is not None
     ]
-    placed: dict[str, dict[dt.date, StageDay] | Missing] = {}
+    placed: dict[str, PlacedStages | Missing] = {}
 
-    def growth(day: dt.date, crop: str) -> Growth | Missing:
+    def growth(day: dt.date, crop: str) -> Growth | Missing | None:
         ((start, end, component),) = [
             (start, end, component)
             for start, end, component in dated
@@ -587,6 +595,9 @@ def _growth_of_day(
         stages = placed[key]
         if isinstance(stages, Missing):
             return stages
+        if day in stages.tail:
+            # After maturity: no living crop (D136).
+            return None
         stage_day = stages[day]
         kcb = by_stage(
             stage_day,
@@ -893,23 +904,8 @@ def _run_chain(
             scope: Scope = NO_CROP if crop is None else ((CROP_KEY, crop),)
             height = catalogue.value(CROP_HEIGHT, scope, day)
             curve_number = catalogue.value(CURVE_NUMBER, scope, day)
-            if crop is None:
-                # A fallow day (unit #217). Weed-free (D111): no crop reaches
-                # the balance, so nothing is transpired. The surface layer
-                # takes the cover, the wetting and the evaporable waters of
-                # D110.
-                kcb = catalogue.value(BASAL_CROP_COEFFICIENT, scope, day)
-                crop_day = None
-                exponent = None
-                fallow_surface = _fallow_surface(
-                    catalogue,
-                    notes,
-                    day,
-                    following_of(day),
-                    surface_constants[TOTAL_EVAPORABLE_WATER],
-                    surface_constants["readily_evaporable_water"],
-                )
-            else:
+            growth: Growth | Missing | None = None
+            if crop is not None:
                 exponent = catalogue.value(COVER_FRACTION_EXPONENT, scope, day)
                 # Every record of the crop is read, so that one that is
                 # missing is named (D56).
@@ -921,26 +917,48 @@ def _run_chain(
                     catalogue.value(parameter_id, scope, day)
                 fraction = catalogue.value(READILY_AVAILABLE_FRACTION, scope, day)
                 growth = growth_of(day, crop)
-                if isinstance(growth, Missing):
-                    # A record that is missing is named by the catalogue; a
-                    # stage not known (D79) or not placed is noted.
-                    if (
-                        growth.detail == STAGE_UNKNOWN
-                        or growth.reason != "MISSING_INPUT"
-                    ):
-                        notes.note(growth, day)
-                    kcb = crop_day = growth
-                else:
-                    kcb = growth.basal_crop_coefficient
-                    crop_day = (
-                        Missing(reason="MISSING_INPUT", detail=fraction.detail)
-                        if isinstance(fraction, Missing)
-                        else balance.CropDay(
-                            transpiration_coefficient=kcb,
-                            root_depth=growth.root_depth,
-                            readily_available_fraction=fraction,
-                        )
+                if growth is None:
+                    # A day of the tail, after the late stage and up to the
+                    # harvest (D135, D136): no living crop, so it is a day
+                    # with no crop from here on, with the records of one.
+                    scope = NO_CROP
+                    height = catalogue.value(CROP_HEIGHT, scope, day)
+                    curve_number = catalogue.value(CURVE_NUMBER, scope, day)
+            if growth is None:
+                # A fallow day (unit #217), or a day of the tail (D136).
+                # Weed-free (D111): no crop reaches the balance, so nothing
+                # is transpired and no potential transpiration enters the
+                # ratio (D106); the day stays in the balance (D44, D50). The
+                # surface layer takes the cover, the wetting and the
+                # evaporable waters of D110.
+                kcb = catalogue.value(BASAL_CROP_COEFFICIENT, scope, day)
+                crop_day = None
+                exponent = None
+                fallow_surface = _fallow_surface(
+                    catalogue,
+                    notes,
+                    day,
+                    following_of(day),
+                    surface_constants[TOTAL_EVAPORABLE_WATER],
+                    surface_constants["readily_evaporable_water"],
+                )
+            elif isinstance(growth, Missing):
+                # A record that is missing is named by the catalogue; a
+                # stage not known (D79) or not placed is noted.
+                if growth.detail == STAGE_UNKNOWN or growth.reason != "MISSING_INPUT":
+                    notes.note(growth, day)
+                kcb = crop_day = growth
+            else:
+                kcb = growth.basal_crop_coefficient
+                crop_day = (
+                    Missing(reason="MISSING_INPUT", detail=fraction.detail)
+                    if isinstance(fraction, Missing)
+                    else balance.CropDay(
+                        transpiration_coefficient=kcb,
+                        root_depth=growth.root_depth,
+                        readily_available_fraction=fraction,
                     )
+                )
 
         # 2. Runoff by the Curve Number.
         runoff = runoff_day(

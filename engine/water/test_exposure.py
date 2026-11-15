@@ -979,42 +979,95 @@ def test_one_crop_without_stage_lengths_leaves_the_other_crop_computed():
     assert "crop (MISSING_INPUT)" in first_missing.balance.storage_end.detail
 
 
-def test_stage_lengths_that_do_not_fill_the_period_leave_it_missing_naming_open_25():
-    # The third and fourth periods are each one day off the first period of
-    # their crop, which the four PLACEHOLDER stage lengths fill.
-    calendar_ = RotationCalendar.model_validate(
-        chain_calendar_document(fill_periods=False)
-    )
-    first, _, third, *_ = calendar_.components
-    assert first.crop_id == third.crop_id
-    assert (third.end.date - third.start.date) != (first.end.date - first.start.date)
+def calendar_with_tail_and_cut(tail: int, cut: int) -> RotationCalendar:
+    """The calendar of ``chain_calendar`` with the third period ``tail`` days
+    longer and the fourth ``cut`` days shorter than the days the four
+    PLACEHOLDER stage lengths of their crop fill (D135, D136)."""
+    document = chain_calendar_document()
+    third, fourth = document["components"][2:4]
+    for component, change in ((third, tail), (fourth, -cut)):
+        end = dt.date.fromisoformat(component["end"]["date"])
+        component["end"]["date"] = (end + ONE_DAY * change).isoformat()
+    return RotationCalendar.model_validate(document)
+
+
+@pytest.mark.parametrize(
+    ("tail", "cut"),
+    [
+        (1, 1),  # the calendar of fill_periods=False
+        (33, 66),  # a longer tail; a cut inside the mid stage of crop-b
+    ],
+)
+def test_stage_lengths_that_do_not_fill_the_period_leave_a_no_crop_tail_or_are_cut_at_harvest(
+    monkeypatch, tail, cut
+):
+    calendar_ = calendar_with_tail_and_cut(tail, cut)
+    if (tail, cut) == (1, 1):
+        assert calendar_ == RotationCalendar.model_validate(
+            chain_calendar_document(fill_periods=False)
+        )
+    _, _, third, fourth, _ = calendar_.components
+    assert fourth.crop_id.endswith("crop-b")
+    tail_days = {third.end.date - ONE_DAY * n for n in range(tail)}
+    crops_given: dict[dt.date, Any] = {}
+    step = module.balance.step
+
+    def spy(storage, day, **kwargs):
+        crops_given[day.date] = day.crop
+        return step(storage, day, **kwargs)
+
+    monkeypatch.setattr(module.balance, "step", spy)
+    given = spy_surface_layer(monkeypatch)
     days = chain(calendar_)
+    assert tail_days <= {day.date for day in days}
+    following_tew = mulched(PLACEHOLDER_RESIDUE_COVER["crop-b"])
     for day in days:
-        if day.date < third.start.date:
-            assert is_number(day.balance.storage_end)
-        elif day.date == third.start.date:
-            assert isinstance(day.balance.storage_end, Missing)
-            assert "crop (NOT_COMPUTABLE)" in day.balance.storage_end.detail
+        b = day.balance
+        flows = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
+        assert all(is_number(flow) and flow >= 0 for flow in flows), day.date
+        balance = (
+            b.precipitation - b.runoff - b.evaporation - b.transpiration - b.drainage
+        )
+        scale = max(abs(term) for term in (b.storage_start, b.storage_end, *flows))
+        assert abs(b.storage_end - b.storage_start - balance) <= (
+            64 * sys.float_info.epsilon * max(scale, 1.0)
+        )
+        if day.date in tail_days:
+            # D136: no living crop. Nothing reaches the balance as a crop, so
+            # nothing is transpired or demanded (out of the ratio, D106), and
+            # the surface layer takes the fallow of the crop sown next (#217).
+            assert crops_given[day.date] is None
+            assert b.transpiration == 0
+            assert b.transpiration_demanded.reason == "NOT_APPLICABLE"
+            _, day_input, constants = given[day.date]
+            assert day_input.cover_fraction == PLACEHOLDER_FALLOW["cover_fraction"]
+            assert constants["wetted_fraction"] == PLACEHOLDER_FALLOW["wetted_fraction"]
+            assert constants["total_evaporable_water"] == pytest.approx(following_tew)
+            continue
+        period = crop_period_of(calendar_, day.date)
+        if period is None:
+            continue
+        crop, sowing = period
+        day_number = (day.date - sowing).days + 1
+        # The stages keep their lengths: not stretched, not shrunk (D135).
+        kcb = expected_by_stage(crop, day_number, *PLACEHOLDER_STAGE.values())
+        assert crops_given[day.date].transpiration_coefficient == pytest.approx(kcb)
+        assert b.transpiration_demanded == pytest.approx(
+            kcb * day.reference_evapotranspiration
+        )
+    # The cut: the harvest day of the fourth period still has a crop, on the
+    # line of its whole stage, so it never reaches the end value (D135).
+    harvest = crops_given[fourth.end.date]
+    initial, mid, end = PLACEHOLDER_STAGE.values()
+    assert harvest is not None
+    assert harvest.transpiration_coefficient != pytest.approx(end)
+    if cut > placeholder_stage_lengths("crop-b")["late"]:
+        assert harvest.transpiration_coefficient == pytest.approx(mid)
+    # Every day is computed, so every year is missing only for the definition.
     result = run(calendar_=calendar_)
     assert_loads(result)
-    sowing = third.start.date
-    missing_from = sowing.year if sowing.month >= start_month() else sowing.year - 1
     for item in result:
-        if item.ag_year < missing_from:
-            assert_definition_incomplete(item)
-            continue
-        detail = item.missing.detail
-        assert item.missing.reason != "NOT_AVAILABLE"
-        (placed,) = [
-            entry
-            for entry in items_of(detail)
-            if entry.startswith(
-                "chain NOT_COMPUTABLE: the growth stages of component "
-                f"'{third.component_id}'"
-            )
-        ]
-        assert "OPEN 25" in placed
-        assert "no stage is guessed" in placed
+        assert_definition_incomplete(item)
 
 
 def test_stage_length_that_is_not_whole_days_is_not_computable():

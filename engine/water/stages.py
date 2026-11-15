@@ -9,7 +9,11 @@ Two pure functions:
 - ``place_stages`` lays the four stages of FAO-56 chapter 6 (initial,
   development, mid, late) end to end from the first day of a crop period
   (its sowing), using the length of each stage in days. The lengths come
-  from the parameter catalogue, by crop (D78, D79); none is written here.
+  from the parameter catalogue, by crop (D78, D79, D137); none is written
+  here. The stages are never stretched (D135): stages that run past the
+  harvest are cut at the harvest, and the days after the end of the late
+  stage up to the harvest are a separate tail of days with no living crop
+  (``no_crop``, D136), which the caller treats as such.
 - ``by_stage`` gives the value of one day from three values, one at the
   initial stage, one at the mid stage and one at the end of the late stage:
   constant in the initial and mid stages, and a straight line between them in
@@ -21,9 +25,11 @@ Two pure functions:
 
 Status: PROPOSED (blueprint section 3.7): the stage words, the identifiers
 of the stage lengths, the day numbering, the straight line of ``by_stage``
-for both uses, the answer when the lengths do not fill the period, and every
-``detail``. See EXPOSURE.md in this folder, choices 6, 16 and 17 and OPEN 4
-and 25 to 29.
+for both uses, the form in which the tail is returned, the stage length kept
+by a stage cut at the harvest, and every ``detail``. The cut and the tail are
+decisions D135 and D136 of issue #77. See EXPOSURE.md in this folder, choices
+6, 16 and 17 and OPEN 4, 26 to 29 and 38 (OPEN 25 is closed by D135 to
+D137).
 
 Pure function (G1): no file, no network, no clock, no environment variable,
 and the arguments are not changed. The only integer is the one of day
@@ -34,7 +40,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
 from contracts.results.models import Missing
@@ -42,6 +48,7 @@ from contracts.results.models import Missing
 __all__ = [
     "GROWTH_STAGES",
     "STAGE_LENGTH_PARAMETERS",
+    "PlacedStages",
     "StageDay",
     "by_stage",
     "place_stages",
@@ -94,13 +101,40 @@ def _whole_days(value: float) -> int | None:
     return int(value)
 
 
+@dataclass(frozen=True)
+class PlacedStages(Mapping[dt.date, StageDay]):
+    """The stages placed inside one crop period (D135, D136).
+
+    As a mapping, it gives the ``StageDay`` of every day from the sowing to
+    the end of the late stage or to the harvest, whichever comes first: the
+    days with a growth stage. ``tail`` holds, in order, the days from the day
+    after the end of the late stage to the harvest (both inclusive), when the
+    stages end before the harvest; it is empty otherwise. A tail day has no
+    growth stage and is not a key of the mapping: it is a day with no living
+    crop (``no_crop``, D136), which the caller treats as such. Every day of
+    the period is either a key or in ``tail``, never both.
+    """
+
+    stages: dict[dt.date, StageDay]
+    tail: tuple[dt.date, ...]
+
+    def __getitem__(self, day: dt.date) -> StageDay:
+        return self.stages[day]
+
+    def __iter__(self) -> Iterator[dt.date]:
+        return iter(self.stages)
+
+    def __len__(self) -> int:
+        return len(self.stages)
+
+
 def place_stages(
     first: dt.date,
     last: dt.date,
     lengths: Mapping[str, float],
     *,
     what: str,
-) -> dict[dt.date, StageDay] | Missing:
+) -> PlacedStages | Missing:
     """The stage of every day from ``first`` to ``last`` (both inclusive).
 
     ``lengths`` holds the length in days of each stage of GROWTH_STAGES, as
@@ -108,13 +142,27 @@ def place_stages(
     names the period and its crop in a ``detail``.
 
     The initial stage begins on ``first`` (the sowing) and each stage begins
-    the day after the one before it ends. Returns ``NOT_COMPUTABLE`` (the
-    method does not cover the case, G4), never a guess:
+    the day after the one before it ends, with its catalogue length; no
+    length is stretched or shrunk to fit the period (D135):
 
-    - when a length is not a whole number of days of at least one;
-    - when the lengths do not add up to the days of the period. FAO-56 does
-      not say how to fit stage lengths to a period they do not fill, so the
-      whole period is left missing (OPEN 25 of EXPOSURE.md).
+    - stages that run past ``last`` (the harvest) are cut there: the stage
+      in which ``last`` falls ends on it, and the stages after it are not
+      placed. A cut stage keeps its catalogue length in ``stage_length``, so
+      that its straight line in ``by_stage`` is the one of the whole stage,
+      ended early (FAO-56 chapter 6, early harvest, as D135 reads it;
+      PROPOSED);
+    - stages that end before ``last`` leave a tail, from the day after the
+      last day of the late stage to ``last``, returned in
+      ``PlacedStages.tail`` (D136);
+    - lengths that add up to the days of the period exactly leave no tail
+      and cut nothing.
+
+    The days are calendar days, so a 29 February inside the period only
+    lengthens the tail or shortens the cut by one day.
+
+    Returns ``NOT_COMPUTABLE`` (the method does not cover the case, G4),
+    never a guess, when a length is not a whole number of days of at least
+    one.
 
     Raises ``ValueError`` when ``last`` comes before ``first`` (the calendar
     contract does not allow it) or a stage of GROWTH_STAGES has no length.
@@ -142,28 +190,21 @@ def place_stages(
                 "issue #206)"
             ),
         )
-    period = (last - first).days + _FIRST
-    total = sum(whole.values())
-    if total != period:
-        return Missing(
-            reason="NOT_COMPUTABLE",
-            detail=(
-                f"the growth stages of {what} cannot be placed: the four stage "
-                f"lengths add up to {total} day(s) and the period holds {period} "
-                "day(s), and how FAO-56 stage lengths are fitted to a period they "
-                "do not fill is not decided, so no stage is guessed (OPEN 25 of "
-                "engine/water/EXPOSURE.md, issue #206)"
-            ),
-        )
     stages: dict[dt.date, StageDay] = {}
     day = first
     for stage in GROWTH_STAGES:
         for day_in_stage in range(_FIRST, whole[stage] + _FIRST):
+            if day > last:
+                break
             stages[day] = StageDay(
                 stage=stage, day_in_stage=day_in_stage, stage_length=whole[stage]
             )
             day += _ONE_DAY
-    return stages
+    tail: list[dt.date] = []
+    while day <= last:
+        tail.append(day)
+        day += _ONE_DAY
+    return PlacedStages(stages=stages, tail=tuple(tail))
 
 
 def by_stage(
