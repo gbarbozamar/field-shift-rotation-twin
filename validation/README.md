@@ -26,9 +26,10 @@ Each of the three folders holds only files named `<id>.json`. Anything else in t
 
 The extension is read without regard to case, so `<id>.JSON` is a record file too. The name before the extension is the id, letter for letter. Where a file system allows two files that carry the same id, such as `<id>.json` and `<id>.JSON`, both are rejected: neither replaces the other.
 
-A `.json` file anywhere else below the root of a store is reported as a problem too, so a record saved in a misnamed folder such as `result/` is not lost. Exactly two things are not looked at:
+A `.json` file anywhere else below the root of a store is reported as a problem too, so a record saved in a misnamed folder such as `result/` is not lost. Exactly three things are not looked at:
 
 - the folder `examples/` directly below the root, because it is a separate store;
+- the folder `fixtures/` directly below the root, because its files are read by the tests of their checks, not by this store (PROPOSED, issue #225);
 - outside the three folders, files that are not `.json` files, such as this document and the Python files.
 
 ## Record format (PROPOSED)
@@ -307,6 +308,7 @@ For a person to approve. The code in the first column is the start of the test i
 | S33 | An integer in a file that would change when read (one above the last that a float holds exactly, one too large for a float, one with more digits than Python converts) is reported in its field, in a value, a tolerance and an observed value; integers that a float holds exactly are accepted and stay integers; a number written with a decimal point or an exponent is accepted as the float it denotes, whatever its digits; a failed result that holds such an integer is still counted as failed |
 | S34 | `summarise` raises only `ValueError` when it is given anything that is not a store of well-formed records, a store object that was never initialised included, and works on a sound store built by hand; `load_store` raises only `TypeError` when `root` is not a path, and a path that does not exist is an empty store |
 | S35 | A passed result whose observed number is written with more digits than a float keeps (`0.10000000000000001`, `1e23`, `12345678901234567890.0`) is accepted, counted as passed, and its test is not listed under `no_result` |
+| S36 | A `.json` file in `fixtures/` directly below the root is not looked at; one in a deeper folder of that name is listed |
 
 One more test, without a case code, checks that every case code above appears in this section.
 
@@ -357,7 +359,7 @@ Raised by unit l0/chain-examples (issue #168). The builder session did not decid
 
 Raised by unit l0/validation-h2-e3-ready (issue #225). The builder session did not decide them.
 
-20. **The store reports the fixtures.** `load_store` reports every `.json` file below `validation/` outside the three record folders, so a signed `validation/fixtures/*.json` would fail `test_S05_real_store_has_no_malformed_record`. Either `fixtures/` is left alone like `examples/`, or the fixtures move. Until one is chosen the signed files cannot be committed at the paths of `fixtures/README.md`. *Lead developer.*
+20. ~~The store reports the fixtures.~~ `DECIDED` by the orchestrator session for the lead developer (option A): the store leaves `fixtures/` directly below the root alone, as it leaves `examples/` (`FIXTURES_FOLDER` in `records.py`, case S36). *Lead developer.*
 21. **Two formats for an expected value.** This store keeps one expected value per record; the fixtures keep a whole worked example or table per file, signed as a whole, with the parameter records the check needs. Whether both stay is not decided (`fixtures/README.md`, OPEN 2). *Lead developer; science reviewers.*
 
 ## Environment

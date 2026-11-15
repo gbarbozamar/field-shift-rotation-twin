@@ -136,7 +136,7 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Transcribed by: the scientific-integration AI session (D34), in the fixture's `transcribed_by`.
 - Checked by: OPEN until the lead developer signs `checked_by` in the fixture and in its unit-length record (D34, D66).
 - Test: `engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values`. **Skip rule:** it skips, naming the file and each missing signature, while the fixture is absent, its `checked_by` is empty, or its unit-length record is absent or unsigned. Once signed, a malformed fixture or a value outside its tolerance fails.
-- Status: written; skipped until the signed fixture is committed. OPEN: `validation/records.py` reports any `.json` file under `validation/` outside its three record folders (`validation/fixtures/README.md`, OPEN 1).
+- Status: written; skipped until the signed fixture is committed.
 
 ### E7
 
@@ -235,7 +235,7 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Transcribed by: the scientific-integration AI session (D34), in the fixture's `transcribed_by`.
 - Checked by: OPEN until the lead developer signs `checked_by` in the fixture and in each of its 31 constant and 2 bound records (D34, D66).
 - Test: `engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56`. **Skip rule:** it skips, naming the file and each missing signature, while the fixture is absent, its `checked_by` is empty, or any constant or bound record is absent or unsigned. Once signed, a malformed fixture, a step the engine does not compute, or a step outside its tolerance fails.
-- Status: written; skipped until the signed fixture is committed. OPEN: `validation/records.py` reports any `.json` file under `validation/` outside its three record folders (`validation/fixtures/README.md`, OPEN 1).
+- Status: written; skipped until the signed fixture is committed.
 
 ### H5
 

@@ -82,6 +82,6 @@ What the test does with the file: it reads `a1` to `a4`, `s_break` and `b1` to `
 
 ## OPEN
 
-1. **The validation store reports these files.** `validation/records.py` reports every `.json` file below `validation/` outside `expected/`, `runs/` and `results/` (`test_S05_real_store_has_no_malformed_record`). Committing a signed fixture at the paths above would fail that test. Either the store leaves `fixtures/` alone, as it leaves `examples/` (a change to `validation/records.py` and `validation/test_layout.py`), or the fixtures move elsewhere. *Lead developer.*
+1. ~~The validation store reports these files.~~ `DECIDED` (option A, chosen by the orchestrator session for the lead developer): `validation/records.py` leaves `fixtures/` directly below the root alone, as it leaves `examples/` (case S36 of `validation/test_layout.py`). *Lead developer.*
 2. **Two formats for an expected value.** The store of `validation/README.md` keeps one expected value per record with its citation; these fixtures keep a whole worked example or table per file, with a signature for the file. Whether both stay, or the fixtures are later split into store records, is not decided. *Lead developer; science reviewers.*
 3. **Which value of reference evapotranspiration.** D124 fixes it as the one of the Eq. 6 line of the example. The test cannot tell, from the file alone, that the row given is that line without writing the value here; the person who signs checks it.
