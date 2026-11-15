@@ -198,7 +198,7 @@ def _describe_missing(name: str, item: InputMissing | ResultMissing) -> str:
     return text
 
 
-def _finite(item: int | float) -> float | None:
+def _finite(item: float) -> float | None:
     """Convert a number to a finite float, or ``None`` if non-finite/overflow."""
     try:
         number = float(item)

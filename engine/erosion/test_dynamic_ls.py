@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import dataclasses
 import inspect
+import itertools
 import math
 import sys
 from pathlib import Path
@@ -307,7 +308,7 @@ def test_monotonic_increase_with_steepness():
         call_segmented([SlopeSegment(length_m=44.0, steepness=s)], **MONOTONIC_PARAMS)
         for s in slopes
     ]
-    assert all(a < b for a, b in zip(single_vals, single_vals[1:]))
+    assert all(a < b for a, b in itertools.pairwise(single_vals))
 
     multi_vals = [
         call_segmented(
@@ -319,7 +320,7 @@ def test_monotonic_increase_with_steepness():
         )
         for s in slopes
     ]
-    assert all(a < b for a, b in zip(multi_vals, multi_vals[1:]))
+    assert all(a < b for a, b in itertools.pairwise(multi_vals))
 
 
 def test_monotonic_increase_with_length():
@@ -330,7 +331,7 @@ def test_monotonic_increase_with_length():
         )
         for length in lengths
     ]
-    assert all(a < b for a, b in zip(single_vals, single_vals[1:]))
+    assert all(a < b for a, b in itertools.pairwise(single_vals))
 
     multi_vals = [
         call_segmented(
@@ -342,7 +343,7 @@ def test_monotonic_increase_with_length():
         )
         for length in lengths
     ]
-    assert all(a < b for a, b in zip(multi_vals, multi_vals[1:]))
+    assert all(a < b for a, b in itertools.pairwise(multi_vals))
 
 
 # --- Time-varying periods: dynamic_ls_by_period ------------------------------
