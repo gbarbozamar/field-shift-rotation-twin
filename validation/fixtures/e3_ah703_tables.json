@@ -1,0 +1,800 @@
+{
+  "test": "engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values",
+  "source": {
+    "reference": "Renard, K.G., Foster, G.R., Weesies, G.A., McCool, D.K., Yoder, D.C. (coord.) (1997). Predicting Soil Erosion by Water: A Guide to Conservation Planning With the Revised Universal Soil Loss Equation (RUSLE). U.S. Department of Agriculture, Agriculture Handbook No. 703.",
+    "read": "2026-11-14"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "tolerance_rule": "Option A: plus or minus 0.005, half a unit of the second decimal both tables print. Fixed before the test is run.",
+  "tolerance_decided_by": "Lead developer, explicit chat reply to the science integration session on 14 November 2026 (\"Sí, las recomendadas\"). A choice of the lead developer, not a value of the source. Recorded in issue #77 as D124: https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443",
+  "table_4_2": {
+    "locator": "Table 4-2, «Values for topographic factor, LS, for moderate ratio of rill to interrill erosion», p. 123 (PDF p. 145), printed rotated",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/AH_703%20-%20Predicting%20Soil%20Erosion%20by%20Water%20-%20A%20Guide%20to%20Conservation%20Planning%20With%20the%20RUSLE%20(RUSLE).pdf#page=145",
+    "footnote": "«Such as for row-cropped agricultural and other moderately consolidated soil conditions with little-to-moderate cover (not applicable to thawing soil)»",
+    "cells": [
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.19,
+        "printed": "0.19",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.22,
+        "printed": "0.22",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 0.25,
+        "printed": "0.25",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 0.27,
+        "printed": "0.27",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 0.29,
+        "printed": "0.29",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 0.31,
+        "printed": "0.31",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 2.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 0.37,
+        "printed": "0.37",
+        "check_sheet_row": 88
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.25,
+        "printed": "0.25",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.32,
+        "printed": "0.32",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 0.36,
+        "printed": "0.36",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 0.39,
+        "printed": "0.39",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 0.44,
+        "printed": "0.44",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 0.48,
+        "printed": "0.48",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 3.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 0.6,
+        "printed": "0.60",
+        "check_sheet_row": 89
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.31,
+        "printed": "0.31",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.4,
+        "printed": "0.40",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 0.47,
+        "printed": "0.47",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 0.52,
+        "printed": "0.52",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 0.6,
+        "printed": "0.60",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 0.67,
+        "printed": "0.67",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 4.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 0.86,
+        "printed": "0.86",
+        "check_sheet_row": 90
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.37,
+        "printed": "0.37",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.49,
+        "printed": "0.49",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 0.58,
+        "printed": "0.58",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 0.65,
+        "printed": "0.65",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 0.76,
+        "printed": "0.76",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 0.85,
+        "printed": "0.85",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 5.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 1.13,
+        "printed": "1.13",
+        "check_sheet_row": 91
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.43,
+        "printed": "0.43",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.58,
+        "printed": "0.58",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 0.69,
+        "printed": "0.69",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 0.78,
+        "printed": "0.78",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 0.93,
+        "printed": "0.93",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 1.05,
+        "printed": "1.05",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 6.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 1.42,
+        "printed": "1.42",
+        "check_sheet_row": 92
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.53,
+        "printed": "0.53",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.74,
+        "printed": "0.74",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 0.91,
+        "printed": "0.91",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 1.04,
+        "printed": "1.04",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 1.26,
+        "printed": "1.26",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 1.45,
+        "printed": "1.45",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 8.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 2.03,
+        "printed": "2.03",
+        "check_sheet_row": 93
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.67,
+        "printed": "0.67",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 0.97,
+        "printed": "0.97",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 1.19,
+        "printed": "1.19",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 1.38,
+        "printed": "1.38",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 1.71,
+        "printed": "1.71",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 1.98,
+        "printed": "1.98",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 10.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 2.84,
+        "printed": "2.84",
+        "check_sheet_row": 94
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 0.84,
+        "printed": "0.84",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 1.23,
+        "printed": "1.23",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 1.53,
+        "printed": "1.53",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 1.79,
+        "printed": "1.79",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 2.23,
+        "printed": "2.23",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 2.61,
+        "printed": "2.61",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 12.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 3.81,
+        "printed": "3.81",
+        "check_sheet_row": 95
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 1.0,
+        "printed": "1.00",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 1.48,
+        "printed": "1.48",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 1.86,
+        "printed": "1.86",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 2.19,
+        "printed": "2.19",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 2.76,
+        "printed": "2.76",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 3.25,
+        "printed": "3.25",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 14.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 4.82,
+        "printed": "4.82",
+        "check_sheet_row": 96
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 1.15,
+        "printed": "1.15",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 1.73,
+        "printed": "1.73",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 2.2,
+        "printed": "2.20",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 2.6,
+        "printed": "2.60",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 3.3,
+        "printed": "3.30",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 3.9,
+        "printed": "3.90",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 16.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 5.86,
+        "printed": "5.86",
+        "check_sheet_row": 97
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 1.45,
+        "printed": "1.45",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 2.22,
+        "printed": "2.22",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 2.85,
+        "printed": "2.85",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 3.4,
+        "printed": "3.40",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 4.36,
+        "printed": "4.36",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 5.21,
+        "printed": "5.21",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 20.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 7.97,
+        "printed": "7.97",
+        "check_sheet_row": 98
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 1.81,
+        "printed": "1.81",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 2.82,
+        "printed": "2.82",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 3.65,
+        "printed": "3.65",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 4.39,
+        "printed": "4.39",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 5.69,
+        "printed": "5.69",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 6.83,
+        "printed": "6.83",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 25.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 10.65,
+        "printed": "10.65",
+        "check_sheet_row": 99
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 25,
+        "ls_expected": 2.15,
+        "printed": "2.15",
+        "check_sheet_row": 100
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 50,
+        "ls_expected": 3.39,
+        "printed": "3.39",
+        "check_sheet_row": 100
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 75,
+        "ls_expected": 4.42,
+        "printed": "4.42",
+        "check_sheet_row": 100
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 100,
+        "ls_expected": 5.34,
+        "printed": "5.34",
+        "check_sheet_row": 100
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 150,
+        "ls_expected": 6.98,
+        "printed": "6.98",
+        "check_sheet_row": 100
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 200,
+        "ls_expected": 8.43,
+        "printed": "8.43",
+        "check_sheet_row": 100
+      },
+      {
+        "slope_percent": 30.0,
+        "horizontal_length_ft": 400,
+        "ls_expected": 13.3,
+        "printed": "13.30",
+        "check_sheet_row": 100
+      }
+    ]
+  },
+  "table_4_5_moderate_optional": {
+    "locator": "Table 4-5, «Slope-length exponents (m) for a range of slopes and rill/interrill erosion classes», column Moderate, p. 126 (PDF p. 148); «Source: McCool et al. (1989)»",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/AH_703%20-%20Predicting%20Soil%20Erosion%20by%20Water%20-%20A%20Guide%20to%20Conservation%20Planning%20With%20the%20RUSLE%20(RUSLE).pdf#page=148",
+    "cells": [
+      {
+        "slope_percent": 0.2,
+        "m_expected_moderate": 0.04,
+        "printed": "0.04",
+        "check_sheet_row": 101
+      },
+      {
+        "slope_percent": 0.5,
+        "m_expected_moderate": 0.08,
+        "printed": "0.08",
+        "check_sheet_row": 102
+      },
+      {
+        "slope_percent": 1.0,
+        "m_expected_moderate": 0.15,
+        "printed": "0.15",
+        "check_sheet_row": 103
+      },
+      {
+        "slope_percent": 2.0,
+        "m_expected_moderate": 0.24,
+        "printed": "0.24",
+        "check_sheet_row": 104
+      },
+      {
+        "slope_percent": 3.0,
+        "m_expected_moderate": 0.31,
+        "printed": "0.31",
+        "check_sheet_row": 105
+      },
+      {
+        "slope_percent": 4.0,
+        "m_expected_moderate": 0.36,
+        "printed": "0.36",
+        "check_sheet_row": 106
+      },
+      {
+        "slope_percent": 5.0,
+        "m_expected_moderate": 0.4,
+        "printed": "0.40",
+        "check_sheet_row": 107
+      },
+      {
+        "slope_percent": 6.0,
+        "m_expected_moderate": 0.43,
+        "printed": "0.43",
+        "check_sheet_row": 108
+      },
+      {
+        "slope_percent": 8.0,
+        "m_expected_moderate": 0.48,
+        "printed": "0.48",
+        "check_sheet_row": 109
+      },
+      {
+        "slope_percent": 10.0,
+        "m_expected_moderate": 0.52,
+        "printed": "0.52",
+        "check_sheet_row": 110
+      },
+      {
+        "slope_percent": 12.0,
+        "m_expected_moderate": 0.55,
+        "printed": "0.55",
+        "check_sheet_row": 111
+      },
+      {
+        "slope_percent": 14.0,
+        "m_expected_moderate": 0.57,
+        "printed": "0.57",
+        "check_sheet_row": 112
+      },
+      {
+        "slope_percent": 16.0,
+        "m_expected_moderate": 0.59,
+        "printed": "0.59",
+        "check_sheet_row": 113
+      },
+      {
+        "slope_percent": 20.0,
+        "m_expected_moderate": 0.61,
+        "printed": "0.61",
+        "check_sheet_row": 114
+      },
+      {
+        "slope_percent": 25.0,
+        "m_expected_moderate": 0.64,
+        "printed": "0.64",
+        "check_sheet_row": 115
+      },
+      {
+        "slope_percent": 30.0,
+        "m_expected_moderate": 0.66,
+        "printed": "0.66",
+        "check_sheet_row": 116
+      },
+      {
+        "slope_percent": 40.0,
+        "m_expected_moderate": 0.68,
+        "printed": "0.68",
+        "check_sheet_row": 117
+      },
+      {
+        "slope_percent": 50.0,
+        "m_expected_moderate": 0.7,
+        "printed": "0.70",
+        "check_sheet_row": 118
+      },
+      {
+        "slope_percent": 60.0,
+        "m_expected_moderate": 0.71,
+        "printed": "0.71",
+        "check_sheet_row": 119
+      }
+    ],
+    "included": true
+  },
+  "tolerance": {
+    "ls": 0.005,
+    "m": 0.005
+  },
+  "length_unit": {
+    "choice": "feet, the table's own units, with the unit length 72.6 ft (AH703 Eq. 4-1), as D124 fixes it. The lead developer briefly chose metres and returned to feet on 14 November 2026, after seeing an estimate (from the tables, without running the engine) that 22.1 m = 72.51 ft would shift about six long-slope cells beyond 0.005. The catalogue stays in metres (22.1 m).",
+    "record": {
+      "id": "rusle_l_unit_length",
+      "scope": {},
+      "value": 72.6,
+      "unit": "ft",
+      "range": null,
+      "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+      "citation": {
+        "reference": "Renard, K.G., Foster, G.R., Weesies, G.A., McCool, D.K., Yoder, D.C. (coord.) (1997). Predicting Soil Erosion by Water: A Guide to Conservation Planning With the Revised Universal Soil Loss Equation (RUSLE). U.S. Department of Agriculture, Agriculture Handbook No. 703.",
+        "locator": "Chapter 4, Eq. [4-1], p. 105 (PDF p. 127). Scanned copy: read the page image",
+        "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/AH_703%20-%20Predicting%20Soil%20Erosion%20by%20Water%20-%20A%20Guide%20to%20Conservation%20Planning%20With%20the%20RUSLE%20(RUSLE).pdf#page=127"
+      },
+      "transcribed_by": "AI session (D34 of issue #77)",
+      "checked_by": "gbarbozamar",
+      "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «L = (λ/72.6)^m» and «where 72.6 = the RUSLE unit plot length in ft». Second source to cross-check: S1 (RUSLE2 Science Documentation), Eq. [5.3]/[5.4] pp. 123-124 or Eq. [2.13] p. 9. Signed gbarbozamar on the lead developer's explicit instruction in the chat of the science integration session, 14 November 2026, after the lead developer confirmed having checked every value against the original pages (D34, D66). The session wrote the signature; it did not check the values itself."
+    }
+  },
+  "signature_note": "Signed gbarbozamar on the lead developer's explicit instruction in the chat of the science integration session, 14 November 2026, after the lead developer confirmed having checked every value against the original pages (D34, D66). The session wrote the signature; it did not check the values itself."
+}
