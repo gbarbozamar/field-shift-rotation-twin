@@ -106,7 +106,7 @@ The model does not check what no decision asks for. Each item is a case "accepte
 ## Writing and reading
 
 - Write with `SavedCase.model_dump(mode="json")` (or `model_dump_json()`), **never with `exclude_none=True`**: it drops `"carbon_balance": null` and `"value": null`, which are required, and the document no longer loads (D177: "written with every null kept"; `test_a_document_written_without_its_nulls_does_not_load`).
-- A document written by the model also writes the members that the carried documents leave to their defaults, such as `"assumption": false`, `"range": null` and `"missing": null` in each row of the results table. The example, copied from the examples of the folders, leaves them out. Both load into the same model; a reader accepts both. Measured on the example: 24 934 bytes as written by hand; 31 532 bytes written by the model with an indent of two spaces; 20 540 bytes written by the model on one line.
+- A document written by the model also writes the members that the carried documents leave to their defaults, such as `"assumption": false`, `"range": null` and `"missing": null` in each row of the results table. The example, copied from the examples of the folders, leaves them out. Both load into the same model; a reader accepts both. Measured on the example: 24 934 bytes as written by hand; 31 532 bytes written by `model_dump_json(indent=2)`; 19 136 bytes written by `model_dump_json()` on one line.
 - Read with `SavedCase.model_validate_json(text)`. A reader of a part first checks whether the part is null and, if so, shows its `missing` reason (C3.3).
 
 ## The example
