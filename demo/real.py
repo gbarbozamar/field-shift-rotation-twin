@@ -47,7 +47,10 @@ The levels, read off D115 verbatim:
   0 % level runs and the upper level is missing with its reason" (D115).
   Per condition 2 of D176 that member is **not evaluated** at the upper
   level — its rows there are the typed absence over the cells of its 0 %
-  run, never zero — and it is never read as a tipping point of the cover.
+  run, never zero - and it is never read as a tipping point of the cover,
+  nor admitted into the set D4 is read over (D171: the admitted set is
+  the caller's table, so the level's scenarios never enter the base state
+  and the states of D4).
   (The other case D176 names, no row after alfalfa, is the third template
   of D72, not part of this pair.) The upper level of the sweep is the
   continuous-soybean cap, the only cap of the two sequences that exists.
@@ -113,7 +116,7 @@ from contracts.inputs import RotationCalendar, SiteClimate
 from contracts.results.models import Missing, ResultsPerRotation, ResultsTable
 from decision.functions import (
     NOT_EVALUATED,
-    MeasurementPriority,
+    MeasurementPriorityItem,
     TippingPoint,
     UncertainInput,
     measurement_priority,
@@ -129,6 +132,7 @@ __all__ = [
     "MEASURED_COVER_WAITS",
     "PAIR",
     "SweepTippingPoint",
+    "SweepMeasurementPriority",
     "cover_record",
     "demo_rotations",
     "honest_reason",
@@ -790,24 +794,152 @@ def the_tipping_point(
 
 
 
-# --- D4: the priority list over the same table ------------------------------------
+# --- D4: the priority list over the same table, with the guard of condition 2 -----
+
+
+def _levels_not_admitted(
+    table: ResultsTable,
+    first: str,
+    second: str,
+    uncertain_input: UncertainInput,
+) -> tuple[tuple[float, tuple[str, ...]], ...]:
+    """The levels of the cover the sweep does not admit for the pair
+    (D115, D171).
+
+    A level where a member of the pair is the typed absence of the sweep
+    (every row of the member at the level's scenarios missing with the
+    reason of D115, the stamp ``member_not_evaluated`` writes) is a
+    level that member did not run at (D115: "only the 0 % level runs"),
+    so the pair is not admitted there and D4 never reads it (condition 2;
+    the admitted set is the caller's table, D171). The sweep's own table
+    says so: the stamp is what the absence carries, never a value.
+    """
+    not_admitted: list[tuple[float, tuple[str, ...]]] = []
+    for value, entry in uncertain_input.values:
+        scenarios = (entry,) if isinstance(entry, str) else tuple(entry)
+        named = set(scenarios)
+        for member in (first, second):
+            rows = [
+                row
+                for row in table.rows
+                if row.rotation_id == member and row.scenario_id in named
+            ]
+            if rows and all(
+                row.value is None
+                and row.missing is not None
+                and row.missing.reason == "MISSING_INPUT"
+                and row.missing.detail == NO_CAP_BEFORE_A_WINTER_CEREAL
+                for row in rows
+            ):
+                not_admitted.append((value, tuple(sorted(named))))
+                break
+    return tuple(not_admitted)
+
+
+@dataclass(frozen=True)
+class SweepMeasurementPriority:
+    """The priority list of what to measure first over the real table (D4),
+    with the guard of condition 2 (D171).
+
+    ``base_state`` and ``items`` are what ``measurement_priority`` reports
+    over the admitted set alone; ``machinery_base_state`` is what it
+    reports over the whole sweep table. The two differ exactly when the
+    guard fired: a level of the cover a member of the pair does not run
+    at (D115 leaves the upper level missing for the wheat rotation) is
+    not admitted for the pair (the admitted set is the caller's table,
+    D171), so its scenarios never enter the base set and its value never
+    enters the states the rank is read from; the machinery alone would
+    read the not-admitted level into both. ``guard`` names the guard
+    when it fired.
+    """
+
+    first_rotation: str
+    second_rotation: str
+    base_state: str | None
+    items: tuple[MeasurementPriorityItem, ...]
+    machinery_base_state: str | None
+    guard: str | None
 
 
 def the_measurement_priority(
     table: ResultsTable | None = None,
-) -> MeasurementPriority:
-    """What to measure first, over the real table (D4).
+    uncertain_input: UncertainInput | None = None,
+    *,
+    first_rotation: str | None = None,
+    second_rotation: str | None = None,
+) -> SweepMeasurementPriority:
+    """What to measure first, over the real table (D4), with the guard of
+    condition 2.
 
-    The only uncertain input is the cover; its two admitted values are the
-    levels of D115. On the real outputs of today the state of the pair never
-    changes between them (nothing computed can move: the declared C and the
-    water axis without a number), so the input holds rank 2 — the honest
-    outcome, with the states it was read from.
+    Called without arguments it reads the sweep table with the mapping of
+    the cover; the arguments let a caller read another table and mapping
+    (the structural case of the tests). The machinery
+    (``measurement_priority``) is D4 over the table as given, and the
+    mapping still names both levels of D115, the same input D3 sweeps.
+    The guard is the one D3 already grows for the cover, on the part of
+    D4 a level without the pair anchors: where a member of the pair is
+    the typed absence of the sweep at a level (D115, condition 2), the
+    level is not admitted for the pair (the admitted set is the caller's
+    table, D171), so D4 is read over the admitted levels alone, and the
+    guard says so; a not-admitted level never turns a base state into
+    "Not robust across scenarios" and never ranks the cover first. On
+    the real outputs of today the state of the pair never changes
+    between the admitted levels (nothing computed can move: the declared
+    C and the water axis without a number), so the input holds rank 2,
+    the honest outcome, with the states it was read from.
     """
     table = the_sweep_table() if table is None else table
-    first, second = PAIR
-    return measurement_priority(
-        table, first, second, (the_uncertain_input(table),)
+    first = PAIR[0] if first_rotation is None else first_rotation
+    second = PAIR[1] if second_rotation is None else second_rotation
+    if uncertain_input is None:
+        uncertain_input = the_uncertain_input(table)
+    machinery = measurement_priority(table, first, second, (uncertain_input,))
+    not_admitted = _levels_not_admitted(table, first, second, uncertain_input)
+    guard = None
+    admitted_table, admitted_values = table, uncertain_input.values
+    if not_admitted:
+        refused = {
+            scenario_id for _, scenarios in not_admitted for scenario_id in scenarios
+        }
+        guard = (
+            "condition 2 of the brief of issue #267, with D171: the level(s) "
+            f"{[value for value, _ in not_admitted]} are not admitted for "
+            "the pair (a member not evaluated there, D115, and the "
+            "admitted set is the caller's table, D171), so their scenarios "
+            "never enter the base set of D4 and their values never enter "
+            "the states the rank is read from"
+        )
+        admitted_table = ResultsTable(
+            case_id=table.case_id,
+            field_id=table.field_id,
+            rows=[row for row in table.rows if row.scenario_id not in refused],
+        )
+        refused_values = {value for value, _ in not_admitted}
+        admitted_values = tuple(
+            (value, entry)
+            for value, entry in uncertain_input.values
+            if value not in refused_values
+        )
+    priority = measurement_priority(
+        admitted_table,
+        first,
+        second,
+        (
+            UncertainInput(
+                name=uncertain_input.name,
+                unit=uncertain_input.unit,
+                cell=uncertain_input.cell,
+                values=admitted_values,
+            ),
+        ),
+    )
+    return SweepMeasurementPriority(
+        first_rotation=first,
+        second_rotation=second,
+        base_state=priority.base_state,
+        items=priority.items,
+        machinery_base_state=machinery.base_state,
+        guard=guard,
     )
 
 
@@ -879,6 +1011,8 @@ def main() -> None:
         f"  D4: the base state over the whole admitted set is "
         f"'{priority.base_state or NOT_EVALUATED}'"
     )
+    if priority.guard is not None:
+        print(f"  D4, the guard of condition 2: {priority.guard}")
     for item in priority.items:
         print(f"    rank {item.rank}: {item.input_name} — {item.why}")
     print(f"  D10/D12: {MEASURED_COVER_WAITS}")
