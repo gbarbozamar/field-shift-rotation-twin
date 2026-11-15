@@ -20,6 +20,11 @@ when it is importable.
 What each part gets is the table "The producer of CarbonForcing" of
 api/README.md. Every choice there is PROPOSED (blueprint section 3.7).
 
+``annual_carbon_inputs`` are the series of the residue ledger (EP4) when the
+runner has one, copied unchanged and never converted (OPEN 3 of the ledger:
+its unit is not the one ``run_amg`` requires); otherwise one all-missing
+series per crop (D122). See ``carbon_input_series``.
+
 When the horizon cannot be laid out (the calendar has no start month, the
 climate document has no daily series, or the record holds no whole
 agricultural year), no forcing is built: the function returns the results
@@ -33,6 +38,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import statistics
+from collections.abc import Sequence
 
 from contracts.carbon_forcing import (
     AnnualCarbonInputSeries,
@@ -365,13 +371,68 @@ def _soil_property(soil_slope: SiteSoilSlope, quantity: str) -> SoilProperty:
 # --- the producer ---------------------------------------------------------------------
 
 
+def carbon_input_series(
+    calendar: RotationCalendar,
+    years: tuple[int, int],
+    carbon_inputs: Sequence[AnnualCarbonInputSeries] | InputMissing | None,
+) -> list[AnnualCarbonInputSeries]:
+    """``annual_carbon_inputs`` of the forcing. PROPOSED.
+
+    - ``None`` (EP4 not built): one series per crop, every year missing
+      ``NOT_AVAILABLE`` with the D122 text, as before EP4 existed.
+    - A ``Missing`` (the ``years_missing`` of a residue ledger without years):
+      the same per-crop series, every year missing with that reason.
+    - A sequence (the ``annual_carbon_inputs`` of a residue ledger): copied
+      unchanged, the same objects in the same order. No unit is converted
+      (OPEN 3 of the residue ledger). A series that is not an
+      ``AnnualCarbonInputSeries``, or whose agricultural years are not those
+      of the horizon, is a defect of the producer: ``TypeError``.
+    """
+    if carbon_inputs is None or isinstance(carbon_inputs, InputMissing):
+        missing = (
+            _missing("NOT_AVAILABLE", CARBON_INPUTS_OPEN)
+            if carbon_inputs is None
+            else carbon_inputs
+        )
+        return [
+            AnnualCarbonInputSeries(
+                origin=origin, **_all_missing(origin, STOCK_UNIT, years, missing)
+            )
+            for origin in crop_origins(calendar)
+        ]
+    if isinstance(carbon_inputs, str | bytes) or not isinstance(
+        carbon_inputs, Sequence
+    ):
+        raise TypeError("carbon_inputs: expected a sequence of AnnualCarbonInputSeries")
+    copied: list[AnnualCarbonInputSeries] = []
+    for series in carbon_inputs:
+        if not isinstance(series, AnnualCarbonInputSeries):
+            raise TypeError(
+                f"carbon_inputs: expected AnnualCarbonInputSeries, not "
+                f"{type(series).__name__}"
+            )
+        if (series.first_ag_year, series.last_ag_year) != years:
+            raise TypeError(
+                "carbon_inputs: a series of the residue ledger does not run over "
+                "the agricultural years of the forcing horizon"
+            )
+        copied.append(series)
+    return copied
+
+
 def build_carbon_forcing(
-    calendar: RotationCalendar, climate: SiteClimate, soil_slope: SiteSoilSlope
+    calendar: RotationCalendar,
+    climate: SiteClimate,
+    soil_slope: SiteSoilSlope,
+    *,
+    carbon_inputs: Sequence[AnnualCarbonInputSeries] | InputMissing | None = None,
 ) -> CarbonForcing | ResultsMissing:
     """The ``CarbonForcing`` of one rotation, or why it cannot be laid out.
 
     The caller has already checked that climate and soil and slope carry the
-    calendar's ``case_id`` and ``field_id`` (D14).
+    calendar's ``case_id`` and ``field_id`` (D14). ``carbon_inputs`` is what
+    the residue ledger (EP4) gives for ``annual_carbon_inputs``, or ``None``
+    when EP4 is not built (``carbon_input_series``).
     """
     for name, given, model in (
         ("calendar", calendar, RotationCalendar),
@@ -411,7 +472,7 @@ def build_carbon_forcing(
             ),
         )
 
-    carbon_inputs_missing = _missing("NOT_AVAILABLE", CARBON_INPUTS_OPEN)
+    annual_carbon_inputs = carbon_input_series(calendar, years, carbon_inputs)
     return CarbonForcing(
         contract="carbon_forcing",
         example_data=(
@@ -439,13 +500,7 @@ def build_carbon_forcing(
                 )
             ),
         ],
-        annual_carbon_inputs=[
-            AnnualCarbonInputSeries(
-                origin=origin,
-                **_all_missing(origin, STOCK_UNIT, years, carbon_inputs_missing),
-            )
-            for origin in crop_origins(calendar)
-        ],
+        annual_carbon_inputs=annual_carbon_inputs,
         soil_properties=[
             _soil_property(soil_slope, quantity) for quantity in SOIL_PROPERTIES
         ],

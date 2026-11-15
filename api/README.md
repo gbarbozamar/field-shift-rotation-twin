@@ -295,13 +295,14 @@ removed.
 carbon_models=(), parameters=None)` implements `RotationEngines`.
 
 - `EngineFunctions(build_rotation_calendar, compute_soil_loss,
-  compute_water_deficit_exposure, run_amg)`: each an injected callable, `None`
-  when the engine is not built.
+  compute_water_deficit_exposure, build_residue_ledger, run_amg)`: each an
+  injected callable, `None` when the engine is not built.
 - `discover_engine_functions()` imports each one by the module path and name
   of `contracts/ENTRYPOINTS.md`: `engine.calendar.build_rotation_calendar`
   (EP2), `engine.erosion.compute_soil_loss` (EP1),
-  `engine.water.compute_water_deficit_exposure` (EP3), `engine.amg.run_amg`
-  (EP5, unit `l2/runner-amg`). A module (or a package
+  `engine.water.compute_water_deficit_exposure` (EP3),
+  `engine.residues.build_residue_ledger` (EP4, unit `l2/runner-residues`),
+  `engine.amg.run_amg` (EP5, unit `l2/runner-amg`). A module (or a package
   above it) or a function that does not exist gives `None`. Any other import
   error, including a module that imports something absent, propagates; a
   name that exists and is not callable is a `TypeError`. Engines land in the
@@ -331,12 +332,20 @@ Call order (accepted in issue 18):
 2. EP1 and EP3 with the keyword arguments `calendar`, `climate`, `soil_slope`
    (G3), also when the calendar is infeasible (G4), and `parameters`, always
    (below). EP2 never gets `parameters`.
-3. EP5 `run_amg(forcing, parameters=...)` (D65), under the same conditions
+3. EP4 `build_residue_ledger(rotation=..., calendar=..., climate=...,
+   parameters=...)`, all by keyword, under the same conditions as EP1 and EP3
+   (also for an infeasible calendar): `rotation` is what `load_rotation`
+   returned (the object EP2 received), `calendar` the calendar of the phase,
+   the same one EP1 gets (item 8 of "For the platform" in
+   `engine/residues/README.md`), `climate` the same `SiteClimate`, and the
+   same catalogue. Its series become `annual_carbon_inputs` of the forcing
+   (below); the ledger itself is not in the response (OPEN).
+4. EP5 `run_amg(forcing, parameters=...)` (D65), under the same conditions
    as EP1 and EP3 (calendar built, climate and soil-and-slope present and of
    the calendar's field), on the `CarbonForcing` built by
    `api.carbon_forcing.build_carbon_forcing` (below). When the forcing cannot
    be laid out, EP5 is not called (see the table of absences).
-4. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
+5. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
    calendar; `soil_loss` from EP1 and `water_deficit_exposure` from EP3,
    unchanged, or in the not-built form when that engine is not built (D12);
    `soil_carbon_trend` by the mapping below.
@@ -346,8 +355,14 @@ never builds a number. It catches nothing an engine raises (G5, Q7): the route
 answers `500` `INTERNAL_ERROR` with the CORS headers and no exception text. An
 engine that returns something other than the type its signature names
 (`RotationCalendar`; `SoilLossResults` or the results `Missing`; a `list` of
-`WaterDeficitExposure`; `CarbonBalance`) is a defect: `TypeError`, so also
-`500`. So is a `CarbonBalance` whose `case_id`, `field_id` or `rotation_id`
+`WaterDeficitExposure`; `ResidueLedger`; `CarbonBalance`) is a defect:
+`TypeError`, so also `500`. `contracts/residue_ledger/` is never imported at
+module load: `residue_ledger_type()` imports it only once EP4 has answered
+(PROPOSED), so the runner works whether or not that contract and EP4 are in
+the repository; the tests replace that seam with a class of their own. A
+`ResidueLedger` whose `case_id`, `field_id` or `rotation_id` differs from the
+calendar is a `TypeError` too (`check_ledger`, PROPOSED), and so is a series
+of the ledger whose agricultural years are not those of the forcing horizon. So is a `CarbonBalance` whose `case_id`, `field_id` or `rotation_id`
 differs from the forcing, or whose `carbon_model` is not `amg`: the forcing is
 the runner's own, so the mismatch is the engine's (`check_balance`). That includes
 a built engine that returns the not-built form of its own part: D12 allows
@@ -533,6 +548,20 @@ an input absent, site data of another field): `amg` is then `not_available` /
 `MISSING_INPUT` with the same detail as `erosion` and `water`, and the
 `residues` and `rothc` details name their engine function.
 
+EP4 (unit `l2/runner-residues`, PROPOSED). Not built: every row above is
+unchanged. Built: it is called whenever EP1 and EP3 are, and not called
+whenever they are not; then `residues` is `not_available` / `MISSING_INPUT`
+with the same detail. When it ran, `residues` takes its state from the
+ledger: a ledger without agricultural years (`years_missing`) is
+`not_available` with that reason and detail; otherwise every value of the
+ledger is counted with the rule of every module (`ledger_values`: each
+`Value` of each component, found by type rather than by field name, then
+each yearly value of each series). A ledger with no value at all is
+`not_available` / `NOT_AVAILABLE`, detail "the residue ledger holds no
+component and no carbon-input series". With EP4 built and EP5 not built, `amg` is
+`not_available` / `NOT_AVAILABLE` naming `engine.amg.run_amg`, and so are its
+three rows (not "no carbon engine is built yet").
+
 **Precedence rule (PROPOSED):** a module whose function is not built is
 `not_available` / `NOT_AVAILABLE` whatever else is absent; `MISSING_INPUT` is
 written only for a module that is built and was not called because an input
@@ -541,8 +570,8 @@ is missing. So in the default app (nothing built) every module is
 
 ### The producer of `CarbonForcing` (`api/carbon_forcing.py`, PROPOSED)
 
-`build_carbon_forcing(calendar, climate, soil_slope) -> CarbonForcing | Missing`
-builds the one forcing of one rotation (L2a is the producer of the contract,
+`build_carbon_forcing(calendar, climate, soil_slope, *, carbon_inputs=None)
+-> CarbonForcing | Missing` builds the one forcing of one rotation (L2a is the producer of the contract,
 #155, D62) from what the runner already holds. It converts no unit, fills
 no gap and computes only what a decision of #77 fixes: the yearly
 `mean_temperature` of D118 from the daily mean of D30. Every quantity whose
@@ -561,7 +590,8 @@ importable. Every row is PROPOSED (platform developer, issue #18).
 | `soil_depth` | Missing `NOT_AVAILABLE`, unit `OPEN`, detail naming C1.6 (depth OPEN) |
 | `annual_climate` `mean_temperature` (D118) | One item per agricultural year of the horizon: the arithmetic mean over the year of the daily mean temperatures of D30. D30 reads "Derived by the engine (mean from the daily maximum and minimum; pressure from elevation), not requested as series"; the daily mean is the arithmetic mean of `air_temperature_max_2m` and `air_temperature_min_2m` (CQ2, CQ3 of `contracts/CLIMATE_QUANTITIES.md`, found by quantity, never by position), the same form as `mean_temperature` of `engine/water/et0/equations.py`. A year with a day missing in either series is missing `MISSING_INPUT` naming the series, the day and its reason (never filled or partially averaged, C3.3, C3.4); a day absent from a series, `NO_COVERAGE`. An absent input series: every year `MISSING_INPUT`. Input units that differ: every year `NOT_COMPUTABLE`, unit `OPEN`, nothing converted. Otherwise the unit of the inputs; provenance `DERIVED` (C4.3); source naming D118, D30 and the source of each input series; `range_missing` with the reason the inputs carry (or `NOT_AVAILABLE` if they differ): no range is derived (C2.2) |
 | `annual_climate` `water_balance` (D119) | Every year missing `NOT_AVAILABLE`, unit `OPEN`: D119 (precipitation minus FAO-56 ET0, each summed over the agricultural year, in mm) is conditional on a science reviewer's check against the AMG description, and no ET0 series reaches the producer (FAO-56 ET0 is computed inside the water engine). The detail says both |
-| `annual_carbon_inputs` | One series per crop of the calendar, once each in order of first appearance, `origin` and `quantity` both the `crop_id` (`run_amg` looks the humification coefficient up under scope key `crop` = `origin`, `ORIGIN_SCOPE_KEY`). Every year missing `NOT_AVAILABLE`: the residue ledger (EP4) is not built (D122). Unit `t C ha-1`, the unit `run_amg` requires (`STOCK_UNIT`, derived from C1.5 as the engine derives it). A `crop_id` that is not a quantity identifier (`^[a-z][a-z0-9_]*$`) cannot be a series and is left out, never renamed; `CarbonForcing` has no field to say so, so the runner adds to the detail of the `amg` module "N crop(s) of the calendar could not be written as carbon-input series of the forcing: their crop_id is not a quantity identifier" (their number only, never the identifiers; `crops_left_out`). Why series and not an empty list: with no series `run_amg` answers `NOT_COMPUTABLE` ("no origin") for the humified input; with all-missing series it answers `MISSING_INPUT` naming the reason, the residue ledger |
+| `annual_carbon_inputs`, EP4 built (unit `l2/runner-residues`) | The `annual_carbon_inputs` of the `ResidueLedger`, copied unchanged: the same series, in the same order (up to three per crop and purpose, `origin` the crop). **No unit is converted:** the ledger writes `kg C ha-1` and `run_amg` requires `t C ha-1`, so AMG answers `NOT_COMPUTABLE` naming the unit; who converts is OPEN 3 of the ledger (OPEN below). The `amg` module detail says how many series were copied, in which unit, that the platform converts none and, when the unit is not `t C ha-1`, that this is OPEN 3. A series with `NOT_COMPUTABLE` years (a cover or pasture crop, OPEN 5 of the ledger) is copied, never left out, since leaving it out would make AMG run without that crop's carbon; the detail gives their number (PROPOSED). A ledger without agricultural years (`years_missing`): the per-crop series of the next row, every year missing with the ledger's `years_missing` instead of the D122 text |
+| `annual_carbon_inputs`, EP4 not built | One series per crop of the calendar, once each in order of first appearance, `origin` and `quantity` both the `crop_id` (`run_amg` looks the humification coefficient up under scope key `crop` = `origin`, `ORIGIN_SCOPE_KEY`). Every year missing `NOT_AVAILABLE`: the residue ledger (EP4) is not built (D122). Unit `t C ha-1`, the unit `run_amg` requires (`STOCK_UNIT`, derived from C1.5 as the engine derives it). A `crop_id` that is not a quantity identifier (`^[a-z][a-z0-9_]*$`) cannot be a series and is left out, never renamed; `CarbonForcing` has no field to say so, so the runner adds to the detail of the `amg` module "N crop(s) of the calendar could not be written as carbon-input series of the forcing: their crop_id is not a quantity identifier" (their number only, never the identifiers; `crops_left_out`). Why series and not an empty list: with no series `run_amg` answers `NOT_COMPUTABLE` ("no origin") for the humified input; with all-missing series it answers `MISSING_INPUT` naming the reason, the residue ledger |
 | `soil_properties` (D120) | `clay_content`, `carbonate_content`, `ph`: copied from `SiteSoilSlope.soil_properties` only if an item with exactly that `quantity` is there (never converted, never renamed); otherwise missing `NOT_AVAILABLE`, unit `OPEN`, detail naming D120 (a person reads them from the D112 profile, under D34). Why `NOT_AVAILABLE` and not `NOT_DECLARED`: D120 keeps `NOT_DECLARED` for a property the profile does not print, which only the person reading it can know; until a person has read it, the platform only knows that no value has reached it, the meaning of `NOT_AVAILABLE` closest in C3.2. When the reading says "not printed", the soil file carries the item missing `NOT_DECLARED` and it is copied as it is |
 | `starting_state` (D121) | `soil_organic_carbon` (PROPOSED source): the `SiteSoilSlope.soil_properties` item with exactly that quantity, copied unchanged only if its unit is `t C ha-1`, the stock unit `run_amg` requires. Another unit (for example a concentration) is never converted: missing `NOT_COMPUTABLE`, detail naming D121. Absent: missing `NOT_AVAILABLE`, detail naming D121 (a person reads it from the D112 profile, under D34) |
 | `climate`, `carbon_inputs`, `soil_cover` | Empty lists: `run_amg` (AMG-A, D80) reads annual series only |
@@ -591,6 +621,8 @@ Identifiers (decided, D13) `calendar`, `erosion`, `water`, `residues`, `amg`, `r
 entry of `contracts/ENTRYPOINTS.md`, always all six, in that order.
 
 - Function absent: `not_available` / `NOT_AVAILABLE`.
+- `residues`: from the ledger, as described under the absence table (unit
+  `l2/runner-residues`).
 - Function ran, no value of its output missing: `available`.
 - Function ran, some values missing: `degraded`, reason of the first missing
   value (annual soil loss before monthly), detail `"<n> of <m> values are
@@ -683,6 +715,17 @@ result and not both zero with one (checked at construction).
   cases of `api/test_carbon_forcing.py` and section 15 of
   `api/test_engines.py`.
 
+- Unit `l2/runner-residues`: EP4 in discovery and in the call order (after
+  EP3, before EP5, per phase); the lazy import of `contracts.residue_ledger`
+  through `residue_ledger_type`; `check_ledger` (type and identifiers);
+  copying the ledger's series unchanged into `annual_carbon_inputs`, with
+  the years check; copying `NOT_COMPUTABLE` series instead of leaving them
+  out; the per-crop missing series with the ledger's `years_missing`; the
+  state of `residues` counted on every value of the ledger (components,
+  then series), and `NOT_AVAILABLE` for a ledger with no value; the
+  notes in the `amg` detail; the `amg` rows naming EP5 when only EP4 is
+  built; the test cases of `api/test_runner_residues.py`.
+
 - Unit `l2/soil-tables`: the variables `SOIL_TABLE_FILES` and
   `SOIL_GROUPS_FILE` (both or neither), `SoilTablesConfig`,
   `AppConfig.soil_tables`, the `ConfigError` for the example and the tables
@@ -741,8 +784,15 @@ here.
     organic carbon (D121): read by a person from the D112 profile (D34) into
     the soil file; whether the profile gives organic carbon as a stock in
     `t C ha-1` (D121) is for that person;
-  - the carbon inputs (D122): the residue ledger (EP4), and the vocabulary of
-    `origin` and of the carbon-input quantities (Q14 (b)).
+  - the carbon inputs (D122): the residue ledger (EP4) is wired (unit
+    `l2/runner-residues`); its series reach AMG in `kg C ha-1` while AMG
+    requires `t C ha-1`. **Who converts** (the platform, AMG, or the ledger
+    writing a second unit), and with which record, is OPEN 3 of the residue
+    ledger, for the lead developer and the platform developer; until then
+    the platform converts nothing and AMG answers `NOT_COMPUTABLE` naming the
+    unit. Whether `NOT_COMPUTABLE` series of a cover or pasture crop are
+    copied (PROPOSED here: yes) is for the lead developer. The vocabulary of
+    `origin` and of the carbon-input quantities stays Q14 (b).
 - **The soil depth and its unit** (C1.6), for the science reviewers.
 - **Whether the forcing horizon must equal the agricultural years of the
   record** (OPEN 3 of `contracts/carbon_forcing/README.md`); proposed here:
@@ -752,11 +802,14 @@ here.
   developer and the interface developer.
 - **RothC (EP6, `engine.rothc.run_rothc`)**: discovered and called on the same
   forcing once it exists, in a later unit of this lane.
-- **EP4 and EP6 are written "not built" without being discovered.**
-  `RESIDUES` and `ROTHC` in `api/engines.py` only name them; a test of
-  `api/test_engines.py` fails as soon as `engine.residues.build_residue_ledger`
-  or `engine.rothc.run_rothc` becomes importable, so that the runner is then
-  changed to discover and call it. For the platform developer.
+- **EP6 is written "not built" without being discovered.** `ROTHC` in
+  `api/engines.py` only names it; a test of `api/test_engines.py` fails as
+  soon as `engine.rothc.run_rothc` becomes importable, so that the runner is
+  then changed to discover and call it. For the platform developer. (EP4 is
+  discovered since unit `l2/runner-residues`.)
+- **Expose the residue ledger in the response** (components, closure):
+  not done; Q14 (b) and Q15 of `contracts/ENTRYPOINTS.md`, for the lead
+  developer and the interface developer.
 - **Crops whose `crop_id` is not a quantity identifier** cannot be a
   carbon-input series, and `CarbonForcing` has no field to record that they
   were left out; today only the `amg` module detail says how many. Whether
