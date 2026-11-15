@@ -492,13 +492,24 @@ def test_years_are_the_whole_agricultural_years_of_the_record():
 
 
 def test_first_year_before_the_first_cycle_is_missing():
+    # The case keeps the name README.md lists; since D188 (2) it asserts
+    # the opposite of what the name says (a follow-up of brief #372).
+    # The first cycle starts on 2001-07-10, after the first day of the
+    # record's years. D188 (2): the cycle before it is laid out (points 6 and
+    # 13 of engine/calendar/repeat.py); its harvests fall before the record,
+    # so it adds no entry, and the first year holds the harvests of the
+    # first cycle like every other year.
     late = calendar_data(start_date="2001-07-10", end_date="2002-07-09")
     ledger = run(calendar=late)
+    assert min(entry.cycle for entry in ledger.components) == 0
     for found in ledger.annual_carbon_inputs:
-        first, *rest = found.years
-        assert first.missing.reason == "MISSING_INPUT"
-        assert "before the first cycle" in first.missing.detail
-        assert all(item.value is not None for item in rest)
+        assert [item.ag_year for item in found.years] == list(YEARS)
+        assert all(item.value is not None for item in found.years)
+    for found in ledger.monthly_carbon_inputs:
+        for item in found.months:
+            assert item.missing is None or (
+                "before the first cycle" not in item.missing.detail
+            )
 
 
 def test_component_starting_before_the_start_month_gives_a_lead_in_entry():

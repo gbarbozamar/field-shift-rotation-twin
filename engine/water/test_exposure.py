@@ -3142,25 +3142,35 @@ def test_calendar_that_starts_at_its_first_sowing_runs_on_a_record_that_starts_i
 
 
 def test_days_before_the_first_cycle_are_not_described_and_leave_the_years_missing():
+    # The case keeps the name EXPOSURE.md lists; since D188 (2) it asserts
+    # the opposite of what the name says (a follow-up of brief #372).
     # The same calendar on a record that starts on the first day of an
     # agricultural year: the first cycle starts on 2001-08-10 and no
-    # component of the cycle before it reaches the record, so the forty days
-    # before it are not described (point 6 of engine/calendar/repeat.py).
-    # The crop is not known on them, and the balance never restarts (D44).
+    # component of the cycle before it reaches the record. D188 (2): that
+    # cycle is laid out all the same (points 6 and 13 of
+    # engine/calendar/repeat.py), so the forty days before the first cycle
+    # are days with no crop and the balance runs from the first day. Every
+    # year is computed but the last, whose fallow after the last harvest has
+    # no crop that follows it inside the record (OPEN 41, not D188).
     calendar_ = two_year_calendar(start="2031-08-10")
     record = literal_record()
     days = chain(calendar_, climate(record))
-    assert all(isinstance(day.balance.storage_end, Missing) for day in days)
+    before = [day for day in days if day.date < dt.date(2001, 8, 10)]
+    assert len(before) == 40 and before[0].date == record[0]
+    for day in before:
+        assert is_number(day.balance.storage_end)
+        assert day.balance.transpiration_demanded.reason == module.NO_CROP_ON_THE_DAY
     result = run(calendar_=calendar_, climate_=climate(record))
     assert_loads(result)
     assert [item.ag_year for item in result] == expected_ag_years(*record)
+    *computed, last = result
+    for item in computed:
+        assert_computed(item)
+    assert f"chain MISSING_INPUT: {module.fallow.NO_FOLLOWING_CROP}" in items_of(
+        last.missing.detail
+    )
     for item in result:
-        assert item.missing.reason == "MISSING_INPUT"
-        assert f"chain MISSING_INPUT: {module.CROP_UNKNOWN}" in items_of(
-            item.missing.detail
-        )
-        assert "Q5" not in item.missing.detail
-    assert "the first on 2001-07-01" in result[0].missing.detail
+        assert module.CROP_UNKNOWN not in (item.missing.detail if item.missing else "")
     assert "D47" in module.CROP_UNKNOWN and "OPEN 5" in module.CROP_UNKNOWN
 
 

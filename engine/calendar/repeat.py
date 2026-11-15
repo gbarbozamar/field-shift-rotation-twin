@@ -8,8 +8,8 @@ the record runs from 2001-01-01 to 2024-12-31. The record's first and last day
 are arguments here, so this file holds neither date.
 
 ``repeat_over_record`` is a helper of the engines, not an entry point: EP2
-(``build_rotation_calendar``) and its signature are unchanged (D56). EP1 uses
-it; EP3 will use it in a later unit.
+(``build_rotation_calendar``) and its signature are unchanged (D56). EP1, EP3
+(``engine/water/``) and EP4 (``engine/residues/``) use it.
 
 The form, PROPOSED (blueprint section 3.7). The questions each point leaves
 are listed under OPEN at the end of this docstring and in OPEN 2 of
@@ -34,9 +34,17 @@ are listed under OPEN at the end of this docstring and in OPEN 2 of
    marked, with the components that start after that day (those are not laid
    out). A component that starts on or before that day and ends after it
    keeps its dates and is marked.
-6. Nothing is laid out before the first cycle, except the lead-in of point 13
-   (D141): the days of the record before it are not described by the
-   calendar.
+6. The cycle before the first (decision D188 of issue #77, part (2),
+   completing D141): "the cycle before the first is laid out whenever the
+   first cycle starts after the first day of the record's years, not only
+   when one of its components ends inside them. Its days that no component
+   holds are days with no crop, as inside any cycle." So, in every phase,
+   ``repeat_over_record`` lays out the lead-in of point 13 whenever the first
+   cycle starts after that day, and every day of the record's years is
+   described. No date moves and nothing is guessed: the components of the
+   cycle before keep the calendar's month and day, one cycle earlier than the
+   first. When the first cycle starts on the first day of the record's years
+   there is no lead-in: every day of those years lies in a cycle already.
 7. A missing date stays missing in every cycle; nothing is filled in. A
    component without a start date can start no earlier than the cycle's
    start (the calendar's ``start_date`` in the cycle); a component without an
@@ -97,15 +105,17 @@ crossing component. The form, PROPOSED (blueprint section 3.7):
     cycle length is the calendar's (point 3). ``feasibility``, the
     identifiers and the start month are copied unchanged, and the result is a
     valid ``RotationCalendar``.
-13. The lead-in (D141). ``repeat_over_record`` also lays out the cycle before
-    the first (index ``LEAD_IN``, -1) when one of its components has an end
-    date on or after the first day of the record's years: each of its
-    components that can reach that day (by its end, or by the bound of point
-    7) is laid out with its dates, the part before that day outside the
-    record; the others are listed in the cycle's ``components_not_laid_out``.
-    So a crossing component is present from the first day of the record, in
-    every phase and in phase 0 alike, and ``described_from`` is the lead-in's
-    start. Without such a component there is no lead-in and point 6 holds.
+13. The lead-in (D141, D188). The cycle before the first (index ``LEAD_IN``,
+    -1), laid out as point 6 says: each of its components that can reach the
+    first day of the record's years (by its end, or by the bound of point 7)
+    is laid out with its dates, the part before that day outside the record;
+    the others (they end before that day) are listed in the cycle's
+    ``components_not_laid_out``. So a crossing component is present from the
+    first day of the record, in every phase and in phase 0 alike (D141), and
+    ``described_from`` is the lead-in's start. A component that ends inside
+    the record's years always comes with a first cycle that starts after
+    their first day (every date of a calendar lies inside its own dates), so
+    the case of D141 is one case of point 6.
 
 OPEN, for the lead developer and the science reviewers (Q5 of
 contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
@@ -123,11 +133,15 @@ contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
   runner's check that a moved calendar changes only dates (``api/phases.py``)
   sees those dates go missing. A way to hold such a component (a field of
   the calendar contract, lane L0) would give those days back.
-- Point 13, the lead-in changes phase 0 too: a calendar whose cycle before
-  the first has a component ending inside the record now has that component
-  laid out (D141 reads "each phase is laid out as the first one"), where
-  before those days were not described. Days of the lead-in that no
-  component holds read as days with no crop, as inside any cycle (point 3).
+- Points 6 and 13, the lead-in changes phase 0 too: a calendar whose first
+  cycle starts after the first day of the record's years now has the days
+  before that start described (D141 reads "each phase is laid out as the
+  first one"; D188), where before they were not described unless a
+  component of the cycle before ended inside the record. Days of the
+  lead-in that no component holds read as days with no crop, as inside any
+  cycle (point 3); a component of the lead-in without an end date reaches
+  the first cycle by the bound of point 7, so its days are not known, never
+  days with no crop.
 - Point 11, a component of a year before ``p`` whose end date is missing and
   that has no dated period on or after year ``p``: it may cross the boundary
   but cannot be shown to, so it is moved with its end still missing (point
@@ -143,9 +157,10 @@ contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
   date.
 - Point 9, a calendar whose start month is missing: ``phase_calendar``
   raises ``ValueError`` for a phase above 0, as its years are not known.
-- Point 6, the residue before the record: a harvest before the first day of
-  the record's years is still not laid out, so a quantity that needs it stays
-  missing (D141); the residue ledger (Q12) is the candidate.
+- Point 13, the residue before the record: a harvest before the first day of
+  the record's years is still not laid out (the lead-in lists it in
+  ``components_not_laid_out``), so a quantity that needs it stays missing
+  (D141); the residue ledger (Q12) is the candidate.
 - Point 3, the cycle length, and the days between two cycles as days with no
   component. The rotation definition's ``repeats`` does not reach the
   calendar (EP2 is unchanged, D56), so a rotation declared as not repeating is
@@ -158,7 +173,6 @@ contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
   not known, never days with no crop.
 - Which daily series marks the record for each engine (Q5): the caller passes
   the dates. EP1 passes those of its ``precipitation`` series.
-- EP3 (``engine/water/``) does not call this helper yet: a later unit.
 
 Pure function (G1 of contracts/ENTRYPOINTS.md): no file, no network, no clock,
 and the calendar is not changed. The feasibility of the calendar is not read.
@@ -289,8 +303,9 @@ class RepeatedRotation:
     @property
     def described_from(self) -> IsoDate:
         """The first day the repeated calendar describes: the start of the
-        first cycle, or of the lead-in when there is one (point 13). The days
-        of the record's years before it are not described."""
+        lead-in when there is one (points 6 and 13), else of the first
+        cycle, which then starts on the first day of the record's years. So
+        no day of the record's years comes before it (D188)."""
         return self.cycles[0].start
 
 
@@ -597,20 +612,16 @@ def _lead_in(
     first_day: IsoDate,
     last_day: IsoDate,
 ) -> tuple[Cycle, list[RepeatedComponent]] | None:
-    """Point 13 (D141): the cycle before the first, laid out when one of its
-    components has an end date on or after the first day of the record's
-    years; ``None`` otherwise (point 6 then holds). Its components that can
-    reach that day are laid out with their dates; the others are listed."""
-    if not any(
-        shifted_date(component.end.date, shift)[0] >= first_day
-        for component in calendar.components
-        if component.end.date is not None
-    ):
-        return None
+    """Points 6 and 13 (D141, D188): the cycle before the first, laid out
+    whenever the first cycle starts after the first day of the record's
+    years; ``None`` when it starts on that day. Its components that can reach
+    that day are laid out with their dates; the others are listed."""
     one_day = first_day.replace(day=_SECOND) - first_day
+    cycle_last_day = shifted_date(calendar.start_date, shift + length)[0] - one_day
+    if cycle_last_day < first_day:
+        return None
     cycle_start, _ = shifted_date(calendar.start_date, shift)
     cycle_end, _ = shifted_date(calendar.end_date, shift)
-    cycle_last_day = shifted_date(calendar.start_date, shift + length)[0] - one_day
     bounds = (cycle_start, cycle_end, cycle_last_day)
     laid: list[RepeatedComponent] = []
     not_laid_out: list[str] = []
