@@ -3,8 +3,10 @@
 Every number in this file is a PLACEHOLDER chosen to exercise the code. None
 is a real capacity, coefficient, root depth, fraction or climate value, and
 none comes from FAO-56 or any other source. The checks are structural (mass
-closure, bounds, invariants, missing values); the numeric criteria of H7 and
-H8 and the reference case H1 are skipped until people supply them.
+closure, bounds, invariants, missing values). The criterion of H7 decided by
+D227 of issue #77 runs below (docs/VALIDATION.md H7); H8 is the list of
+invariants checked by the tests docs/VALIDATION.md H8 names. The reference
+case H1 is skipped until people supply it.
 """
 
 from __future__ import annotations
@@ -168,6 +170,34 @@ def test_mass_closure_from_other_initial_states_and_series(seed, initial):
     for r in run(placeholder_series(3 * 366, seed), initial=initial):
         residual, scale = closure_residual(r)
         assert abs(residual) <= 16 * EPS * max(scale, 1.0), r.date
+
+
+def h7_series():
+    """The PLACEHOLDER series of the two closure tests above, each with the
+    initial storage it is run from (the long one from the default of run)."""
+    yield LONG, {}
+    for seed in (2, 3, 4):
+        for initial in (0.0, CAPACITY):
+            yield placeholder_series(3 * 366, seed), {"initial": initial}
+
+
+def test_h7_mass_closure_numeric_criterion():
+    """[H7] as D227 of issue #77 decides it (docs/VALIDATION.md H7): the daily
+    closure within 16 x machine epsilon x the scale of the day's terms, on
+    every day with values, on the PLACEHOLDER series of the structural tests.
+    The bound is the one those tests already use, not a value of the science.
+    A day with a missing quantity (R9) is not checked and never read as zero.
+    """
+    for series, kwargs in h7_series():
+        checked = 0
+        for r in run(series, **kwargs):
+            terms = (r.storage_start, r.storage_end, *(getattr(r, f) for f in FLOWS))
+            if any(isinstance(t, Missing) for t in terms):
+                continue
+            residual, scale = closure_residual(r)
+            assert abs(residual) <= 16 * EPS * max(scale, 1.0), r.date
+            checked += 1
+        assert checked > 0
 
 
 def test_balance_is_never_reset_between_days_crops_or_years():
@@ -517,19 +547,11 @@ def test_h1_public_reference_case():
 
 
 @pytest.mark.skip(
-    reason="[H7] numeric criterion waits for docs/VALIDATION.md H7: the definition "
-    "of the closure check and its tolerance, supplied and checked by people. "
-    "The structure of H7 is tested above to floating-point precision"
-)
-def test_h7_mass_closure_numeric_criterion():
-    raise AssertionError("not defined")
-
-
-@pytest.mark.skip(
-    reason="[H8] numeric criteria wait for docs/VALIDATION.md H8: the list of "
-    "invariants, their expected values and tolerances, supplied and checked by "
-    "people. The structure of H8 (root growth, sowing, harvest, bounds) is "
-    "tested above"
+    reason="[H8] is defined by D227 of issue #77 (docs/VALIDATION.md H8) as a "
+    "list of invariants that the tests named in that entry check one by one. "
+    "This test has no criterion of its own: asserting the list again here would "
+    "need series and cases D227 does not give. Whether to remove it is for the "
+    "lead developer"
 )
 def test_h8_invariants_numeric_criteria():
     raise AssertionError("not defined")
