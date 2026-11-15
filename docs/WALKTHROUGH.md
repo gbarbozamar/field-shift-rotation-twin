@@ -2,7 +2,7 @@
 
 What to type, in order, and what you should see: clone, install, run the tests, start the backend without Docker, send the example rotation, read the answer, build and open the interface.
 
-**Checked against commit `35d5b2689bb597eae2010633e59d0c9de642f250` of `main`, on 15 November 2026.** At `35d5b2689bb597eae2010633e59d0c9de642f250`, test collection (`--collect-only`, `7642` total / `7609` non-`ci/`) and `validation/` + `kinds_of_year/` (`464 passed`) were executed directly; `contracts/` (`1665 passed, 1 xfailed`) and `web/` (`npm ci`, `npm test`, `npm run build`) were verified at `540095f86c1b39f1dc29bad225e006a9aa39018a` (neither folder changed between `540095f` and `35d5b26`, which merged `PR #510` in `kinds_of_year/records/oni_v6.json` and `PR #511` in `validation/` and `docs/VALIDATION.md`), and the full non-`ci/` test suite was executed at `540095f` in Validation Run #5 (`PR #511`); the interactive clone-to-browser walk and the in-process module states of steps 7 and 8 were previously run at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9`, `2e5caf99086080a36a13d5972b493708258393a9`, and `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
+**Checked against commit `9b70bcdab22a32e01519553686e78bdfc30c3065` of `main` plus PR B (`l0/h10-signed-fixture-and-docs-sync`), on 15 November 2026.** At `9b70bcd` + PR B, test collection (`--collect-only`, `7769` total / `7736` non-`ci/`) and `validation/` + `engine/water/evaporation/` + `contracts/` (`2165 passed, 1 xfailed`) were executed directly; `contracts/` (`1665 passed, 1 xfailed`) and `web/` (`npm ci`, `npm test`, `npm run build`) were verified at `540095f86c1b39f1dc29bad225e006a9aa39018a` (neither folder changed between `540095f` and `9b70bcd`, which merged `PR #510` in `kinds_of_year/records/oni_v6.json`, `PR #511` in `validation/` and `docs/VALIDATION.md`, `PR #512`, `PR #513` and `PR #514` in `demo/`, and `PR #515` in `engine/water/evaporation/` and `validation/fixtures/fao56_example35_surface_layer.json`), and the full non-`ci/` test suite was executed at `540095f` in Validation Run #5 (`PR #511`); the interactive clone-to-browser walk and the in-process module states of steps 7 and 8 were previously run at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9`, `2e5caf99086080a36a13d5972b493708258393a9`, and `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
 
 The commands are written for a POSIX shell (bash); the `NAME=value command` form sets a variable for one command. They come from `CLAUDE.md`, `api/README.md`, `web/README.md` and `.github/workflows/ci.yml`.
 
@@ -37,7 +37,7 @@ uv creates `.venv` from `uv.lock`, the development tools included, and lists eac
 uv run pytest
 ```
 
-At `35d5b2689bb597eae2010633e59d0c9de642f250`, the full suite was not re-run locally (collection finds `7642` tests total, or `7609` with `--ignore=ci` excluding the `33` tests in `ci/`; GitHub Actions runs the full suite on pull requests, and `validation/` + `kinds_of_year/` passed locally with `464 passed` at `35d5b26`). The latest recorded full non-`ci/` run on `main` is Validation Run #5 at `540095f` (`validation/runs/run-20261115T194950Z-540095f.json`, `PR #511`), which took `493.03s` and reported:
+At `9b70bcd` + PR B (`l0/h10-signed-fixture-and-docs-sync`), the full suite was not re-run locally (collection finds `7769` tests total, or `7736` with `--ignore=ci` excluding the `33` tests in `ci/`; GitHub Actions runs the full suite on pull requests, and `validation/` + `engine/water/evaporation/` + `contracts/` passed locally with `2165 passed, 1 xfailed`). The latest recorded full non-`ci/` run on `main` is Validation Run #5 at `540095f` (`validation/runs/run-20261115T194950Z-540095f.json`, `PR #511`), which took `493.03s` and reported:
 
 ```text
 7584 passed, 16 skipped, 3 xfailed (7603 items, --ignore=ci)
@@ -51,7 +51,7 @@ The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml
 uv run pytest contracts/
 ```
 
-Observed at `540095f` (`contracts/` was unchanged in `540095f..35d5b26`; it also grows with new tests; what matters is no failure, and the `xfailed` item is an open contract test):
+Observed at `540095f` (`contracts/` was unchanged in `540095f..9b70bcd`, and `validation/ engine/water/evaporation/ contracts/` passed together with `2165 passed, 1 xfailed` on PR B; it also grows with new tests; what matters is no failure, and the `xfailed` item is an open contract test):
 
 ```text
 1665 passed, 1 xfailed
@@ -99,7 +99,7 @@ npm test
 npm run build
 ```
 
-Observed at `540095f` (`web/` was unchanged in `540095f..35d5b26`):
+Observed at `540095f` (`web/` was unchanged in `540095f..9b70bcd`):
 
 - `npm ci` ends with `found 0 vulnerabilities`;
 - `npm test`: `Test Files  24 passed (24)`, `Tests  416 passed (416)`;
