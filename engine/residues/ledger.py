@@ -30,7 +30,10 @@ What it does, in order:
    the components of that crop and purpose harvested in that agricultural
    year; a year in which none is harvested is zero. The entries are in
    ``kg C ha-1``; each sum is divided by ``KG_PER_TONNE`` so the series are in
-   ``t C ha-1``, the unit AMG requires (D147 of #77).
+   ``t C ha-1``, the unit AMG requires (D147 of #77). The origin of a series
+   is ``<crop_id>_aboveground`` for the retained aboveground carbon and
+   ``<crop_id>_belowground`` for root and rhizodeposit carbon (D194 of #77),
+   so AMG reads one humification coefficient for each group.
 
 An infeasible calendar makes every value ``NOT_COMPUTABLE`` (G4). A pure
 function (G1): no file, no network, no clock, and its arguments are not changed.
@@ -48,6 +51,7 @@ from contracts.inputs.common import DateValue, Missing, Value
 from contracts.inputs.rotation_calendar import RotationCalendar
 from contracts.inputs.site_climate import SiteClimate
 from contracts.residue_ledger import LedgerComponent, NotGiven, ResidueLedger
+from contracts.residue_ledger.models import series_origin
 from contracts.rotation_definition import (
     MissingManagementField,
     RotationComponent,
@@ -493,7 +497,10 @@ def _series(
                 AnnualCarbonInputSeries(
                     quantity=f"{crop}_{purpose}_{part}",
                     unit=CARBON_INPUT_UNIT,
-                    origin=crop,
+                    # D194 of #77: <crop>_aboveground for the retained
+                    # aboveground carbon, <crop>_belowground for root and
+                    # rhizodeposit carbon (contracts/residue_ledger/models.py).
+                    origin=series_origin(crop, part),
                     first_ag_year=years[0],
                     last_ag_year=years[1],
                     years=values,

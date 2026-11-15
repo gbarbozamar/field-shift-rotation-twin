@@ -65,6 +65,23 @@ CARBON_FIELDS = (
     "rhizodeposit_carbon",
 )
 
+# D194 of #77: the origin of a series of ``annual_carbon_inputs`` is
+# ``<crop_id>_<group>``, where the group follows the part at the end of the
+# quantity (``<crop>_<purpose>_<part>``): the retained aboveground carbon is
+# ``aboveground``; root carbon and rhizodeposit carbon are ``belowground``
+# together, because AMG humifies them as one belowground input (Clivot et al.
+# 2019, eq. 11). The order is the order of the parts EP4 writes.
+ORIGIN_GROUP_OF_PART = {
+    "aboveground_carbon_retained": "aboveground",
+    "root_carbon": "belowground",
+    "rhizodeposit_carbon": "belowground",
+}
+
+
+def series_origin(crop_id: str, part: str) -> str:
+    """The origin of the series of ``part`` for ``crop_id`` (D194 of #77)."""
+    return f"{crop_id}_{ORIGIN_GROUP_OF_PART[part]}"
+
 
 class NotGiven(ContractModel):
     """A declared word of an entry that is not known: its ``missing`` part only.
@@ -210,7 +227,23 @@ class ResidueLedger(ContractModel):
                 raise ValueError(
                     f"{what}: is not in the carbon_input_unit of the ledger"
                 )
-            if series.origin not in crops:
+            parts = [
+                part
+                for part in ORIGIN_GROUP_OF_PART
+                if series.quantity.endswith(f"_{part}")
+            ]
+            if not parts:
                 raise ValueError(
-                    f"{what}: its origin is not the crop of any component of the ledger"
+                    f"{what}: its quantity does not end in a part of the ledger "
+                    f"({', '.join(ORIGIN_GROUP_OF_PART)}), so its origin cannot "
+                    "be checked (D194 of #77)"
+                )
+            group = ORIGIN_GROUP_OF_PART[parts[0]]
+            if series.origin not in {f"{crop}_{group}" for crop in crops}:
+                raise ValueError(
+                    f"{what}: its origin is not '<crop>_{group}' for a crop of a "
+                    f"component of the ledger; the part {parts[0]!r} at the end of "
+                    f"its quantity takes the origin group {group!r} (D194 of #77: "
+                    "'<crop>_aboveground' for aboveground_carbon_retained, "
+                    "'<crop>_belowground' for root_carbon and rhizodeposit_carbon)"
                 )
