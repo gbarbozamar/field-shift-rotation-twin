@@ -133,10 +133,14 @@ describe('FieldsScreen', () => {
 
   it('carries the workbench two-column layout at the desktop variant', () => {
     const html = renderScreen()
-    expect(html).toContain('max-w-6xl mx-auto')
+    // full width from the shell padding, and the wider 480px inspector the
+    // developer asked for on 15 Nov 2026 (the readability pass), replacing
+    // the 380px of the design handoff
+    expect(html).toContain('<section aria-labelledby="fields-screen-title">')
+    expect(html).not.toContain('max-w-6xl')
     expect(html).toContain('min-[1100px]:grid')
-    expect(html).toContain('min-[1100px]:grid-cols-[minmax(0,1fr)_380px]')
-    expect(html).toContain('min-[1100px]:w-[380px]')
+    expect(html).toContain('min-[1100px]:grid-cols-[minmax(0,1fr)_480px]')
+    expect(html).toContain('min-[1100px]:w-[480px]')
   })
 
   it('keeps the inspector order: run, site sheet, ribbon, clocks, results, decision', () => {

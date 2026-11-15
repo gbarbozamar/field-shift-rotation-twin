@@ -45,7 +45,7 @@ export default function FieldsScreen() {
     exampleCase.fields.find((field) => field.field_id === selectedFieldId) ?? null
 
   return (
-    <section aria-labelledby="fields-screen-title" className="max-w-6xl mx-auto">
+    <section aria-labelledby="fields-screen-title">
       <h2 id="fields-screen-title" className="text-lg font-semibold">
         {strings['identity.title']}
       </h2>
@@ -73,7 +73,7 @@ export default function FieldsScreen() {
           field list) in the flexible column and the second (the six
           inspector pieces, in their today order) in the fixed inspector
           column. Every component still mounts exactly once. */}
-      <div className="min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1fr)_380px] min-[1100px]:items-start min-[1100px]:gap-6">
+      <div className="min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1fr)_480px] min-[1100px]:items-start min-[1100px]:gap-6">
         <div>
           <div className="mt-6">
             <h3 className="text-base font-semibold">{strings['map.title']}</h3>
@@ -132,7 +132,7 @@ export default function FieldsScreen() {
             most the viewport minus the main padding), instead of
             leaving the left column as empty space on the way down.
             Under 1100px this wrapper is plain block flow, unchanged. */}
-        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[380px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
+        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[480px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
           <RotationRun />
 
           <SiteSheet />
