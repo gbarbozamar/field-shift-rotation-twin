@@ -6,6 +6,7 @@ What the residue engine returns for one rotation of one field. Blueprint section
 
 - `components`: one entry per component of the calendar in each cycle of the rotation repeated over the record (D47);
 - `annual_carbon_inputs`: one series per crop, purpose and part that enters the soil, with one value per agricultural year. Each series is a `contracts.carbon_forcing.AnnualCarbonInputSeries`, so the platform copies it into the forcing unchanged.
+- `monthly_carbon_inputs`: one series per origin of D194, with one value per calendar month of the agricultural years of the ledger, for the monthly carbon inputs of RothC ([D221 of #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6892470314)). Each series is a `contracts.carbon_forcing.CarbonInputSeries`, the shape of `CarbonForcing.carbon_inputs`.
 
 This folder fixes structure only. It names no record and no value, and it fixes no unit: a producer states its units once, in `mass_unit` and `carbon_unit` for the components and in `carbon_input_unit` for the series. The model is `models.py`. The example is `examples/PLACEHOLDER_residue_ledger.json`, and its numbers mean nothing.
 
@@ -17,12 +18,13 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 | `example_data` | boolean | True when any input of the engine is example data |
 | `case_id`, `field_id`, `rotation_id` | non-empty text | Those of the calendar |
 | `first_ag_year`, `last_ag_year` | integer, or null | The agricultural years of the ledger, inclusive (C5.3). Null together, and only with `years_missing` |
-| `years_missing` | `Missing` of `contracts/inputs/common.py`, or absent | Why no agricultural year could be laid out. With it, `components` and `annual_carbon_inputs` are empty |
+| `years_missing` | `Missing` of `contracts/inputs/common.py`, or absent | Why no agricultural year could be laid out. With it, `components`, `annual_carbon_inputs` and `monthly_carbon_inputs` are empty |
 | `mass_unit` | non-empty text | The unit of every mass value of the ledger |
 | `carbon_unit` | non-empty text | The unit of every carbon value of the components |
-| `carbon_input_unit` | non-empty text | The unit of every series of `annual_carbon_inputs`. It may differ from `carbon_unit`: EP4 writes its entries in `kg C ha-1` and its series in `t C ha-1` (D147 of #77) |
+| `carbon_input_unit` | non-empty text | The unit of every series of `annual_carbon_inputs` and of `monthly_carbon_inputs`. It may differ from `carbon_unit`: EP4 writes its entries in `kg C ha-1` and its series in `t C ha-1` (D147 of #77) |
 | `components` | list of `LedgerComponent` | See below |
 | `annual_carbon_inputs` | list of `AnnualCarbonInputSeries` of `contracts/carbon_forcing/` | `quantity`, `unit`, `origin`, provenance, source or assumption mark, `range_missing`, and one value per agricultural year from `first_ag_year` to `last_ag_year`, each a number or missing with its reason |
+| `monthly_carbon_inputs` | list of `CarbonInputSeries` of `contracts/carbon_forcing/` | D221: one series per origin (`<crop>_aboveground`, `<crop>_belowground`; D194). `quantity` is the origin followed by `_carbon_input` (PROPOSED), `unit` is `carbon_input_unit`, `origin`, provenance, source or assumption mark, `range_missing`, `start`, `end`, and one value per calendar month of the agricultural years `first_ag_year` to `last_ag_year`, each a number or missing with its reason. A month without an input is an explicit zero |
 
 `LedgerComponent`, one component of the calendar in one cycle:
 
@@ -51,9 +53,10 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 - `ag_year` is given exactly when the harvest date is given.
 - No quantity identifier appears twice in `annual_carbon_inputs`. Every series runs from `first_ag_year` to `last_ag_year` and is in `carbon_input_unit`.
 - The `origin` of a series follows the part at the end of its quantity (D194 of #77, https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765): `<crop>_aboveground` for `aboveground_carbon_retained`, and `<crop>_belowground` for `root_carbon` and `rhizodeposit_carbon`, where `<crop>` is the crop of a component of the ledger. The plain crop word is not an origin of a ledger series. A quantity that does not end in one of those three parts is rejected, because its origin cannot be checked. The rule is `ORIGIN_GROUP_OF_PART` and `series_origin` in `models.py`; EP4 writes its origins with `series_origin`.
+- `monthly_carbon_inputs` ([D221 of #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6892470314)): at most one series per origin; the origin is `<crop>_aboveground` or `<crop>_belowground` for a crop of a component of the ledger; the quantity is the origin followed by `_carbon_input` (`monthly_quantity` in `models.py`); the unit is `carbon_input_unit`; every series starts in the same month, in `first_ag_year`, and holds twelve months for each agricultural year of the ledger. The start month itself is not in the ledger, so the model checks the year and the count, not the month.
 - Everything the shared parts already check. A value or a missing part, never both, never neither (C3.1). A present value carries a provenance label and a source or the assumption mark (C4.1, C4.2), and a range or the reason it has none (C2.2). Unknown fields are rejected and nothing is coerced.
 
-The model does not check closure, that retained plus exported is produced, nor that a series value is the sum of the components of its year. Both are statements of the engine and not of the shape, as for `CarbonBalance`. The engine checks both in its tests (`engine/residues/test_ledger.py`).
+The model does not check closure, that retained plus exported is produced, nor that a series value is the sum of the components of its year, nor that the months of an agricultural year add up to the annual series of that year and origin. Both are statements of the engine and not of the shape, as for `CarbonBalance`. The engine checks both in its tests (`engine/residues/test_ledger.py`).
 
 ## PROPOSED cases
 
@@ -65,7 +68,9 @@ Each case is a test function of `test_examples.py`. A test checks that this list
 | `test_example_round_trips_through_json` | `model_dump(mode="json")` loads back into an equal model |
 | `test_example_closes_mass_and_carbon` | In the example, retained plus exported is produced, for mass and for carbon |
 | `test_every_value_missing_loads` | A ledger in which every value is missing with its reason is valid |
-| `test_ledger_without_years_loads` | No years, with the reason, and no component or series |
+| `test_ledger_without_years_loads` | No years, with the reason, and no component or series (annual or monthly); a monthly series without years is rejected |
+| `test_monthly_series_follow_d221` | D221: the example's monthly series, one per origin of D194, twelve months a year, explicit zeros, a missing month with its reason |
+| `test_monthly_series_rules_are_checked` | An origin twice, the plain crop word, a crop that no component has, a quantity that is not the origin with `_carbon_input`, a unit other than `carbon_input_unit`, a month short, another first year, series that start in different months |
 | `test_years_and_their_missing_reason_together_are_rejected` | Years and `years_missing` together |
 | `test_ledger_without_years_or_reason_is_rejected` | One year bound alone; no years and no reason |
 | `test_ledger_without_years_listing_components_is_rejected` | No years, but components listed |
@@ -90,6 +95,7 @@ The ledger's series already have the shape, the agricultural years and the unit 
 - `unit` is `carbon_input_unit`. EP4 writes `t C ha-1`, the unit AMG requires for a carbon input (D147 of #77): it divides its sums in `kg C ha-1` by 1000, the SI definition of the prefixes. The runner and AMG convert nothing.
 - `origin` is `<crop>_aboveground` for the retained aboveground carbon and `<crop>_belowground` for root and rhizodeposit carbon (D194 of #77). AMG reads its humification coefficient by `origin` under the scope key `crop` (`engine/amg/entry.py`, `ORIGIN_SCOPE_KEY`), so it reads one coefficient for each group: D194 gives `h_AG` to the first and `h_BG` to the second (AMGv2 parameters v2.0, https://doi.org/10.57745/MEQQIX). This contract writes no record.
 - `quantity` is `<crop>_<purpose>_<part>`. `<part>` is `aboveground_carbon_retained`, `root_carbon` or `rhizodeposit_carbon`. AMG sums every series of `annual_carbon_inputs`, each with the coefficient of its origin.
+- `monthly_carbon_inputs[i]` → `CarbonForcing.carbon_inputs[i]`, unchanged, as D221 says ("the platform copies it into `carbon_inputs` unchanged"). Not wired yet: the copy is the platform's, and RothC (EP6) reads `carbon_inputs` by `origin`. The horizon of the forcing must then start in the start month of `first_ag_year`, as the series do.
 
 What the platform still decides is in `engine/residues/README.md`, under "For the platform".
 
@@ -103,3 +109,4 @@ Each item is a question a person answers; the role is named.
 4. **Closure checked by the model.** It is not checked here, so no tolerance is written. For the lead developer.
 5. **Ranges.** Every computed value carries `range_missing` with reason `NOT_AVAILABLE` (Q6 of `contracts/ENTRYPOINTS.md`, C2.3). For the science reviewers.
 6. **Private names imported.** None directly: `AnnualCarbonInputSeries` brings `_SeriesHeader` and `_SeriesItem` of `contracts/inputs/site_climate.py` with it, as in `contracts/carbon_forcing/`.
+7. **The monthly series of D221.** Answered by D221 of #77: the carbon of a component enters in the calendar month of its harvest, and every other month is zero. Still open, as D221 states: roots spread over the months of crop growth (an option not taken); the quantity identifier `<origin>_carbon_input` (PROPOSED here); whether the platform copies these series into `CarbonForcing.carbon_inputs` (D221 says it does; not wired). For the lead developer and the platform developer.

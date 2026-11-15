@@ -88,8 +88,81 @@ def test_ledger_without_years_loads():
         years_missing={"reason": "NO_COVERAGE", "detail": "PLACEHOLDER: no year"},
         components=[],
         annual_carbon_inputs=[],
+        monthly_carbon_inputs=[],  # D221: no years, no monthly series either
     )
     ResidueLedger.model_validate(data)
+    data["monthly_carbon_inputs"] = load()["monthly_carbon_inputs"]
+    rejected(data, "lists no component and no series")
+
+
+def test_monthly_series_follow_d221():
+    """D221 of #77: one monthly series per origin of D194, over every month of
+    the agricultural years of the ledger, in carbon_input_unit; an explicit
+    zero in a month without a harvest, missing with its reason never zero."""
+    ledger = ResidueLedger.model_validate(load())
+    by_origin = {s.origin: s for s in ledger.monthly_carbon_inputs}
+    assert set(by_origin) == {
+        "placeholder_crop_a_aboveground",
+        "placeholder_crop_a_belowground",
+        "placeholder_crop_b_aboveground",
+        "placeholder_crop_b_belowground",
+    }
+    for series in ledger.monthly_carbon_inputs:
+        assert series.quantity == f"{series.origin}_carbon_input"
+        assert series.unit == ledger.carbon_input_unit
+        assert len(series.months) == 12 * 2
+    above = by_origin["placeholder_crop_a_aboveground"]
+    assert [m.value for m in above.months].count(0.0) == 22  # explicit zeros
+    below = by_origin["placeholder_crop_a_belowground"]
+    may_2002 = [m for m in below.months if (m.year, m.month) == (2002, 5)][0]
+    assert may_2002.value is None and may_2002.missing.reason == "MISSING_INPUT"
+
+
+def test_monthly_series_rules_are_checked():
+    cases = []
+    data = load()
+    data["monthly_carbon_inputs"][1]["origin"] = "placeholder_crop_a_aboveground"
+    data["monthly_carbon_inputs"][1]["quantity"] = (
+        "placeholder_crop_a_aboveground_carbon_input"
+    )
+    cases.append((data, "has more than one series"))
+    data = load()
+    data["monthly_carbon_inputs"][0]["origin"] = "placeholder_crop_a"
+    data["monthly_carbon_inputs"][0]["quantity"] = "placeholder_crop_a_carbon_input"
+    cases.append((data, "is not '<crop>_aboveground' or '<crop>_belowground'"))
+    data = load()
+    data["monthly_carbon_inputs"][0]["origin"] = "placeholder_crop_c_aboveground"
+    data["monthly_carbon_inputs"][0]["quantity"] = (
+        "placeholder_crop_c_aboveground_carbon_input"
+    )
+    cases.append((data, "is not '<crop>_aboveground' or '<crop>_belowground'"))
+    data = load()
+    data["monthly_carbon_inputs"][0]["quantity"] = "placeholder_other_quantity"
+    cases.append((data, "its quantity is not its origin followed by"))
+    data = load()
+    data["monthly_carbon_inputs"][0]["unit"] = data["carbon_unit"]
+    cases.append((data, "is not in the carbon_input_unit"))
+    data = load()
+    series = data["monthly_carbon_inputs"][0]
+    series["end"] = {"year": 2002, "month": 11}
+    series["months"].pop()
+    cases.append((data, "runs over every month of the agricultural years"))
+    data = load()
+    for series in data["monthly_carbon_inputs"]:
+        series["start"] = {"year": 2000, "month": 1}
+        series["end"] = {"year": 2001, "month": 12}
+        for item in series["months"]:
+            item["year"] -= 1
+    cases.append((data, "runs over every month of the agricultural years"))
+    data = load()
+    series = data["monthly_carbon_inputs"][3]
+    series["start"] = {"year": 2001, "month": 2}
+    series["end"] = {"year": 2003, "month": 1}
+    for index, item in enumerate(series["months"]):
+        item["year"], item["month"] = 2001 + (index + 1) // 12, (index + 1) % 12 + 1
+    cases.append((data, "every series starts in the same month"))
+    for data, words in cases:
+        rejected(data, words)
 
 
 def test_years_and_their_missing_reason_together_are_rejected():

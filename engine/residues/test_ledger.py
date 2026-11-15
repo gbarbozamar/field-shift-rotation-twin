@@ -772,6 +772,165 @@ def test_amg_without_the_group_records_names_them_and_not_the_crop():
         assert f'"{entry.ORIGIN_SCOPE_KEY}": "{crop}"' not in detail
 
 
+# --- the monthly carbon inputs of D221 ------------------------------------------------
+
+
+GROUP_PARTS = {
+    "aboveground": ("aboveground_carbon_retained",),
+    "belowground": ("root_carbon", "rhizodeposit_carbon"),
+}
+
+
+def monthly(ledger: ResidueLedger, origin: str):
+    (found,) = [s for s in ledger.monthly_carbon_inputs if s.origin == origin]
+    return found
+
+
+def month_of(series_, year: int, month: int):
+    (found,) = [m for m in series_.months if (m.year, m.month) == (year, month)]
+    return found
+
+
+def test_monthly_series_use_the_origins_of_d194():
+    """D221 of #77: one monthly series per origin of D194, over every month of
+    the agricultural years of the ledger, from the start month, in t C ha-1."""
+    ledger = run()
+    origins = [s.origin for s in ledger.monthly_carbon_inputs]
+    assert origins == [
+        f"{crop}_{group}" for crop in (CROP_A, CROP_B) for group in GROUP_PARTS
+    ]
+    for item in ledger.monthly_carbon_inputs:
+        assert item.quantity == f"{item.origin}_carbon_input"
+        assert item.unit == CARBON_INPUT_UNIT == AMG_INPUT_UNIT
+        assert (item.start.year, item.start.month) == (YEARS[0], START_MONTH)
+        assert (item.end.year, item.end.month) == (YEARS[-1] + 1, START_MONTH - 1)
+        assert len(item.months) == 12 * len(YEARS)
+        assert "D221" in item.source
+    # The annual series keep their own origins (D194): the same set.
+    assert {s.origin for s in ledger.annual_carbon_inputs} == set(origins)
+
+
+def test_harvest_month_carries_the_whole_component_and_other_months_are_zero():
+    """All the carbon of a component enters in the calendar month of its
+    harvest; every other month is an explicit zero (D221). Recomputed here
+    from the entries of the ledger, converted by 1 t = 1000 kg (D147)."""
+    ledger = run()
+    kg_per_tonne = 1000
+    for crop in (CROP_A, CROP_B):
+        for group, parts in GROUP_PARTS.items():
+            found = monthly(ledger, f"{crop}_{group}")
+            expected: dict[tuple[int, int], float] = {}
+            for entry in ledger.components:
+                if entry.crop_id != crop:
+                    continue
+                key = (entry.harvest.date.year, entry.harvest.date.month)
+                carbon = sum(getattr(entry, part).value for part in parts)
+                expected[key] = expected.get(key, 0.0) + carbon / kg_per_tonne
+            assert expected  # one harvest a year
+            for item in found.months:
+                value = expected.get((item.year, item.month), 0.0)
+                assert item.missing is None
+                assert item.value == pytest.approx(value, rel=1e-12)
+            zeros = [m for m in found.months if (m.year, m.month) not in expected]
+            assert zeros and all(m.value == 0.0 for m in zeros)  # explicit zeros
+
+
+def test_two_harvests_in_one_month_add_up():
+    """Two components of one crop harvested in the same calendar month: the
+    month holds the sum of both (D221)."""
+    calendar = calendar_data()
+    second = calendar["components"][1]
+    second.update(
+        crop_id=CROP_A, start=date_value("2001-12-21"), end=date_value("2001-12-30")
+    )
+    rotation = rotation_data()
+    item = rotation["components"][1]
+    item.update(
+        crop_id=CROP_A,
+        sowing=date_value("2001-12-21"),
+        harvest=date_value("2001-12-30"),
+    )
+    ledger = run(rotation=rotation, calendar=calendar)
+    for group, parts in GROUP_PARTS.items():
+        found = monthly(ledger, f"{CROP_A}_{group}")
+        december = [
+            entry
+            for entry in ledger.components
+            if (entry.harvest.date.year, entry.harvest.date.month) == (2001, 12)
+        ]
+        assert {entry.component_id for entry in december} == {"c1", "c2"}
+        total = sum(getattr(e, part).value for e in december for part in parts)
+        assert month_of(found, 2001, 12).value == pytest.approx(
+            total / KG_PER_TONNE, rel=1e-12
+        )
+    assert not [s for s in ledger.monthly_carbon_inputs if s.origin.startswith(CROP_B)]
+
+
+def test_missing_component_gives_missing_months_never_zero():
+    """A component whose carbon is missing makes its harvest month missing;
+    an undated harvest makes every month it may fall in missing. Never zero."""
+    rootless = run(parameters=catalogue(**{f"root_mass_at_harvest.{CROP_A}": None}))
+    below = monthly(rootless, f"{CROP_A}_belowground")
+    for entry in entries(rootless, "c1"):
+        item = month_of(below, entry.harvest.date.year, entry.harvest.date.month)
+        assert item.value is None and item.missing.reason == "MISSING_INPUT"
+        assert "root_carbon of component 'c1'" in item.missing.detail
+    # The aboveground series of the same crop does not need the roots.
+    above = monthly(rootless, f"{CROP_A}_aboveground")
+    assert all(item.value is not None for item in above.months)
+
+    undated = calendar_data()
+    undated["components"][0]["end"] = date_value(None)
+    ledger = run(calendar=undated)
+    found = monthly(ledger, f"{CROP_A}_aboveground")
+    missing = [m for m in found.months if m.value is None]
+    assert missing
+    for item in missing:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert "harvest date of component 'c1'" in item.missing.detail
+    assert not [m for m in missing if m.value == 0.0]
+    # Crop B, harvested on its dates, is computed in every month.
+    assert all(
+        m.value is not None for m in monthly(ledger, f"{CROP_B}_aboveground").months
+    )
+
+
+def test_monthly_sum_equals_the_annual_series():
+    """For each origin and agricultural year, the sum of the twelve months
+    equals the sum of the annual series of that origin in that year (D221)."""
+    for ledger in (
+        run(),
+        run(parameters=catalogue(**{f"root_mass_at_harvest.{CROP_A}": None})),
+    ):
+        checked = 0
+        for found in ledger.monthly_carbon_inputs:
+            annual = [
+                s for s in ledger.annual_carbon_inputs if s.origin == found.origin
+            ]
+            assert annual
+            for year in YEARS:
+                months = found.months[
+                    (year - YEARS[0]) * 12 : (year - YEARS[0] + 1) * 12
+                ]
+                assert (months[0].year, months[0].month) == (year, START_MONTH)
+                values = [
+                    item.value
+                    for series_ in annual
+                    for item in series_.years
+                    if item.ag_year == year
+                ]
+                if any(v is None for v in values):
+                    # A missing annual value has at least one missing month.
+                    assert any(m.value is None for m in months)
+                    continue
+                assert all(m.value is not None for m in months)
+                assert sum(m.value for m in months) == pytest.approx(
+                    sum(values), rel=1e-12
+                )
+                checked += 1
+        assert checked
+
+
 def test_series_are_in_tonnes_hand_checked():
     """D147, checked by hand on one PLACEHOLDER number.
 
