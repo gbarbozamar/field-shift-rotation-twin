@@ -13,7 +13,12 @@ chains the four internal parts of the water engine (decision D44):
 4. the one-layer daily balance of ``engine/water/balance/``.
 
 Every constant and parameter of those parts is read from ``parameters`` by
-its ``id`` and ``scope`` (``engine/water/_parameters.py``). The daily chain is
+its ``id`` and ``scope`` (``engine/water/_parameters.py``). Unit
+``l1/water-ep3-identifiers`` (issue #191) reads every parameter of the
+drafted water records: the basal crop coefficient by crop and stage, the
+maximum root depth, the layer of the total evaporable water (D77, D78) and
+the bounds of D82 (PC-4). The calendar carries no growth stage, so a day with
+a crop has no basal coefficient and no root depth (D79). The daily chain is
 then reduced to one ``WaterDeficitExposure`` per agricultural year of the
 record (D47). The definition of the indicator is incomplete (convention
 C1.4), so no year carries a number: a year whose daily balance was computed
@@ -51,8 +56,10 @@ from contracts.results.models import (
 )
 from engine.water import balance, evaporation
 from engine.water._parameters import Catalogue, Scope, check_parameters
-from engine.water.et0 import Et0Constants, PointUnits
-from engine.water.et0 import reference_evapotranspiration_from_climate as et0_days
+from engine.water.et0 import Et0Bounds, Et0Constants, PointUnits
+from engine.water.et0 import (
+    reference_evapotranspiration_from_climate_with_bounds as et0_days,
+)
 from engine.water.et0.quantities import (
     ACCEPTED_UNITS,
     CLIMATE_QUANTITIES,
@@ -116,6 +123,20 @@ ET0_PARAMETERS: dict[str, tuple[str, ...]] = {
     for group in (item.name for item in fields(Et0Constants))
 }
 
+# The two bounds of decision D82 (PC-4) the reference evapotranspiration
+# applies, by the field of Et0Bounds and of its class. The identifiers are
+# those of the drafted records (PROPOSED there), not the ones et0 README OPEN
+# 19 proposes (`relative_shortwave_bound_upper_bound`,
+# `wind_speed_bound_lower_bound`): the drafts name each bound after the
+# equation it belongs to.
+_BOUND_GROUPS: dict[str, type] = get_type_hints(Et0Bounds)
+ET0_BOUND_PARAMETERS: dict[str, dict[str, str]] = {
+    "relative_shortwave_bound": {
+        "upper_bound": "net_longwave_relative_shortwave_maximum"
+    },
+    "wind_speed_bound": {"lower_bound": "penman_monteith_minimum_wind_speed"},
+}
+
 # The runoff: the field names of CurveNumberConstants, as its README table.
 RUNOFF_PARAMETERS: tuple[str, ...] = tuple(
     item.name for item in fields(CurveNumberConstants)
@@ -126,13 +147,31 @@ RUNOFF_PARAMETERS: tuple[str, ...] = tuple(
 # and the field, as its README table, and the two constants of the cover
 # fraction. The minimum relative humidity is read as a parameter of the site
 # because no daily series carries it (OPEN in EXPOSURE.md).
+#
+# The total evaporable water is not read: it is computed from the surface
+# layer by ``evaporation.total_evaporable_water`` (FAO-56 chapter 7, D77), so
+# it is left out of the constants read by name.
+TOTAL_EVAPORABLE_WATER = "total_evaporable_water"
 SURFACE_LAYER_PARAMETERS: tuple[str, ...] = tuple(
     name
     for name, parameter in inspect.signature(
         evaporation.run_surface_layer
     ).parameters.items()
     if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    and name != TOTAL_EVAPORABLE_WATER
 )
+# The operands of the total evaporable water, by the argument of
+# ``evaporation.total_evaporable_water`` each is passed as. The depth of the
+# layer and the two constants carry the identifiers of the drafted records
+# (D77); the two water contents of the layer are new identifiers (no record
+# is drafted for them; the soil's hydraulic profile of D77 would give them).
+TOTAL_EVAPORABLE_WATER_PARAMETERS: dict[str, str] = {
+    "field_capacity_water_content": "field_capacity_water_content",
+    "wilting_point_water_content": "wilting_point_water_content",
+    "surface_layer_depth": "evaporation_layer_depth",
+    "wilting_point_weight": "total_evaporable_water_wilting_point_weight",
+    "unit_factor": "total_evaporable_water_unit_factor",
+}
 UPPER_LIMIT_FIELDS: tuple[str, ...] = tuple(
     item.name for item in fields(evaporation.UpperLimitClimateConstants)
 )
@@ -146,21 +185,31 @@ COLUMN_CAPACITY = "column_capacity"
 COLUMN_DEPTH = "column_depth"
 INITIAL_STORAGE = "initial_storage"
 
-# Per crop, and per day with no crop.
+# Per crop and growth stage, and per day with no crop: the basal crop
+# coefficient of FAO-56 Table 17, one value per stage (D78). The stage words
+# are those of the drafted records (PROPOSED; the words allowed under the
+# scope key `stage` are question 4 of params/README.md, OPEN).
 BASAL_CROP_COEFFICIENT = "basal_crop_coefficient"
+STAGE_KEY = "stage"
+STAGES: tuple[str, ...] = ("initial", "mid", "end")
+# Per crop, and per day with no crop.
 CROP_HEIGHT = "crop_height"
 COVER_FRACTION_EXPONENT = "cover_fraction_exponent"
 CURVE_NUMBER = "curve_number"
-# Per crop only: the crop of a balance day (CropDay).
-ROOT_DEPTH = "root_depth"
+# Per crop only: the crop of a balance day (CropDay). The maximum root depth
+# is read but not used as the root depth of a day: the growth of the root
+# zone (FAO-56 Annex 8, D78) needs the stage dates (OPEN 4).
+ROOT_DEPTH = "maximum_root_depth"
 READILY_AVAILABLE_FRACTION = "readily_available_fraction"
 
 # Every parameter the chain reads, by the scope it is looked up with; the
 # table "Parameters" of EXPOSURE.md lists the same, and a test checks it.
 SITE_PARAMETERS: tuple[str, ...] = (
     *(f"{group}_{name}" for group, names in ET0_PARAMETERS.items() for name in names),
+    *(name for names in ET0_BOUND_PARAMETERS.values() for name in names.values()),
     *RUNOFF_PARAMETERS,
     *SURFACE_LAYER_PARAMETERS,
+    *TOTAL_EVAPORABLE_WATER_PARAMETERS.values(),
     *(f"{UPPER_LIMIT_PREFIX}{name}" for name in UPPER_LIMIT_FIELDS),
     MINIMUM_CROP_COEFFICIENT,
     MINIMUM_RELATIVE_HUMIDITY,
@@ -168,9 +217,11 @@ SITE_PARAMETERS: tuple[str, ...] = (
     COLUMN_DEPTH,
     INITIAL_STORAGE,
 )
+# Looked up with the crop of the day and each stage of STAGES, or with
+# NO_CROP on a day with no crop.
+STAGE_PARAMETERS: tuple[str, ...] = (BASAL_CROP_COEFFICIENT,)
 # Looked up with the crop of the day, or with NO_CROP on a day with no crop.
 DAY_PARAMETERS: tuple[str, ...] = (
-    BASAL_CROP_COEFFICIENT,
     CROP_HEIGHT,
     COVER_FRACTION_EXPONENT,
     CURVE_NUMBER,
@@ -218,6 +269,13 @@ CROP_UNKNOWN = (
 CROP_DATES_MISSING = (
     "the crop of the day is not known: a component of the calendar has a "
     "missing date, so the days it covers are not known"
+)
+STAGE_UNKNOWN = (
+    "the growth stage of the day is not known: the calendar carries no growth "
+    "stage, so neither the basal crop coefficient of the day (one value per "
+    "stage, FAO-56 Table 17, decision D78 of issue #77) nor its root depth (the "
+    "root growth of FAO-56 Annex 8, D78) can be taken, and missing stages stay "
+    "missing (decision D79 of issue #77, OPEN 4)"
 )
 CROPS_OVERLAP = (
     "two components of the calendar cover the day, and the water chain takes "
@@ -397,6 +455,40 @@ def _crop_of_day(
     return crop
 
 
+@dataclass(frozen=True)
+class Growth:
+    """The growth stage of a day with a crop and the root depth of that day.
+
+    ``stage`` is one of the stage words of STAGES, the scope word under which
+    the basal crop coefficient of the day is read; ``root_depth`` is the root
+    depth of the balance on that day.
+    """
+
+    stage: str
+    root_depth: float
+
+
+def _growth_of_day(
+    calendar: RotationCalendar,
+) -> Callable[[dt.date, str], Growth | Missing]:
+    """The growth stage and root depth of a day with a crop, or why they are not known.
+
+    D78 gives the basal crop coefficient one value per growth stage (FAO-56
+    Table 17) and the root depth a crop-specific growth (FAO-56 Annex 8);
+    both need the dates of the stages. The calendar carries no growth stage
+    and no part builds the growth of the root zone, so on every day with a
+    crop both are missing (D79, OPEN 4). The unit that brings the stage
+    dates replaces this function and nothing else; a test replaces it with
+    synthetic stages to check the balance on days with transpiration.
+    PROPOSED.
+    """
+
+    def growth(day: dt.date, crop: str) -> Growth | Missing:
+        return Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
+
+    return growth
+
+
 # --- the daily chain -----------------------------------------------------------
 
 
@@ -492,6 +584,35 @@ def _site(catalogue: Catalogue, parameter_id: str, day: dt.date) -> float | Miss
     return catalogue.value(parameter_id, SITE, day)
 
 
+def _total_evaporable_water(
+    catalogue: Catalogue, notes: _Notes, start: dt.date
+) -> float | Missing:
+    """The total evaporable water of the surface layer, computed from its operands.
+
+    The operands are read from the catalogue (TOTAL_EVAPORABLE_WATER_PARAMETERS)
+    and passed to ``evaporation.total_evaporable_water``. A missing operand is
+    named by the catalogue. A value the part does not compute (below zero, not
+    finite) or refuses (a negative operand) is ``NOT_COMPUTABLE`` and is noted,
+    because no parameter names it. PROPOSED.
+    """
+    operands = {
+        argument: _site(catalogue, parameter_id, start)
+        for argument, parameter_id in TOTAL_EVAPORABLE_WATER_PARAMETERS.items()
+    }
+    what = "the total evaporable water"
+    try:
+        value = evaporation.total_evaporable_water(**operands)
+    except ValueError as error:
+        value = Missing(
+            reason="NOT_COMPUTABLE", detail=f"{what} refuses a value: {error}"
+        )
+    if isinstance(value, Missing) and value.reason == "NOT_COMPUTABLE":
+        notes.note(
+            Missing(reason=value.reason, detail=f"{what}: {value.detail}"), start
+        )
+    return value
+
+
 def _run_chain(
     calendar: RotationCalendar,
     climate: SiteClimate,
@@ -514,12 +635,24 @@ def _run_chain(
             for group, names in ET0_PARAMETERS.items()
         }
     )
+    et0_bounds = Et0Bounds(
+        **{
+            group: _BOUND_GROUPS[group](
+                **{
+                    field: _site(catalogue, parameter_id, start)
+                    for field, parameter_id in names.items()
+                }
+            )
+            for group, names in ET0_BOUND_PARAMETERS.items()
+        }
+    )
     et0_by_day = {
         item.date: item.value
         for item in et0_days(
             climate,
             point_units=POINT_UNITS,
             constants=et0_constants,
+            bounds=et0_bounds,
             unit_guard_reason=_UNIT_GUARD_REASON,
         )
     }
@@ -533,6 +666,9 @@ def _run_chain(
         for name in SURFACE_LAYER_PARAMETERS
         if name != INITIAL_DEPLETION
     }
+    surface_constants[TOTAL_EVAPORABLE_WATER] = _total_evaporable_water(
+        catalogue, notes, start
+    )
     upper_limit_constants = evaporation.UpperLimitClimateConstants(
         **{
             name: _site(catalogue, f"{UPPER_LIMIT_PREFIX}{name}", start)
@@ -553,6 +689,7 @@ def _run_chain(
     precipitation_values = _series_values(precipitation_series)
     wind_values = _series_values(by_quantity.get(WIND_SPEED_2M))
     crop_of = _crop_of_day(calendar)
+    growth_of = _growth_of_day(calendar)
 
     chain: list[ChainDay] = []
     for day in days:
@@ -574,32 +711,47 @@ def _run_chain(
             kcb = height = exponent = curve_number = crop_day = crop
         else:
             scope: Scope = NO_CROP if crop is None else ((CROP_KEY, crop),)
-            kcb = catalogue.value(BASAL_CROP_COEFFICIENT, scope, day)
             height = catalogue.value(CROP_HEIGHT, scope, day)
             exponent = catalogue.value(COVER_FRACTION_EXPONENT, scope, day)
             curve_number = catalogue.value(CURVE_NUMBER, scope, day)
             if crop is None:
+                kcb = catalogue.value(BASAL_CROP_COEFFICIENT, scope, day)
                 crop_day = None
             else:
-                root_depth = catalogue.value(ROOT_DEPTH, scope, day)
+                # Every record of the crop is read, so that one that is
+                # missing is named (D56).
+                for stage in STAGES:
+                    catalogue.value(
+                        BASAL_CROP_COEFFICIENT, (*scope, (STAGE_KEY, stage)), day
+                    )
+                catalogue.value(ROOT_DEPTH, scope, day)
                 fraction = catalogue.value(READILY_AVAILABLE_FRACTION, scope, day)
-                absent = [
-                    item
-                    for item in (kcb, root_depth, fraction)
-                    if isinstance(item, Missing)
-                ]
-                crop_day = (
-                    Missing(
-                        reason="MISSING_INPUT",
-                        detail="; ".join(item.detail for item in absent),
+                growth = growth_of(day, crop)
+                if isinstance(growth, Missing):
+                    # Today on every day with a crop (D79, OPEN 4).
+                    notes.note(growth, day)
+                    kcb = crop_day = growth
+                else:
+                    kcb = catalogue.value(
+                        BASAL_CROP_COEFFICIENT,
+                        (*scope, (STAGE_KEY, growth.stage)),
+                        day,
                     )
-                    if absent
-                    else balance.CropDay(
-                        transpiration_coefficient=kcb,
-                        root_depth=root_depth,
-                        readily_available_fraction=fraction,
+                    absent = [
+                        item for item in (kcb, fraction) if isinstance(item, Missing)
+                    ]
+                    crop_day = (
+                        Missing(
+                            reason="MISSING_INPUT",
+                            detail="; ".join(item.detail for item in absent),
+                        )
+                        if absent
+                        else balance.CropDay(
+                            transpiration_coefficient=kcb,
+                            root_depth=growth.root_depth,
+                            readily_available_fraction=fraction,
+                        )
                     )
-                )
 
         # 2. Runoff by the Curve Number.
         runoff = runoff_day(

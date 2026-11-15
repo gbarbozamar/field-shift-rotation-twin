@@ -1,4 +1,5 @@
-"""Acceptance test of unit l1/water-ep3-parameters (issue #153).
+"""Acceptance test of units l1/water-ep3-parameters (issue #153) and
+l1/water-ep3-identifiers (issue #191).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases"; a test checks that the two lists
@@ -95,12 +96,21 @@ PLACEHOLDER_SITE = {
     # Zero, structurally: the pressure does not depend on the elevation, so
     # the bracket of its form stays above zero at any elevation.
     "atmospheric_pressure_lapse_rate": 0.0,
+    # The two bounds of D82 (PC-4), plainly not their values. With no
+    # longwave term (the Stefan-Boltzmann constant above is zero) the bound of
+    # Rs/Rso changes nothing; the bound of the wind speed lies below every
+    # placeholder wind speed, so it changes nothing either.
+    "net_longwave_relative_shortwave_maximum": 7.77,
+    "penman_monteith_minimum_wind_speed": 0.111,
     "soil_heat_flux_daily_value": 1.11,
     "initial_abstraction_ratio": 0.555,
     "retention_numerator": 2.22,
     "retention_unit_factor": 4.44,
     "initial_depletion": 1.11,
-    "total_evaporable_water": 4.44,
+    # The total evaporable water is computed from these (with a unit factor,
+    # a wilting-point weight and a layer depth of one): 5.55 - 1.11.
+    "field_capacity_water_content": 5.55,
+    "wilting_point_water_content": 1.11,
     "readily_evaporable_water": 2.22,
     "wetted_fraction": 0.777,
     "margin_above_basal": 0.555,
@@ -111,16 +121,146 @@ PLACEHOLDER_SITE = {
     "initial_storage": 11.1,
 }
 PLACEHOLDER_DAY = {
-    "basal_crop_coefficient": {"crop-a": 0.555, "crop-b": 0.777, "no_crop": 0.333},
+    # On a day with a crop the basal crop coefficient is read by crop and
+    # stage (PLACEHOLDER_STAGE); here, the one of a day with no crop.
+    "basal_crop_coefficient": {"no_crop": 0.333},
     "crop_height": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 0.111},
     "cover_fraction_exponent": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 1.11},
     "curve_number": {"crop-a": 1.11, "crop-b": 0.555, "no_crop": 1.11},
 }
 PLACEHOLDER_CROP = {
-    "root_depth": {"crop-a": 1.11, "crop-b": 2.22},
+    "maximum_root_depth": {"crop-a": 1.11, "crop-b": 2.22},
     "readily_available_fraction": {"crop-a": 0.444, "crop-b": 0.888},
 }
+# The value of every record read by crop and growth stage.
+PLACEHOLDER_STAGE = {"initial": 0.444, "mid": 0.555, "end": 0.666}
+# The root depth of a day with a crop in the case with synthetic stages: above
+# zero and not deeper than the column (column_depth).
+PLACEHOLDER_GROWTH_ROOT_DEPTH = 1.11
 CROPS = ("crop-a", "crop-b")
+
+# The water records drafted for the lead developer's check
+# (params_borrador/agua/, outside the repository, issue #191): exactly their
+# id, scope and unit, and none of their values. Three of their unit strings
+# carry the value of the record in a note; that note is left out here, so
+# that no value of a draft is written in this file.
+DRAFTED_RECORDS: tuple[tuple[str, dict[str, str], str], ...] = (
+    ("atmospheric_pressure_exponent", {}, "dimensionless (not printed)"),
+    ("atmospheric_pressure_lapse_rate", {}, "K m-1 (not printed; z in [m])"),
+    (
+        "atmospheric_pressure_reference_temperature",
+        {},
+        "K (the draft's note on this unit carries the value and is left out)",
+    ),
+    (
+        "atmospheric_pressure_sea_level_pressure",
+        {},
+        "kPa (not printed with the value; symbol list: P [kPa])",
+    ),
+    ("basal_crop_coefficient", {"crop": "alfalfa", "stage": "end"}, "dimensionless"),
+    (
+        "basal_crop_coefficient",
+        {"crop": "alfalfa", "stage": "initial"},
+        "dimensionless",
+    ),
+    ("basal_crop_coefficient", {"crop": "alfalfa", "stage": "mid"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "maize", "stage": "end"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "maize", "stage": "initial"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "maize", "stage": "mid"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "soybean", "stage": "end"}, "dimensionless"),
+    (
+        "basal_crop_coefficient",
+        {"crop": "soybean", "stage": "initial"},
+        "dimensionless",
+    ),
+    ("basal_crop_coefficient", {"crop": "soybean", "stage": "mid"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "wheat", "stage": "end"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "wheat", "stage": "initial"}, "dimensionless"),
+    ("basal_crop_coefficient", {"crop": "wheat", "stage": "mid"}, "dimensionless"),
+    ("clear_sky_radiation_base", {}, "dimensionless (not printed)"),
+    ("clear_sky_radiation_elevation_coefficient", {}, "m-1 (not printed; z in [m])"),
+    ("evaporation_layer_depth", {}, "m"),
+    ("extraterrestrial_radiation_solar_constant", {}, "MJ m-2 min-1"),
+    (
+        "extraterrestrial_radiation_time_factor",
+        {},
+        "min day-1 (the draft's note on this unit carries the value and is left out)",
+    ),
+    ("initial_abstraction_ratio", {}, "dimensionless"),
+    ("inverse_relative_distance_amplitude", {}, "dimensionless (not printed)"),
+    ("inverse_relative_distance_days_in_year", {}, "day (not printed)"),
+    ("inverse_relative_distance_offset", {}, "dimensionless (not printed)"),
+    ("margin_above_basal", {}, "dimensionless"),
+    ("maximum_root_depth", {"crop": "alfalfa"}, "m"),
+    ("maximum_root_depth", {"crop": "maize"}, "m"),
+    ("maximum_root_depth", {"crop": "soybean"}, "m"),
+    ("maximum_root_depth", {"crop": "wheat"}, "m"),
+    ("minimum_crop_coefficient", {}, "dimensionless"),
+    ("net_longwave_cloudiness_multiplier", {}, "dimensionless (not printed)"),
+    ("net_longwave_cloudiness_offset", {}, "dimensionless (not printed)"),
+    ("net_longwave_humidity_intercept", {}, "dimensionless (not printed)"),
+    ("net_longwave_humidity_slope", {}, "kPa-0.5 (not printed; ea in [kPa])"),
+    (
+        "net_longwave_kelvin_offset",
+        {},
+        "K (the draft's note on this unit carries the value and is left out)",
+    ),
+    ("net_longwave_relative_shortwave_maximum", {}, "dimensionless (not printed)"),
+    ("net_longwave_stefan_boltzmann", {}, "MJ K-4 m-2 day-1"),
+    ("net_shortwave_albedo", {}, "dimensionless"),
+    ("penman_monteith_denominator_constant", {}, "s m-1 (not printed; u2 in [m s-1])"),
+    ("penman_monteith_kelvin_offset", {}, "K (not printed; T in [°C])"),
+    ("penman_monteith_minimum_wind_speed", {}, "m s-1"),
+    ("penman_monteith_numerator_constant", {}, "not printed"),
+    (
+        "penman_monteith_radiation_factor",
+        {},
+        "mm day-1 per MJ m-2 day-1 (not printed in Eq. 6; Eq. 20 converts [MJ m-2 day-1] to [mm day-1])",
+    ),
+    (
+        "psychrometric_coefficient",
+        {},
+        "kPa-1 x kPa °C-1, as printed: gamma [kPa °C-1] = coefficient x P [kPa]",
+    ),
+    ("readily_available_fraction", {"crop": "alfalfa"}, "dimensionless"),
+    ("readily_available_fraction", {"crop": "maize"}, "dimensionless"),
+    ("readily_available_fraction", {"crop": "soybean"}, "dimensionless"),
+    ("readily_available_fraction", {"crop": "wheat"}, "dimensionless"),
+    ("readily_evaporable_water", {}, "mm"),
+    ("retention_numerator", {}, "dimensionless (CN dimensionless)"),
+    ("retention_offset", {}, "in (S in inches, Eq. 10-12)"),
+    ("retention_unit_factor", {}, "mm in-1"),
+    ("saturation_vapour_pressure_numerator", {}, "dimensionless (not printed)"),
+    ("saturation_vapour_pressure_offset", {}, "°C (not printed; T in [°C])"),
+    (
+        "saturation_vapour_pressure_scale",
+        {},
+        "kPa (not printed with the value; e°(T) in [kPa])",
+    ),
+    ("slope_multiplier", {}, "°C (not printed; Delta in [kPa °C-1])"),
+    ("soil_heat_flux_daily_value", {}, "MJ m-2 day-1"),
+    (
+        "solar_declination_amplitude",
+        {},
+        "rad (not printed with the value; delta in [rad])",
+    ),
+    ("solar_declination_days_in_year", {}, "day (not printed)"),
+    ("solar_declination_phase", {}, "rad (not printed)"),
+    (
+        "total_evaporable_water_unit_factor",
+        {},
+        "mm m-1 (theta in m3 m-3, Ze in m, TEW in mm)",
+    ),
+    ("total_evaporable_water_wilting_point_weight", {}, "dimensionless"),
+    ("upper_limit_base", {}, "dimensionless"),
+    ("upper_limit_height_exponent", {}, "dimensionless"),
+    ("upper_limit_humidity_coefficient", {}, "percent-1 (RHmin in %)"),
+    ("upper_limit_reference_crop_height", {}, "m (h in [m])"),
+    ("upper_limit_reference_minimum_relative_humidity", {}, "percent"),
+    ("upper_limit_reference_wind_speed", {}, "m s-1"),
+    ("upper_limit_wind_coefficient", {}, "s m-1 (u2 in m s-1)"),
+    ("wetted_fraction", {}, "dimensionless"),
+)
 
 
 # --- the catalogue -------------------------------------------------------------
@@ -151,10 +291,24 @@ def crop_word(crop: str) -> str:
     return f"PLACEHOLDER-{crop}"
 
 
-def scope_of(crop: str) -> dict:
-    if crop == "no_crop":
+def scope_of(label: str) -> dict:
+    """The scope of a label: ``no_crop``, a crop, or ``<crop>:<stage>``."""
+    if label == "no_crop":
         return {"management": "no_crop"}
+    crop, _, stage = label.partition(":")
+    if stage:
+        return {"crop": crop_word(crop), "stage": stage}
     return {"crop": crop_word(crop)}
+
+
+def label_of(scope: dict) -> str | None:
+    """The label of a scope of the test catalogue; ``None`` for the empty scope."""
+    if not scope:
+        return None
+    if "management" in scope:
+        return "no_crop"
+    crop = scope["crop"].split("-", 1)[1]
+    return f"{crop}:{scope['stage']}" if "stage" in scope else crop
 
 
 def marked_catalogue() -> dict[str, dict]:
@@ -166,6 +320,16 @@ def marked_catalogue() -> dict[str, dict]:
     for parameter_id, by_crop in (*PLACEHOLDER_DAY.items(), *PLACEHOLDER_CROP.items()):
         for crop, value in by_crop.items():
             records.append(placeholder_record(parameter_id, value, scope_of(crop)))
+    for parameter_id in module.STAGE_PARAMETERS:
+        for crop in CROPS:
+            for stage in module.STAGES:
+                records.append(
+                    placeholder_record(
+                        parameter_id,
+                        PLACEHOLDER_STAGE[stage],
+                        scope_of(f"{crop}:{stage}"),
+                    )
+                )
     return {
         f"PLACEHOLDER_{position}.json": record
         for position, record in enumerate(records)
@@ -186,17 +350,12 @@ def catalogue_with(
 ) -> dict[str, dict]:
     """The catalogue with some records replaced (or removed, ``None``).
 
-    A key is ``(id, crop)``; ``crop`` is ``None`` for a parameter of the site.
+    A key is ``(id, label)``; the label is ``None`` for a parameter of the
+    site, ``no_crop``, a crop, or ``<crop>:<stage>`` (``scope_of``).
     """
     records = marked_catalogue()
     for name, record in list(records.items()):
-        crop = None
-        scope = record["scope"]
-        if scope:
-            crop = (
-                "no_crop" if "management" in scope else scope["crop"].split("-", 1)[1]
-            )
-        key = (record["id"], crop)
+        key = (record["id"], label_of(record["scope"]))
         if key in changes:
             if changes[key] is None:
                 del records[name]
@@ -357,6 +516,19 @@ def chain_calendar() -> RotationCalendar:
     return RotationCalendar.model_validate(chain_calendar_document())
 
 
+def bare_calendar() -> RotationCalendar:
+    """The calendar of ``chain_calendar`` with no component: no day has a crop.
+
+    On a day with a crop the chain has no value, because the growth stage of
+    the day is not known (D79, OPEN 4 of EXPOSURE.md), and the states carried
+    from day to day stay missing after it. The cases that check the chain
+    itself run on this calendar, so that every day is computed.
+    """
+    document = chain_calendar_document()
+    document["components"] = []
+    return RotationCalendar.model_validate(document)
+
+
 def soil() -> SiteSoilSlope:
     return SiteSoilSlope.model_validate(soil_document())
 
@@ -368,7 +540,7 @@ def run(
     parameters: dict | None = None,
 ) -> list[WaterDeficitExposure]:
     return module.compute_water_deficit_exposure(
-        calendar=calendar_ if calendar_ is not None else chain_calendar(),
+        calendar=calendar_ if calendar_ is not None else bare_calendar(),
         climate=climate_ if climate_ is not None else climate(),
         soil_slope=soil_ if soil_ is not None else soil(),
         parameters=parameters if parameters is not None else catalogue(),
@@ -381,7 +553,7 @@ def chain(
     parameters: dict | None = None,
 ) -> list[module.ChainDay]:
     """The daily chain the entry point reduces, over the days it runs on."""
-    calendar_ = calendar_ if calendar_ is not None else chain_calendar()
+    calendar_ = calendar_ if calendar_ is not None else bare_calendar()
     climate_ = climate_ if climate_ is not None else climate()
     by_quantity = {
         series.quantity: series
@@ -507,7 +679,7 @@ def test_the_chain_gives_a_number_every_day_from_each_part():
 def test_daily_balance_closes_its_mass_every_day():
     days = chain()
     capacity = PLACEHOLDER_SITE["column_capacity"]
-    branches = {"drainage": 0, "runoff": 0, "crop": 0, "no_crop": 0}
+    branches = {"drainage": 0, "runoff": 0}
     for day in days:
         b = day.balance
         flows = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
@@ -521,30 +693,104 @@ def test_daily_balance_closes_its_mass_every_day():
         assert 0 <= b.storage_end <= capacity
         branches["drainage"] += b.drainage > 0
         branches["runoff"] += b.runoff > 0
-        branches["crop" if is_number(b.stress_coefficient) else "no_crop"] += 1
+        assert b.transpiration == 0  # no day of the calendar has a crop
     assert all(count > 0 for count in branches.values()), branches
+
+
+def synthetic_stage(day: dt.date) -> str:
+    """A growth stage given directly by the test, in turn day after day."""
+    return module.STAGES[day.toordinal() % len(module.STAGES)]
+
+
+def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_synthetic_stages(
+    monkeypatch,
+):
+    # The calendar contract carries no growth stage, so the stages and the
+    # root depth of each day with a crop are given by replacing the one
+    # function of EP3 that would read them (_growth_of_day). Synthetic: they
+    # come from no phenology and no root-growth curve.
+    def synthetic_growth(calendar_):
+        return lambda day, crop: module.Growth(
+            stage=synthetic_stage(day), root_depth=PLACEHOLDER_GROWTH_ROOT_DEPTH
+        )
+
+    monkeypatch.setattr(module, "_growth_of_day", synthetic_growth)
+    calendar_ = chain_calendar()
+    components = [
+        (component.start.date, component.end.date) for component in calendar_.components
+    ]
+    days = chain(calendar_)
+    capacity = PLACEHOLDER_SITE["column_capacity"]
+    with_transpiration = 0
+    for day in days:
+        b = day.balance
+        flows = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
+        assert all(is_number(flow) and flow >= 0 for flow in flows)
+        change = b.storage_end - b.storage_start
+        balance = (
+            b.precipitation - b.runoff - b.evaporation - b.transpiration - b.drainage
+        )
+        scale = max(abs(term) for term in (b.storage_start, b.storage_end, *flows))
+        assert abs(change - balance) <= 64 * sys.float_info.epsilon * max(scale, 1.0)
+        assert 0 <= b.storage_end <= capacity
+        if any(start <= day.date <= end for start, end in components):
+            # The basal coefficient of the stage given for the day.
+            kcb = PLACEHOLDER_STAGE[synthetic_stage(day.date)]
+            assert b.transpiration_demanded == pytest.approx(
+                kcb * day.reference_evapotranspiration
+            )
+            assert is_number(b.stress_coefficient)
+            with_transpiration += b.transpiration > 0
+        else:
+            assert b.transpiration == 0
+    assert with_transpiration > 0
+    # Every year is computed, so it is missing only for the definition (D61).
+    result = run(calendar_=calendar_)
+    assert_loads(result)
+    for item in result:
+        assert_definition_incomplete(item)
 
 
 def test_crop_of_each_day_follows_the_calendar():
     calendar_ = chain_calendar()
     components = [
-        (component.start.date, component.end.date, component.crop_id.split("-", 1)[1])
-        for component in calendar_.components
+        (component.start.date, component.end.date) for component in calendar_.components
     ]
-    for day in chain(calendar_):
-        crops = [crop for start, end, crop in components if start <= day.date <= end]
+    first_crop_day = min(start for start, _ in components)
+    days = chain(calendar_)
+    assert days[0].date < first_crop_day
+    for day in days:
+        covered = any(start <= day.date <= end for start, end in components)
         b = day.balance
-        if crops:
-            (crop,) = crops
-            kcb = PLACEHOLDER_DAY["basal_crop_coefficient"][crop]
-            assert b.transpiration_demanded == pytest.approx(
-                kcb * day.reference_evapotranspiration
-            )
-            assert is_number(b.stress_coefficient)
-        else:
+        if day.date < first_crop_day:
+            # A day with no crop: computed, with no transpiration.
+            assert not covered
+            assert is_number(b.storage_end)
             assert b.transpiration == 0
             assert isinstance(b.transpiration_demanded, Missing)
             assert b.transpiration_demanded.reason == "NOT_APPLICABLE"
+        elif day.date == first_crop_day:
+            # The basal coefficient and the crop of the balance are missing,
+            # because the stage of the day is not known (D79).
+            assert isinstance(b.storage_end, Missing)
+            assert b.storage_end.reason == "MISSING_INPUT"
+            assert "crop (MISSING_INPUT)" in b.storage_end.detail
+            ke = day.surface_layer.evaporation_coefficient
+            assert isinstance(ke, Missing)
+            assert "basal_crop_coefficient (MISSING_INPUT)" in ke.detail
+        else:
+            # The storage carried from that day stays missing (no reset).
+            assert isinstance(b.storage_start, Missing)
+            assert "missing since" in b.storage_start.detail
+    result = run(calendar_=calendar_)
+    assert_loads(result)
+    for item in result:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert f"chain MISSING_INPUT: {module.STAGE_UNKNOWN}" in items_of(
+            item.missing.detail
+        )
+        assert "D79" in item.missing.detail
+    assert f"the first on {first_crop_day.isoformat()}" in result[0].missing.detail
 
 
 def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by_id_and_scope():
@@ -561,7 +807,7 @@ def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by
         for parameter_id in module.SITE_PARAMETERS:
             assert f"'{parameter_id}'" in site
         no_crop = no_record_item(detail, NO_CROP_SCOPE)
-        for parameter_id in module.DAY_PARAMETERS:
+        for parameter_id in (*module.DAY_PARAMETERS, *module.STAGE_PARAMETERS):
             assert f"'{parameter_id}'" in no_crop
         for parameter_id in module.CROP_PARAMETERS:
             assert f"'{parameter_id}'" not in no_crop
@@ -569,14 +815,24 @@ def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by
         for component in calendar_.components:
             scope = json.dumps({"crop": component.crop_id})
             named = no_record_item(detail, scope)
+            by_stage = [
+                no_record_item(
+                    detail, json.dumps({"crop": component.crop_id, "stage": stage})
+                )
+                for stage in module.STAGES
+            ]
             if component.start.date <= last:
                 for parameter_id in (*module.DAY_PARAMETERS, *module.CROP_PARAMETERS):
                     assert f"'{parameter_id}'" in named
+                for named_by_stage in by_stage:
+                    for parameter_id in module.STAGE_PARAMETERS:
+                        assert f"'{parameter_id}'" in named_by_stage
             elif not any(
                 other.crop_id == component.crop_id and other.start.date <= last
                 for other in calendar_.components
             ):
                 assert named == ""
+                assert by_stage == [""] * len(module.STAGES)
         assert "C1.4" in detail
 
 
@@ -584,14 +840,29 @@ def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by
     "key",
     [(name, None) for name in module.SITE_PARAMETERS]
     + [(name, crop) for name in module.DAY_PARAMETERS for crop in (*CROPS, "no_crop")]
+    + [(name, "no_crop") for name in module.STAGE_PARAMETERS]
+    + [
+        (name, f"{crop}:{stage}")
+        for name in module.STAGE_PARAMETERS
+        for crop in CROPS
+        for stage in module.STAGES
+    ]
     + [(name, crop) for name in module.CROP_PARAMETERS for crop in CROPS],
 )
 def test_parameter_with_no_record_is_missing_input_naming_it_and_no_other(key):
-    parameter_id, crop = key
-    result = run(parameters=catalogue_with({key: None}))
-    scope = "{}" if crop is None else json.dumps(unmarked(scope_of(crop)))
+    parameter_id, label = key
+    # A parameter of the site or of a day with no crop is checked on the
+    # calendar with no crop, on which every year is computed with the whole
+    # catalogue; a parameter of a crop on the calendar with crops, on which the
+    # years are missing anyway (the stage of a crop day is not known, D79).
+    with_crops = label not in (None, "no_crop")
+    calendar_ = chain_calendar() if with_crops else bare_calendar()
+    result = run(calendar_=calendar_, parameters=catalogue_with({key: None}))
+    scope = "{}" if label is None else json.dumps(unmarked(scope_of(label)))
     missing = [item for item in result if item.missing.reason != "NOT_AVAILABLE"]
     assert missing, "the parameter is needed by some year"
+    if not with_crops:
+        assert missing == result  # removing the record makes every year missing
     for item in missing:
         assert item.missing.reason == "MISSING_INPUT"
         named = no_record_item(item.missing.detail, scope)
@@ -622,7 +893,8 @@ def test_record_with_null_value_is_missing_input_repeating_its_reason():
         assert check_record(record) == []
         parameters = catalogue_with({key: record})
         assert check_catalogue(parameters) == []
-        result = run(parameters=parameters)
+        calendar_ = bare_calendar() if crop is None else chain_calendar()
+        result = run(calendar_=calendar_, parameters=parameters)
         missing = [item for item in result if item.missing.reason != "NOT_AVAILABLE"]
         assert missing
         for item in missing:
@@ -690,14 +962,147 @@ def test_malformed_record_makes_every_parameter_missing_input_naming_it():
 
 
 def test_parameter_outside_what_a_part_accepts_is_not_computable_and_raises_nothing():
-    too_deep = unmarked(placeholder_record("root_depth", 3.0, scope_of("crop-a")))
-    result = run(parameters=catalogue_with({("root_depth", "crop-a"): too_deep}))
+    # An initial storage above the capacity of the column (both PLACEHOLDER).
+    too_full = unmarked(placeholder_record("initial_storage", 33.3, {}))
+    result = run(parameters=catalogue_with({("initial_storage", None): too_full}))
     assert_loads(result)
     assert result[0].missing.reason == "NOT_COMPUTABLE"
     assert "the daily balance refuses a value" in result[0].missing.detail
-    assert "root_depth" in result[0].missing.detail
+    assert "capacity" in result[0].missing.detail
     for item in result:
         assert item.missing.reason in ("NOT_COMPUTABLE", "MISSING_INPUT")
+
+
+# --- the cases of #191: the drafted water records ------------------------------
+
+DRAFTED_CROPS = tuple(
+    sorted({scope["crop"] for _, scope, _ in DRAFTED_RECORDS if "crop" in scope})
+)
+
+
+def drafted_key(parameter_id: str, scope: dict) -> tuple[str, str]:
+    """A record by its id and its scope as JSON text with sorted keys."""
+    return (parameter_id, json.dumps(scope, sort_keys=True))
+
+
+def drafted_calendar() -> RotationCalendar:
+    """The calendar of ``chain_calendar``, one component per crop of the drafts."""
+    document = chain_calendar_document()
+    assert len(document["components"]) == len(DRAFTED_CROPS)
+    for component, crop in zip(document["components"], DRAFTED_CROPS, strict=True):
+        component["crop_id"] = crop
+    return RotationCalendar.model_validate(document)
+
+
+def read_by_ep3(crops: tuple[str, ...]) -> set[tuple[str, str]]:
+    """Every (id, scope) EP3 reads for a calendar with these crops and days with none."""
+    no_crop = scope_of("no_crop")
+    read = {drafted_key(name, {}) for name in module.SITE_PARAMETERS}
+    read |= {
+        drafted_key(name, scope)
+        for name in module.DAY_PARAMETERS
+        for scope in [*({"crop": crop} for crop in crops), no_crop]
+    }
+    read |= {
+        drafted_key(name, scope)
+        for name in module.STAGE_PARAMETERS
+        for scope in [
+            *(
+                {"crop": crop, "stage": stage}
+                for crop in crops
+                for stage in module.STAGES
+            ),
+            no_crop,
+        ]
+    }
+    read |= {
+        drafted_key(name, {"crop": crop})
+        for name in module.CROP_PARAMETERS
+        for crop in crops
+    }
+    return read
+
+
+def drafted_catalogue(leave_out: tuple[str, str] | None = None) -> dict[str, dict]:
+    """The drafted records with PLACEHOLDER values, and the others EP3 reads.
+
+    Each drafted record has its id, scope and unit; its value is a value of
+    the test catalogue (PLACEHOLDER), never a value of a draft. The records
+    EP3 reads that are not drafted are added with the values of the test
+    catalogue. ``leave_out`` removes one drafted record.
+    """
+    drafted = {drafted_key(i, scope) for i, scope, _ in DRAFTED_RECORDS}
+    records = []
+    for parameter_id, scope, unit in DRAFTED_RECORDS:
+        if drafted_key(parameter_id, scope) == leave_out:
+            continue
+        value = PLACEHOLDER_SITE.get(parameter_id, 1.0) if not scope else 0.555
+        record = placeholder_record(parameter_id, value, scope)
+        record["unit"] = unit
+        records.append(record)
+    for parameter_id, scope_text in sorted(read_by_ep3(DRAFTED_CROPS) - drafted):
+        scope = json.loads(scope_text)
+        if not scope:
+            value = PLACEHOLDER_SITE.get(parameter_id, 1.0)
+        elif "management" in scope:
+            value = PLACEHOLDER_DAY[parameter_id]["no_crop"]
+        else:
+            value = 1.11
+        records.append(placeholder_record(parameter_id, value, scope))
+    return unmarked(
+        {f"PLACEHOLDER_{position}.json": item for position, item in enumerate(records)}
+    )
+
+
+def test_drafted_records_pass_check_catalogue_and_ep3_reads_every_one(monkeypatch):
+    drafted = {drafted_key(i, scope): unit for i, scope, unit in DRAFTED_RECORDS}
+    assert len(drafted) == len(DRAFTED_RECORDS)  # no id and scope twice
+    # Every drafted id and scope is one EP3 reads.
+    assert set(drafted) <= read_by_ep3(DRAFTED_CROPS)
+    parameters = drafted_catalogue()
+    assert check_catalogue(parameters) == []
+    units = {
+        drafted_key(record["id"], record["scope"]): record["unit"]
+        for record in parameters.values()
+    }
+    assert {key: units[key] for key in drafted} == drafted
+    # EP3 looks every one of them up, with this catalogue and calendar.
+    looked_up: set[tuple[str, str]] = set()
+
+    class Recording(_parameters.Catalogue):
+        def value(self, parameter_id, scope, day):
+            looked_up.add(drafted_key(parameter_id, dict(scope)))
+            return super().value(parameter_id, scope, day)
+
+    monkeypatch.setattr(module, "Catalogue", Recording)
+    result = run(calendar_=drafted_calendar(), parameters=parameters)
+    assert_loads(result)
+    assert looked_up == read_by_ep3(DRAFTED_CROPS)
+    for item in result:
+        assert "parameters with no record" not in item.missing.detail
+
+
+@pytest.mark.parametrize(
+    "drafted",
+    [(i, scope) for i, scope, _ in DRAFTED_RECORDS],
+    ids=[f"{i}{json.dumps(scope, sort_keys=True)}" for i, scope, _ in DRAFTED_RECORDS],
+)
+def test_drafted_record_removed_makes_the_result_missing_naming_it(drafted):
+    parameter_id, scope = drafted
+    key = drafted_key(parameter_id, scope)
+    result = run(calendar_=drafted_calendar(), parameters=drafted_catalogue(key))
+    assert_loads(result)
+    naming = [
+        item
+        for item in result
+        if no_record_item(item.missing.detail, key[1]).endswith(f"'{parameter_id}'")
+    ]
+    assert naming, "a year names the record"
+    first = result.index(naming[0])
+    assert result[first:] == naming  # every later year names it too
+    for item in naming:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert item.missing.detail.count("parameters with no record") == 1
 
 
 # --- the cases of #135, with the catalogue ------------------------------------
@@ -1158,7 +1563,12 @@ def test_package_exposes_the_entry_point_with_parameters_by_keyword_and_no_defau
 
 
 def test_parameter_identifiers_are_well_formed_and_unique():
-    names = [*module.SITE_PARAMETERS, *module.DAY_PARAMETERS, *module.CROP_PARAMETERS]
+    names = [
+        *module.SITE_PARAMETERS,
+        *module.STAGE_PARAMETERS,
+        *module.DAY_PARAMETERS,
+        *module.CROP_PARAMETERS,
+    ]
     assert len(names) == len(set(names))
     for name in names:
         assert re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name), name
@@ -1190,8 +1600,16 @@ def test_parameter_table_matches_exposure_md():
     by_scope: dict[str, list[str]] = {}
     for name, scope in rows:
         by_scope.setdefault(scope.strip(), []).append(name)
-    assert sorted(by_scope) == ["crop", "crop or no crop", "site"]
+    assert sorted(by_scope) == [
+        "crop",
+        "crop and stage, or no crop",
+        "crop or no crop",
+        "site",
+    ]
     assert sorted(by_scope["site"]) == sorted(module.SITE_PARAMETERS)
+    assert sorted(by_scope["crop and stage, or no crop"]) == sorted(
+        module.STAGE_PARAMETERS
+    )
     assert sorted(by_scope["crop or no crop"]) == sorted(module.DAY_PARAMETERS)
     assert sorted(by_scope["crop"]) == sorted(module.CROP_PARAMETERS)
 
