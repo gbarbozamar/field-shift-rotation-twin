@@ -1,16 +1,27 @@
-"""Acceptance test of the decision functions (unit l2/decision-functions).
+"""Acceptance test of the decision functions (units l2/decision-functions
+#163 and l2/decision-separation #202).
 
 The table below is the one supplied by a person and verified by the lead
 developer on #96 (decisions D59 to D61 of #77); every expected value in
-this file is that supplied one, and none is invented here. The logic
-each group of tests follows is the D entry of ``docs/VALIDATION.md``
-named in its title, as decided by the lead developer on 14 November
-2026.
+this file is that supplied one, or follows from the decisions D74 and
+D85 to D99 of #77 as the person-approved expectations of #202 state
+them, and none is invented here. The logic each group of tests follows
+is the D entry of ``docs/VALIDATION.md`` named in its title, as decided
+by the lead developer on 14 November 2026.
 
 The table is labelled example data throughout; the results contract has
 no field for that label (``ResultsTable`` holds only ``case_id``,
 ``field_id`` and ``rows``), so the label lives in this docstring, and
 the sources of the numbers carry their PLACEHOLDER markers.
+
+The supplied table carries no range on any value (``range_missing``
+NOT_AVAILABLE everywhere), so under D92 no difference of any pair has a
+range: the branches of D92, D93 and D98 that need a range (a computed
+difference range, the classes of a ranged cell, the states "Robust
+preference" and "Not separated: within uncertainty") are implemented in
+``decision/functions.py`` and are not exercised numerically here,
+because no person-supplied table carries ranges and this file invents
+no value, threshold or range (CLAUDE.md, "Rules a session must follow").
 
 Run from the repository root: ``python -m pytest decision/``.
 """
@@ -22,18 +33,24 @@ import pytest
 from contracts.results import models
 from contracts.results.models import Missing, ResultsTable, ResultsTableRow
 from decision.functions import (
-    NOT_RESOLVED,
+    IDENTICAL,
+    NOT_SEPARATED_UNCERTAINTY_MISSING,
     DeclaredLimit,
+    PairCounts,
+    PointSignCounts,
+    RangeClassCounts,
     indicator_ranking,
     limit_counts,
     never_preferred_less,
     paired_difference,
     paired_differences,
+    pair_counts,
     pair_state,
 )
 
-# The numerical tolerance of the paired differences (D2), supplied by
-# the person who designed the case: absolute.
+# The numerical tolerance of the paired differences (D2) and of the
+# "equal" cells of the counts of D87, supplied by the person who
+# designed the case: absolute.
 TOLERANCE = 1e-9
 
 CASE_ID = "example-case"
@@ -143,15 +160,46 @@ def example_table() -> ResultsTable:
     rows = []
     for rotation_id in ROTATIONS:
         for ag_year in (2020, 2021, 2022, 2023):
-            rows.append(soil_row(rotation_id, ag_year, SOIL_VALUES[rotation_id].get(ag_year)))
+            soil = SOIL_VALUES[rotation_id].get(ag_year)
+            rows.append(soil_row(rotation_id, ag_year, soil))
         rows.append(carbon_row(rotation_id, CARBON_VALUES[rotation_id]))
         rows.append(water_row(rotation_id))
     return ResultsTable(case_id=CASE_ID, field_id=FIELD_ID, rows=rows)
 
 
+def water_only_table() -> ResultsTable:
+    """The water rows of the supplied table alone (a subset of it: no value
+    is added, changed or invented)."""
+    return ResultsTable(
+        case_id=CASE_ID,
+        field_id=FIELD_ID,
+        rows=[water_row(rotation_id) for rotation_id in ROTATIONS],
+    )
+
+
 def by_cell(differences) -> dict[tuple, object]:
     """The paired differences of one pair, by indicator and agricultural year."""
     return {(item.indicator, item.ag_year): item for item in differences}
+
+
+def by_cell_of_pair(
+    table: ResultsTable, first_rotation: str, second_rotation: str
+) -> dict[tuple, PairCounts]:
+    """The counts of one pair, by scenario and indicator (the tolerance is
+    the one the designer of the case set)."""
+    return {
+        (item.scenario_id, item.indicator): item
+        for item in pair_counts(
+            table, first_rotation, second_rotation, equal_tolerance=TOLERANCE
+        )
+    }
+
+
+def soil_count_key(rotation_id: str) -> tuple[str, str, str, None, None]:
+    """The key of the soil-loss counts: soil loss names no carbon model and
+    no computation (D94 keys the counts by rotation, scenario, indicator,
+    carbon model and computation)."""
+    return (rotation_id, SCENARIO_ID, "soil_loss", None, None)
 
 
 def row_of(
@@ -210,42 +258,61 @@ def test_d1_counts_by_year_against_the_declared_limit(
         table, LIMITS, equal_to_limit_counts_as_within=equal_is_within
     )
 
+    # One count per rotation, scenario, indicator, carbon model and
+    # computation (D94); the scenario of this table is s1 only, and soil
+    # loss names no carbon model and no computation.
+    assert set(counts) == {soil_count_key(rotation_id) for rotation_id in ROTATIONS}
+
     # A soil loss: three years evaluated (2023 is missing), one within on
     # the inclusive setting (2021 = 7.0 exactly), none on the exclusive one.
-    a_soil = counts[("A", "soil_loss")]
+    a_soil = counts[soil_count_key("A")]
     assert a_soil.evaluated == 3
     assert a_soil.within == a_soil_within
+    assert a_soil.outside == a_soil.evaluated - a_soil.within
     # B soil loss: four years evaluated; 2022 = 7.0 exactly is the argument.
-    b_soil = counts[("B", "soil_loss")]
+    b_soil = counts[soil_count_key("B")]
     assert b_soil.evaluated == 4
     assert b_soil.within == b_soil_within
     # C holds the same rows as B and gives the same counts.
-    c_soil = counts[("C", "soil_loss")]
+    c_soil = counts[soil_count_key("C")]
     assert (c_soil.evaluated, c_soil.within) == (b_soil.evaluated, b_soil.within)
 
-    # The carbon trend: one value per rotation, against >= -0.1, where no
-    # value equals the limit, so both settings agree.
-    for rotation_id in ROTATIONS:
-        carbon = counts[(rotation_id, "soil_carbon_trend")]
-        assert carbon.evaluated == 1
-        assert carbon.within == (0 if rotation_id == "A" else 1)
 
-    # Water has no declared limit and no value at all: nothing is judged,
-    # nothing counts as within or outside (D60 of #77).
+def test_d1_an_indicator_on_another_time_basis_gets_no_count_of_years():
+    # D95: years are counted only over rows whose time basis is ag_year.
+    # The soil-carbon trend is one value per rotation and the water ratio
+    # here is per rotation: neither has a count of years, and the limit
+    # declared for the carbon trend is not used in the counts.
+    counts = limit_counts(
+        example_table(), LIMITS, equal_to_limit_counts_as_within=True
+    )
+    assert all(key[2] != "soil_carbon_trend" for key in counts)
+    assert all(key[2] != "water_deficit_exposure" for key in counts)
+
+
+def test_d1_without_a_declared_limit_no_row_is_evaluated():
+    # D60: without a declared limit nothing is judged. No row is
+    # evaluated, the years within the limit are null, and a row without a
+    # value keeps its reason in not_evaluated: a value never counts as
+    # within or outside, and never as zero.
+    counts = limit_counts(example_table(), {}, equal_to_limit_counts_as_within=True)
     for rotation_id in ROTATIONS:
-        water = counts[(rotation_id, "water_deficit_exposure")]
-        assert water.limit is None
-        assert water.evaluated == 0
-        assert water.within == 0
-        assert water.outside == 0
-        assert [entry.missing.reason for entry in water.not_evaluated] == [
-            "NOT_AVAILABLE"
-        ]
+        count = counts[soil_count_key(rotation_id)]
+        assert count.limit is None
+        assert count.evaluated == 0
+        assert count.within is None
+        assert count.outside is None
+    a_not_evaluated = counts[soil_count_key("A")].not_evaluated
+    assert [(entry.ag_year, entry.missing.reason) for entry in a_not_evaluated] == [
+        (2023, "NO_COVERAGE")
+    ]
+    for rotation_id in ("B", "C"):
+        assert counts[soil_count_key(rotation_id)].not_evaluated == ()
 
 
 def test_d1_a_missing_year_is_not_evaluated_with_its_reason():
     counts = limit_counts(example_table(), LIMITS, equal_to_limit_counts_as_within=True)
-    not_evaluated = counts[("A", "soil_loss")].not_evaluated
+    not_evaluated = counts[soil_count_key("A")].not_evaluated
     assert len(not_evaluated) == 1
     entry = not_evaluated[0]
     assert entry.ag_year == 2023
@@ -321,6 +388,18 @@ def test_d2_rows_of_a_pair_with_different_units_are_refused():
         paired_difference(annual, monthly)
 
 
+def test_d92_no_difference_of_this_table_has_a_range():
+    """The supplied table carries no range on any value, so under D92 the
+    range of every computed difference is missing with its reason (and the
+    pairs take the state "Not separated: uncertainty missing", entry D7)."""
+    table = example_table()
+    for first, second in (("A", "B"), ("A", "C"), ("B", "C")):
+        for difference in paired_differences(table, first, second):
+            if difference.value is not None:
+                assert difference.range is None
+                assert difference.range_missing.reason == "NOT_AVAILABLE"
+
+
 # --- D5: direction of each indicator and dominance between rotations ------------
 
 
@@ -374,7 +453,7 @@ def test_d6_a_missing_value_never_counts_as_zero_within_best_or_worst():
     # are evaluated, not four, and the paired difference of 2023 is
     # missing, never 6.8 - 0.0.
     counts = limit_counts(table, LIMITS, equal_to_limit_counts_as_within=True)
-    assert counts[("A", "soil_loss")].evaluated == 3
+    assert counts[soil_count_key("A")].evaluated == 3
     differences = by_cell(paired_differences(table, "A", "B"))
     assert differences[("soil_loss", 2023)].value is None
     # A keeps its place among the rotations that hold a value, through its
@@ -387,29 +466,108 @@ def test_d6_a_missing_value_never_counts_as_zero_within_best_or_worst():
     ]
 
 
-# --- D7: the state "not resolved" -----------------------------------------------
+# --- D7: the state of a pair (D74, with the names of D88 and D97) ---------------
 
 
-def test_d7_every_difference_of_this_table_is_missing_its_range():
-    table = example_table()
-    for first, second in (("A", "B"), ("B", "C")):
-        for difference in paired_differences(table, first, second):
-            if difference.value is not None:
-                assert difference.range is None
-                assert difference.range_missing.reason == "NOT_AVAILABLE"
+def test_d74_a_pair_with_a_computed_difference_and_no_range_is_not_separated():
+    """Person-approved expectation of #202: every rotation pair on soil_loss
+    and soil_carbon_trend of this table is "Not separated: uncertainty
+    missing" (a computed difference exists; its range is missing, D92)."""
+    for first, second in (("A", "B"), ("A", "C")):
+        state = pair_state(example_table(), first, second)
+        assert state.state == NOT_SEPARATED_UNCERTAINTY_MISSING
+        assert state.identical_rows is False
+        assert state.indicators_not_resolved == ("soil_carbon_trend", "soil_loss")
+        # Water was never evaluated for this pair: it does not enter the
+        # state (D6, D85).
+        assert "water_deficit_exposure" not in state.indicators_not_resolved
 
 
-def test_d7_a_pair_whose_differences_have_no_range_is_not_resolved():
-    state = pair_state(example_table(), "A", "B")
-    assert state.state == NOT_RESOLVED
-    assert state.identical_rows is False
-    assert state.indicators_not_resolved == ("soil_carbon_trend", "soil_loss")
-    # Water was never evaluated for this pair: it does not enter the state (D6).
-    assert "water_deficit_exposure" not in state.indicators_not_resolved
-
-
-def test_d7_two_rotations_with_identical_rows_are_never_resolved():
+def test_d85_two_rotations_with_identical_rows_are_identical():
+    """Person-approved expectation of #202: B and C are "Identical" (D85: at
+    least one difference holds a value and every difference of an indicator
+    the pair evaluated is zero; the all-missing water difference does not
+    enter the state, D6). The ranges of those differences are missing as
+    well (this table carries no ranges): "Identical" is the state the
+    person approved for this pair; which state comes first in general is
+    OPEN as K2 of entry D7."""
     state = pair_state(example_table(), "B", "C")
-    assert state.state == NOT_RESOLVED
+    assert state.state == IDENTICAL
     assert state.identical_rows is True
     assert state.indicators_not_resolved == ("soil_carbon_trend", "soil_loss")
+
+
+def test_d85_a_pair_without_a_computed_difference_is_not_evaluated():
+    """Person-approved expectation of #202: the all-missing
+    water_deficit_exposure is "Not evaluated", with no state (D85). The
+    table here is the water rows of the supplied table alone."""
+    for first, second in (("A", "B"), ("A", "C"), ("B", "C")):
+        state = pair_state(water_only_table(), first, second)
+        assert state.state is None  # "Not evaluated" (D85, D88): no state at all
+        assert state.identical_rows is False  # a missing difference is never identical
+        assert state.indicators_not_resolved == ()
+
+
+# --- D87 with D99: the counts of the cells of a pair; D91: the coverage ----------
+
+
+def test_d87_the_cells_of_each_pair_by_the_sign_of_the_point_value():
+    table = example_table()
+    # Pair (A, B): B, the second rotation, is better in the three years
+    # where both hold a soil-loss value (lower is better) and in the
+    # carbon trend (higher is better, 0.3 against -0.4); 2023 holds a
+    # missing side, and water holds one in its only cell.
+    counts = by_cell_of_pair(table, "A", "B")
+    assert counts[("s1", "soil_loss")].by_point_sign == PointSignCounts(
+        better=3, worse=0, equal=0, missing_side=1
+    )
+    assert counts[("s1", "soil_carbon_trend")].by_point_sign == PointSignCounts(
+        better=1, worse=0, equal=0, missing_side=0
+    )
+    assert counts[("s1", "water_deficit_exposure")].by_point_sign == PointSignCounts(
+        better=0, worse=0, equal=0, missing_side=1
+    )
+    # C holds the same rows as B, so the pair (A, C) gives the same counts.
+    counts_of_a_c = by_cell_of_pair(table, "A", "C")
+    for key, count in counts.items():
+        assert counts_of_a_c[key].by_point_sign == count.by_point_sign
+
+
+def test_d87_identical_rows_are_equal_within_the_tolerance_of_the_designer():
+    counts = by_cell_of_pair(example_table(), "B", "C")
+    assert counts[("s1", "soil_loss")].by_point_sign == PointSignCounts(
+        better=0, worse=0, equal=4, missing_side=0
+    )
+    assert counts[("s1", "soil_carbon_trend")].by_point_sign == PointSignCounts(
+        better=0, worse=0, equal=1, missing_side=0
+    )
+
+
+def test_d99_the_two_counts_are_shown_apart_and_never_added():
+    """The supplied table carries no range on any value, so no cell enters
+    the count by range; a cell without a range appears only in the count
+    of the point signs, and nothing of one count is added to the other
+    (D99)."""
+    table = example_table()
+    for first, second in (("A", "B"), ("A", "C"), ("B", "C")):
+        for count in pair_counts(table, first, second, equal_tolerance=TOLERANCE):
+            assert count.by_range == RangeClassCounts(
+                strict_improvement=0, deterioration=0, not_separated=0
+            )
+
+
+def test_d91_the_coverage_names_the_cells_compared_out_of_the_cells_of_the_pair():
+    counts = by_cell_of_pair(example_table(), "A", "B")
+    soil = counts[("s1", "soil_loss")]
+    # 2023 holds no value on side A: three cells compared of the four of the pair.
+    assert (soil.cells_compared, soil.cells_of_the_pair) == (3, 4)
+    carbon = counts[("s1", "soil_carbon_trend")]
+    assert (carbon.cells_compared, carbon.cells_of_the_pair) == (1, 1)
+    water = counts[("s1", "water_deficit_exposure")]
+    assert (water.cells_compared, water.cells_of_the_pair) == (0, 1)
+    # B and C hold a value in every soil-loss cell: all four are compared.
+    counts_of_b_c = by_cell_of_pair(example_table(), "B", "C")
+    assert counts_of_b_c[("s1", "soil_loss")].cells_compared == 4
+    assert counts_of_b_c[("s1", "soil_loss")].cells_of_the_pair == 4
+    # No minimum coverage is set (D91): a missing side lowers the coverage
+    # and blocks nothing.
