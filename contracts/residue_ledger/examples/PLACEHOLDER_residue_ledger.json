@@ -1,0 +1,408 @@
+{
+  "contract": "residue_ledger",
+  "example_data": true,
+  "case_id": "PLACEHOLDER-case",
+  "field_id": "PLACEHOLDER-field",
+  "rotation_id": "PLACEHOLDER-rotation",
+  "first_ag_year": 2001,
+  "last_ag_year": 2002,
+  "mass_unit": "PLACEHOLDER_mass_unit",
+  "carbon_unit": "PLACEHOLDER_carbon_unit",
+  "carbon_input_unit": "PLACEHOLDER_carbon_input_unit",
+  "components": [
+    {
+      "component_id": "c1",
+      "crop_id": "placeholder_crop_a",
+      "cycle": 0,
+      "purpose": "grain",
+      "residue_management": "removed",
+      "harvest": {
+        "date": "2001-05-01",
+        "provenance": "DECLARED",
+        "source": "PLACEHOLDER: example data, no real source"
+      },
+      "ag_year": 2001,
+      "aboveground_mass_produced": {
+        "value": 3.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_mass_exported": {
+        "value": 1.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_mass_retained": {
+        "value": 2.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_carbon_produced": {
+        "value": 1.5,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_carbon_exported": {
+        "value": 0.5,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_carbon_retained": {
+        "value": 1.0,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "root_mass": {
+        "value": 1.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "root_carbon": {
+        "value": 0.5,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "rhizodeposit_carbon": {
+        "value": 0.25,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      }
+    },
+    {
+      "component_id": "c2",
+      "crop_id": "placeholder_crop_b",
+      "cycle": 0,
+      "purpose": "cover",
+      "residue_management": {
+        "missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER: example of a word nobody has given"
+        }
+      },
+      "harvest": {
+        "date": null,
+        "missing": {
+          "reason": "NOT_APPLICABLE",
+          "detail": "PLACEHOLDER: a cover crop is terminated, not harvested"
+        }
+      },
+      "ag_year": null,
+      "aboveground_mass_produced": {
+        "value": null,
+        "unit": "PLACEHOLDER_mass_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "aboveground_mass_exported": {
+        "value": null,
+        "unit": "PLACEHOLDER_mass_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "aboveground_mass_retained": {
+        "value": null,
+        "unit": "PLACEHOLDER_mass_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "aboveground_carbon_produced": {
+        "value": null,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "aboveground_carbon_exported": {
+        "value": null,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "aboveground_carbon_retained": {
+        "value": null,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "root_mass": {
+        "value": null,
+        "unit": "PLACEHOLDER_mass_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "root_carbon": {
+        "value": null,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      },
+      "rhizodeposit_carbon": {
+        "value": null,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "missing": {
+          "reason": "NOT_COMPUTABLE",
+          "detail": "PLACEHOLDER: the method does not cover this component"
+        }
+      }
+    },
+    {
+      "component_id": "c1",
+      "crop_id": "placeholder_crop_a",
+      "cycle": 1,
+      "purpose": "grain",
+      "residue_management": "removed",
+      "harvest": {
+        "date": "2002-05-01",
+        "provenance": "DECLARED",
+        "source": "PLACEHOLDER: example data, no real source"
+      },
+      "ag_year": 2002,
+      "aboveground_mass_produced": {
+        "value": 4.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_mass_exported": {
+        "value": 2.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_mass_retained": {
+        "value": 2.0,
+        "unit": "PLACEHOLDER_mass_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_carbon_produced": {
+        "value": 2.0,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_carbon_exported": {
+        "value": 1.0,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "aboveground_carbon_retained": {
+        "value": 1.0,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      },
+      "root_mass": {
+        "value": null,
+        "unit": "PLACEHOLDER_mass_unit",
+        "missing": {
+          "reason": "MISSING_INPUT",
+          "detail": "PLACEHOLDER: the input named here"
+        }
+      },
+      "root_carbon": {
+        "value": null,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "missing": {
+          "reason": "MISSING_INPUT",
+          "detail": "PLACEHOLDER: the input named here"
+        }
+      },
+      "rhizodeposit_carbon": {
+        "value": 0.25,
+        "unit": "PLACEHOLDER_carbon_unit",
+        "provenance": "DERIVED",
+        "source": "PLACEHOLDER: example data, no real source",
+        "range_missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "PLACEHOLDER: the example carries no uncertainty range"
+        }
+      }
+    }
+  ],
+  "annual_carbon_inputs": [
+    {
+      "quantity": "placeholder_crop_a_grain_aboveground_carbon_retained",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_a",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "first_ag_year": 2001,
+      "last_ag_year": 2002,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": 1.0
+        },
+        {
+          "ag_year": 2002,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_a_grain_root_carbon",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_a",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "first_ag_year": 2001,
+      "last_ag_year": 2002,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": 0.5
+        },
+        {
+          "ag_year": 2002,
+          "value": null,
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "PLACEHOLDER: the input named here"
+          }
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_a_grain_rhizodeposit_carbon",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_a",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "first_ag_year": 2001,
+      "last_ag_year": 2002,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": 0.25
+        },
+        {
+          "ag_year": 2002,
+          "value": 0.25
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_b_cover_aboveground_carbon_retained",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_b",
+      "first_ag_year": 2001,
+      "last_ag_year": 2002,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "ag_year": 2002,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        }
+      ]
+    }
+  ]
+}

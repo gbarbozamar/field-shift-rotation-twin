@@ -1,4 +1,5 @@
-"""Tests of ``engine/water/stages.py`` (unit l1/water-crop-stages, issue #206).
+"""Tests of ``engine/water/stages.py`` (unit l1/water-crop-stages, issue #206;
+unit l1/water-stage-tail-d135, issue #224: the cut and the tail of D135, D136).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases of the stages"; a test checks that the
@@ -34,10 +35,17 @@ LAST = FIRST + ONE_DAY * (TOTAL - 1)
 INITIAL, MID, END = 0.222, 0.888, 0.444
 
 
-def placed() -> dict[dt.date, module.StageDay]:
-    result = module.place_stages(FIRST, LAST, LENGTHS, what=WHAT)
-    assert not isinstance(result, Missing)
+def placed(last: dt.date = LAST, first: dt.date = FIRST) -> module.PlacedStages:
+    result = module.place_stages(first, last, LENGTHS, what=WHAT)
+    assert isinstance(result, module.PlacedStages)
     return result
+
+
+def stage_list(result: module.PlacedStages) -> list[str]:
+    return [result[day].stage for day in sorted(result)]
+
+
+FILLED = ["initial"] * 3 + ["development"] * 4 + ["mid"] * 2 + ["late"] * 5
 
 
 # --- the stage boundaries --------------------------------------------------------
@@ -85,21 +93,91 @@ def test_boundary_days_belong_to_the_stage_that_ends_or_begins_on_them():
 def test_a_stage_of_one_day_and_a_period_of_four_days():
     lengths = dict.fromkeys(module.GROWTH_STAGES, 1.0)
     result = module.place_stages(FIRST, FIRST + ONE_DAY * 3, lengths, what=WHAT)
-    assert [result[day].stage for day in sorted(result)] == list(module.GROWTH_STAGES)
+    assert stage_list(result) == list(module.GROWTH_STAGES)
+    assert result.tail == ()
     assert all(item.fraction == 1.0 for item in result.values())
 
 
-@pytest.mark.parametrize("change", [+1, -1])
-def test_lengths_that_do_not_fill_the_period_are_not_computable_naming_open_25(change):
-    last = LAST + ONE_DAY * change
-    result = module.place_stages(FIRST, last, LENGTHS, what=WHAT)
-    assert isinstance(result, Missing)
-    assert result.reason == "NOT_COMPUTABLE"
-    assert WHAT in result.detail
-    assert f"add up to {TOTAL} day(s)" in result.detail
-    assert f"the period holds {TOTAL + change} day(s)" in result.detail
-    assert "OPEN 25" in result.detail
-    assert "no stage is guessed" in result.detail
+def test_lengths_that_fill_the_period_exactly_leave_no_tail_and_cut_nothing():
+    result = placed()
+    assert result.tail == ()
+    assert stage_list(result) == FILLED
+    assert result.stages == dict(result)
+    assert result[LAST] == module.StageDay(stage="late", day_in_stage=5, stage_length=5)
+
+
+@pytest.mark.parametrize(
+    ("short", "kept"),
+    [
+        (1, FILLED[:-1]),  # the harvest falls inside the late stage
+        (5, FILLED[:9]),  # on the last day of the mid stage: no late day
+        (9, FILLED[:5]),  # inside the development stage: no mid nor late day
+        (TOTAL - 1, ["initial"]),  # the period holds only its sowing day
+    ],
+)
+def test_lengths_longer_than_the_period_are_cut_at_the_harvest(short, kept):
+    last = LAST - ONE_DAY * short
+    result = placed(last)
+    assert result.tail == ()
+    assert sorted(result) == [FIRST + ONE_DAY * n for n in range(TOTAL - short)]
+    assert max(result) == last
+    assert stage_list(result) == kept
+    # The stages are not shrunk: every placed day keeps its catalogue length
+    # and its place in its stage, as in the period the lengths fill.
+    whole = placed()
+    for day, item in result.items():
+        assert item == whole[day]
+
+
+def test_a_stage_cut_at_the_harvest_keeps_its_whole_line_and_never_reaches_the_next_value():
+    last = LAST - ONE_DAY * 2  # three of the five late days are placed
+    result = placed(last)
+    item = result[last]
+    assert (item.stage, item.day_in_stage, item.stage_length) == ("late", 3, 5)
+    assert item.fraction == pytest.approx(3 / 5)
+    value = module.by_stage(item, INITIAL, MID, END)
+    assert value == pytest.approx(MID + 3 / 5 * (END - MID))
+    assert value != pytest.approx(END)
+
+
+@pytest.mark.parametrize("extra", [1, 2, 9])
+def test_lengths_shorter_than_the_period_leave_a_tail_of_exactly_the_days_to_the_harvest(
+    extra,
+):
+    last = LAST + ONE_DAY * extra
+    result = placed(last)
+    # The four stages are placed whole, as in the period they fill.
+    assert result.stages == placed().stages
+    assert stage_list(result) == FILLED
+    # The tail runs from the day after the late stage to the harvest.
+    assert result.tail == tuple(LAST + ONE_DAY * n for n in range(1, extra + 1))
+    assert result.tail[-1] == last
+    # Every day of the period is a stage day or a tail day, never both.
+    period = [FIRST + ONE_DAY * n for n in range((last - FIRST).days + 1)]
+    assert sorted([*result, *result.tail]) == period
+    assert not set(result) & set(result.tail)
+    for day in result.tail:
+        assert day not in result
+        with pytest.raises(KeyError):
+            result[day]
+
+
+def test_a_period_crossing_29_february_has_one_more_tail_day_or_one_day_less_cut():
+    # The same calendar dates, in a year without and a year with 29 February.
+    plain_first, leap_first = dt.date(2002, 2, 20), dt.date(2004, 2, 20)
+    plain_last, leap_last = dt.date(2002, 3, 10), dt.date(2004, 3, 10)
+    plain = placed(plain_last, plain_first)
+    leap = placed(leap_last, leap_first)
+    assert dt.date(2004, 2, 29) in leap.stages
+    assert len(leap.tail) == len(plain.tail) + 1
+    assert stage_list(leap) == stage_list(plain) == FILLED
+    # Cut: the period holds one day fewer than the lengths without the leap
+    # day, and exactly their days with it.
+    plain_cut = placed(dt.date(2002, 3, 4), plain_first)
+    leap_cut = placed(dt.date(2004, 3, 4), leap_first)
+    assert stage_list(plain_cut) == FILLED[:-1]
+    assert stage_list(leap_cut) == FILLED
+    assert plain_cut.tail == leap_cut.tail == ()
 
 
 @pytest.mark.parametrize("bad", [0.0, -2.0, 2.5, float("nan"), float("inf"), True])
@@ -114,6 +192,8 @@ def test_a_length_that_is_not_whole_days_of_at_least_one_is_not_computable(bad):
 
 
 def test_a_period_that_ends_before_it_starts_or_a_stage_without_length_raises():
+    # A stage without length: the caller answers it before, MISSING_INPUT with
+    # the stage unknown (D79); reaching place_stages without it is a bug.
     with pytest.raises(ValueError, match="ends before it starts"):
         module.place_stages(FIRST, FIRST - ONE_DAY, LENGTHS, what=WHAT)
     lengths = {stage: LENGTHS[stage] for stage in module.GROWTH_STAGES[:-1]}

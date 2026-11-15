@@ -2302,13 +2302,18 @@ RECORDS = ROOT / "params" / "records"
 DEMO_SOIL = ROOT / "data" / "demo" / "la_estanzuela_soil_slope.json"
 
 
-def test_records_on_main_give_the_declared_product_whatever_the_rotation():
-    """The deployed catalogue of params/records/ (the 26 records of #203) holds
-    no record of the computed C, so C falls back to the declared record and the
-    soil loss of the demonstration point is the same declared product for
-    both rotations, computed again here from the records: the deployed number
-    is unchanged until the records of the computed C are added. When they are
-    added, this guard fails and the unit that adds them updates it."""
+# The crop words of the records of params/records/ (unit l0/c-records): the
+# crop_id of the demonstration calendars of D128 must be the same words.
+REPOSITORY_CROP_WORDS = {SOY: "soybean", WHEAT: "wheat", MAIZE: "maize"}
+
+
+def test_records_on_main_compute_c_for_both_demo_rotations():
+    """The catalogue of params/records/ holds the records of the computed C
+    (unit l0/c-records, D129): the guard of #218 (OPEN 39) is updated. With the
+    demonstration soil file and both rotations of D128, whose crops carry the
+    words of the records, every covered year is a number computed through
+    c_factor/, none falls back to the declared record, and the two rotations
+    do not give the same soil loss. No expected value is asserted."""
     records, problems = load_folder(RECORDS)
     assert problems == [] and check_catalogue(records) == []
     c_ids = {
@@ -2318,9 +2323,8 @@ def test_records_on_main_give_the_declared_product_whatever_the_rotation():
         *module.MAIN_C_RESIDUE_IDS,
         *module.MAIN_C_SITE_IDS,
     }
-    assert not [r["id"] for r in records.values() if r["id"] in c_ids], (
-        "records of the computed C are in params/records/: update this guard"
-    )
+    present = {r["id"] for r in records.values() if r["id"] in c_ids}
+    assert present == c_ids
     soil_document_ = json.loads(DEMO_SOIL.read_text("utf-8"))
     identity = {k: soil_document_[k] for k in ("case_id", "field_id")}
     soil_ = SiteSoilSlope.model_validate(soil_document_)
@@ -2328,57 +2332,25 @@ def test_records_on_main_give_the_declared_product_whatever_the_rotation():
     climate_document_.update(identity)
     span = daily_years()
     climate_ = climate_with(rain_series(*span), climate_document_)
-
-    def value_of(pid: str) -> float:
-        (record,) = [r for r in records.values() if r["id"] == pid and r["scope"] == {}]
-        return record["value"]
-
-    numbers = {
-        pid: value_of(pid)
-        for pid in (*module.PARAMETER_IDS, *module.MONTHLY_EROSIVITY_IDS)
-    }
-    s_break_unit = ls.SlopeUnit(
-        next(r["unit"] for r in records.values() if r["id"] == module.S_BREAK_ID)
-    )
-    steepness = ls.slope_steepness_factor(
-        slope_steepness=soil_.slope_steepness.value,
-        slope_unit=ls.SlopeUnit(soil_.slope_steepness.unit),
-        s_break=numbers[module.S_BREAK_ID],
-        s_break_unit=s_break_unit,
-        **{name: numbers[pid] for name, pid in module.S_COEFFICIENTS.items()},
-    )
-    length = ls.slope_length_factor(
-        slope_length=soil_.slope_length.value,
-        slope_length_unit=soil_.slope_length.unit,
-        lambda_unit=numbers[module.LAMBDA_UNIT_ID],
-        lambda_unit_unit=next(
-            r["unit"] for r in records.values() if r["id"] == module.LAMBDA_UNIT_ID
-        ),
-        slope_steepness=soil_.slope_steepness.value,
-        slope_unit=ls.SlopeUnit(soil_.slope_steepness.unit),
-        **{name: numbers[pid] for name, pid in module.L_COEFFICIENTS.items()},
-    )
-    declared = (
-        numbers[module.R_ID]
-        * numbers[module.K_ID]
-        * length
-        * steepness
-        * numbers[module.C_ID]
-        * numbers[module.P_ID]
-    )
-    values = set()
+    by_rotation = {}
     for rotation in DEMO_ROTATIONS:
         document = demo_calendar(rotation, ag_year_of(span[0])).model_dump(mode="json")
         document.update(identity)
+        for item in document["components"]:
+            item["crop_id"] = REPOSITORY_CROP_WORDS[item["crop_id"]]
         result = run(
             RotationCalendar.model_validate(document), climate_, soil_, records
         )
         assert isinstance(result, SoilLossResults)
-        for item in covered_only(result, span).values():
-            assert item.value == pytest.approx(declared, rel=1e-12)
-            assert "PROPOSED fallback of brief #218" in item.source
-            values.add(item.value)
-    assert len(values) == 1
+        covered = covered_only(result, span)
+        assert covered
+        for item in covered.values():
+            assert item.value is not None, item.missing
+            assert "PROPOSED fallback of brief #218" not in item.source
+            assert "engine/erosion/c_factor/" in item.source
+        by_rotation[rotation] = tuple(item.value for item in covered.values())
+    first, second = (by_rotation[rotation] for rotation in DEMO_ROTATIONS)
+    assert first != second
 
 
 # --- the modules --------------------------------------------------------------
