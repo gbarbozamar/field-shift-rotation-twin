@@ -1,0 +1,16 @@
+{
+  "id": "retention_unit_factor",
+  "scope": {},
+  "value": 25.4,
+  "unit": "mm in-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "USDA Natural Resources Conservation Service (2004). National Engineering Handbook, Part 630 Hydrology, Chapter 10: Estimation of Direct Runoff from Storm Rainfall (210-VI-NEH, July 2004)",
+    "locator": "p. 10-4 (PDF p. 10), Eq. 10-13",
+    "url": "https://directives.nrcs.usda.gov/sites/default/files2/1720460920/Chapter%2010%20-%20Estimation%20of%20Direct%20Runoff%20from%20Storm%20Rainfall.pdf#page=10"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «If S is in millimeters: CN = 1000 / (10 + S/25.4) [10–13]» Decision PC-6: NRCS (2004) is the source of the forms; their use in a continuous daily balance is a declared adaptation (2025 edition, section 630.113G). The text layer of the PDF is garbled for these equations; compare with the page image. The runoff form S = factor x (numerator / CN − offset) is Eq. 10-13 solved for S. SIGNED on 2026-11-15: checked_by gbarbozamar, row 40 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

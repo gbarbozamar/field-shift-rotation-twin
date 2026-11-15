@@ -376,12 +376,13 @@ def assert_water_missing_for_every_covered_year(
     With the point in the unit strings of D55, EP3 passes its unit guard, so
     a covered year is ``MISSING_INPUT`` for what the daily chain lacks, not for
     a unit (Q11): every site parameter of EP3 has no record (D56: neither test
-    catalogue holds one), and the crop of some days is not known (they lie
-    before the first cycle of the rotation repeated over the record, D47,
-    D109, D141). The detail of such a year also names what the definition of
-    the indicator still leaves open after D157 (C1.4). The texts are EP3's own
-    constants (``SITE_PARAMETERS``, ``CROP_UNKNOWN``,
-    ``DEFINITION_INCOMPLETE``).
+    catalogue holds one), and the crop of some days is not known (a component
+    of the example has no harvest date, so the days it may cover are not
+    known, point 7 of engine/calendar/repeat.py; since D188 (2) no day lies
+    before the first cycle, D47, D109, D141). The detail of such a year also
+    names what the definition of the indicator still leaves open after D157
+    (C1.4). The texts are EP3's own constants (``SITE_PARAMETERS``,
+    ``CROP_DATES_MISSING``, ``DEFINITION_INCOMPLETE``).
     """
     result = outcome.result
     assert result is not None
@@ -399,7 +400,8 @@ def assert_water_missing_for_every_covered_year(
             for pid in ep3.SITE_PARAMETERS:
                 assert f"'{pid}'" in detail, pid
             assert "no record in parameters (D56)" in detail
-            assert ep3.CROP_UNKNOWN in detail
+            assert ep3.CROP_DATES_MISSING in detail
+            assert ep3.CROP_UNKNOWN not in detail
             assert ep3.DEFINITION_INCOMPLETE in detail
     function = ep3.compute_water_deficit_exposure
     extra = {"parameters": parameters} if takes_parameters(function) else {}

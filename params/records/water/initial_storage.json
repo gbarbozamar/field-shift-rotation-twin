@@ -1,0 +1,16 @@
+{
+  "id": "initial_storage",
+  "scope": {},
+  "value": 151.91,
+  "unit": "mm",
+  "range": null,
+  "range_missing_reason": "No range: D208 takes one of the two cases of USER-P (D75) for the main catalogue. The other case, an empty column (0 mm), is the second run of the check of D189, not an interval.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 8, the paragraph that begins «To initiate the water balance for the root zone» (found by text search; its heading and equation number were not read)",
+    "url": "https://www.fao.org/4/X0490E/x0490e0e.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare (FAO-56 chapter 8): «To initiate the water balance for the root zone, the initial depletion Dr, i-1 should be estimated.» and «Following heavy rain or irrigation, the user can assume that the root zone is near field capacity, i.e., Dr, i-1 » 0.» (» is the page's rendering of the approximately-equal sign). UPDATED on 2026-11-15 by an AI session to follow D208 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D208: the main catalogue starts with the column full, initial_storage equal to column_capacity. DERIVED: 151.91 mm, the drafted column_capacity (Capurro et al. 2017, Cuadro 1, sum of «AD horizonte-1»); if that value changes when it is signed, this one changes with it. In this one-layer column a depletion of zero is a full column and a depletion equal to TAW is an empty one, whatever the root depth. The other case of D75 (USER-P), an empty column (0 mm) with the surface layer depleted to its total, is the second run, and the check of D189 states the first day on which the two runs agree before any water value is released. EP3 refuses a storage above column_capacity. SIGNED on 2026-11-15: checked_by gbarbozamar, row 5 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

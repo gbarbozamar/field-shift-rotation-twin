@@ -1,0 +1,22 @@
+{
+  "id": "surface_residue_cover",
+  "scope": {
+    "crop": "soybean",
+    "management": "no_crop"
+  },
+  "value": 0.0,
+  "unit": "fraction of the soil surface (the table prints percent)",
+  "range": {
+    "low": 0.0,
+    "high": 0.4,
+    "basis": "The two levels of D115 for continuous soybean: lower 0 % (bare soil, no mulch), upper 40 % (the cap printed in Cuadro 1 for soybean after a soybean chemical fallow). Levels of a sensitivity block, not an uncertainty interval of a measurement."
+  },
+  "citation": {
+    "reference": "Decision D115 and D208 of issue #77, gbarbozamar/field-shift-rotation-twin, 15 November 2026, taken by the orchestrating AI session under the delegation of D161",
+    "locator": "Row D208 of the comment of 15 November 2026 (06:51 UTC), which applies the lower level of the residue-cover block of D115 (row D115, comment of 00:09 UTC: «Lower level: 0 % (bare soil, FAO-56 with no mulch)»)",
+    "url": "https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15. Transcribed by an AI session under D34 of issue #77. Value: the lower level of D115 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886369099), «0 % (bare soil, FAO-56 with no mulch)», written as the fraction 0.0. UPDATED on 2026-11-15 by an AI session to follow D208 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D208: «Residue level of the first number: 0 %, the no-residue extreme of D115, with its warning in the label: it is not the practice of the site, which is no-till with residue, and it overstates evaporation and runoff.» The residue level is the second catalogue; it becomes the main one when D185 is on main and its cover records and curve numbers are signed (D208). With 0 the total evaporable water of the fallow is not reduced, so OPEN 30 does not arise. The upper end of the range is the upper level of D115 for continuous soybean, read in the local copy fuentes_descargadas/mgap/tanda1_2026-11-15/MGAP_2020_actualizacion_USLE-RUSLE.pdf by an AI session: García Préchac et al. (MGAP, hosted on gub.uy under files/2020-01), Cuadro 1, row as the text layer gives it «BQ de soja soja 40 83 99%» (column layout not reliable in the text layer; check on the page) https://www.gub.uy/ministerio-ganaderia-agricultura-pesca/sites/ministerio-ganaderia-agricultura-pesca/files/2020-01/Actualizaci%C3%B3n%20t%C3%A9cnica%20del%20modelo%20USLE-RUSLE_0.pdf. The scope names the crop sown after the fallow (EXPOSURE.md choice 19). SIGNED on 2026-11-15: checked_by gbarbozamar, row 36 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

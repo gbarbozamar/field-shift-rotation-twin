@@ -290,8 +290,9 @@ def crops_left_out(calendar: RotationCalendar) -> list[str]:
 def daily_mean_temperature(temperature_max: float, temperature_min: float) -> float:
     """D30: "mean from the daily maximum and minimum": the arithmetic mean of the two.
 
-    The same form as ``mean_temperature`` of engine/water/et0/equations.py
-    (PROPOSED there); written here because this module never imports ``engine/``.
+    The same form as ``mean_temperature`` of the FAO-56 equations of lane L1
+    (file ``equations.py`` of the ET0 package of the water engine, PROPOSED there);
+    written here because this module never imports ``engine/``.
     """
     return statistics.fmean([temperature_max, temperature_min])
 

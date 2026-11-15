@@ -1,0 +1,18 @@
+{
+  "id": "basal_crop_coefficient",
+  "scope": {
+    "management": "no_crop"
+  },
+  "value": 0,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source prints one value (zero) for bare soil in the dual approach.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 11, «Bare soil», «Dual crop coefficient»",
+    "url": "https://www.fao.org/4/X0490E/x0490e0h.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Where a daily soil water balance can be applied, the user may elect to apply the dual Kc approach of Chapter 7. In this situation, the topsoil layer may dry to very low water contents during periods having no precipitation. Therefore, the values for Kcb and for Kc min in Equations 71 and 76 should be set equal to zero.» And: «The daily water balance calculation, given Kcb = 0, will provide the most accurate estimates of ETc during the non-growing periods.» Decision D106 of issue #77 cites it in its source column («with the dual coefficient, Kcb = 0 on bare soil»); EXPOSURE.md OPEN 33 says the value of the record is a person's. FOR THE PERSON: the paragraph is under «Bare soil»; the paragraph on dead vegetation (the fallow of D110) does not repeat Kcb, and the one on live vegetation sets Kcb by the vegetation; D111 declares the fallow weed-free. The same sentence sets Kc min to zero in the non-growing period; EP3 does not read Kc min on a day with no crop. On such a day this Kcb enters the upper limit and Ke of the surface layer, never transpiration (D111). SIGNED on 2026-11-15: checked_by gbarbozamar, row 31 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

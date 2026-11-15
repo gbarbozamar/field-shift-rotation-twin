@@ -263,6 +263,19 @@ def test_a_zero_measured_total_gives_no_percent_bias():
     assert all("zero" in e.reason for e in result.year_errors)
 
 
+def test_a_negative_measured_total_gives_no_percent_bias():
+    # Example values (not runoff of any plot): the sum is -10 + 30 - 50 = -30.
+    # The modelled values equal the measured ones, so reading the sum as a
+    # divisor would give a PBIAS of 0, the same order, and a pass of H10.
+    measured = {2017: -10.0, 2018: 30.0, 2019: -50.0}
+    result = run(dict(measured), measured=measured)
+    assert result.pbias_percent is None
+    assert "not above zero" in result.pbias_reason
+    assert result.pbias_condition.verdict is None
+    assert "not above zero" in result.pbias_condition.reason
+    assert result.h10.verdict is None
+
+
 # --- an event above the cap -----------------------------------------------------------------
 
 MODELLED_PASS = {2017: 90.0, 2018: 280.0, 2019: 190.0}

@@ -1,0 +1,21 @@
+{
+  "id": "initial_root_depth",
+  "scope": {
+    "crop": "soybean"
+  },
+  "value": 0.2,
+  "unit": "m",
+  "range": {
+    "low": 0.15,
+    "high": 0.2,
+    "basis": "Printed in FAO-56 Annex 8 for many annual crops («0.15 to 0.20 m»); D203 takes 0.20 m and declares 0.15 m as the sensitivity. Not an uncertainty interval of a measurement."
+  },
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Annex 8, text on the minimum rooting depth Zr min, the sentence «For many annual crops, Zr min can be estimated as 0.15 to 0.20 m.»",
+    "url": "https://www.fao.org/4/X0490E/x0490e0p.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15 by an AI session (FAO-56 Annex 8, official HTML edition). Transcribed under D34 of issue #77. Verbatim text to compare: «Zr min for annual crops should represent the depth of seed placement plus an additional depth of soil that may contribute water to the seed as it extends its initial roots downward following germination. For many annual crops, Zr min can be estimated as 0.15 to 0.20 m.» UPDATED on 2026-11-15 by an AI session to follow D203 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D203: 0.20 m for the four crops, 0.15 m the sensitivity. It rests on the general sentence of Annex 8 for annual crops, not on the bean example of the same annex (USER-AI: the initial depth of that example is not transferred). Choosing the upper end is a modelling choice. Local uses of 0.20 m: Capurro Bazzano, M.C. (2016). Determinación de las necesidades hídricas y respuesta al riego en el cultivo de soja. Tesis de Magíster en Ciencias Agrarias, opción Ciencias del Suelo, Facultad de Agronomía, Universidad de la República, Montevideo. Section 2.2.2.6, printed p. 49 (PDF p. 56): «En las etapas iniciales del cultivo se considera una profundidad de 20 cm, ya que se considera que el agua se mueve por capilaridad, como se describe en la Guía FAO N° 56, según Allen et al. (1998).» (an assumption of the thesis, citing FAO-56); Hayashi (2022), doctoral thesis, Cuadro 4, p. 77: the minimum effective rooting depth of maize in AquaCrop adjusted from 0.30 to 0.20 m. The first version of this draft cited the thesis of Capurro (2016) as the source; D203 puts Annex 8 first. EP3 uses it as the root depth of the initial stage and as the start of the straight line of the development stage (EXPOSURE.md choice 17); it must be above zero and not above column_depth. SIGNED on 2026-11-15: checked_by gbarbozamar, row 23 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}
