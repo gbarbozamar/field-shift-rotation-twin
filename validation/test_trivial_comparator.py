@@ -43,14 +43,16 @@ SOIL = {
     "C": ((7.0, 6.8, 7.2), (6.0, 5.8, 6.2), (8.0, 7.8, 8.2)),
 }
 # Water deficit exposure (dimensionless, higher is better), one value per
-# agricultural year:
-#   A: 0.60 [0.50, 0.70]   0.70 [0.60, 0.80]   0.80 [0.70, 0.90]
-#   B: 0.65 [0.55, 0.75]   0.75 [0.65, 0.85]   0.85 [0.75, 0.95]
-#   C: 0.30 [0.25, 0.35]   0.40 [0.35, 0.45]   0.50 [0.45, 0.55]
+# agricultural year. The 2020 values are chosen so that the order by the
+# mean differs from the order by the median, from the order by the
+# midpoint of the extremes, and from the order of every single year:
+#   A: 0.45 [0.40, 0.50]   0.70 [0.60, 0.80]   0.80 [0.70, 0.90]
+#   B: 0.20 [0.15, 0.25]   0.75 [0.65, 0.85]   0.85 [0.75, 0.95]
+#   C: 0.75 [0.70, 0.80]   0.40 [0.35, 0.45]   0.50 [0.45, 0.55]
 WATER = {
-    "A": ((0.60, 0.50, 0.70), (0.70, 0.60, 0.80), (0.80, 0.70, 0.90)),
-    "B": ((0.65, 0.55, 0.75), (0.75, 0.65, 0.85), (0.85, 0.75, 0.95)),
-    "C": ((0.30, 0.25, 0.35), (0.40, 0.35, 0.45), (0.50, 0.45, 0.55)),
+    "A": ((0.45, 0.40, 0.50), (0.70, 0.60, 0.80), (0.80, 0.70, 0.90)),
+    "B": ((0.20, 0.15, 0.25), (0.75, 0.65, 0.85), (0.85, 0.75, 0.95)),
+    "C": ((0.75, 0.70, 0.80), (0.40, 0.35, 0.45), (0.50, 0.45, 0.55)),
 }
 # Soil carbon trend (t C ha-1 yr-1, higher is better), one value per
 # rotation, model amg, end minus start:
@@ -67,12 +69,20 @@ CARBON = {"A": (-0.4, -0.5, -0.3), "B": (0.3, 0.2, 0.4), "C": (0.5, 0.45, 0.55)}
 HAND_SOIL_MEANS = {"A": 9.0, "B": 5.0, "C": 7.0}
 HAND_SOIL_ORDER = ("B", "C", "A")
 # Water, mean over the three agricultural years, ranges ignored:
-#   A: (0.60 + 0.70 + 0.80) / 3 = 2.10 / 3 = 0.70
-#   B: (0.65 + 0.75 + 0.85) / 3 = 2.25 / 3 = 0.75
-#   C: (0.30 + 0.40 + 0.50) / 3 = 1.20 / 3 = 0.40
-#   Higher is better: 0.75 > 0.70 > 0.40, so the order, best first, is B, A, C.
-HAND_WATER_MEANS = {"A": 0.70, "B": 0.75, "C": 0.40}
-HAND_WATER_ORDER = ("B", "A", "C")
+#   A: (0.45 + 0.70 + 0.80) / 3 = 1.95 / 3 = 0.65
+#   B: (0.20 + 0.75 + 0.85) / 3 = 1.80 / 3 = 0.60
+#   C: (0.75 + 0.40 + 0.50) / 3 = 1.65 / 3 = 0.55
+#   Higher is better: 0.65 > 0.60 > 0.55, so the order, best first, is A, B, C.
+# What other summaries would give, to show the test tells them apart:
+#   median: A 0.70, B 0.75, C 0.50 -> B, A, C;
+#   midpoint of the extremes: A (0.45 + 0.80) / 2 = 0.625, B (0.20 + 0.85) /
+#   2 = 0.525, C (0.40 + 0.75) / 2 = 0.575 -> A, C, B;
+#   single years: 2020 C, A, B; 2021 B, A, C; 2022 B, A, C.
+# None of them is A, B, C.
+HAND_WATER_MEANS = {"A": 0.65, "B": 0.60, "C": 0.55}
+HAND_WATER_ORDER = ("A", "B", "C")
+HAND_WATER_ORDER_BY_MEDIAN = ("B", "A", "C")
+HAND_WATER_ORDER_BY_MIDPOINT = ("A", "C", "B")
 # Soil carbon trend: one value per rotation, on the time basis 'rotation',
 # not 'ag_year'. There is no mean over agricultural years, and entry D0
 # gives no rule for it: no order (OPEN).
@@ -84,9 +94,10 @@ HAND_WATER_ORDER = ("B", "A", "C")
 #   C - A: [-2.4, -1.6] in every year: wholly better for C. C - B: [1.6, 2.4]
 #   in every year: wholly worse for C, so B is ahead of C. Every pair is
 #   separated: B, C, A, the same as the trivial order.
-#   Water. B - A: 2020 [0.55 - 0.70, 0.75 - 0.50] = [-0.15, 0.25], which
-#   crosses zero: A and B are not separated, so the full decision gives no
-#   order for water, while the trivial comparator gives B, A, C.
+#   Water. B - A: 2020 [0.15 - 0.50, 0.25 - 0.40] = [-0.35, -0.15] (worse
+#   for B), 2021 [0.65 - 0.80, 0.85 - 0.60] = [-0.15, 0.25], which crosses
+#   zero: A and B are not separated, so the full decision gives no order
+#   for water, while the trivial comparator gives A, B, C.
 #   Carbon. B - A [0.2 + 0.3, 0.4 + 0.5] = [0.5, 0.9]; C - B [0.45 - 0.4,
 #   0.55 - 0.2] = [0.05, 0.35]; C - A [0.75, 1.05]: every pair separated,
 #   C, B, A. The trivial comparator gives none (time basis).
@@ -169,6 +180,7 @@ def test_the_trivial_order_is_the_one_counted_by_hand():
     assert water.direction == "higher_is_better"
     assert dict(water.means) == pytest.approx(HAND_WATER_MEANS)
     assert water.order == HAND_WATER_ORDER
+    assert water.order not in (HAND_WATER_ORDER_BY_MEDIAN, HAND_WATER_ORDER_BY_MIDPOINT)
     assert water.reason is None
 
 
@@ -249,6 +261,57 @@ def test_a_tie_of_two_means_gives_no_order():
     assert item.trivial.order is None
     assert "equal" in item.trivial.reason and "tie" in item.trivial.reason
     assert item.decision.order is None
+    assert item.outcome == "no order from either"
+
+
+def test_a_tie_that_exists_only_in_decimal_is_ordered_by_the_stored_values():
+    # As written, A (0.1, 0.2) and B (0.3, 0.0) both have the mean 0.15. The
+    # stored binary values differ: 0.1 + 0.2 is a little above 0.3, so the
+    # mean of A is a little above the mean of B, and lower is better: B, A.
+    # This pins what the module does today (it compares the stored values
+    # exactly); which comparison entry D0 means is OPEN 7 of the module.
+    rows = []
+    for rotation_id, entries in {
+        "A": ((0.1, 0.05, 0.15), (0.2, 0.15, 0.25)),
+        "B": ((0.3, 0.25, 0.35), (0.0, 0.0, 0.05)),
+    }.items():
+        for ag_year, entry in zip(YEARS, entries):
+            rows.append(soil_row(rotation_id, "s1", ag_year, entry))
+    item = trivial_orders(table(rows))[0]
+    assert dict(item.means) == pytest.approx({"A": 0.15, "B": 0.15})
+    assert item.order == ("B", "A")
+    assert item.reason is None
+
+
+def test_the_reason_names_the_carbon_models_and_computations_read_together():
+    # The end-minus-start trend of two carbon models: amg separates A and B
+    # ([0.1, 0.5] for B), rothc does not ([-0.1, 0.2]). The full decision of
+    # decision/ reads the indicator over all its carbon models and
+    # computations together (one entry of "indicators not resolved" for the
+    # whole indicator), so it does not separate the pair; the reason says
+    # so instead of blaming the pair alone. Two models are used, not two
+    # computations, so that the case holds also once only the computation
+    # used to compare enters the state (D173).
+    rows = []
+    for model, a, b in (
+        ("amg", (0.0, -0.1, 0.1), (0.3, 0.2, 0.4)),
+        ("rothc", (0.1, 0.0, 0.2), (0.15, 0.1, 0.2)),
+    ):
+        for rotation_id, entry in (("A", a), ("B", b)):
+            value, low, high = entry
+            rows.append(
+                ResultsTableRow(
+                    rotation_id=rotation_id, scenario_id="s1", time_basis="rotation",
+                    indicator="soil_carbon_trend", direction="higher_is_better",
+                    value=value, unit="t C ha-1 yr-1", carbon_model=model,
+                    computation="end_minus_start", range=Range(low=low, high=high, kind=KIND),
+                    provenance="SIMULATED", source=SOURCE,
+                )
+            )
+    item = compare_with_decision(table(rows))[0]
+    assert item.decision.order is None
+    assert "carbon models and computations" in item.decision.reason
+    assert "together" in item.decision.reason
     assert item.outcome == "no order from either"
 
 

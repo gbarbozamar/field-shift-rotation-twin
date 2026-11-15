@@ -43,8 +43,11 @@ they are equal, because the full decision separates two rotations on an
 indicator only when the range of every paired difference of it lies wholly
 on one side of zero (D93 as ``decision/`` applies it), and each value lies
 inside its range (C2.1), so every year then favours the same rotation and
-so does the mean. The report can therefore say "different" only if the
-reading of the full decision changes.
+so does the mean. This holds under any reading of the full decision that
+separates a pair on an indicator only when every agricultural year
+favours the same rotation (or is no worse for it). The report can
+therefore say "different" only if the reading of the full decision
+changes so that a pair is separated while its years disagree.
 
 OPEN, for the lead developer (entry D0 does not say; this module gives no
 order, with the reason):
@@ -62,11 +65,20 @@ order, with the reason):
    model and computation; (c) for the soil carbon trend, only the
    computation used to compare rotations (C1.6, D173).
 5. A table with several scenarios. This module orders each scenario on its
-   own (D166). Options: (a) that; (b) one order over all scenarios, which
-   D166 does not allow for the state of a pair.
+   own (D166). Options: (a) that; (b) one order over all scenarios, with the
+   cells of every scenario pooled, which D166 does not allow for the state
+   of a pair; (c) one order over the set, read as D166 reads a set, without
+   pooling cells: a pair ordered over the set only when every scenario
+   orders it the same way.
 6. How the order of the full decision is read (see above). Options: (a) the
    indicators that ``pair_state`` resolves, as here; (b) only the pairs whose
    state is "Robust preference" over every indicator.
+7. How two means are compared. This module compares the stored binary
+   values exactly, so means that are equal as written in decimals can
+   differ (0.1 and 0.2 against 0.3 and 0.0: both 0.15 as written, ordered
+   here). Options: (a) the stored binary values exactly, as here; (b) the
+   decimals as written; (c) a tie within a tolerance, which entry D0 does
+   not give.
 """
 
 from __future__ import annotations
@@ -280,6 +292,23 @@ def decision_order(
             if indicator not in pair_state(scenario, x, y).indicators_not_resolved:
                 ahead_of[y].add(x)
         if not (first in ahead_of[second] or second in ahead_of[first]):
+            kinds = sorted(
+                {
+                    (row.carbon_model, row.computation)
+                    for row in scenario.rows
+                    if row.indicator == indicator and row.carbon_model is not None
+                }
+            )
+            if len(kinds) > 1:
+                return none(
+                    f"the full decision does not separate '{first}' and '{second}' "
+                    f"on '{indicator}' as a whole: pair_state names an indicator, "
+                    f"not a carbon model or computation, among the indicators not "
+                    f"resolved, and it reads the {len(kinds)} carbon models and "
+                    "computations of this indicator together, so one that does not "
+                    "separate the pair keeps the whole indicator not resolved even "
+                    "where another separates it"
+                )
             return none(
                 f"the full decision does not separate '{first}' and '{second}' on "
                 f"'{indicator}': pair_state names it among the indicators not "
