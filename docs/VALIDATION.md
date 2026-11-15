@@ -20,6 +20,8 @@ Later change (`l0/validation-d74-d96`): an AI session wrote into entries D1, D2,
 
 Later change (`l0/validation-d151-d156`): an AI session wrote into entries D1, D5 and D7 the lead developer's decisions D151 to D156 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888774819) (15 November 2026), which resolve K1, K2 and K4 to K7, and into entries D3, D4 and D7 his decisions D103 and D117, which this file did not record yet. Each is restated with a link to its comment. That change wrote no value, threshold, tolerance, expected value of the science, data source or citation.
 
+Later change (`l0/validation-d151-d156-fixes`, #273, and `l0/validation-k12-reading`): after the independent verifications of #263 and #273, an AI session pointed the readings that D151 to D154 change (D93, D88, D95 and D92) to those decisions, gave the dates of the lists and status lines that now hold decisions of 15 November 2026, and recorded that D152 answers K12. That last item is a reading of D152 by an AI session, to which the lead developer left it; it is stated in a [correction on issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6889121826) and adds no rule. That change wrote no value, threshold, tolerance, expected value of the science, data source or citation.
+
 ## How an entry gets completed
 
 - **Section 3.5.** A threshold is never delegated to a session. A value, a unit, a range, an expected result or a citation is transcribed under decision D34 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6882095622), which section 3.5 of the blueprint states in full: a reference, a locator, the verbatim text and the date read travel with the transcription, and one person checks it against the source.
@@ -349,7 +351,7 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: logic DECIDED (lead developer, 14 November 2026), with D85, D89, D90, D94 to D96 and D154 of #77; the OPEN items of this entry are for the lead developer and the science reviewers; acceptance by a science reviewer pending
+- Status: logic DECIDED (lead developer, 14 and 15 November 2026), with D85, D89, D90, D94 to D96 and D154 of #77; the OPEN items of this entry are for the lead developer and the science reviewers; acceptance by a science reviewer pending
 
 ### D2
 
@@ -430,7 +432,7 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: logic DECIDED (lead developer, 14 November 2026), with D59, D91, the cell part of D93 (amended by D98) and D156 of #77; K7 is resolved by D156; acceptance by a science reviewer pending
+- Status: logic DECIDED (lead developer, 14 and 15 November 2026), with D59, D91, the cell part of D93 (amended by D98) and D156 of #77; K7 is resolved by D156; acceptance by a science reviewer pending
 
 ### D6
 
@@ -481,7 +483,7 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
   - K7 is under entry D5 (dominance and D93), where D156 resolves it.
 - OPEN (not decided by D74, D85 to D99, D103, D117 or D151 to D156): which scenarios are "admitted" (D74, D86, D93 and D96), as under entry D1.
 - OPEN (named as not decided in the comment of D151 to D156 on #77): which of the three computations of the soil carbon trend (`end_minus_start`, `fitted_slope`, `mean_over_cycles` in `contracts/results/`) enter the separation rule. For the lead developer.
-- Not in this file: the clashes K8 to K12, which `contracts/decision_output/README.md` lists. D152 answers K12: in its order "Not separated: uncertainty missing" comes before "Not separated: within uncertainty", so a pair with one cell whose range crosses zero and one cell with no range takes the first, as that README records. D151 to D156 do not decide K8 to K11.
+- Not in this file: the clashes K8 to K12, which `contracts/decision_output/README.md` lists. K12 is answered by D152, in the reading of an AI session to which the lead developer left it ([correction on #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6889121826)): read in one scenario, a pair with one cell whose range crosses zero and one cell with no range takes "Not separated: uncertainty missing", which comes before "Not separated: within uncertainty" in the order of D152, unless every difference is zero ("Identical" comes before both); the reason of D86 follows the state. That README records the same reading. D151 to D156 do not decide K8 to K11.
 - Expected value: the outcome stated as logic in the definition. Any count, difference, order or bracket that a test compares is read off the hand-made table by the person who designs the case; this file writes no expected value of the science.
 - Tolerance: not applicable to the logic: counts, states, ranks and brackets are compared exactly.
 - Source: CITATION NEEDED
