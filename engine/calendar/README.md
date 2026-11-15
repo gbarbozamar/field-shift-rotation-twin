@@ -60,6 +60,17 @@ Not carried, because the rotation calendar has no field for them: `label`, `repe
 
 The questions the repetition leaves are under OPEN at the end of that docstring; Q5 of `contracts/ENTRYPOINTS.md` records the repetition as decided (D109) and keeps two points open: what the first agricultural year of the record is when the start month is not January, and which daily series marks the record.
 
+## Overlap check (D72, PROPOSED)
+
+Decision D72 (`USER-Z` in `docs/SCIENCE_DECISIONS.md`) states that initial executable calendars reject crops overlapping on the same area. `engine/calendar/overlap.py` implements this opt-in check as a pure helper module without modifying `RULES` in `rules.py` or `build_rotation_calendar` in `build.py`:
+
+- Rule identifier: `NO_OVERLAPPING_COMPONENTS` (`"no_overlapping_components"`).
+- `find_overlapping_components(rotation, *, allow_same_day_handoff=False)` compares pairs of components whose `sowing.date` and `harvest.date` are both present with `harvest.date >= sowing.date`. Undated components and components whose harvest precedes sowing are skipped cleanly.
+- `allow_same_day_handoff` controls whether a harvest on the exact day another component is sown (`harvest == next sowing`) is permitted (`True`) or reported as an overlap (`False`, default; two components sharing only that exact single day still count as overlapping).
+- `make_overlap_rule(*, allow_same_day_handoff=False)` builds a `CalendarRule` for `NO_OVERLAPPING_COMPONENTS`; `OVERLAP_RULE` is the strict default (`allow_same_day_handoff=False`) and `RULES_WITH_OVERLAP` appends it after `RULES`.
+- `check_feasibility_with_overlap(rotation, *, allow_same_day_handoff=False)` returns `Feasibility` checked against `RULES` plus the overlap rule.
+- Tested in `engine/calendar/test_overlap.py` (including the two non-overlapping D128 demonstration rotations, partial/nested/coincident overlaps, the same-day handoff toggle, undated components, and G1/G5 checks).
+
 ## PROPOSED choices
 
 EP2 does not say how a definition becomes a calendar. For each point below the engine takes the option that invents nothing. Each is a proposal for a person to accept or correct, and each has its question under [OPEN](#open).
