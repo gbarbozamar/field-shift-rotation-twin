@@ -41,6 +41,27 @@ describe('App routing', () => {
     expect(html).not.toContain('data-testid="fields-map"')
   })
 
+  it('the header links every section and marks the one shown', () => {
+    for (const [hash, current] of [
+      ['', '#/'],
+      ['#/fields', '#/fields'],
+      ['#/board', '#/board'],
+      ['#/plant', '#/plant'],
+    ] as const) {
+      const links = renderAppAtHash(hash).split('data-testid="nav-link"').slice(1).map((part) => part.split('>')[0])
+      expect(links.map((link) => link.match(/href="([^"]*)"/)![1])).toEqual(['#/', '#/fields', '#/board', '#/plant'])
+      const marked = links.filter((link) => link.includes('aria-current="page"'))
+      expect(marked.length, hash).toBe(1)
+      expect(marked[0], hash).toContain(`href="${current}"`)
+    }
+  })
+
+  it('renders the board at #/board', () => {
+    const html = renderAppAtHash('#/board')
+    expect(html).toContain(strings['board.title'])
+    expect(html).toContain(strings['map.select_hint'])
+  })
+
   it('renders the fields screen, with the map above the list, at #/fields', () => {
     const html = renderAppAtHash('#/fields')
     expect(html).toContain('data-testid="fields-map"')

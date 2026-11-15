@@ -359,6 +359,11 @@ export const strings = {
   // banner of the answer, the soil loss of a kind of year, the price track
   // and the link to the screen with every detail line. Wording is a person's
   // decision; the operator approves it.
+  'nav.label': 'Sections',
+  'nav.case': 'Case',
+  'nav.fields': 'Fields',
+  'nav.board': 'Plan a field',
+  'nav.report': 'Full report',
   'board.title': 'Plan this field',
   'board.step.field': 'Field',
   'board.step.candidates': 'Candidate rotations',
