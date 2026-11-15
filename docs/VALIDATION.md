@@ -320,18 +320,20 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 ### H10
 
 - What it checks (blueprint wording): "Contrast case from published runoff plots: modelled next to measured [E7, H10]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the yearly runoff of EP3 for the La Estanzuela runoff plots in 2017, 2018 and 2019, set next to the yearly average runoff printed by Grahmann et al. (2022), Table 5. The runoff experiment stays separate from the demonstration (D71). DECIDED under D161 ([D229 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768), 15 November 2026)
 - Lane: L0 Core
 - Block: "Block 3 — the full decision on real data, until CP3"
 - Unit it gates: "Contrast case from published runoff plots: modelled next to measured [E7, H10]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
-- Transcribed by: OPEN
-- Checked by: OPEN
-- Status: not defined
+- Decision: [D229](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768) and [D230](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893254289) of issue #77, taken under the delegation of D161 on 15 November 2026, before any result: no runoff of EP3 for the plots existed. The measured values are not written in this file.
+- Definition (PROPOSED by an AI session, unit l0/validation-h10-d230, issue #355; logic DECIDED under D161, D230 of issue #77, 15 November 2026): Input: the measured yearly runoff of the plots by calendar year (the six-plot mean the source prints), the yearly runoff of one run of EP3 on the plots with one set of plot records, by calendar year, and optionally that run's daily runoff. `compare_h10_runoff` of `validation/h10_runoff.py` computes the percent bias over the years, PBIAS = 100 × Σ(measured − modelled) / Σ measured (positive means EP3 underestimates); each year's relative error, with the sign of the percent bias; the order of the years by runoff, highest first, on each side, and whether the two orders match; the verdict of each condition and of H10; and the flag for a modelled single day above the cap of D230. H10 passes when both conditions of D230 hold: (1) the percent bias is within the bound, (2) EP3 ranks the years as the source does. Each year's relative error is reported with no pass mark. The flag never changes a verdict. A missing year or a missing value, on either side, gives no verdict, with its reason; nothing is filled or read as zero. A tie in either order gives no order, as in D0, and the order condition then has no verdict. A sum of the measured values that is not above zero gives no percent bias, with its reason. The bound and the cap are arguments with no default. The tests of this logic, `validation/test_h10_runoff.py`, run on hand-made tables labelled as example data, not on the values of the source. What D230 does not say (a tie, the verdict of H10 when one condition has none, the sign of a year's relative error, modelled years beyond the measured ones) is PROPOSED in the module and listed there as OPEN for the lead developer.
+- Expected value: the yearly averages of Grahmann et al. (2022), Table 5, in the fixture `validation/fixtures/h10_grahmann2022_runoff.json` (path PROPOSED). **The fixture does not exist yet**: it waits for a person to transcribe it from the page and sign it (D34, D66). That person also checks that the table's years are calendar years (D230).
+- Tolerance (D230): both conditions hold: (1) PBIAS within ±25%, read as a value exactly at the bound passing (PROPOSED); (2) the same order of the three years as the source. A modelled single event above 100 mm, the size up to which the source states the plot tanks captured events, is reported, and the rule does not change.
+- Source: named by D229 (Grahmann et al. 2022, Table 5) and D230 (Moriasi et al. 2007, Eq. 2, for the percent bias and the bound); the full reference and locators travel in the fixture and are checked by the person who signs.
+- Transcribed by: OPEN (the fixture's `transcribed_by`)
+- Checked by: OPEN (the fixture's `checked_by`; D34, D66)
+- Known limits: EP3 has never given runoff for these plots, and the plots' Curve Number and soil profile records are not signed, so no run of H10 exists. With three years and one printed mean per year, a pass or a fail is weak evidence either way (D230).
+- Status: logic DECIDED under D161 (D230); acceptance by a science reviewer pending
 
 ## D codes
 
