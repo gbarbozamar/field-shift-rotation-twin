@@ -22,8 +22,9 @@ keyword argument ``parameters`` (Q3, D46, D56).
 ``compute_soil_loss_daily_index`` keeps the daily-index route available, off
 the main path: ``R`` through the daily erosivity index of ``r_factor/`` and
 ``C`` of each year through ``engine/erosion/c_factor/`` (D45, PC-1) from the
-crop and the last harvest of each day of the calendar. The runner never
-calls it. See SOIL_LOSS.md in this folder.
+crop and the last harvest of each day of the rotation repeated over the years
+of the record (D47, ``engine/calendar/repeat.py``, unit l1/calendar-repeat-d47).
+The runner never calls it. See SOIL_LOSS.md in this folder.
 
 Status: PROPOSED (blueprint section 3.7): the parameter identifiers and their
 scope, the monthly value of the main route, the crop and the residue of a
@@ -44,7 +45,7 @@ from dataclasses import dataclass, field
 from typing import Protocol, get_args
 
 from contracts.inputs.common import Value
-from contracts.inputs.rotation_calendar import CalendarComponent, RotationCalendar
+from contracts.inputs.rotation_calendar import RotationCalendar
 from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.inputs.site_soil_slope import SiteSoilSlope
 from contracts.results.models import (
@@ -56,6 +57,11 @@ from contracts.results.models import (
     Missing,
     MonthlySoilLoss,
     SoilLossResults,
+)
+from engine.calendar.repeat import (
+    RepeatedComponent,
+    RepeatedRotation,
+    repeat_over_record,
 )
 from engine.erosion import c_factor, ls, r_factor
 from engine.erosion._parameters import Parameter, ParameterReader, scope_text
@@ -257,9 +263,10 @@ CLIMATOLOGY_PART = (
 DECLARED_C = (
     "C is the single declared value of the record "
     f"'{C_ID}' (DECLARED; docs/METHODS.md M1.2, decisions D69, D84 and D101 of "
-    "issue #77, USER-G): a C computed through engine/erosion/c_factor/ needs the "
-    "crop of each day of the climate record, and the rotation is not yet repeated "
-    "over the years of the record (D47; OPEN 28 of engine/erosion/SOIL_LOSS.md)"
+    "issue #77, USER-G): C computed through engine/erosion/c_factor/ from the "
+    "rotation repeated over the years of the record (D47, engine/calendar/repeat.py) "
+    "is on the daily-index route, and whether the main route switches to it is "
+    "not decided (OPEN 28 of engine/erosion/SOIL_LOSS.md)"
 )
 RANGE_NOT_BUILT = (
     "how an uncertainty range passes through the product of docs/METHODS.md M1.1 "
@@ -284,16 +291,23 @@ RESIDUE_PART = (
     "the surface residue cover, with residue decay by residue type, of "
     "docs/METHODS.md M1.5 (decision D45 of issue #77; engine/erosion/c_factor/)"
 )
-OUTSIDE_CALENDAR = (
-    "the day lies outside the dates of the rotation calendar, and how the rotation "
-    "is repeated over the years of the climate record (decision D47 of issue #77) "
-    "is not laid out (OPEN 2 of engine/erosion/SOIL_LOSS.md)"
+OUTSIDE_RECORD = (
+    "the day lies outside the agricultural years of the climate record over which "
+    "the rotation is repeated (decision D47 of issue #77; engine/calendar/repeat.py)"
+)
+BEFORE_FIRST_CYCLE = (
+    "the day lies before the first cycle of the rotation repeated over the years of "
+    "the climate record (decision D47 of issue #77; engine/calendar/repeat.py), so "
+    "the calendar does not describe it: nothing is laid out before the first cycle "
+    "(OPEN 2 of engine/erosion/SOIL_LOSS.md)"
 )
 NO_HARVEST_BEFORE = (
-    "no component of the rotation calendar ends before the day, so the residue on "
-    "the surface is not known: the residue left before the calendar begins needs "
-    "the rotation repeated over the years (decision D47 of issue #77) or the "
-    "residue ledger (Q12 of contracts/ENTRYPOINTS.md)"
+    "no component of the rotation, repeated over the years of the climate record "
+    "from its first agricultural year (decision D47 of issue #77; "
+    "engine/calendar/repeat.py), ends before the day, so the residue on the surface "
+    "is not known: the residue left before the record begins is not laid out "
+    "(OPEN 2 of engine/erosion/SOIL_LOSS.md; the residue ledger, Q12 of "
+    "contracts/ENTRYPOINTS.md)"
 )
 TOLERANCE_NOT_SUPPLIED = Missing(
     reason="NOT_AVAILABLE",
@@ -724,22 +738,37 @@ def _r_of_year(erosivity: _Erosivity, ag_year: int, start_month: int) -> Factor:
 # --- C: through c_factor/ (M1.5, D45) --------------------------------------------
 
 
-def _crop_scope(calendar: RotationCalendar, day: dt.date) -> dict[str, str] | _Problem:
+def _earliest(component: RepeatedComponent) -> dt.date:
+    """The first day a component can cover: its start, else its cycle's start."""
+    return component.start if component.start is not None else component.calendar_start
+
+
+def _latest(component: RepeatedComponent) -> dt.date:
+    """The last day a component can cover: its end, else the day before the
+    next cycle starts (point 7 of engine/calendar/repeat.py)."""
+    return component.end if component.end is not None else component.cycle_last_day
+
+
+def _crop_scope(repeated: RepeatedRotation, day: dt.date) -> dict[str, str] | _Problem:
     """The scope of the canopy records of a day. PROPOSED, as engine/water/.
 
-    The crop of the one dated component that covers the day; ``NO_CROP_SCOPE``
-    when no component can cover it; a problem when the day lies outside the
-    calendar, when two components cover it, or when a component with a
-    missing date could cover it.
+    The crop of the one dated component of the repeated rotation (D47) that
+    covers the day; ``NO_CROP_SCOPE`` when no component can cover it; a
+    problem when the day lies outside the years of the record or before the
+    first cycle, when two components cover it, or when a component with a
+    missing date could cover it (within its cycle, point 7 of
+    engine/calendar/repeat.py).
     """
-    if not calendar.start_date <= day <= calendar.end_date:
-        return _Problem("MISSING_INPUT", OUTSIDE_CALENDAR)
+    if not repeated.first_day <= day <= repeated.last_day:
+        return _Problem("MISSING_INPUT", OUTSIDE_RECORD)
+    if day < repeated.described_from:
+        return _Problem("MISSING_INPUT", BEFORE_FIRST_CYCLE)
     covering = [
         component
-        for component in calendar.components
-        if component.start.date is not None
-        and component.end.date is not None
-        and component.start.date <= day <= component.end.date
+        for component in repeated.components
+        if component.start is not None
+        and component.end is not None
+        and component.start <= day <= component.end
     ]
     if len(covering) > _FIRST:
         names = ", ".join(repr(c.component_id) for c in covering)
@@ -752,13 +781,12 @@ def _crop_scope(calendar: RotationCalendar, day: dt.date) -> dict[str, str] | _P
         return {CROP_KEY: component.crop_id}
     undated = [
         component.component_id
-        for component in calendar.components
-        if (component.start.date is None or component.end.date is None)
-        and (component.start.date is None or component.start.date <= day)
-        and (component.end.date is None or day <= component.end.date)
+        for component in repeated.components
+        if (component.start is None or component.end is None)
+        and _earliest(component) <= day <= _latest(component)
     ]
     if undated:
-        names = ", ".join(repr(name) for name in undated)
+        names = ", ".join(repr(name) for name in dict.fromkeys(undated))
         return _Problem(
             "MISSING_INPUT",
             f"the component(s) {names} of the rotation calendar have a missing date, "
@@ -768,39 +796,42 @@ def _crop_scope(calendar: RotationCalendar, day: dt.date) -> dict[str, str] | _P
 
 
 def _last_harvest(
-    calendar: RotationCalendar, day: dt.date
-) -> CalendarComponent | _Problem:
+    repeated: RepeatedRotation, day: dt.date
+) -> RepeatedComponent | _Problem:
     """The component whose end date is the last one before the day. PROPOSED.
 
-    Its residue is the residue on the surface on the day. A problem when the
-    day lies outside the calendar, when a component without an end date
-    could have ended before the day, when no component ends before it, or
-    when two components end on that last date.
+    Searched in the rotation repeated over the years of the record (D47). Its
+    residue is the residue on the surface on the day. A problem when the day
+    lies outside the years of the record, when a component without an end
+    date could have ended before the day and after every known end before it,
+    when no component ends before it, or when two components end on that
+    last date.
     """
-    if not calendar.start_date <= day <= calendar.end_date:
-        return _Problem("MISSING_INPUT", OUTSIDE_CALENDAR)
+    if not repeated.first_day <= day <= repeated.last_day:
+        return _Problem("MISSING_INPUT", OUTSIDE_RECORD)
+    ended = [
+        component
+        for component in repeated.components
+        if component.end is not None and component.end < day
+    ]
+    last = max((c.end for c in ended if c.end is not None), default=None)
     unknown = [
         component.component_id
-        for component in calendar.components
-        if component.end.date is None
-        and (component.start.date is None or component.start.date < day)
+        for component in repeated.components
+        if component.end is None
+        and _earliest(component) < day
+        and (last is None or component.cycle_last_day >= last)
     ]
     if unknown:
-        names = ", ".join(repr(name) for name in unknown)
+        names = ", ".join(repr(name) for name in dict.fromkeys(unknown))
         return _Problem(
             "MISSING_INPUT",
             f"the component(s) {names} of the rotation calendar have no end date, so "
             "the last harvest before the day is not known",
         )
-    ended = [
-        component
-        for component in calendar.components
-        if component.end.date is not None and component.end.date < day
-    ]
-    if not ended:
+    if last is None:
         return _Problem("MISSING_INPUT", NO_HARVEST_BEFORE)
-    last = max(component.end.date for component in ended if component.end.date)
-    at_last = [component for component in ended if component.end.date == last]
+    at_last = [component for component in ended if component.end == last]
     if len(at_last) > _FIRST:
         names = ", ".join(repr(c.component_id) for c in at_last)
         return _Problem(
@@ -837,7 +868,7 @@ class _DayInputs:
     """What the soil-loss ratio of one day is computed from."""
 
     crop_scope: dict[str, str]
-    harvest: CalendarComponent
+    harvest: RepeatedComponent
 
 
 def _scope_of_crop(crop_id: str) -> dict[str, str]:
@@ -845,7 +876,7 @@ def _scope_of_crop(crop_id: str) -> dict[str, str]:
 
 
 def _c_inputs(
-    calendar: RotationCalendar,
+    repeated: RepeatedRotation,
     ag_year: int,
     start_month: int,
     reader: ParameterReader,
@@ -870,8 +901,8 @@ def _c_inputs(
             problems.append(problem)
     for year, month in _months_of(ag_year, start_month):
         for day in _days_of(year, month):
-            crop_scope = _crop_scope(calendar, day)
-            harvest = _last_harvest(calendar, day)
+            crop_scope = _crop_scope(repeated, day)
+            harvest = _last_harvest(repeated, day)
             if isinstance(crop_scope, _Problem):
                 groups.add(crop_scope, day)
             else:
@@ -988,14 +1019,14 @@ def _day_ratio(
     mass_coefficient = reader.read(MASS_COVER_COEFFICIENT_ID, SCOPE)
     fall_coefficient = reader.read(FALL_HEIGHT_COEFFICIENT_ID, SCOPE)
     fall_height = reader.read(FALL_HEIGHT_ID, inputs.crop_scope)
-    assert harvest.end.date is not None
+    assert harvest.end is not None
 
     after_decay = c_factor.residue_mass_after_decay(
         residue_mass=_number(mass),
         residue_type=harvest.crop_id,
         decay_coefficients={harvest.crop_id: _number(decay)},
         decay_coefficient_per_unit=_inverse_of(decay),
-        elapsed_time=(day - harvest.end.date).days,
+        elapsed_time=(day - harvest.end).days,
         elapsed_time_unit=DAY,
     )
     if isinstance(after_decay, Missing):
@@ -1054,7 +1085,7 @@ def _mean(values: list[float]) -> float:
 
 
 def _c_of_year(
-    calendar: RotationCalendar,
+    repeated: RepeatedRotation,
     ag_year: int,
     start_month: int,
     erosivity: _Erosivity,
@@ -1086,7 +1117,7 @@ def _c_of_year(
                 f"({fractions.reason}: {fractions.detail})",
             )
         )
-    inputs, more = _c_inputs(calendar, ag_year, start_month, reader)
+    inputs, more = _c_inputs(repeated, ag_year, start_month, reader)
     problems += more
     if problems:
         return Factor(value=_combined(problems, prefix), unit=ACCEPTED_UNITS.c)
@@ -1269,6 +1300,7 @@ class _Inputs:
     start_month: int
     ag_years: tuple[int, ...]
     parameters: dict[str, dict]
+    repeated: RepeatedRotation  # the rotation over the years of the record (D47)
 
 
 class _Route(Protocol):
@@ -1439,7 +1471,7 @@ class _DailyRoute:
         start_month = self.inputs.start_month
         r = _r_of_year(self.erosivity, ag_year, start_month)
         c = _c_of_year(
-            self.inputs.calendar, ag_year, start_month, self.erosivity, reader
+            self.inputs.repeated, ag_year, start_month, self.erosivity, reader
         )
         return _annual_product(r, self.k, self.ls, c, self.p), _daily_source(reader)
 
@@ -1490,6 +1522,9 @@ def _soil_loss(
     if not calendar.feasibility.feasible:
         infeasible = Missing(reason="NOT_COMPUTABLE", detail=INFEASIBLE)
     else:
+        repeated = repeat_over_record(calendar, series.start_date, series.end_date)
+        assert isinstance(repeated, RepeatedRotation)  # the start month is known
+        assert repeated.ag_years == ag_years
         route = route_of(
             _Inputs(
                 calendar=calendar,
@@ -1498,6 +1533,7 @@ def _soil_loss(
                 start_month=start_month,
                 ag_years=ag_years,
                 parameters=parameters,
+                repeated=repeated,
             )
         )
 
