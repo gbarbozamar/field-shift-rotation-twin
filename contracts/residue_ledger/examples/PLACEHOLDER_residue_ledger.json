@@ -403,6 +403,56 @@
           }
         }
       ]
+    },
+    {
+      "quantity": "placeholder_crop_b_cover_root_carbon",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_b_belowground",
+      "first_ag_year": 2001,
+      "last_ag_year": 2002,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "ag_year": 2002,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_b_cover_rhizodeposit_carbon",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_b_belowground",
+      "first_ag_year": 2001,
+      "last_ag_year": 2002,
+      "years": [
+        {
+          "ag_year": 2001,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "ag_year": 2002,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        }
+      ]
     }
   ],
   "monthly_carbon_inputs": [

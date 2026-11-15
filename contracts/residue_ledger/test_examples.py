@@ -165,6 +165,62 @@ def test_monthly_series_rules_are_checked():
         rejected(data, words)
 
 
+def test_monthly_series_cover_the_origins_of_the_annual_series():
+    """D221 of #77: one monthly series for every origin of the annual series
+    and for no other; annual series without monthly ones are refused."""
+    ledger = ResidueLedger.model_validate(load())
+    assert {s.origin for s in ledger.monthly_carbon_inputs} == {
+        s.origin for s in ledger.annual_carbon_inputs
+    }
+    words = "one series for every origin of annual_carbon_inputs"
+    data = load()
+    data["monthly_carbon_inputs"].pop(3)  # placeholder_crop_b_belowground
+    rejected(data, words)
+    data = load()
+    data["monthly_carbon_inputs"] = []
+    rejected(data, words)
+    data = load()
+    data["annual_carbon_inputs"] = [
+        s
+        for s in data["annual_carbon_inputs"]
+        if s["origin"] != "placeholder_crop_b_belowground"
+    ]
+    rejected(data, words)
+    data = load()
+    data.update(annual_carbon_inputs=[], monthly_carbon_inputs=[])
+    ResidueLedger.model_validate(data)  # no series of either kind
+
+
+def start_monthly_series_in(data: dict[str, Any], month: int) -> None:
+    """Lay every monthly series of the example out again from ``month`` of
+    first_ag_year, keeping the count of months and their values."""
+    first = data["first_ag_year"] * 12 + month - 1
+    for series in data["monthly_carbon_inputs"]:
+        for index, item in enumerate(series["months"]):
+            item["year"], item["month"] = divmod(first + index, 12)
+            item["month"] += 1
+        last = series["months"][-1]
+        series["start"] = {"year": data["first_ag_year"], "month": month}
+        series["end"] = {"year": last["year"], "month": last["month"]}
+
+
+def test_monthly_start_month_is_bounded_by_the_harvests():
+    """The start month is not a field of the ledger; a dated harvest falls in
+    one of the twelve months of its ag_year counted from the start month of
+    the series (C5.3). The example's harvests are on 1 May, in the
+    agricultural year of the same calendar year."""
+    for month in (1, 5):
+        data = load()
+        start_monthly_series_in(data, month)
+        ResidueLedger.model_validate(data)
+    data = load()
+    start_monthly_series_in(data, 6)  # 1 May 2001 is then before ag_year 2001
+    rejected(data, "they start in month 6")
+    data = load()
+    data["components"][2]["ag_year"] = 2001  # 1 May 2002 is after ag_year 2001
+    rejected(data, "they start in month 1")
+
+
 def test_years_and_their_missing_reason_together_are_rejected():
     data = load()
     data["years_missing"] = dict(GONE)
@@ -275,6 +331,7 @@ def test_series_origin_follows_the_part_group():
         "placeholder_crop_a_aboveground",
         "placeholder_crop_a_belowground",
         "placeholder_crop_b_aboveground",
+        "placeholder_crop_b_belowground",
     }
     for index, quantity, origin, words in (
         # the plain crop word is no longer an origin of a ledger series
