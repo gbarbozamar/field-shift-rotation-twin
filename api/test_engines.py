@@ -2288,12 +2288,17 @@ def test_d256_the_runners_et0_is_the_one_ep3_runs_its_chain_on(monkeypatch):
     day by day, the one EP3's daily chain obtains (``exposure.et0_days``)."""
     water = pytest.importorskip("engine.water")
     exposure = pytest.importorskip("engine.water.exposure")
-    if not hasattr(exposure, "et0_days"):
-        pytest.skip("engine.water.exposure.et0_days is not there to read EP3's ET0")
     ep3 = getattr(water, "compute_water_deficit_exposure", None)
     public = getattr(water, "daily_reference_evapotranspiration", None)
     if ep3 is None or public is None:
         pytest.skip("EP3 or the public function of D256 is not built")
+    # With both built, the pinning must not be lost silently: if EP3 stops
+    # reading its ET0 through ``exposure.et0_days`` (D256 asks it to call the
+    # public function), this test fails so that it is re-pinned in that unit.
+    assert hasattr(exposure, "et0_days"), (
+        "engine.water.exposure.et0_days is gone: re-pin the runner's ET0 to EP3's "
+        "in the unit that changed how EP3 reads its ET0 (D256)"
+    )
     from api.config import PARAMETERS_FOLDER, load_parameters
 
     parameters = load_parameters(PARAMETERS_FOLDER)
