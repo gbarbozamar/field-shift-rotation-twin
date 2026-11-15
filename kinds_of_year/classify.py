@@ -224,7 +224,9 @@ def classify_agricultural_years(
             detail = (
                 None
                 if kind is not None
-                else f"the run of season {season} {season_year} reaches past the record"
+                else f"a season needed to judge the run of season {season} "
+                f"{season_year} is not in the record (outside its span or a gap "
+                "in it)"
             )
         result[ag_year] = KindOfYear(
             kind=kind,

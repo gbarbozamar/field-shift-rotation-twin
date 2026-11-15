@@ -157,7 +157,10 @@ def rain_stress(factor: Value) -> RainStress | RainStressMissing:
     number: Any = factor.value
     if number is None:
         # The Value contract gives a missing value its missing part (C3.1).
-        assert factor.missing is not None
+        if factor.missing is None:
+            raise ValueError(
+                "factor: a missing value carries a missing part with its reason (C3.1)"
+            )
         return RainStressMissing(
             missing=factor.missing, detail=_missing_detail(factor.missing)
         )
