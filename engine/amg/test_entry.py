@@ -40,8 +40,10 @@ from contracts.results.models import TREND_COMPUTATIONS, UNIT_SOIL_CARBON_TREND
 from engine.amg import entry
 from engine.amg.entry import (
     FORCING_QUANTITIES,
+    METHOD_LABEL,
     MODIFIERS,
     PARAMETERS,
+    POOL_QUANTITIES,
     SCHEME,
     STEP_UNIT,
     STOCK_UNIT,
@@ -767,6 +769,103 @@ def test_entry_holds_no_value_of_the_method():
         and not isinstance(node.value, bool)
     }
     assert numbers <= {0, 1}, numbers
+
+
+# --- the label of the method (D210) ------------------------------------------------------
+
+
+def carriers(balance: CarbonBalance) -> list[tuple[str, Any, bool]]:
+    """Each part of the balance that carries a ``source`` when it holds a number.
+
+    The header of each stock and flow series (it holds a number when one of
+    its steps does; a step carries no source of its own), the ``initial`` of
+    each stock series, and each trend value. With where it is, and whether
+    it holds a number.
+    """
+    found = []
+    for series in [balance.total_stock, *balance.pools, *balance.flows]:
+        holds = any(step.value is not None for step in series.steps)
+        found.append((series.quantity, series, holds))
+        if hasattr(series, "initial"):
+            initial = series.initial
+            found.append(
+                (f"{series.quantity}.initial", initial, initial.value is not None)
+            )
+    found += [
+        (f"trend {item.computation}", item, item.value is not None)
+        for item in balance.soil_carbon_trend
+    ]
+    return found
+
+
+def test_every_number_carries_the_method_label_first():
+    """D210: every part that holds a number opens its source with the label,
+    then "; " and the source text EP5 wrote before."""
+    parameters = catalogue()
+    assert check_catalogue(parameters) == []
+    balance = run_amg(forcing(forcing_data()), parameters=parameters)
+    parts = carriers(balance)
+    # Five series, three initial stocks, three trend values; only
+    # mean_over_cycles, which has no input, holds no number.
+    assert len(parts) == len(POOL_QUANTITIES) * 2 + 2 + len(TREND_COMPUTATIONS)
+    assert [where for where, _, holds in parts if not holds] == [
+        "trend mean_over_cycles"
+    ]
+    opening = f"{METHOD_LABEL}; "
+    rest = {}
+    for where, part, holds in parts:
+        if holds:
+            assert part.source.startswith(opening), where
+            assert part.source.count(METHOD_LABEL) == 1, where
+            rest[where] = part.source[len(opening) :]
+    total = POOL_QUANTITIES["total"]
+    assert rest[f"{total}.initial"].startswith("derived by engine.amg.run_amg ")
+    assert rest[total].startswith("simulated by engine.amg.run_amg, variant 'amg_a'")
+    for name in ("end_minus_start", "fitted_slope"):
+        assert rest[f"trend {name}"] == (
+            f"{rest[total]}; computation '{name}' of engine/amg/trend.py"
+        )
+
+
+def test_a_missing_value_carries_no_source():
+    """A missing value carries no source, and so no label (the models require it)."""
+    balance = run_amg(example_forcing(), parameters={})
+    parts = carriers(balance)
+    assert parts
+    for where, part, holds in parts:
+        assert not holds, where
+        assert part.source is None, where
+    dumped = json.dumps(balance.model_dump(mode="json"), ensure_ascii=False)
+    assert METHOD_LABEL not in dumped  # the degree sign kept as it is
+    # mean_over_cycles is always missing: no source either when the rest is computed.
+    computed = run_amg(forcing(), parameters=catalogue())
+    (cycles,) = [
+        item
+        for item in computed.soil_carbon_trend
+        if item.computation == "mean_over_cycles"
+    ]
+    assert cycles.value is None and cycles.source is None
+
+
+def readme_labels() -> list[str]:
+    """Each ``text`` block of README.md, section "EP5 run_amg", without its indentation."""
+    blocks = re.findall(
+        r"^( *)```text\n(.*?)\n\1```$", section("EP5 run_amg"), flags=re.M | re.S
+    )
+    return [
+        "\n".join(line.removeprefix(indent) for line in body.split("\n"))
+        for indent, body in blocks
+    ]
+
+
+def test_the_method_label_is_the_one_of_the_readme():
+    assert readme_labels() == [METHOD_LABEL]
+
+
+def test_the_method_label_names_no_site_value():
+    """D210: the facts of one site travel with the site's own records, not here."""
+    for word in ("transferred", "La Estanzuela", "Uruguay", "clay", "C:N"):
+        assert word.lower() not in METHOD_LABEL.lower(), word
 
 
 def section(title: str) -> str:
