@@ -30,6 +30,8 @@ jobs:
       - name: Lint the platform folders
         run: |
           folders=""
+          # economics/ and kinds_of_year/ come from l2/main-nico (#392, #386);
+          # a folder that does not exist yet is skipped.
           for folder in api adapters ci economics kinds_of_year; do
             if [ -d "$folder" ]; then folders="$folders $folder"; fi
           done
