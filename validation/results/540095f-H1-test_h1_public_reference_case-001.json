@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "540095f-H1-test_h1_public_reference_case-001",
+  "run_id": "run-20261115T194950Z-540095f",
+  "test_code": "H1",
+  "expected": {
+    "missing_reason": "the expected values of this check are in the signed fixture validation/fixtures/h1_fao56_example37.json, which the test reads; this store holds no expected-value record for it (validation/README.md, OPEN 21)"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/water/balance/test_bucket.py::test_h1_public_reference_case"
+  },
+  "notes": "Test engine/water/balance/test_bucket.py::test_h1_public_reference_case. Placed under H1: named as the test of the entry in docs/VALIDATION.md, entry H1."
+}

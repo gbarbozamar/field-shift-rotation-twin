@@ -50,6 +50,10 @@ RECORDED_RUNS = {
         "outcomes": {"passed": 497, "failed": 0, "not_evaluated": 1},
         "skipped_in_the_whole_suite": 16,
     },
+    "run-20261115T194950Z-540095f": {
+        "outcomes": {"passed": 497, "failed": 0, "not_evaluated": 1},
+        "skipped_in_the_whole_suite": 16,
+    },
 }
 
 _ENTRY_HEADING_RE = re.compile(r"^### ([EHD][0-9]+[a-z]?)\s*$")
@@ -65,7 +69,11 @@ def store() -> records.Store:
 
 
 def results_of(store: records.Store, run_id: str) -> dict[str, dict]:
-    return {key: result for key, result in store.results.items() if result["run_id"] == run_id}
+    return {
+        key: result
+        for key, result in store.results.items()
+        if result["run_id"] == run_id
+    }
 
 
 def codes_not_defined() -> set[str]:
@@ -88,7 +96,11 @@ def top_level_tests_of(path: str) -> dict[str, ast.FunctionDef]:
     file = REPOSITORY / path
     assert file.is_file(), f"{path} is not a file of the repository"
     tree = ast.parse(file.read_text(encoding="utf-8"))
-    return {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")}
+    return {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+    }
 
 
 def named_by_the_entries() -> dict[str, tuple[str, str]]:
@@ -138,8 +150,12 @@ def test_a_run_names_its_commit_its_protocol_and_the_session_that_ran_it(store, 
 
 @pytest.mark.parametrize("run_id", sorted(RECORDED_RUNS))
 def test_the_results_of_a_run_give_the_counts_pytest_reported(store, run_id):
-    outcomes = Counter(result["outcome"] for result in results_of(store, run_id).values())
-    assert {word: outcomes[word] for word in records.OUTCOMES} == RECORDED_RUNS[run_id]["outcomes"]
+    outcomes = Counter(
+        result["outcome"] for result in results_of(store, run_id).values()
+    )
+    assert {word: outcomes[word] for word in records.OUTCOMES} == RECORDED_RUNS[run_id][
+        "outcomes"
+    ]
 
 
 def test_summarise_gives_the_counts_pytest_reported(store):
@@ -159,8 +175,14 @@ def test_summarise_gives_the_counts_pytest_reported(store):
 @pytest.mark.parametrize("run_id", sorted(RECORDED_RUNS))
 def test_a_code_without_a_result_is_listed_and_never_counted(store, run_id):
     run = store.runs[run_id]
-    with_a_result = {result["test_code"] for result in results_of(store, run_id).values()}
-    listed = [item["test_code"] for item in records.summarise(store)["no_result"] if item["run_id"] == run_id]
+    with_a_result = {
+        result["test_code"] for result in results_of(store, run_id).values()
+    }
+    listed = [
+        item["test_code"]
+        for item in records.summarise(store)["no_result"]
+        if item["run_id"] == run_id
+    ]
     assert listed == [code for code in run["test_codes"] if code not in with_a_result]
     assert listed, "this run has codes with no test; they must stay visible"
 
@@ -169,7 +191,11 @@ def test_no_code_whose_entry_is_not_defined_holds_a_passed_result(store):
     # Since D252 to D254 no entry of docs/VALIDATION.md has the status
     # "not defined"; the check stays for any entry that returns to it.
     not_defined = codes_not_defined()
-    passed = {result["test_code"] for result in store.results.values() if result["outcome"] == "passed"}
+    passed = {
+        result["test_code"]
+        for result in store.results.values()
+        if result["outcome"] == "passed"
+    }
     assert passed & not_defined == set()
 
 
@@ -185,7 +211,10 @@ def test_every_result_names_the_test_it_is_the_outcome_of(store, run_id):
         node = f"{path}::{function}{case or ''}"
         names.append(node)
         # The id is built from the commit, the code and the test function.
-        assert re.fullmatch(re.escape(f"{short}-{result['test_code']}-{function}-") + r"\d{3}", result_id)
+        assert re.fullmatch(
+            re.escape(f"{short}-{result['test_code']}-{function}-") + r"\d{3}",
+            result_id,
+        )
         slot = result["observed"]
         assert node in (slot.get("text") or slot.get("missing_reason"))
         # No expected-value record is pointed to: the store holds none.
@@ -208,9 +237,13 @@ def test_the_latest_run_names_test_files_and_functions_that_exist(store):
     for result_id, result in results_of(store, run_id).items():
         path, function, case = _RESULT_TEST_RE.match(result["notes"]).groups()
         found = functions.setdefault(path, top_level_tests_of(path))
-        assert function in found, f"{result_id} names {path}::{function}, which is not a test of that file"
+        assert function in found, (
+            f"{result_id} names {path}::{function}, which is not a test of that file"
+        )
         if case:
-            assert found[function].decorator_list, f"{result_id} names a case of a test that has no cases"
+            assert found[function].decorator_list, (
+                f"{result_id} names a case of a test that has no cases"
+            )
         if result["test_code"] in named_by_entry:
             # Where the entry names its test, the result is the outcome of that test.
             assert (path, function) == named_by_entry[result["test_code"]], result_id
@@ -220,19 +253,30 @@ def test_the_latest_run_names_test_files_and_functions_that_exist(store):
         if line.startswith("- SKIPPED "):
             path, function = _SKIPPED_LINE_RE.match(line).groups()
             found = functions.setdefault(path, top_level_tests_of(path))
-            assert function in found, f"the notes name {path}::{function}, which is not a test of that file"
+            assert function in found, (
+                f"the notes name {path}::{function}, which is not a test of that file"
+            )
 
 
 @pytest.mark.parametrize("run_id", sorted(RECORDED_RUNS))
 def test_every_skipped_test_is_in_the_store_with_its_reason(store, run_id):
-    not_evaluated = [r for r in results_of(store, run_id).values() if r["outcome"] == "not_evaluated"]
+    not_evaluated = [
+        r for r in results_of(store, run_id).values() if r["outcome"] == "not_evaluated"
+    ]
     for result in not_evaluated:
         # The three tests skipped under a code name that code in their reason.
         assert result["reason"].startswith(f"[{result['test_code']}] ")
         assert "pytest skipped" in result["observed"]["missing_reason"]
-    lines = [line for line in store.runs[run_id]["notes"].splitlines() if line.startswith("- SKIPPED ")]
+    lines = [
+        line
+        for line in store.runs[run_id]["notes"].splitlines()
+        if line.startswith("- SKIPPED ")
+    ]
     assert all(re.match(r"- SKIPPED \S+\.py::test_\w+: \S", line) for line in lines)
-    assert len(not_evaluated) + len(lines) == RECORDED_RUNS[run_id]["skipped_in_the_whole_suite"]
+    assert (
+        len(not_evaluated) + len(lines)
+        == RECORDED_RUNS[run_id]["skipped_in_the_whole_suite"]
+    )
 
 
 @pytest.mark.parametrize("run_id", sorted(RECORDED_RUNS))
@@ -240,12 +284,21 @@ def test_the_notes_of_a_run_hold_what_no_result_can(store, run_id):
     notes = store.runs[run_id]["notes"]
     # The plot check has no code, so it has no result. Its entry gives it two
     # statuses, one for each way of obtaining C, and the notes keep them apart.
-    assert "PLOT CHECK WITHOUT A CODE: NOT PASSED FOR THE COMPUTED C; A KNOWN OVERESTIMATE FOR THE DECLARED C" in notes
+    assert (
+        "PLOT CHECK WITHOUT A CODE: NOT PASSED FOR THE COMPUTED C; A KNOWN OVERESTIMATE FOR THE DECLARED C"
+        in notes
+    )
     # The tests of the machinery of E3 and H2 ran and are not results.
-    assert re.search(r"TESTS OF THE MACHINERY OF E3 AND H2, NOT RECORDED AS RESULTS \(\d+ items\)", notes)
+    assert re.search(
+        r"TESTS OF THE MACHINERY OF E3 AND H2, NOT RECORDED AS RESULTS \(\d+ items\)",
+        notes,
+    )
     # The structural cases under entries that are not defined are not results.
     assert "passing them does not make either entry pass" in notes
     for code in ("E8", "E9", "H7", "H8"):
-        assert re.search(rf"{code}: \d+ items of \d+ test functions ran, \d+ passed, \d+ did not pass", notes)
+        assert re.search(
+            rf"{code}: \d+ items of \d+ test functions ran, \d+ passed, \d+ did not pass",
+            notes,
+        )
     # The decision tests ran on the functions as they are.
     assert "do not say that the decided rule is built" in notes
