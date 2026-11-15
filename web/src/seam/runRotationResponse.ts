@@ -375,8 +375,10 @@ function parseListPartOrNotBuilt(
  * NASA POWER source behind the platform route — answered fresh or cached
  * data (adapters/ports.py). An unavailable or example climate source leaves
  * the flag off: the live-data label then does not show, whatever the values.
+ * Exported for the decision route, whose envelope carries the same sources
+ * list (issue #354).
  */
-function parseLiveData(value: unknown): boolean {
+export function parseLiveData(value: unknown): boolean {
   if (!Array.isArray(value)) {
     throw new Error('invalid-envelope:sources-not-a-list')
   }
