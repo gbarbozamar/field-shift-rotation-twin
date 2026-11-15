@@ -14,8 +14,11 @@ import json
 
 import pytest
 
+from api.decision_layer import check_document
+from api.ports import UncertainInputSpec
 from contracts.decision_output import DecisionOutput
 from contracts.results.models import Range, ResultsTable, ResultsTableRow
+from decision.functions import UncertainInput
 from decision.output import assemble_decision_output
 from demo import matrix
 
@@ -487,3 +490,232 @@ def test_only_a_computation_that_does_not_enter_the_state_gives_no_state():
         ("amg", "end_minus_start"),
         ("amg", "fitted_slope"),
     }
+
+
+# --- D4: optional uncertain_inputs and measure_first -------------------------------
+
+
+def test_omitted_or_none_uncertain_inputs_leaves_measure_first_empty():
+    given = matrix.thin_matrix()
+    omitted = assemble_decision_output(given, example_data=True)
+    explicit_none = assemble_decision_output(
+        given, example_data=True, uncertain_inputs=None
+    )
+    assert omitted.measure_first == []
+    assert explicit_none.model_dump(mode="json") == omitted.model_dump(mode="json")
+
+
+def test_uncertain_inputs_populates_measure_first_in_rank_order():
+    """Rank-1 inputs (those whose values change the state) precede rank-2 inputs
+    even when listed after them in the caller's sequence."""
+    rows = [
+        # s1: B strictly improves over A; s2: B crosses zero (not separated);
+        # s3: B still strictly improves over A.
+        soil("A", "s1", 2001, 9.0, 8.5, 9.5),
+        soil("B", "s1", 2001, 2.0, 1.5, 2.5),
+        soil("A", "s2", 2001, 5.0, 4.5, 5.5),
+        soil("B", "s2", 2001, 4.8, 4.3, 5.3),
+        soil("A", "s3", 2001, 9.0, 8.5, 9.5),
+        soil("B", "s3", 2001, 3.0, 2.5, 3.5),
+    ]
+    given = table(rows)
+    constant = UncertainInput(
+        name="u_constant",
+        unit="t ha-1 yr-1",
+        cell=("B", "soil_loss", "ag_year", 2001, None, None),
+        values=((2.0, "s1"), (3.0, "s3")),
+    )
+    changer = UncertainInput(
+        name="u_changer",
+        unit="t ha-1 yr-1",
+        cell=("B", "soil_loss", "ag_year", 2001, None, None),
+        values=((2.0, "s1"), (4.8, "s2")),
+    )
+    document = assemble_decision_output(
+        given, example_data=True, uncertain_inputs=(constant, changer)
+    )
+    roundtrip(document)
+    check_document(document, given, example_data=True)
+    assert [
+        (item.rank, item.what.split("'")[1]) for item in document.measure_first
+    ] == [
+        (1, "u_changer"),
+        (2, "u_constant"),
+    ]
+    assert "('A', 'B')" in document.measure_first[0].what
+    assert "u_changer" in document.measure_first[0].why
+    assert "u_constant" in document.measure_first[1].why
+
+
+def test_uncertain_inputs_across_multiple_pairs_stays_in_rank_order():
+    """With >2 rotations, items across pairs are sorted by rank so the document
+    always passes DecisionOutput._priorities_are_in_rank_order."""
+    rows = [
+        soil("A", "s1", 2001, 9.0, 8.5, 9.5),
+        soil("B", "s1", 2001, 8.8, 8.3, 9.3),
+        soil("C", "s1", 2001, 2.0, 1.5, 2.5),
+        soil("A", "s2", 2001, 5.0, 4.5, 5.5),
+        soil("B", "s2", 2001, 4.8, 4.3, 5.3),
+        soil("C", "s2", 2001, 4.8, 4.3, 5.3),
+    ]
+    given = table(rows)
+    inputs = (
+        UncertainInput(
+            name="u_sweep",
+            unit="t ha-1 yr-1",
+            cell=("C", "soil_loss", "ag_year", 2001, None, None),
+            values=((1.0, "s1"), (2.0, "s2")),
+        ),
+    )
+    document = assemble_decision_output(
+        given, example_data=True, uncertain_inputs=inputs
+    )
+    roundtrip(document)
+    check_document(document, given, example_data=True)
+    ranks = [item.rank for item in document.measure_first]
+    assert ranks == sorted(ranks)
+    # Pair (A, B) stays not separated (rank 2); pairs (A, C) and (B, C) change state (rank 1).
+    assert ranks == [1, 1, 2]
+
+
+def test_uncertain_inputs_on_robust_pair_and_empty_inputs_give_empty_measure_first():
+    rows = [
+        soil("A", "s1", 2001, 9.0, 8.5, 9.5),
+        soil("B", "s1", 2001, 2.0, 1.5, 2.5),
+    ]
+    given = table(rows)
+    sweep = (
+        UncertainInput(
+            name="u",
+            unit="t ha-1 yr-1",
+            cell=("B", "soil_loss", "ag_year", 2001, None, None),
+            values=((2.0, "s1"),),
+        ),
+    )
+    assert (
+        assemble_decision_output(
+            given, example_data=True, uncertain_inputs=sweep
+        ).measure_first
+        == []
+    )
+
+    non_robust = table(
+        [
+            soil("A", "s1", 2001, 5.0, 4.5, 5.5),
+            soil("B", "s1", 2001, 5.0, 4.5, 5.5),
+        ]
+    )
+    assert (
+        assemble_decision_output(
+            non_robust, example_data=True, uncertain_inputs=()
+        ).measure_first
+        == []
+    )
+
+
+def test_uncertain_inputs_accepts_nested_scenarios_and_transport_spec():
+    rows = [
+        soil("A", "p1", 2001, 9.0, 8.5, 9.5),
+        soil("B", "p1", 2001, 2.0, 1.5, 2.5),
+        soil("A", "p2", 2001, 5.0, 4.5, 5.5),
+        soil("B", "p2", 2001, 4.8, 4.3, 5.3),
+    ]
+    given = table(rows)
+    spec = UncertainInputSpec(
+        name="u_nested",
+        unit="t ha-1 yr-1",
+        cell=("B", "soil_loss", "ag_year", 2001, None, None),
+        values=((1.0, ("p1", "p2")), (2.0, ("p1",))),
+    )
+    document = assemble_decision_output(
+        given, example_data=True, uncertain_inputs=(spec,)
+    )
+    roundtrip(document)
+    assert len(document.measure_first) == 1
+    assert document.measure_first[0].rank == 1
+
+
+@pytest.mark.parametrize(
+    ("bad_inputs", "exc_type"),
+    [
+        ("not_a_sequence", TypeError),
+        ((123,), TypeError),
+        (
+            (
+                UncertainInput(
+                    name="  ",
+                    unit="t ha-1 yr-1",
+                    cell=("A", "soil_loss", "ag_year", 2001, None, None),
+                    values=((1.0, "s1"),),
+                ),
+            ),
+            ValueError,
+        ),
+        (
+            (
+                UncertainInput(
+                    name="u",
+                    unit="t ha-1 yr-1",
+                    cell=("A", "soil_loss"),  # type: ignore[arg-type]
+                    values=((1.0, "s1"),),
+                ),
+            ),
+            ValueError,
+        ),
+        (
+            (
+                UncertainInput(
+                    name="u",
+                    unit="t ha-1 yr-1",
+                    cell=("A", "soil_loss", "ag_year", 2001, None, None),
+                    values=((1.0, ()),),
+                ),
+            ),
+            ValueError,
+        ),
+        (
+            (
+                UncertainInput(
+                    name="u",
+                    unit="t ha-1 yr-1",
+                    cell=("A", "soil_loss", "ag_year", 2001, None, None),
+                    values=((1.0, "PLACEHOLDER_unknown_scenario"),),
+                ),
+            ),
+            ValueError,
+        ),
+        (
+            (
+                UncertainInput(
+                    name="u",
+                    unit="t ha-1 yr-1",
+                    cell=("A", "soil_loss", "ag_year", 2001, None, None),
+                    values=((float("nan"), "s1"),),
+                ),
+            ),
+            ValueError,
+        ),
+        (
+            (
+                UncertainInput(
+                    name="u",
+                    unit="t ha-1 yr-1",
+                    cell=("A", "soil_loss", "ag_year", 2001, None, None),
+                    values=((True, "s1"),),  # type: ignore[arg-type]
+                ),
+            ),
+            TypeError,
+        ),
+    ],
+)
+def test_invalid_uncertain_inputs_are_refused(bad_inputs, exc_type):
+    # Include a robust table case too: unknown scenarios are refused even when
+    # the base state is a robust preference.
+    given = table(
+        [
+            soil("A", "s1", 2001, 9.0, 8.5, 9.5),
+            soil("B", "s1", 2001, 2.0, 1.5, 2.5),
+        ]
+    )
+    with pytest.raises(exc_type):
+        assemble_decision_output(given, example_data=True, uncertain_inputs=bad_inputs)

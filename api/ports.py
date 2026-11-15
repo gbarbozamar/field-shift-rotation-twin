@@ -58,6 +58,7 @@ __all__ = [
     "SoilSlopePayload",
     "SoilSlopeResult",
     "SoilSlopeSource",
+    "UncertainInputSpec",
 ]
 
 # --- payload types: one line each --------------------------------------------
@@ -252,6 +253,16 @@ class RunSettings:
 # --- decision layer -----------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class UncertainInputSpec:
+    """One uncertain input mapping passed to ``DecisionLayer.decide``. PROPOSED."""
+
+    name: str
+    unit: str
+    cell: tuple[str, str, str, int | None, str | None, str | None]
+    values: tuple[tuple[float, str | tuple[str, ...]], ...]
+
+
 class DecisionLayer(Protocol):
     """Turns a results table into a decision output document, or says why not.
 
@@ -263,5 +274,9 @@ class DecisionLayer(Protocol):
     """
 
     def decide(
-        self, table: ResultsTable, *, example_data: bool
+        self,
+        table: ResultsTable,
+        *,
+        example_data: bool,
+        uncertain_inputs: Sequence[UncertainInputSpec] | None = None,
     ) -> DecisionOutput | Missing: ...

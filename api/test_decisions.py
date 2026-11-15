@@ -919,3 +919,255 @@ def test_the_default_decision_layer_serves_a_document_through_the_route():
     assert state.value in STATE_NAMES or (
         state.value is None and state.missing is not None
     )
+
+
+# --- uncertain_inputs (D4 measure_first) ------------------------------------------------
+
+
+def _soil_loss_result(
+    rotation_id: str,
+    value: float,
+    low: float,
+    high: float,
+    carbon: tuple[float, float, float],
+) -> ResultsPerRotation:
+    payload = copy.deepcopy(RESULT)
+    payload["rotation_id"] = rotation_id
+    first_annual = payload["soil_loss"]["annual"][0]
+    first_annual["value"] = value
+    first_annual["range"]["low"] = low
+    first_annual["range"]["high"] = high
+    c_val, c_low, c_high = carbon
+    first_carbon = payload["soil_carbon_trend"][0]
+    first_carbon["value"] = c_val
+    first_carbon["range"]["low"] = c_low
+    first_carbon["range"]["high"] = c_high
+    return ResultsPerRotation.model_validate(payload)
+
+
+def _multi_phase_engines_for_sweep() -> FakeEngines:
+    """Two rotations: FIRST has one phase, SECOND has two phases where phase_1
+    is strictly better than FIRST and phase_2 crosses zero against FIRST."""
+    first_res = _soil_loss_result(FIRST, 10.0, 9.5, 10.5, (0.5, 0.4, 0.6))
+    second_p1 = _soil_loss_result(SECOND, 4.0, 3.5, 4.5, (1.0, 0.9, 1.1))
+    second_p2 = _soil_loss_result(SECOND, 9.8, 9.3, 10.3, (1.0, 0.9, 1.1))
+
+    def make_run(res: ResultsPerRotation) -> EnginesResult:
+        return EnginesResult(
+            calendar=None,
+            result=res,
+            result_missing=None,
+            modules=MODULES,
+            values_present=1,
+            values_missing=1,
+        )
+
+    first_run = make_run(first_res)
+    p1_run = make_run(second_p1)
+    p2_run = make_run(second_p2)
+    second_run = EnginesResult(
+        calendar=None,
+        result=second_p1,
+        result_missing=None,
+        modules=MODULES,
+        values_present=1,
+        values_missing=1,
+        phases=(
+            PhaseResult(scenario_id="phase_1", first_ag_year=None, result=p1_run),
+            PhaseResult(scenario_id="phase_2", first_ag_year=None, result=p2_run),
+        ),
+    )
+    return FakeEngines({FIRST: first_run, SECOND: second_run})
+
+
+def test_omitted_or_null_uncertain_inputs_works_with_legacy_and_default_layers():
+    """Backwards compatibility: a legacy DecisionLayer without ``uncertain_inputs``
+    and the default DiscoveredDecisionLayer both return 200 with empty
+    ``measure_first`` when ``uncertain_inputs`` is omitted or null."""
+    for payload in (BODY, {**BODY, "uncertain_inputs": None}):
+        legacy_response = client(decision_layer=FakeDecisionLayer()).post(
+            ROUTE, json=payload
+        )
+        assert legacy_response.status_code == 200, legacy_response.text
+        assert legacy_response.json()["decision"]["measure_first"] == []
+
+        default_app = create_app(
+            [ORIGIN],
+            climate=FakeClimate(),
+            soil_slope=FakeSoilSlope(),
+            engines=FakeEngines(),
+            settings=PERIOD,
+        )
+        default_response = TestClient(default_app).post(ROUTE, json=payload)
+        assert default_response.status_code == 200, default_response.text
+        assert default_response.json()["decision"]["measure_first"] == []
+
+
+def test_valid_uncertain_inputs_populates_measure_first_through_default_layer():
+    """Valid ``uncertain_inputs`` (single-scenario and nested-scenario entries)
+    passes through ``DiscoveredDecisionLayer`` to ``assemble_decision_output``
+    and populates ``measure_first`` in rank order."""
+    app = create_app(
+        [ORIGIN],
+        climate=FakeClimate(),
+        soil_slope=FakeSoilSlope(),
+        engines=_multi_phase_engines_for_sweep(),
+        settings=PERIOD,
+    )
+    payload = {
+        **BODY,
+        "uncertain_inputs": [
+            {
+                "name": "PLACEHOLDER_constant",
+                "unit": "t ha-1 yr-1",
+                "cell": [SECOND, "soil_loss", "ag_year", 2001, None, None],
+                "values": [[4.0, ["phase_1+phase_1"]]],
+            },
+            {
+                "name": "PLACEHOLDER_changer",
+                "unit": "t ha-1 yr-1",
+                "cell": [SECOND, "soil_loss", "ag_year", 2001, None, None],
+                "values": [
+                    [4.0, "phase_1+phase_1"],
+                    [9.8, ["phase_1+phase_2"]],
+                ],
+            },
+        ],
+    }
+    response = TestClient(app).post(ROUTE, json=payload)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["decision_missing"] is None
+    document = DecisionOutput.model_validate_json(json.dumps(body["decision"]))
+    assert [item.rank for item in document.measure_first] == [1, 2]
+    assert "PLACEHOLDER_changer" in document.measure_first[0].what
+    assert "PLACEHOLDER_constant" in document.measure_first[1].what
+
+
+def test_valid_empty_uncertain_inputs_is_accepted_and_forwarded():
+    received: list[Any] = []
+
+    class RecordingLayer:
+        def decide(
+            self, table: ResultsTable, *, example_data: bool, uncertain_inputs=None
+        ):
+            received.append(uncertain_inputs)
+            return smallest_document(table, example_data=example_data)
+
+    response = client(decision_layer=RecordingLayer()).post(
+        ROUTE, json={**BODY, "uncertain_inputs": []}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["decision"]["measure_first"] == []
+    assert received == [()]
+
+
+def test_uncertain_inputs_with_legacy_layer_without_param_answers_500():
+    """When ``uncertain_inputs`` is supplied, a layer or function that does not
+    accept ``uncertain_inputs`` raises a clear defect -> 500 INTERNAL_ERROR."""
+    payload = {
+        **BODY,
+        "uncertain_inputs": [
+            {
+                "name": "PLACEHOLDER_input",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", 2001, None, None],
+                "values": [[1.0, "phase_1+phase_1"]],
+            }
+        ],
+    }
+    legacy_resp = client(decision_layer=FakeDecisionLayer()).post(
+        ROUTE, json=payload, headers={"Origin": ORIGIN}
+    )
+    _is_internal_error(legacy_resp)
+
+    def legacy_fn(table, *, example_data):
+        return smallest_document(table, example_data=example_data)
+
+    named_resp = client(decision_layer=NamedDecisionLayer(legacy_fn)).post(
+        ROUTE, json=payload, headers={"Origin": ORIGIN}
+    )
+    _is_internal_error(named_resp)
+    # The same NamedDecisionLayer still works when uncertain_inputs is omitted.
+    ok_resp = client(decision_layer=NamedDecisionLayer(legacy_fn)).post(
+        ROUTE, json=BODY
+    )
+    assert ok_resp.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "bad_uncertain_inputs",
+    [
+        "PLACEHOLDER_not_a_list",
+        {"name": "PLACEHOLDER_dict"},
+        [{"name": "PLACEHOLDER_missing_fields"}],
+        [
+            {
+                "name": "PLACEHOLDER_extra",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", 2001, None, None],
+                "values": [],
+                "PLACEHOLDER_unknown_field": 1,
+            }
+        ],
+        [
+            {
+                "name": "   ",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", 2001, None, None],
+                "values": [],
+            }
+        ],
+        [
+            {
+                "name": "PLACEHOLDER_bad_cell",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss"],
+                "values": [],
+            }
+        ],
+        [
+            {
+                "name": "PLACEHOLDER_bool_year",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", True, None, None],
+                "values": [],
+            }
+        ],
+        [
+            {
+                "name": "PLACEHOLDER_bool_value",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", 2001, None, None],
+                "values": [[True, "phase_1+phase_1"]],
+            }
+        ],
+        [
+            {
+                "name": "PLACEHOLDER_empty_scenarios",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", 2001, None, None],
+                "values": [[1.0, []]],
+            }
+        ],
+        [
+            {
+                "name": "PLACEHOLDER_blank_scenario",
+                "unit": "t ha-1 yr-1",
+                "cell": [FIRST, "soil_loss", "ag_year", 2001, None, None],
+                "values": [[1.0, "  "]],
+            }
+        ],
+    ],
+)
+def test_invalid_uncertain_inputs_returns_422_and_calls_nothing(bad_uncertain_inputs):
+    climate, engines, layer = FakeClimate(), FakeEngines(), FakeDecisionLayer()
+    response = client(climate=climate, engines=engines, decision_layer=layer).post(
+        ROUTE, json={**BODY, "uncertain_inputs": bad_uncertain_inputs}
+    )
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_REQUEST"
+    assert any(d["path"].startswith("uncertain_inputs") for d in error["details"])
+    _nothing_called(climate, engines)
+    assert layer.calls == []
