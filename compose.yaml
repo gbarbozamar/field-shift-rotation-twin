@@ -31,11 +31,19 @@ services:
       # Soil and slope: the PLACEHOLDER example, to exercise the whole route.
       # Its numbers mean nothing and it is shown as example data.
       SOIL_SLOPE_EXAMPLE_FILE: ${SOIL_SLOPE_EXAMPLE_FILE-contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json}
-      # KINDS_OF_YEAR_RECORD_FILE is not set: no ONI record is shipped until a
-      # person checks and signs it (D240 (5) of #77; R26, PROPOSED), so every
+      # The two switches of the plant route are passed through from the host
+      # shell and are unset by default (PROPOSED, R35); blank counts as unset
+      # (api/config.py, _value).
+      # KINDS_OF_YEAR_RECORD_FILE: no ONI record is shipped until a person
+      # checks and signs it (D240 (5) of #77; R26, PROPOSED), so unset, every
       # kind of year of a plant answer is missing NOT_AVAILABLE. A person who
-      # holds a signed record sets the variable to its path as the image sees it.
-      # RAIN_STRESS_TEST is not set either (api/README.md): the heavier-rain stress test stays off.
+      # holds a signed record sets the variable to its path as the image sees it:
+      #   KINDS_OF_YEAR_RECORD_FILE=<path> docker compose watch
+      KINDS_OF_YEAR_RECORD_FILE: ${KINDS_OF_YEAR_RECORD_FILE-}
+      # RAIN_STRESS_TEST: the heavier-rain stress test stays off unless a
+      # person sets exactly `on`; any other non-blank value stops the server
+      # with a ConfigError (api/config.py, _rain_stress_switched_on; api/README.md).
+      RAIN_STRESS_TEST: ${RAIN_STRESS_TEST-}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
