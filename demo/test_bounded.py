@@ -18,9 +18,16 @@ Every count, state, rank and coverage below is what the machinery of
 structure (D29 with D73 and D47 give the twenty-five agricultural years;
 D80 with C1.6 give the six carbon cells; D94, D95, D60, D85, D87, D91 and
 D99 give the counts and states over them). The arithmetic of D92 has no
-work here — no difference holds a value, so no range exists — and the
-tests assert exactly that: the honest state of the demo today, which the
-return path replaces with real values when the runner's outputs arrive.
+work here — no difference holds a value, so no range exists to widen by
+[b_low − a_high, b_high − a_low], and the rule of D165 has no range to
+read — and the tests assert exactly that: the honest state of the demo
+today, which the return path replaces with real values when the runner's
+outputs arrive. The decisions D165 to D176 of 15 November 2026 (unit
+l2/decision-rule-d165-d176, #309) changed two of these expectations and
+changed none of the missing values: D169 splits the carbon counts, one
+per carbon model and computation where this file once read one count of
+the six cells, and D166 with D175 reads each level of the block on its
+own, the state of each member now asserted beside the state of the set.
 
 Run from the repository root: ``python -m pytest demo/``.
 """
@@ -258,27 +265,49 @@ def test_the_counts_of_the_cells_of_each_pair() -> None:
     # it to the designer of the case, who set none for this case).
     for first, second in run_bounded.PAIRS:
         counts = {
-            (count.scenario_id, count.indicator): count
+            (
+                count.scenario_id,
+                count.indicator,
+                count.carbon_model,
+                count.computation,
+            ): count
             for count in pair_counts(TABLE, first, second, equal_tolerance=0.0)
         }
+        # D169 ("One count per pair, scenario, indicator, carbon model and
+        # computation, so that the cells of AMG and of RothC, which D155
+        # never reads together, are never added in one count") resolves K10
+        # the other way round from the comment this test once carried: the
+        # six carbon cells of a level are six counts of one cell each, not
+        # one count of six (the keys below re-derive it).
         assert set(counts) == {
-            (scenario, indicator)
+            (scenario, "soil_loss", None, None)
             for scenario in bounded.SCENARIOS
-            for indicator in run_bounded.INDICATORS
+        } | {
+            (scenario, "water_deficit_exposure", None, None)
+            for scenario in bounded.SCENARIOS
+        } | {
+            (scenario, "soil_carbon_trend", carbon_model, computation)
+            for scenario in bounded.SCENARIOS
+            for carbon_model in bounded.CARBON_MODELS
+            for computation in bounded.TREND_COMPUTATIONS
         }
         for scenario in bounded.SCENARIOS:
-            count = counts[(scenario, "soil_loss")]
+            count = counts[(scenario, "soil_loss", None, None)]
             assert count.by_point_sign.missing_side == SOIL_CELLS
             assert (count.cells_compared, count.cells_of_the_pair) == (0, SOIL_CELLS)
-            count = counts[(scenario, "water_deficit_exposure")]
+            count = counts[(scenario, "water_deficit_exposure", None, None)]
             assert count.by_point_sign.missing_side == 1
             assert (count.cells_compared, count.cells_of_the_pair) == (0, 1)
-            # D99 with K10: the cells of both carbon models in one count.
-            count = counts[(scenario, "soil_carbon_trend")]
-            assert count.by_point_sign.missing_side == CARBON_CELLS
-            assert (count.cells_compared, count.cells_of_the_pair) == (0, CARBON_CELLS)
-            for indicator in run_bounded.INDICATORS:
-                count = counts[(scenario, indicator)]
+            # D169: each carbon model and computation is a count of its
+            # own, over its one cell.
+            for carbon_model in bounded.CARBON_MODELS:
+                for computation in bounded.TREND_COMPUTATIONS:
+                    count = counts[
+                        (scenario, "soil_carbon_trend", carbon_model, computation)
+                    ]
+                    assert count.by_point_sign.missing_side == 1
+                    assert (count.cells_compared, count.cells_of_the_pair) == (0, 1)
+            for count in counts.values():
                 assert (
                     count.by_point_sign.better,
                     count.by_point_sign.worse,
@@ -300,6 +329,16 @@ def test_the_states_of_the_pairs() -> None:
         # D85: no paired difference holds a value, so the pair is not
         # evaluated and has no state; nothing enters it (D6).
         assert state.state is None
+        # D166 with D175: the two levels of the block are read each on its
+        # own — the cells of different scenarios are never merged — and the
+        # state of each member is shown beside the state of the set. Every
+        # member is not evaluated, so the set is not evaluated either (a
+        # member without a state is never a robust preference, D175); no
+        # range exists for D165 to unblock and no computation choice of
+        # D173 changes anything, every carbon difference being missing.
+        assert state.by_scenario == tuple(
+            (scenario, None) for scenario in sorted(bounded.SCENARIOS)
+        )
         assert state.identical_rows is False
         assert state.indicators_not_resolved == ()
 
@@ -428,10 +467,28 @@ def test_the_document_carries_the_differences() -> None:
 
 def test_the_document_carries_the_counts_of_the_pairs_cells() -> None:
     document = run_bounded.build_decision_output(TABLE)
-    counts = {item.key(): item for item in document.pair_cell_counts}
-    assert len(counts) == 18  # 3 pairs x 2 levels x 3 indicators
-    for (pair, scenario, indicator), count in counts.items():
+    counts = {
+        item.key_with_the_carbon_model(): item for item in document.pair_cell_counts
+    }
+    # D169: 3 pairs x 2 levels x (soil, water and the six carbon cells of
+    # two models under three computations, each a count of its own) — 48
+    # counts, where the key of D87 alone gave 18.
+    assert len(counts) == 48
+    carbon_keys = {
+        (carbon_model, computation)
+        for carbon_model in bounded.CARBON_MODELS
+        for computation in bounded.TREND_COMPUTATIONS
+    }
+    for key, count in counts.items():
+        pair, scenario, indicator, carbon_model, computation = key
         assert tuple(pair) in run_bounded.PAIRS
+        assert scenario in bounded.SCENARIOS
+        if indicator == "soil_carbon_trend":
+            # D169: a carbon count names its carbon model and computation.
+            assert (carbon_model, computation) in carbon_keys
+        else:
+            assert indicator in ("soil_loss", "water_deficit_exposure")
+            assert (carbon_model, computation) == (None, None)
         # Without a declared tolerance of "equal" the count by the sign of
         # the point value stays missing (D87, C3.1).
         assert count.by_sign_of_point_value is None
@@ -465,6 +522,18 @@ def test_the_document_carries_the_states_and_their_coverage() -> None:
     assert document.state.indicators_not_resolved == []
     assert len(document.state.reasons) == 7  # 3 pairs, 3 indicators, 1 block
     assert all(reason.strip() for reason in document.state.reasons)
+    # D166 with D152: the reason of a pair shows the state of each member
+    # beside the state of the set, and a member without a state is written
+    # with the label D151 gives that absence.
+    for first, second in run_bounded.PAIRS:
+        reason = next(
+            reason
+            for reason in document.state.reasons
+            if f"('{first}', '{second}')" in reason
+        )
+        assert "; in each scenario:" in reason
+        for scenario in bounded.SCENARIOS:
+            assert f"'{scenario}' 'Not evaluated'" in reason
 
 
 def test_the_document_carries_no_measurement_priority() -> None:
@@ -481,3 +550,6 @@ def test_main_prints_the_document_the_block_and_the_gaps(capsys) -> None:
     assert "D115" in printed
     assert "0% residue cover, bare soil" in printed
     assert "No tipping point of D3 is computed" in printed
+    # D176: the printed gap carries its conditions for the sweep of #267.
+    assert "D176 confirms the block" in printed
+    assert "no tipping point" in printed

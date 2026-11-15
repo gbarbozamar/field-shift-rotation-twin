@@ -65,7 +65,10 @@ reported as gaps (never silently dropped):
   without inventing rows for phases a rotation does not have. The table
   carries one scenario per level, and the state at a level is the state
   over that scenario — the degenerate single-phase reading the machinery
-  of ``decision/functions.py`` accepts and names as such.
+  of ``decision/functions.py`` accepts and names as such. When the phases
+  materialize, the scenarios of a pair are every combination of the
+  phases of the two rotations, N x M of them, each named by the two
+  phases it holds (D172).
 - the uncertain input of the block, in the ``UncertainInput`` form of
   ``decision/functions.py``: the residue cover drives no cell of this
   table directly (it feeds the engines, D116), and its upper level holds
@@ -177,7 +180,9 @@ class FallowCover:
 # second-crop-soybean year in none of the three templates. Whether the few
 # days between the maize harvest (20 April) and the alfalfa sowing (25
 # April) of R3 are a fallow whose cover D115 sets is not decided; this
-# module fills nothing for them.
+# module fills nothing for them. The same holds for the few days between
+# the wheat harvest (5 December) and the second-crop-soybean sowing
+# (10 December) of R2 and R3: D115's table states no cap for them either.
 COVER_AT_THE_UPPER_LEVEL: tuple[FallowCover, ...] = (
     FallowCover(
         rotation_id="R1",
