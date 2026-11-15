@@ -76,6 +76,7 @@ def create_app(
     kinds_of_year_record: Mapping[str, Any] | None = None,
     engines_factory: EnginesFactory | None = None,
     plant_layer: PlantLayer | None = None,
+    rain_stress_switched_on: bool = False,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -110,6 +111,15 @@ def create_app(
     means, with the default engines, ``EntryPointEngines`` on the same engine
     functions, and with ``engines`` given, no factory (the answer says the
     factor was not applied, and why).
+
+    PROPOSED (S-032, decision R25, re-implemented from ``l2/rain-stress-switch``):
+    ``rain_stress_switched_on`` false (the default) means the plant route
+    applies no rain-stress factor: a declared one is echoed not applied with
+    the reason ``api.plant.NOT_SWITCHED_ON`` and ``engines_factory`` (given or
+    the default) is never called. How rain enters erosion and how its
+    uncertainty scales is a science choice, to be proposed to the erosion lane
+    as an option of EP1; until then a person switches it on
+    (``RAIN_STRESS_TEST=on``, read by ``api.config``).
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -198,6 +208,7 @@ def create_app(
             kinds_of_year_record=kinds_of_year_record,
             engines_factory=engines_factory,
             parameters=plant_catalogue,
+            rain_stress_switched_on=rain_stress_switched_on,
         )
 
     return app

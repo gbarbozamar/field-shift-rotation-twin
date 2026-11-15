@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 
 from api.config import PARAMETERS_FOLDER, load_parameters
 from api.main import create_app
-from api.plant import EXTRA_KEY_SEGMENT, NO_FACTORY, REDACTED_MESSAGE
+from api.plant import EXTRA_KEY_SEGMENT, NO_FACTORY, RECORD_STATE, REDACTED_MESSAGE
 from api.ports import EnginesResult, ErrorDetail, Missing, ModuleStatus, RunSettings
 from api.rain_stress import R_ID, rain_stress, scale_erosivity
 from api.test_rotations import FakeClimate, FakeSoilSlope
@@ -224,6 +224,10 @@ def client(**kwargs: Any) -> TestClient:
     kwargs.setdefault("kinds_of_year_record", load_record())
     kwargs.setdefault("climate", FakeClimate())
     kwargs.setdefault("soil_slope", FakeSoilSlope())
+    # S-032: every test here expects the factor path of the request to run, so
+    # it is switched on; the off default is tested in
+    # api/test_rain_stress_switch.py.
+    kwargs.setdefault("rain_stress_switched_on", True)
     if "engines" not in kwargs:
         kwargs.setdefault("parameters", CATALOGUE)
         kwargs.setdefault("engines_factory", Factory())
@@ -285,8 +289,11 @@ def test_the_example_request_gives_the_example_answer():
         "oni_v6",
     ]
     # The record is the PLACEHOLDER record of economics/test_plant.py.
-    for key in ("id", "contract", "state"):
+    for key in ("id", "contract"):
         assert data["sources"][2][key] == ANSWER["sources"][1][key]
+    # Not ``cached`` (nothing is fetched or reused): the state the API gives a
+    # file a person configured. The example answer (lane L0) still says cached.
+    assert data["sources"][2]["state"] == RECORD_STATE == "fresh"
     assert data["sources"][2]["attribution"] == load_record()["reference"]
     # One climate request, one soil request, each rotation run once on them.
     assert len(climate.requests) == 1
@@ -826,7 +833,7 @@ def test_the_default_app_answers_the_example_request():
     """The engines of the repository, the stand-in sources and no period: a
     200 with every soil-loss mean missing and the stress applied through the
     default factory on the catalogue."""
-    app = create_app([], parameters=CATALOGUE)
+    app = create_app([], parameters=CATALOGUE, rain_stress_switched_on=True)
     data = answered(TestClient(app).post(ROUTE, json=REQUEST))
     checked(REQUEST, data)
     assert data["rain_stress"]["applied"] is True
@@ -1118,7 +1125,9 @@ def test_f3_a_catalogue_without_the_r_record_never_calls_the_factory():
     factory, calls = _counting_factory()
     engines = FakeEngines()
     request = PlantRequest.model_validate_json(json.dumps(REQUEST))
-    run = stressed_run(request, engines, factory, WITHOUT_R)
+    run = stressed_run(
+        request, engines, factory, WITHOUT_R, rain_stress_switched_on=True
+    )
     assert calls == []
     assert run.engines is engines
     assert run.echo.applied is False

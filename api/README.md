@@ -15,6 +15,7 @@ under [Decided](#decided), with its decision number of issue #77.
 | `GET /health` | Liveness. Unchanged, at the root |
 | `POST /api/rotations/run` | One rotation for one field, end to end. Synchronous, JSON in and JSON out |
 | `POST /api/decisions/run` | Two rotations of one field and the decision output of the pair (#268). Synchronous, JSON in and JSON out. **PROPOSED** |
+| `POST /api/plant/run` | "What should I plant?": one field, three to five rotations, a `PlantAnswer` (`contracts/plant_answer/`). Synchronous. **PROPOSED** (`api/plant.py`) |
 
 Every product route lives under `/api`.
 
@@ -268,6 +269,37 @@ measured (OPEN below).
   `contracts/results/README.md`): until then a part not built gives no
   decision.
 
+## `POST /api/plant/run` (PROPOSED, unit `l2/plant-route`)
+
+The steps are in the docstring of `api/plant.py`. `api/app.py` finds
+`api.plant.run_plant` by name on each request; absent, the route answers
+`answer: null` with `answer_missing` `NOT_AVAILABLE`. Two points of the
+platform review:
+
+- **Heavier rain is off unless a person switches it on** (S-032, decision
+  R25; review of #427 and point 3 of the review of #310). How rain enters
+  erosion and how its uncertainty scales is a science choice, to be proposed
+  to the erosion lane as an option of EP1; until it is one, `api/` never
+  applies it silently. `create_app(..., rain_stress_switched_on=False)` is the
+  default; `api.config` sets it from `RAIN_STRESS_TEST=on`. Below
+  `create_app` (`run_plant`, `make_plant_router`, `stressed_run`) the switch
+  is a required keyword. Switched off, a declared `rain_stress_factor` is
+  echoed `applied: false` with `api.plant.NOT_SWITCHED_ON` in its detail (a
+  sentence that names no server variable), the engines run unchanged and
+  `engines_factory` (given or the default) is never called. No factor gives no
+  echo; a missing factor gives its missing echo, switched on or off. Switched
+  on, the engines are rebuilt on the catalogue whose erosivity
+  `api/rain_stress.py` scales, as `stressed_run` describes.
+- **The source row of the ONI record** has state `fresh`: the record is a
+  file a person configured (`KINDS_OF_YEAR_RECORD_FILE`), read once at
+  start-up, never fetched and no stored response reused, so not `cached`.
+  `fresh` is the state the API already gives a file a person supplies
+  (`adapters.soil_tables`); `retrieved_at` is null (no read time is kept).
+  The record format has no example-data mark, so `example` is never inferred
+  for it. No record configured: the row is `unavailable`, `NOT_AVAILABLE`.
+  The example answer and OPEN 5 of `contracts/plant_answer/README.md` (lane
+  L0) still write `cached`.
+
 ## Errors (`api/errors.py`)
 
 One shape for every non-2xx response on every route:
@@ -340,6 +372,8 @@ only its path and the reason.
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
+| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED. Path of the ONI record `POST /api/plant/run` classifies the kinds of year on; read once at start-up (a JSON object with an `id` and `seasons`) and passed to `create_app` | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE` |
+| `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` does not set it | Off: a declared rain-stress factor is echoed `applied: false` with `NOT_SWITCHED_ON`, and the engines run unchanged |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -371,6 +405,12 @@ on `httpx.MockTransport`.
   path and the position of the problem, never the content); two tables that
   give the same quantity for one soil group. The source still answers
   `unavailable` for a file that breaks after start-up. PROPOSED.
+- `KINDS_OF_YEAR_RECORD_FILE` set and the file does not exist, cannot be
+  read, is not JSON, or is not a JSON object with an `id` and `seasons`.
+  PROPOSED.
+- `RAIN_STRESS_TEST` set to anything but `on` (after stripping spaces; `ON`,
+  `yes`, `true` and `1` included); the message names the variable and never
+  repeats the value. PROPOSED (S-032).
 - The parameter catalogue in `params/records/` has any problem of
   `load_folder` or `check_catalogue` (not a variable; see "The parameter
   catalogue" under the engine runner). An empty catalogue starts.
@@ -393,6 +433,8 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
 | `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
+| `KINDS_OF_YEAR_RECORD_FILE` | Unset until a person signs the ONI record (D34, D66) | PROPOSED |
+| `RAIN_STRESS_TEST` | Unset (off) unless a person decides to switch the heavier-rain stress test on; then `on` | S-032 (PROPOSED) |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
 

@@ -114,10 +114,12 @@ ROUTE = "/plant/run"
 EnginesFactory = Callable[[dict[str, dict]], RotationEngines]
 
 # PROPOSED: the source row of the ONI record (contract, state; OPEN 5 of
-# contracts/plant_answer/README.md: SourceOut has no state for a record read
-# from the repository).
+# contracts/plant_answer/README.md). Nothing is fetched and no stored response
+# is reused, so the state is not ``cached``: it is ``fresh``, the state the API
+# already gives a file a person configured (adapters.soil_tables). The record
+# format has no example-data mark, so ``example`` is never inferred for it.
 RECORD_CONTRACT = "kinds_of_year_record"
-RECORD_STATE = "cached"
+RECORD_STATE = "fresh"
 # PROPOSED (review of #310, point 1): the ONI record is read only from the file
 # KINDS_OF_YEAR_RECORD_FILE names (api/config.py). Unset, the route answers
 # every kind of year missing with this reason; it never makes one up.
@@ -149,6 +151,11 @@ NOT_FINITE = (
     "the rainfall erosivity of the parameter catalogue times the factor is not "
     "a finite number"
 )
+# PROPOSED (S-032, decision R25): the heavier-rain stress test is a modelling
+# choice inside api/ until the erosion lane takes it as an option of EP1, so a
+# person switches it on with RAIN_STRESS_TEST=on (api/config.py). The sentence
+# is shown to public users: it names no server variable.
+NOT_SWITCHED_ON = "heavier rain is not switched on in this service"
 NO_WHOLE_YEAR = (
     "the climate record period holds no whole agricultural year for the start "
     "month of the rotations"
@@ -329,6 +336,8 @@ def stressed_run(
     engines: RotationEngines,
     factory: EnginesFactory | None,
     catalogue: dict[str, dict] | None,
+    *,
+    rain_stress_switched_on: bool,
 ) -> StressedRun:
     """The engines for this request and the rain-stress echo. PROPOSED (R10).
 
@@ -349,6 +358,12 @@ def stressed_run(
     factor is not applied either, with ``NOT_FINITE`` in the detail, never a
     ``500``. Any ``ValueError`` of ``scale_erosivity`` still surfaces (the
     route's ``500``): it is a defect, not a reason of the echo.
+
+    PROPOSED (S-032, decision R25): ``rain_stress_switched_on`` is required
+    (no default, so a forgotten pass fails loudly). False: a declared factor
+    is not applied: the engines unchanged, the echo ``applied`` false with
+    ``NOT_SWITCHED_ON`` in its detail, and the factory never called. No factor
+    and a missing factor are answered as above.
     """
     factor = request.questions.rain_stress_factor
     if factor is None:
@@ -356,6 +371,8 @@ def stressed_run(
     stress = rain_stress(factor)
     if isinstance(stress, RainStressMissing):
         return StressedRun(engines, stress)
+    if not rain_stress_switched_on:
+        return StressedRun(engines, _not_applied(stress, NOT_SWITCHED_ON))
     if factory is None or catalogue is None:
         why = NO_FACTORY if factory is None else NO_CATALOGUE
         return StressedRun(engines, _not_applied(stress, why))
@@ -389,6 +406,7 @@ def run_plant(
     kinds_of_year_record: Mapping[str, Any] | None,
     engines_factory: EnginesFactory | None,
     parameters: dict[str, dict] | None,
+    rain_stress_switched_on: bool,
 ) -> JSONResponse:
     """Answer "What should I plant?" for one field and three to five rotations.
 
@@ -397,6 +415,9 @@ def run_plant(
     plant layer that fails to load never stops another route.
     ``kinds_of_year_record`` ``None``: no ONI record is configured, and every
     kind of year is missing with ``NO_RECORD_REASON``.
+    ``rain_stress_switched_on`` (required; ``create_app`` holds the default,
+    off): false means a declared rain-stress factor is echoed not applied with
+    ``NOT_SWITCHED_ON`` and ``engines_factory`` is never called (S-032, R25).
     """
     try:
         request, code, problems = request_problems(body)
@@ -424,7 +445,13 @@ def run_plant(
         soil_result = soil_slope.get_soil_slope(
             request.site.case_id, request.site.field_id
         )
-        run = stressed_run(request, engines, engines_factory, parameters)
+        run = stressed_run(
+            request,
+            engines,
+            engines_factory,
+            parameters,
+            rain_stress_switched_on=rain_stress_switched_on,
+        )
         runs = [
             run.engines.run(rotation, climate_result, soil_result)
             for rotation in rotations
@@ -471,6 +498,7 @@ def make_plant_router(
     kinds_of_year_record: Mapping[str, Any] | None,
     engines_factory: EnginesFactory | None,
     parameters: dict[str, dict] | None,
+    rain_stress_switched_on: bool,
 ) -> APIRouter:
     """The plant route bound to the given implementations, for a caller that
     imports this module itself. ``api/app.py`` does not: it calls ``run_plant``
@@ -490,6 +518,7 @@ def make_plant_router(
             kinds_of_year_record=kinds_of_year_record,
             engines_factory=engines_factory,
             parameters=parameters,
+            rain_stress_switched_on=rain_stress_switched_on,
         )
 
     return router
