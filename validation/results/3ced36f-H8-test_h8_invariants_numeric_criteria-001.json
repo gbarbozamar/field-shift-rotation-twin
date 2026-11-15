@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "3ced36f-H8-test_h8_invariants_numeric_criteria-001",
+  "run_id": "run-20261115T061340Z-3ced36f",
+  "test_code": "H8",
+  "expected": {
+    "missing_reason": "the entry H8 of docs/VALIDATION.md is not defined: it has no expected value"
+  },
+  "outcome": "not_evaluated",
+  "observed": {
+    "missing_reason": "pytest skipped engine/water/balance/test_bucket.py::test_h8_invariants_numeric_criteria, so nothing was obtained"
+  },
+  "reason": "[H8] numeric criteria wait for docs/VALIDATION.md H8: the list of invariants, their expected values and tolerances, supplied and checked by people. The structure of H8 (root growth, sowing, harvest, bounds) is tested above",
+  "notes": "Test engine/water/balance/test_bucket.py::test_h8_invariants_numeric_criteria. Placed under H8: the test names [H8] in its skip reason."
+}

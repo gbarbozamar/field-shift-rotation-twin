@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "3ced36f-D5-test_d5_reordering_the_rows_or_the_rotations_changes_nothing-001",
+  "run_id": "run-20261115T061340Z-3ced36f",
+  "test_code": "D5",
+  "expected": {
+    "missing_reason": "the entry D5 of docs/VALIDATION.md states its expected outcome as logic on a hand-made table; the table and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_d5_reordering_the_rows_or_the_rotations_changes_nothing"
+  },
+  "notes": "Test decision/test_decision.py::test_d5_reordering_the_rows_or_the_rotations_changes_nothing. Placed under D5: under the heading 'D5: direction of each indicator and dominance between rotations'. The test ran on the functions of decision/ as they are at this commit; the notes of the run say which decisions of issue #77 those functions do not follow yet. The acceptance of entry D5 by a science reviewer is pending (docs/VALIDATION.md)."
+}
