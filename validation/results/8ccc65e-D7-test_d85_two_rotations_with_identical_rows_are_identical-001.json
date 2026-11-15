@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "8ccc65e-D7-test_d85_two_rotations_with_identical_rows_are_identical-001",
+  "run_id": "run-20261115T232512Z-8ccc65e",
+  "test_code": "D7",
+  "expected": {
+    "missing_reason": "the entry D7 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_d85_two_rotations_with_identical_rows_are_identical"
+  },
+  "notes": "Test decision/test_decision.py::test_d85_two_rotations_with_identical_rows_are_identical. Placed under D7: under the heading of D7 in decision/test_decision.py, as the first and second runs placed it."
+}
