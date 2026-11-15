@@ -730,8 +730,9 @@ def daily_reference_evapotranspiration(
     ``SITE``, on the first day of the record), the point units and the
     unit-guard reason of EP3. No constant is written here. A record that is
     absent makes the ET0 of every day missing with the reason the catalogue
-    gives (it is passed on, never replaced). ``engine/water/`` not built: a
-    ``Missing`` ``NOT_AVAILABLE``. PROPOSED; the unit of D181 brings the same
+    gives (it is passed on, never replaced). ``engine/water/`` not built (one
+    of its three modules absent): a ``Missing`` ``NOT_AVAILABLE``; any other
+    import error propagates. PROPOSED; the unit of D181 brings the same
     daily ET0 to the producer for the annual water balance.
     """
     try:
@@ -739,6 +740,17 @@ def daily_reference_evapotranspiration(
         ep3 = importlib.import_module(EP3_MODULE)
         records = importlib.import_module(EP3_PARAMETERS_MODULE)
     except ModuleNotFoundError as error:
+        # Only the absence of these modules (or of a package above them) is
+        # "not built", the rule of ``_import_function``; any other import
+        # error is a defect and propagates.
+        own = {
+            ".".join(parts[: i + 1])
+            for module in (ET0_MODULE, EP3_MODULE, EP3_PARAMETERS_MODULE)
+            for parts in [module.split(".")]
+            for i in range(len(parts))
+        }
+        if error.name not in own:
+            raise
         return ResultsMissing(
             reason="NOT_AVAILABLE",
             detail=(
