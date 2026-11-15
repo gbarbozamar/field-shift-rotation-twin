@@ -259,6 +259,6 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 2. **Currency.** `USD` only, as in `contracts/economic_facts/` (its OPEN question 2).
 3. **Dry-year label.** No kind of year is named "dry" here; the screen labels kinds.
 4. **Per-year erosivity.** `erosivity` is `"mean_annual"` only; S-026 may add `"per_year"`.
-5. **Source state of a transcribed record.** The ONI record is listed with state `"cached"` (PROPOSED): `SourceOut` has no state for a record read from the repository.
+5. **Source state of a transcribed record.** `api/plant.py` (`RECORD_STATE = "fresh"`, landed in #427, commit `da016c6`) emits `"fresh"` at runtime because nothing is fetched and no stored response is reused, whereas `examples/PLACEHOLDER_plant_answer.json` (shared with `web/src/data/` and checked by `web/src/plant/plantData.test.ts`) still carries `"cached"` until both copies are updated together under L0+L3 coordination. `SourceOut` still has no separate state for a record read from the repository.
 6. **One start month.** `kinds_of_year.start_month` is one month for the whole answer; rotations with different start months are not handled yet.
 7. **Rotation years.** How the route turns a `RotationDefinition` into the crops of each agricultural year for `compute_rotation_margin` is the route's (S-018), not this contract's.
