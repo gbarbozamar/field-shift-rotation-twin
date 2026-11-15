@@ -7,6 +7,7 @@ import FieldsScreen from './identity/FieldsScreen'
 import PlantScreen from './plant/PlantScreen'
 import BoardScreen from './board/BoardScreen'
 import PrintSheetScreen from './print/PrintSheetScreen'
+import FrontierScreen from './frontier/FrontierScreen'
 
 /**
  * The sections of the app, in the order of the work: the case, its fields,
@@ -61,6 +62,8 @@ export default function App() {
           <PlantScreen />
         ) : route === '/board' ? (
           <BoardScreen />
+        ) : route === '/frontier' ? (
+          <FrontierScreen />
         ) : route === '/print' ? (
           <PrintSheetScreen />
         ) : (
