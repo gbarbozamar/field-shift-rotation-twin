@@ -71,6 +71,8 @@ def test_a4_switched_off_a_declared_factor_is_not_applied_and_no_factory_runs():
     echo = data["rain_stress"]
     assert echo["applied"] is False
     assert NOT_SWITCHED_ON in echo["detail"]
+    # Fix round 1: the public detail names no server variable.
+    assert RAIN_STRESS_TEST not in echo["detail"]
     assert factory.catalogues == []
 
     # The soil loss equals the one of the same request with no factor.
@@ -134,17 +136,31 @@ def test_a6_switched_off_a_missing_factor_gives_the_missing_echo():
     assert factory.catalogues == []
 
 
-def test_a6_stressed_run_off_by_default():
+def test_a6_stressed_run_switched_off_applies_nothing():
     from api.plant import stressed_run
 
     factory, calls = plant_tests._counting_factory()
     engines = plant_tests.FakeEngines()
     request = plant_tests.PlantRequest.model_validate(REQUEST)
-    run = stressed_run(request, engines, factory, plant_tests.CATALOGUE)
+    run = stressed_run(
+        request, engines, factory, plant_tests.CATALOGUE, rain_stress_switched_on=False
+    )
     assert calls == []
     assert run.engines is engines
     assert run.echo.applied is False
     assert NOT_SWITCHED_ON in run.echo.detail
+    assert RAIN_STRESS_TEST not in run.echo.detail
+
+
+def test_a6_stressed_run_needs_the_switch():
+    """Fix round 1: only create_app keeps a default; a forgotten pass fails."""
+    from api.plant import stressed_run
+
+    request = plant_tests.PlantRequest.model_validate(REQUEST)
+    with pytest.raises(TypeError):
+        stressed_run(  # type: ignore[call-arg]
+            request, plant_tests.FakeEngines(), None, plant_tests.CATALOGUE
+        )
 
 
 # --- a7: build_app follows the variable -------------------------------------------

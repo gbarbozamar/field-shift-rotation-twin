@@ -182,13 +182,11 @@ NOT_FINITE = (
     "the rainfall erosivity of the parameter catalogue times the factor is not "
     "a finite number"
 )
-# PROPOSED (S-032, decision R25): the heavier-rain stress test is a modelling
-# choice inside api/ until the erosion lane takes it as an option of EP1, so a
-# person switches it on with RAIN_STRESS_TEST=on (api/config.py).
-NOT_SWITCHED_ON = (
-    "the stress test is not switched on in this service (a person sets "
-    "RAIN_STRESS_TEST=on to switch it on)"
-)
+# PROPOSED (S-032, decision R25, fix round 1): the heavier-rain stress test is
+# a modelling choice inside api/ until the erosion lane takes it as an option
+# of EP1, so a person switches it on with RAIN_STRESS_TEST=on (api/config.py).
+# The sentence is shown to public users: it names no server variable.
+NOT_SWITCHED_ON = "heavier rain is not switched on in this service"
 NO_WHOLE_YEAR = (
     "the climate record period holds no whole agricultural year for the start "
     "month of the rotations"
@@ -378,7 +376,7 @@ def stressed_run(
     factory: EnginesFactory | None,
     catalogue: dict[str, dict] | None,
     *,
-    rain_stress_switched_on: bool = False,
+    rain_stress_switched_on: bool,
 ) -> StressedRun:
     """The engines for this request and the rain-stress echo. PROPOSED (R10).
 
@@ -400,8 +398,8 @@ def stressed_run(
     ``500``. Any ``ValueError`` of ``scale_erosivity`` still surfaces (the
     route's ``500``): it is a defect, not a reason of the echo.
 
-    PROPOSED (S-032, decision R25): with ``rain_stress_switched_on`` false
-    (the default), a declared factor is not applied: the engines unchanged,
+    PROPOSED (S-032, decision R25): ``rain_stress_switched_on`` is required
+    (no default, so a forgotten pass fails loudly). False: a declared factor is not applied: the engines unchanged,
     the echo ``applied`` false with ``NOT_SWITCHED_ON`` in its detail, and
     the factory never called. No factor and a missing factor are unchanged.
     """
@@ -445,13 +443,13 @@ def make_plant_router(
     kinds_of_year_record: Mapping[str, Any] | None,
     engines_factory: EnginesFactory | None,
     parameters: dict[str, dict] | None,
+    rain_stress_switched_on: bool,
     plant_layer: PlantLayer | None = None,
-    rain_stress_switched_on: bool = False,
 ) -> APIRouter:
     """The plant route, bound to the given implementations.
 
-    PROPOSED (S-032, decision R25): ``rain_stress_switched_on`` false (the
-    default) means a declared rain-stress factor is echoed not applied with
+    PROPOSED (S-032, decision R25): ``rain_stress_switched_on`` is required
+    (no default; ``create_app`` holds the default, off). False means a declared rain-stress factor is echoed not applied with
     ``NOT_SWITCHED_ON``, and ``engines_factory`` is never called; true means
     the factor is applied as ``stressed_run`` describes.
 

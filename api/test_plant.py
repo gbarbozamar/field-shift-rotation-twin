@@ -226,7 +226,9 @@ def client(**kwargs: Any) -> TestClient:
     # S-031: create_app no longer loads the committed ONI record; the tests
     # that relied on it inject it here.
     kwargs.setdefault("kinds_of_year_record", load_record())
-    # S-032: every test here expects the factor path of the request to run.
+    # S-032: every test here expects the factor path of the request to run, so
+    # it is switched on; the off default is tested in
+    # api/test_rain_stress_switch.py.
     kwargs.setdefault("rain_stress_switched_on", True)
     if "engines" not in kwargs:
         kwargs.setdefault("parameters", CATALOGUE)
@@ -824,7 +826,8 @@ def test_engines_that_answer_for_another_rotation_answer_500():
 def test_the_default_app_answers_the_example_request():
     """The engines of the repository, the stand-in sources and no period: a
     200 with every soil-loss mean missing and the stress applied through the
-    default factory on the catalogue."""
+    default factory on the catalogue. Switched on (S-032); the off default is
+    tested in api/test_rain_stress_switch.py."""
     app = create_app([], parameters=CATALOGUE, rain_stress_switched_on=True)
     data = answered(TestClient(app).post(ROUTE, json=REQUEST))
     checked(REQUEST, data)
