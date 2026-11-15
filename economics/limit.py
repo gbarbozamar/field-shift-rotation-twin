@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import numbers
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Literal, Protocol, get_args
 
@@ -159,9 +159,12 @@ def assess_limit(
     ``every_kind``. Otherwise the kinds of year that have at least one year in
     the record, a subset of ``KINDS_OF_YEAR`` (else ``ValueError``); a kind not
     in it keeps its ``by_kind`` check but is left out of ``every_kind``,
-    ``kinds_not_met`` and ``kinds_not_resolved``, even when its level has a
-    value, and is listed in ``kinds_not_in_record``. When it is empty,
-    ``every_kind`` is not resolved, reason ``NO_COVERAGE``.
+    ``kinds_not_met`` and ``kinds_not_resolved``, and is listed in
+    ``kinds_not_in_record``; a left-out kind whose level has a value is a
+    ``ValueError``. A ``Mapping`` (such as the counts of
+    ``kinds_of_year.count_kinds``), a text, bytes and any object that is not a
+    ``Collection`` (a generator, an iterator) are refused with ``ValueError``.
+    When it is empty, ``every_kind`` is not resolved, reason ``NO_COVERAGE``.
     """
     if limit.unit != UNIT_SOIL_LOSS_ANNUAL:
         raise ValueError(
@@ -180,9 +183,20 @@ def assess_limit(
     if kinds_in_record is None:
         in_record = KINDS_OF_YEAR
     else:
-        if isinstance(kinds_in_record, str):
-            raise ValueError("kinds_in_record: a collection of kinds, not one text")
         # ValueError, not TypeError: one exception type for every misuse.
+        if isinstance(kinds_in_record, Mapping):
+            raise ValueError(
+                "kinds_in_record: not a mapping (such as the counts of "
+                "count_kinds); pass the kinds of year with at least one year "
+                "in the record"
+            )
+        if isinstance(kinds_in_record, (str, bytes, bytearray)):
+            raise ValueError("kinds_in_record: a collection of kinds, not one text")
+        if not isinstance(kinds_in_record, Collection):
+            raise ValueError(
+                "kinds_in_record: a collection of kinds (a set, list or tuple), "
+                "not a generator or an iterator"
+            )
         try:
             given = set(kinds_in_record)
         except TypeError:
@@ -197,6 +211,14 @@ def assess_limit(
             )
         in_record = tuple(k for k in KINDS_OF_YEAR if k in given)
     not_in_record = tuple(k for k in KINDS_OF_YEAR if k not in in_record)
+    # PROPOSED (S-028 code review): a kind with no year in the record has no
+    # soil-loss level, so a value there contradicts the caller.
+    with_value = [k for k in not_in_record if by_kind[k].value is not None]
+    if with_value:
+        raise ValueError(
+            f"kinds_in_record: the kind of year {', '.join(with_value)} is left "
+            "out (no year in the record) but its soil-loss level has a value"
+        )
     left_out = (
         "; left out, no year in the record: " + ", ".join(not_in_record)
         if not_in_record
@@ -221,9 +243,7 @@ def assess_limit(
             unit=UNIT_SOIL_LOSS_ANNUAL,
             on_average=unresolved,
             every_kind=(
-                LimitCheck(
-                    "not_resolved", "MISSING_INPUT", unresolved.detail + left_out
-                )
+                replace(unresolved, detail=unresolved.detail + left_out)
                 if left_out
                 else unresolved
             ),

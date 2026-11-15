@@ -82,14 +82,57 @@ def test_a_failing_kind_in_the_record_still_fails():
     assert result.kinds_not_in_record == ("el_nino",)
 
 
-def test_a_left_out_kind_with_a_value_is_still_left_out():
-    by_kind = _kinds(Level(6.0), Level(2.0), Level(3.0))
+@pytest.mark.parametrize("limit", [TEST_LIMIT, None])
+def test_a_left_out_kind_with_a_value_is_refused(limit):
+    # 9.0 is invented test data, above the invented limit.
+    by_kind = _kinds(Level(9.0), Level(2.0), Level(3.0))
+    with pytest.raises(ValueError, match="el_nino"):
+        assess_limit(
+            _limit(limit), Level(2.0), by_kind, kinds_in_record={"neutral", "la_nina"}
+        )
+
+
+def test_a_left_out_kind_with_a_value_below_the_limit_is_refused():
+    by_kind = _kinds(_absent(), Level(2.0), Level(1.0))
+    with pytest.raises(ValueError, match="la_nina"):
+        assess_limit(
+            _limit(TEST_LIMIT), Level(2.0), by_kind, kinds_in_record={"neutral"}
+        )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"el_nino": 0, "neutral": 4, "la_nina": 2},
+        {"neutral": 4},
+        b"neutral",
+        (kind for kind in ("neutral", "la_nina")),
+        iter(["neutral", "la_nina"]),
+    ],
+)
+def test_a_mapping_bytes_or_a_non_collection_is_refused(bad):
+    # The counts are invented test data.
+    by_kind = _kinds(_absent(), Level(2.0), Level(3.0))
+    with pytest.raises(ValueError, match="kinds_in_record"):
+        assess_limit(_limit(TEST_LIMIT), Level(2.0), by_kind, kinds_in_record=bad)
+
+
+def test_a_mapping_is_refused_with_a_hint():
+    by_kind = _kinds(_absent(), Level(2.0), Level(3.0))
+    counts = {"el_nino": 0, "neutral": 4, "la_nina": 2}  # invented test data
+    with pytest.raises(ValueError, match="at least one year"):
+        assess_limit(_limit(TEST_LIMIT), Level(2.0), by_kind, kinds_in_record=counts)
+
+
+def test_meets_with_a_left_out_kind_carries_no_detail():
+    # The caller shows kinds_not_in_record next to every_kind (README.md).
+    by_kind = _kinds(_absent(), Level(2.0), Level(3.0))
     result = assess_limit(
         _limit(TEST_LIMIT), Level(2.0), by_kind, kinds_in_record={"neutral", "la_nina"}
     )
     assert result.every_kind.verdict == "meets"
-    assert result.kinds_not_met == ()
-    assert result.by_kind["el_nino"].verdict == "does_not_meet"
+    assert result.every_kind.detail is None
+    assert result.kinds_not_in_record == ("el_nino",)
 
 
 def test_an_unresolved_kind_names_the_left_out_kinds():
@@ -174,7 +217,7 @@ def test_the_field_defaults_to_empty_and_keeps_kinds_of_year_order():
     assert result.kinds_not_in_record == ("el_nino", "la_nina")
 
 
-@pytest.mark.parametrize("bad", [3, [["neutral"]], [{"neutral"}]])
+@pytest.mark.parametrize("bad", [3, [["neutral"]], [{"neutral"}], 2.5])
 def test_a_non_collection_or_an_unhashable_element_is_a_value_error(bad):
     by_kind = _kinds(Level(1.0), Level(2.0), Level(3.0))
     with pytest.raises(ValueError, match="kinds_in_record"):
