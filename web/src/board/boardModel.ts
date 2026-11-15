@@ -101,3 +101,79 @@ export function priceTrack(tipping: TippingPrice): PriceTrack | null {
     holdsTo: up.kind === 'tips' ? up.percent : up.kind === 'holds' ? 100 : today,
   }
 }
+
+/** What the options are ordered by on the board. */
+export type SortKey = 'rule' | 'margin' | 'soil'
+
+export const SORT_KEYS: readonly SortKey[] = ['rule', 'margin', 'soil']
+
+/** One option as a column of the comparison. */
+export interface BoardColumn {
+  option: PlantOption
+  /** Its letter, by its order in the answer: stable whatever the options are ordered by. */
+  letter: string
+  /** Its position in the order shown, from 1; null when the order cannot place it. */
+  position: number | null
+}
+
+const FIRST_LETTER = 65
+
+/**
+ * The options as columns, in the order asked for. Display order only: the
+ * values compared are those the answer carries for the kind of year it was
+ * asked for, and no score is computed.
+ *
+ * - rule: the order of the answer (boardCards): the chosen rotation, the
+ *   others within the limit by margin, those not resolved, those over the
+ *   limit. A position is a place the answer gives.
+ * - margin: the larger margin first.
+ * - soil: the smaller soil loss first.
+ *
+ * For margin and soil an option whose value is missing comes last, in the
+ * order of the answer, and has no position: a missing value is not ranked.
+ */
+export function boardColumns(answer: PlantAnswer, sort: SortKey): BoardColumn[] {
+  const letterOf = (option: PlantOption) =>
+    String.fromCharCode(FIRST_LETTER + answer.options.indexOf(option))
+  if (sort === 'rule') {
+    return boardCards(answer).map((card) => ({
+      option: card.option,
+      letter: letterOf(card.option),
+      position: card.rank,
+    }))
+  }
+  const kind = answer.margin_of
+  const valueOf = (option: PlantOption) =>
+    sort === 'margin' ? option.margin[kind].value : option.soil_loss[kind].value
+  const direction = sort === 'margin' ? -1 : 1
+  const ordered = answer.options
+    .map((option, index) => ({ option, index, value: valueOf(option) }))
+    .sort((a, b) => {
+      if (a.value !== null && b.value !== null && a.value !== b.value) return direction * (a.value - b.value)
+      if (a.value === null && b.value !== null) return 1
+      if (a.value !== null && b.value === null) return -1
+      return a.index - b.index
+    })
+  return ordered.map(({ option, value }, index) => ({
+    option,
+    letter: letterOf(option),
+    position: value !== null ? index + 1 : null,
+  }))
+}
+
+const PLACEHOLDER_PREFIX = /^PLACEHOLDER_/
+
+/** True for a crop id that is a placeholder of the example data, not a crop. */
+export function isExampleCrop(cropId: string): boolean {
+  return PLACEHOLDER_PREFIX.test(cropId)
+}
+
+/**
+ * A crop id as a name to read (PROPOSED): the marker of a placeholder id is
+ * dropped and its underscores become spaces. A display form only: wherever a
+ * name read from a placeholder id is shown, the mark of example crops is
+ * shown beside it (isExampleCrop), so the name never passes for a real crop.
+ */
+export function cropName(cropId: string): string {
+  return cropId.replace(PLACEHOLDER_PREFIX, '').replaceAll('_', ' ')
+}

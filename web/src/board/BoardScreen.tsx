@@ -1,4 +1,4 @@
-import { useMemo, useReducer } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
 import { QueryClient, useQuery } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
@@ -18,12 +18,15 @@ import {
 } from '../plant/PlantScreen'
 import type { PlantAction, PlantScreenState, ServicePhase, ServiceStatus } from '../plant/PlantScreen'
 import { CropLegend } from '../plant/PlantVisuals'
-import type { PlantAnswer } from '../plant/plantData'
+import type { PlantAnswer, PlantOption } from '../plant/plantData'
 import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../plant/plantRoute'
 import { buildRotationStrip, cropOrder, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
-import { boardCards } from './boardModel'
-import { AnswerBanner, BoardControls, PriceTrackPanel, RotationCard } from './BoardParts'
+import { boardColumns } from './boardModel'
+import type { SortKey } from './boardModel'
+import { AnswerBanner, BoardControls, PriceTrackPanel } from './BoardParts'
+import { CompareTable, SortPicker, cropsText } from './CompareTable'
+import type { OptionInfo } from './CompareTable'
 
 /**
  * The rotation board (PROPOSED, l3/board), at hash route #/board: one
@@ -33,7 +36,8 @@ import { AnswerBanner, BoardControls, PriceTrackPanel, RotationCard } from './Bo
  * On one side, the map and the list of the fields of the case. On the other,
  * the board of the field picked: the questions as controls (the kind of
  * year, the limit rule, the rain), the banner of the answer, the soybean
- * price as a track, and one card per rotation in board order.
+ * price as a track, and the options side by side, one column per rotation,
+ * in the order picked.
  *
  * Where the data comes from. Picking a field that the plant request
  * describes asks the service (POST /api/plant/run, the call and the state
@@ -92,18 +96,19 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
   )
 }
 
-/** The cards of an answer with what the request says of each rotation. */
-function useBoardRows(answer: PlantAnswer) {
+/** What the request says of each option, the colours of their crops and the scales of their bars. */
+function useBoardInfo(answer: PlantAnswer) {
   return useMemo(() => {
     const kind = answer.margin_of
-    const rows = boardCards(answer).map((card) => {
-      const rotation =
-        plantRotations.rotations?.find((r) => r.rotation_id === card.option.rotation_id) ?? null
-      return { card, rotation, strip: rotation !== null ? buildRotationStrip(rotation) : null }
-    })
+    const byId = new Map<string, OptionInfo>()
+    for (const option of answer.options) {
+      const rotation = plantRotations.rotations?.find((r) => r.rotation_id === option.rotation_id) ?? null
+      byId.set(option.rotation_id, { rotation, strip: rotation !== null ? buildRotationStrip(rotation) : null })
+    }
+    const strips = [...byId.values()].flatMap((each) => (each.strip !== null ? [each.strip] : []))
     return {
-      rows,
-      order: cropOrder(rows.flatMap((row) => (row.strip !== null ? [row.strip] : []))),
+      info: (option: PlantOption): OptionInfo => byId.get(option.rotation_id) ?? { rotation: null, strip: null },
+      order: cropOrder(strips),
       scales: {
         margin: barScale(answer.options.map((o) => o.margin[kind].value)),
         soilLoss: barScale([
@@ -116,39 +121,34 @@ function useBoardRows(answer: PlantAnswer) {
 }
 
 function Answered({ answer }: { answer: PlantAnswer }) {
-  const { rows, order, scales } = useBoardRows(answer)
-  const chosen = rows.find((row) => row.card.option.rotation_id === answer.chosen) ?? null
+  const { info, order, scales } = useBoardInfo(answer)
+  const [sort, setSort] = useState<SortKey>('rule')
+  const columns = useMemo(() => boardColumns(answer, sort), [answer, sort])
+  const chosen = answer.options.find((option) => option.rotation_id === answer.chosen) ?? null
   // The sources an answer lacks are its root reason: said once, in the notice.
   const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
   return (
     <div className="space-y-4">
-      <AnswerBanner answer={answer} label={chosen?.rotation?.label ?? null} showWhy={!lacksSources} />
+      <AnswerBanner
+        answer={answer}
+        label={chosen !== null ? cropsText(info(chosen).strip) : null}
+        showWhy={!lacksSources}
+      />
       {answer.chosen === null ? (
         <SourcesNotice answer={answer} />
       ) : null}
       <PriceTrackPanel tipping={answer.tipping_price} />
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="text-xl font-bold">{strings['board.rotations']}</h3>
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <h3 className="text-xl font-bold">{strings['board.compare.title']}</h3>
+        <SortPicker sort={sort} onSort={setSort} />
+      </div>
+      <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <CropLegend order={order} />
-      </div>
-      <div data-testid="board-cards" className="grid gap-4 xl:grid-cols-2">
-        {rows.map(({ card, rotation, strip }) => (
-          <RotationCard
-            key={card.option.rotation_id}
-            card={card}
-            answer={answer}
-            rotation={rotation}
-            strip={strip}
-            order={order}
-            scales={scales}
-          />
-        ))}
-      </div>
-      <p className="text-sm">
-        <a data-testid="board-report" href="#/plant" className="font-semibold text-fs-primary underline">
+        <a data-testid="board-report" href="#/plant" className="text-sm font-semibold text-fs-primary underline">
           {strings['board.report']}
         </a>
-      </p>
+      </div>
     </div>
   )
 }
@@ -241,7 +241,7 @@ export function BoardView({
           marginOf={state.marginOf}
           strictness={state.strictness}
           rain={state.rain && REQUEST_READ.rain.kind === 'present'}
-          rainAvailable={REQUEST_READ.rain.kind === 'present'}
+          rainFactor={REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null}
           onMarginOf={(value) => dispatch({ type: 'margin_of', value })}
           onStrictness={(value) => dispatch({ type: 'strictness', value })}
           onRain={(on) => dispatch({ type: 'rain', on })}

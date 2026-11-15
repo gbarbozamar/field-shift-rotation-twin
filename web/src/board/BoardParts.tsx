@@ -1,29 +1,18 @@
 import type { ReactNode } from 'react'
+import type { DeclaredFactor } from '../plant/plantRoute'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { barPercent, drawnSoilVerdict, stateTone, verdictTone } from '../plant/optionBars'
-import type { DrawnVerdict } from '../plant/optionBars'
-import { KindTable, RotationTimeline, StatePill } from '../plant/PlantVisuals'
-import { KINDS_OF_YEAR, MARGINS_OF, STRICTNESSES } from '../plant/plantData'
-import type {
-  MarginOf,
-  Measured,
-  PlantAnswer,
-  PlantOption,
-  Strictness,
-  TippingPrice,
-} from '../plant/plantData'
-import type { RotationDefinition } from '../rotation/exampleRotation'
-import type { RotationStrip } from '../plant/rotationStrip'
+import { MARGINS_OF, STRICTNESSES } from '../plant/plantData'
+import type { MarginOf, Measured, PlantAnswer, Strictness, TippingPrice } from '../plant/plantData'
 import { priceTrack } from './boardModel'
-import type { BoardCard, TrackSide } from './boardModel'
+import type { TrackSide } from './boardModel'
 
 /**
  * The parts of the rotation board (PROPOSED, l3/board): the controls of the
- * questions, the banner of the answer, the price track and the card of a
- * rotation.
+ * questions, the banner of the answer and the price track. The options side
+ * by side are in CompareTable.tsx.
  *
  * Display only. Every number is one the answer carries; a missing number is
  * a hatched track and "no value", never 0. Whether a soil loss is over the
@@ -77,13 +66,14 @@ function Segmented({
 
 /**
  * The bar of the questions: the kind of year, the limit rule and the rain.
- * Heavier rain is offered only when the request declares a factor to send.
+ * The stress test of rain erosivity is offered only when the request
+ * declares a factor to send, and names that factor.
  */
 export function BoardControls({
   marginOf,
   strictness,
   rain,
-  rainAvailable,
+  rainFactor,
   onMarginOf,
   onStrictness,
   onRain,
@@ -91,7 +81,8 @@ export function BoardControls({
   marginOf: MarginOf
   strictness: Strictness
   rain: boolean
-  rainAvailable: boolean
+  /** The factor the request declares for the stress test; null when it declares none to send. */
+  rainFactor: DeclaredFactor | null
   onMarginOf: (value: MarginOf) => void
   onStrictness: (value: Strictness) => void
   onRain: (on: boolean) => void
@@ -117,241 +108,19 @@ export function BoardControls({
         selected={STRICTNESSES.indexOf(strictness)}
         onSelect={(index) => onStrictness(STRICTNESSES[index])}
       />
-      {rainAvailable ? (
+      {rainFactor !== null ? (
         <Segmented
           name="board-rain"
           legend={strings['board.hud.rain']}
-          labels={[strings['board.rain.recorded'], strings['board.rain.heavier']]}
+          labels={[
+            strings['board.rain.recorded'],
+            formatString(strings['board.rain.factor'], { factor: displayNumber(rainFactor.value) }),
+          ]}
           selected={rain ? 1 : 0}
           onSelect={(index) => onRain(index === 1)}
         />
       ) : null}
     </div>
-  )
-}
-
-// --- meters ---------------------------------------------------------------------
-
-function NoValue() {
-  return <span className="text-sm italic text-fs-muted">{strings['plant.table.no_value']}</span>
-}
-
-function Reading({ item }: { item: Measured }) {
-  if (item.value === null) {
-    return <NoValue />
-  }
-  return (
-    <span className="whitespace-nowrap tabular-nums" title={String(item.value)}>
-      <span className="font-fs-heading text-base font-bold">{displayNumber(item.value)}</span>{' '}
-      <span className="text-[11px] text-fs-muted">{item.unit}</span>
-    </span>
-  )
-}
-
-function MeterRow({ label, track, reading }: { label: string; track: ReactNode; reading: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3">
-      <span className="text-xs font-semibold uppercase tracking-wide text-fs-muted">{label}</span>
-      {track}
-      <span className="min-w-28 text-right">{reading}</span>
-    </div>
-  )
-}
-
-/** The margin of a rotation as a meter; a loss is drawn dashed and keeps its minus sign. */
-export function MarginMeter({ item, scale }: { item: Measured; scale: number | null }) {
-  const drawn = item.value !== null && scale !== null
-  return (
-    <MeterRow
-      label={strings['plant.table.margin']}
-      track={
-        <div
-          data-testid="board-meter-margin"
-          data-empty={String(!drawn)}
-          aria-hidden="true"
-          className="relative h-3.5 overflow-hidden rounded-full bg-fs-faint data-[empty=true]:fs-fog"
-        >
-          {drawn ? (
-            <span
-              data-negative={String(item.value! < 0)}
-              className="absolute inset-y-0 left-0 rounded-full bg-fs-primary data-[negative=true]:border-2 data-[negative=true]:border-dashed data-[negative=true]:border-fs-error data-[negative=true]:bg-fs-error-bg"
-              style={{ width: `${barPercent(item.value!, scale!)}%` }}
-            />
-          ) : null}
-        </div>
-      }
-      reading={<Reading item={item} />}
-    />
-  )
-}
-
-/**
- * The soil loss of a rotation as a meter against the limit: the fill takes
- * the colour of what the answer says of it, and a tick marks the limit.
- */
-export function SoilMeter({
-  item,
-  limit,
-  scale,
-  drawn,
-}: {
-  item: Measured
-  limit: number | null
-  scale: number | null
-  drawn: DrawnVerdict
-}) {
-  const shown = item.value !== null && scale !== null
-  return (
-    <MeterRow
-      label={strings['plant.table.soil_loss']}
-      track={
-        <div
-          data-testid="board-meter-soil"
-          data-empty={String(!shown)}
-          aria-hidden="true"
-          className="relative h-3.5 rounded-full bg-fs-faint data-[empty=true]:fs-fog"
-        >
-          {shown ? (
-            <span
-              data-tone={verdictTone(drawn)}
-              className="absolute inset-y-0 left-0 rounded-full bg-fs-muted data-[tone=over]:bg-fs-error data-[tone=meets]:bg-fs-ok data-[tone=open]:bg-fs-warning"
-              style={{ width: `${barPercent(item.value!, scale!)}%` }}
-            />
-          ) : null}
-          {limit !== null && scale !== null ? (
-            <span
-              data-testid="board-meter-limit"
-              className="absolute -bottom-1.5 -top-1.5 w-0.5 rounded bg-fs-text"
-              style={{ left: `${barPercent(limit, scale)}%` }}
-            />
-          ) : null}
-        </div>
-      }
-      reading={<Reading item={item} />}
-    />
-  )
-}
-
-/** The three kinds of year of a rotation, side by side: its margin and its soil loss in each. */
-function KindStrip({ option, marginOf }: { option: PlantOption; marginOf: MarginOf }) {
-  return (
-    <div data-testid="board-kinds" className="grid grid-cols-3 gap-1.5">
-      {KINDS_OF_YEAR.map((kind) => {
-        const margin = option.margin[kind]
-        const loss = option.soil_loss[kind]
-        const drawn = drawnSoilVerdict(option, kind)
-        return (
-          <div
-            key={kind}
-            data-selected={String(kind === marginOf)}
-            className="rounded-lg border border-fs-border px-2 py-1.5 data-[selected=true]:border-fs-primary data-[selected=true]:bg-fs-selection"
-          >
-            <p className="font-mono text-[10px] uppercase tracking-wide text-fs-muted">{strings[`plant.kind.${kind}`]}</p>
-            <p className="tabular-nums">
-              {margin.value !== null ? (
-                <span className="font-fs-heading text-sm font-bold" title={String(margin.value)}>
-                  {displayNumber(margin.value)}
-                </span>
-              ) : (
-                <NoValue />
-              )}
-            </p>
-            <p
-              data-tone={loss.value !== null ? verdictTone(drawn) : undefined}
-              className="text-xs tabular-nums text-fs-muted data-[tone=over]:font-bold data-[tone=over]:text-fs-error"
-            >
-              {loss.value !== null ? (
-                <span title={String(loss.value)}>
-                  {formatString(strings['board.kind.soil'], { value: displayNumber(loss.value) })}
-                </span>
-              ) : (
-                <NoValue />
-              )}
-            </p>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// --- the card of a rotation -------------------------------------------------------
-
-export interface CardScales {
-  margin: number | null
-  soilLoss: number | null
-}
-
-/**
- * The card of one rotation: its place when the answer ranks it, its name and
- * state, its crops on a timeline, its margin and soil loss as meters for the
- * kind of year looked at, and the three kinds of year side by side. The
- * table by kind of year opens under it.
- */
-export function RotationCard({
-  card,
-  answer,
-  rotation,
-  strip,
-  order,
-  scales,
-}: {
-  card: BoardCard
-  answer: PlantAnswer
-  rotation: RotationDefinition | null
-  strip: RotationStrip | null
-  order: readonly string[]
-  scales: CardScales
-}) {
-  const { option, rank } = card
-  const kind = answer.margin_of
-  return (
-    <article
-      data-testid="board-card"
-      data-state={option.state}
-      data-tone={stateTone(option.state)}
-      className="rounded-2xl border border-fs-border bg-fs-surface p-4 data-[tone=chosen]:border-2 data-[tone=chosen]:border-fs-primary data-[tone=chosen]:shadow-lg data-[tone=over]:opacity-80"
-    >
-      <header className="flex items-start gap-3">
-        {rank !== null ? (
-          <span
-            data-testid="board-rank"
-            data-first={String(rank === 1)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-fs-border font-fs-heading text-xl font-extrabold text-fs-muted data-[first=true]:border-fs-primary data-[first=true]:bg-fs-primary data-[first=true]:text-white"
-          >
-            {rank}
-          </span>
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <h4 data-testid="board-card-label" className="text-lg font-bold leading-tight">
-            {rotation !== null ? rotation.label : option.rotation_id}
-          </h4>
-          <p className="font-mono text-[11px] text-fs-muted">{option.rotation_id}</p>
-        </div>
-        <StatePill state={option.state} />
-      </header>
-      {strip !== null ? (
-        <RotationTimeline strip={strip} order={order} />
-      ) : null}
-      <div className="mt-3 space-y-2">
-        <MarginMeter item={option.margin[kind]} scale={scales.margin} />
-        <SoilMeter
-          item={option.soil_loss[kind]}
-          limit={option.limit}
-          scale={scales.soilLoss}
-          drawn={drawnSoilVerdict(option, kind)}
-        />
-      </div>
-      <div className="mt-3">
-        <KindStrip option={option} marginOf={kind} />
-      </div>
-      <details className="mt-2">
-        <summary className="cursor-pointer text-xs font-semibold text-fs-muted">{strings['plant.table.heading']}</summary>
-        <div className="mt-2">
-          <KindTable option={option} marginOf={kind} />
-        </div>
-      </details>
-    </article>
   )
 }
 
