@@ -305,6 +305,10 @@ def test_count_kinds_with_a_missing_year_feeds_the_margin():
     # the seasons are synthetic, every one of 2013..2014 at 0.0 (not the real
     # anomalies). The agricultural year 2014 with start month 7 is decided by
     # DJF 2015, which is not in them, so that year is missing NO_COVERAGE.
+    pytest.importorskip(
+        "kinds_of_year",
+        reason="kinds_of_year/ is not on main until its ONI record is signed (D240)",
+    )
     from kinds_of_year import (
         SEASONS,
         classify_agricultural_years,
