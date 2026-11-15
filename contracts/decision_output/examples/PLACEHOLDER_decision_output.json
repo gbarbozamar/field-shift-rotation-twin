@@ -65,6 +65,56 @@
           }
         }
       ]
+    },
+    {
+      "rotation_id": "example-rotation-1",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "years_evaluated": 0,
+      "years_within_limits": null,
+      "not_evaluated": [
+        {
+          "time_basis": "ag_year",
+          "ag_year": 2001,
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2001, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"
+          }
+        },
+        {
+          "time_basis": "ag_year",
+          "ag_year": 2002,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does, so the daily water balance does not cover it; coverage is checked before any missing parameter"
+          }
+        }
+      ]
+    },
+    {
+      "rotation_id": "example-rotation-2",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "years_evaluated": 0,
+      "years_within_limits": null,
+      "not_evaluated": [
+        {
+          "time_basis": "ag_year",
+          "ag_year": 2001,
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2001, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"
+          }
+        },
+        {
+          "time_basis": "ag_year",
+          "ag_year": 2002,
+          "missing": {
+            "reason": "NO_COVERAGE",
+            "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does, so the daily water balance does not cover it; coverage is checked before any missing parameter"
+          }
+        }
+      ]
     }
   ],
   "range_across_scenarios": [
@@ -81,6 +131,28 @@
       "minimum": 0,
       "maximum": 0,
       "scenario_of_the_minimum": "PLACEHOLDER_scenario_one"
+    },
+    {
+      "rotation_id": "example-rotation-1",
+      "indicator": "water_deficit_exposure",
+      "minimum": null,
+      "maximum": null,
+      "scenario_of_the_minimum": null,
+      "missing": {
+        "reason": "NOT_DECLARED",
+        "detail": "PLACEHOLDER detail: no limit is declared for this indicator, so no year is judged (D60)"
+      }
+    },
+    {
+      "rotation_id": "example-rotation-2",
+      "indicator": "water_deficit_exposure",
+      "minimum": null,
+      "maximum": null,
+      "scenario_of_the_minimum": null,
+      "missing": {
+        "reason": "NOT_DECLARED",
+        "detail": "PLACEHOLDER detail: no limit is declared for this indicator, so no year is judged (D60)"
+      }
     }
   ],
   "paired_differences": [
@@ -123,7 +195,24 @@
       "pair": ["example-rotation-1", "example-rotation-2"],
       "scenario_id": "PLACEHOLDER_scenario_one",
       "indicator": "water_deficit_exposure",
-      "time_basis": "rotation",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
+      "difference": {
+        "value": null,
+        "unit": "dimensionless",
+        "missing": {
+          "reason": "MISSING_INPUT",
+          "detail": "the value of the pair's side 'example-rotation-1' and 'example-rotation-2' of this cell is missing (C3.3)"
+        }
+      },
+      "method": "OPEN: paired-difference method and citation, person-supplied"
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "time_basis": "ag_year",
+      "ag_year": 2002,
       "difference": {
         "value": null,
         "unit": "dimensionless",
@@ -263,7 +352,7 @@
       "reason": "a difference without its range",
       "coverage": {
         "cells_compared": 2,
-        "cells_of_the_pair": 5
+        "cells_of_the_pair": 6
       }
     }
   ],
