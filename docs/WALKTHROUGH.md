@@ -9,7 +9,7 @@ The commands are written for a POSIX shell (bash); the `NAME=value command` form
 ## What you need
 
 - `git`.
-- Python 3.12 (`pyproject.toml` requires `>=3.12,<3.13`) and [uv](https://docs.astral.sh/uv/). CI installs uv 0.12.2.
+- Python 3.12 (`pyproject.toml` requires `>=3.12,<3.13`) and [uv](https://docs.astral.sh/uv/). CI installs uv 0.12.2. If uv was installed with pip and the `uv` command is not found, `python -m uv` runs the same tool: write `python -m uv sync` for `uv sync`, and so on (this page was checked that way, with uv 0.11.7).
 - Node.js and npm for the interface. CI uses Node 22.
 - A network connection for the clone and the two installs (`uv sync`, `npm ci`). No other step that was run needs the network, and none calls the public climate service.
 - Docker is **not** needed. The steps that use it are marked as not run.
@@ -37,19 +37,21 @@ uv creates `.venv` from `uv.lock`, the development tools included, and lists eac
 uv run pytest
 ```
 
-Seen at the checked commit, on a machine where the Docker command is installed but Docker itself was not running:
+At the checked commit, on a machine where the Docker command is installed but Docker itself was not running, the last line read:
 
 ```text
 1 failed, 4763 passed, 17 skipped, 7 warnings
 ```
 
-The one failure is `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`. It runs the secret scanner in a Docker container, and with Docker installed but not running the container cannot start. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). Every other test passed. The run took between ten and fifteen minutes.
+The numbers grow with each unit that adds tests, so on a later commit yours will be higher. What you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). The run took between ten and twenty minutes on the machines it was run on; how long depends on the machine.
 
 The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml`):
 
 ```bash
 uv run pytest contracts/
 ```
+
+At the checked commit the last line read (it also grows with new tests; what matters is no failure):
 
 ```text
 930 passed, 1 warning
@@ -61,10 +63,14 @@ uv run pytest contracts/
 CORS_ORIGINS=http://localhost:5173 uv run uvicorn api.main:app --reload
 ```
 
-`CORS_ORIGINS` lets the interface of step 6 (served on port 5173) call this backend (`CLAUDE.md`, "CORS"). Without it the backend allows no cross-origin call. The terminal ends with:
+`CORS_ORIGINS` lets the interface of step 6 (served on port 5173) call this backend (`CLAUDE.md`, "CORS"). Without it the backend allows no cross-origin call. The terminal prints these lines, in this order (`<folder>` and `<number>` stand for your own values):
 
 ```text
+INFO:     Will watch for changes in these directories: ['<folder>']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [<number>] using StatReload
+INFO:     Started server process [<number>]
+INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 ```
 
@@ -80,7 +86,7 @@ curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:800
 200
 ```
 
-The body of `GET /health` is `{"status":"ok"}`. The interactive page of the backend, `http://localhost:8000/docs`, opens and lists the two routes, `GET /health` and `POST /api/rotations/run`.
+The body of `GET /health` is `{"status":"ok"}`. The interactive page of the backend, `http://localhost:8000/docs`, opens and lists the routes of the backend, among them the two this page uses: `GET /health` and `POST /api/rotations/run`.
 
 ## 5. Build the interface
 
@@ -129,7 +135,7 @@ Everything else on the Fields screen (Site data, Rotation timeline, Two clocks, 
 
 ## 7. Read the answer
 
-The backend answered HTTP `200` with this JSON (the browser's network panel shows it). The parts that matter:
+The backend answered HTTP `200` with a JSON body. To see it, open the browser's developer tools (F12 in most browsers), go to the **Network** tab, press the button of step 6 again, and select the request named `run` (a `POST`; an `OPTIONS` request of the same name may come first); its response is the JSON. The parts that matter:
 
 | Field | Value seen |
 |---|---|
@@ -171,7 +177,7 @@ CORS_ORIGINS=http://localhost:5173 SOIL_SLOPE_EXAMPLE_FILE=data/demo/la_estanzue
 Illustrative rotation: missing input: input not available: climate (site data: climate)
 ```
 
-The soil source is now listed with state `example`; the climate is still `climate_not_connected`, `NOT_AVAILABLE`. Without a climate record no indicator can be computed, so every module except `calendar` keeps the states of step 7, now naming only the climate.
+The soil source is now listed with state `example`; the climate is still `climate_not_connected`, `NOT_AVAILABLE`. Without a climate record no indicator can be computed: `erosion`, `water`, `residues` and `amg` stay `not_available` / `MISSING_INPUT`, their detail now naming only the climate; `rothc` stays `not_available` / `NOT_AVAILABLE` with the same detail as in step 7; `calendar` stays `available`.
 
 ### C. The climate source and the demonstration soil file switched on: not run when this page was written
 
@@ -207,11 +213,11 @@ POWER_SETTINGS_FILE= CLIMATE_START_DATE= CLIMATE_END_DATE= docker compose up
 
 ## 9. The deployed service
 
-The interface is published at `https://gbarbozamar.github.io/field-shift-rotation-twin/`; the public address of the backend is in `CLAUDE.md`, "Deploy". A plain `GET` of each answered `200` when this page was written, and `GET /health` of the backend answered `{"status":"ok"}`. No rotation was sent to the deployed service from this page.
+The interface is published at `https://gbarbozamar.github.io/field-shift-rotation-twin/`; the public address of the backend is in `CLAUDE.md`, "Deploy". When this page was written, a plain `GET` of the interface's address answered `200`. On the backend, `GET /health` answered `200` with `{"status":"ok"}`, while a `GET` of its root address (`/`) answered `404` with `{"error":{"code":"NOT_FOUND","message":"No route matches this path.","details":[]}}`: the backend serves its routes, not a page. No rotation was sent to the deployed service from this page.
 
 ## Limits of the answer, at the checked commit
 
-- **Without a climate record nothing is computed.** In configurations A and B every indicator is missing with `MISSING_INPUT`; the answer is `no_result`.
+- **Without a climate record nothing is computed.** In configurations A and B every indicator is missing (`MISSING_INPUT`, except RothC, below); the answer is `no_result`.
 - **RothC is not called by the runner** at this commit: its rows and its module say "the runner does not call this engine yet: engine.rothc.run_rothc", whatever the configuration.
 - **The soil-loss figure, when it appears, carries the label of D148** quoted above, and it is the same for both rotations of D128 (D158).
 - **Example data is example data.** The fields, the rotation and most of the Fields screen are synthetic, and the screen labels them so. The demonstration soil-and-slope file is marked `example_data: true`, and the backend refuses to start with one that is not (`api/README.md`).
