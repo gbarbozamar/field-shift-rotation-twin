@@ -20,14 +20,17 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    (``residue_ledger_type``), never at module load. Its series become the
    ``annual_carbon_inputs`` of the forcing, copied unchanged (PROPOSED);
    the ledger itself is not in the response;
-4. EP5 ``run_amg(forcing, parameters=...)`` under the same conditions as EP1
-   and EP3, on the ``CarbonForcing`` that ``api.carbon_forcing`` builds from
-   the calendar and the site data (PROPOSED). When the forcing cannot be laid
-   out, EP5 is not called and its rows are missing with that reason;
+4. EP5 ``run_amg(forcing, parameters=...)`` and then EP6
+   ``run_rothc(forcing, parameters=...)`` under the same conditions as EP1
+   and EP3, each only when its carbon model is configured, both on the one
+   ``CarbonForcing`` that ``api.carbon_forcing`` builds from the calendar and
+   the site data (PROPOSED), the same object for both (D65). When the forcing
+   cannot be laid out, neither is called and their rows are missing with
+   that reason;
 5. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend``: the three rows of the
-   ``CarbonBalance`` of EP5 unchanged for ``amg`` (the mapping of
-   contracts/ENTRYPOINTS.md), and
+   ``CarbonBalance`` of EP5 unchanged for ``amg``, then those of EP6 for
+   ``rothc`` (the mapping of contracts/ENTRYPOINTS.md), and
    missing rows for every model whose engine is not built or was not called
    (decision Q15 c). A part whose engine is
    not built is written in the not-built form of the contract (decision D12
@@ -120,12 +123,8 @@ EROSION = EntryPoint("EP1", "erosion", "engine.erosion", "compute_soil_loss")
 WATER = EntryPoint("EP3", "water", "engine.water", "compute_water_deficit_exposure")
 AMG = EntryPoint("EP5", "amg", "engine.amg", "run_amg")
 RESIDUES = EntryPoint("EP4", "residues", "engine.residues", "build_residue_ledger")
-DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, RESIDUES, AMG)
-# Not discovered and not called yet (contracts/ENTRYPOINTS.md), whether or not
-# the engine exists: the runner does not look for it. It is named in the
-# detail of its missing rows and module state once another carbon engine is
-# built. Discovering and calling it is a later unit of lane L2a (api/README.md).
 ROTHC = EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")
+DISCOVERED: tuple[EntryPoint, ...] = (CALENDAR, EROSION, WATER, RESIDUES, AMG, ROTHC)
 
 # The contract EP4 returns (contracts/residue_ledger/, lane L1). Imported only
 # when EP4 has answered, never at module load: the runner must work before the
@@ -150,19 +149,25 @@ MODULE_IDS: tuple[str, ...] = (
 DEFAULT_CARBON_MODELS: tuple[str, ...] = ("amg", "rothc")
 # The closed list of carbon models of the results contract (``CarbonModel``).
 CARBON_MODEL_IDS: tuple[str, ...] = get_args(CarbonModel)
-# The carbon model of EP5 (D1 of #77) and the entry point of each carbon model.
+# The carbon models of EP5 and EP6 (D1 of #77) and the entry point of each,
+# in the order of their rows in soil_carbon_trend (EP5, then EP6).
 AMG_CARBON_MODEL = "amg"
-CARBON_ENTRY_POINTS: dict[str, EntryPoint] = {AMG_CARBON_MODEL: AMG, "rothc": ROTHC}
+ROTHC_CARBON_MODEL = "rothc"
+CARBON_ENTRY_POINTS: dict[str, EntryPoint] = {
+    AMG_CARBON_MODEL: AMG,
+    ROTHC_CARBON_MODEL: ROTHC,
+}
 
 # PROPOSED detail texts: English for developers, never shown to users.
 AMG_NOT_CONFIGURED = (
     "the carbon model 'amg' is not among the configured carbon models, "
     "so engine.amg.run_amg is not called"
 )
+ROTHC_NOT_CONFIGURED = (
+    "the carbon model 'rothc' is not among the configured carbon models, "
+    "so engine.rothc.run_rothc is not called"
+)
 NOT_BUILT = "the module is not built yet"
-# For an entry point the runner does not look for (EP6): true whether or not
-# the engine exists, unlike NOT_BUILT.
-NOT_CALLED = "the runner does not call this engine yet"
 LEDGER_EMPTY = "the residue ledger holds no component and no carbon-input series"
 CARBON_NOT_BUILT = "no carbon engine is built yet"
 CARBON_MODELS_NOT_CONFIGURED = (
@@ -202,6 +207,8 @@ class EngineFunctions:
     build_residue_ledger: Callable[..., Any] | None = None
     # EP5
     run_amg: Callable[..., CarbonBalance] | None = None
+    # EP6 (the same arguments and return type as EP5, D65)
+    run_rothc: Callable[..., CarbonBalance] | None = None
     # The phase rule of lane L1 (issue #221), not an entry point. Used only
     # when both are given; otherwise only phase 1 runs.
     phase_calendar: Callable[..., RotationCalendar] | None = None
@@ -402,15 +409,6 @@ def _not_built(point: EntryPoint) -> ModuleStatus:
     )
 
 
-def _not_called(point: EntryPoint) -> ModuleStatus:
-    return _status(
-        point.module_id,
-        "not_available",
-        "NOT_AVAILABLE",
-        f"{NOT_CALLED}: {_name(point)}",
-    )
-
-
 def _missing_input(module_id: str, detail: str) -> ModuleStatus:
     return _status(module_id, "not_available", "MISSING_INPUT", detail)
 
@@ -438,16 +436,19 @@ def part_not_built(
 
 
 def _carbon_modules(
-    amg: ModuleStatus | None = None, residues: ModuleStatus | None = None
+    amg: ModuleStatus | None = None,
+    residues: ModuleStatus | None = None,
+    rothc: ModuleStatus | None = None,
 ) -> tuple[ModuleStatus, ...]:
     """The states of ``residues``, ``amg`` and ``rothc``.
 
-    ``amg`` is ``None`` when EP5 is not built and ``residues`` when EP4 is not
-    built. Both ``None``: the three are written as before any carbon engine
-    existed, "no carbon engine is built yet". Otherwise each given state is
-    used and every other carbon module names its own engine function.
+    ``amg`` is ``None`` when EP5 is not built, ``residues`` when EP4 is not
+    built and ``rothc`` when EP6 is not built. All three ``None``: the three
+    are written as before any carbon engine existed, "no carbon engine is
+    built yet". Otherwise each given state is used and every other carbon
+    module names its own engine function.
     """
-    if amg is None and residues is None:
+    if amg is None and residues is None and rothc is None:
         return tuple(
             _status(module_id, "not_available", "NOT_AVAILABLE", CARBON_NOT_BUILT)
             for module_id in CARBON_MODULE_IDS
@@ -455,7 +456,7 @@ def _carbon_modules(
     return (
         residues if residues is not None else _not_built(RESIDUES),
         amg if amg is not None else _not_built(AMG),
-        _not_called(ROTHC),
+        rothc if rothc is not None else _not_built(ROTHC),
     )
 
 
@@ -463,10 +464,16 @@ def _amg_not_configured() -> ModuleStatus:
     return _status(AMG.module_id, "not_available", "NOT_AVAILABLE", AMG_NOT_CONFIGURED)
 
 
+def _rothc_not_configured() -> ModuleStatus:
+    return _status(
+        ROTHC.module_id, "not_available", "NOT_AVAILABLE", ROTHC_NOT_CONFIGURED
+    )
+
+
 def _carbon_dependent(
-    functions: EngineFunctions, amg_configured: bool, missing_input: str
+    functions: EngineFunctions, carbon_models: Sequence[str], missing_input: str
 ) -> tuple[ModuleStatus, ...]:
-    """The carbon modules when EP4 and EP5 were not called: an input is missing."""
+    """The carbon modules when EP4, EP5 and EP6 were not called: an input is missing."""
     residues = (
         None
         if functions.build_residue_ledger is None
@@ -474,11 +481,17 @@ def _carbon_dependent(
     )
     if functions.run_amg is None:
         amg = None
-    elif not amg_configured:
+    elif AMG_CARBON_MODEL not in carbon_models:
         amg = _amg_not_configured()
     else:
         amg = _missing_input(AMG.module_id, missing_input)
-    return _carbon_modules(amg, residues)
+    if functions.run_rothc is None:
+        rothc = None
+    elif ROTHC_CARBON_MODEL not in carbon_models:
+        rothc = _rothc_not_configured()
+    else:
+        rothc = _missing_input(ROTHC.module_id, missing_input)
+    return _carbon_modules(amg, residues, rothc)
 
 
 def crops_left_out_detail(count: int) -> str:
@@ -497,16 +510,23 @@ def _with_note(status: ModuleStatus, note: str) -> ModuleStatus:
     return _status(status.id, status.state, status.reason, detail)
 
 
-def check_balance(balance: object, forcing: CarbonForcing) -> CarbonBalance:
-    """What EP5 returned, checked against the forcing the runner gave it.
+def check_balance(
+    balance: object,
+    forcing: CarbonForcing,
+    carbon_model: str = AMG_CARBON_MODEL,
+) -> CarbonBalance:
+    """What EP5 or EP6 returned, checked against the forcing the runner gave it.
 
+    ``carbon_model`` is the model of the engine that answered (``amg`` for
+    EP5, ``rothc`` for EP6); its entry point is named in every message.
     Anything but a ``CarbonBalance``, or a balance of another rotation or
     another carbon model, is a defect of the engine: ``TypeError`` (``500``).
     The forcing is the runner's own, so a mismatch cannot be the request's.
     """
+    point = CARBON_ENTRY_POINTS[carbon_model]
     if not isinstance(balance, CarbonBalance):
         raise TypeError(
-            f"{_name(AMG)} returned {type(balance).__name__}, not CarbonBalance"
+            f"{_name(point)} returned {type(balance).__name__}, not CarbonBalance"
         )
     differ = [
         field
@@ -515,13 +535,13 @@ def check_balance(balance: object, forcing: CarbonForcing) -> CarbonBalance:
     ]
     if differ:
         raise TypeError(
-            f"{_name(AMG)} returned the balance of another rotation: "
+            f"{_name(point)} returned the balance of another rotation: "
             f"{' and '.join(differ)} differ from the forcing"
         )
-    if balance.carbon_model != AMG_CARBON_MODEL:
+    if balance.carbon_model != carbon_model:
         raise TypeError(
-            f"{_name(AMG)} returned a balance of another carbon model, "
-            f"not {AMG_CARBON_MODEL!r}"
+            f"{_name(point)} returned a balance of another carbon model, "
+            f"not {carbon_model!r}"
         )
     return balance
 
@@ -687,7 +707,7 @@ class EntryPointEngines:
       returned it and after ``params.catalogue.check_catalogue`` reported no
       problem (the app loads and checks it at start-up, ``api/config.py``).
       Passed by keyword, the same object on every call and never copied,
-      edited or filtered, to EP1, EP3, EP4 and EP5 always.
+      edited or filtered, to EP1, EP3, EP4, EP5 and EP6 always.
       ``None`` (the default) is the empty catalogue ``{}``, today's state of
       ``params/records/``; it reads no file (PROPOSED).
     """
@@ -741,7 +761,7 @@ class EntryPointEngines:
         build_calendar = functions.build_rotation_calendar
         soil_loss_function = functions.compute_soil_loss
         water_function = functions.compute_water_deficit_exposure
-        amg_configured = AMG_CARBON_MODEL in self._carbon_models
+        carbon_models = self._carbon_models
 
         # 1. EP2 first.
         if build_calendar is None:
@@ -758,7 +778,7 @@ class EntryPointEngines:
                     _not_built(CALENDAR),
                     _dependent(EROSION, soil_loss_function, calendar_input),
                     _dependent(WATER, water_function, calendar_input),
-                    *_carbon_dependent(functions, amg_configured, calendar_input),
+                    *_carbon_dependent(functions, carbon_models, calendar_input),
                 ),
             )
         definition = self._load_rotation(rotation)
@@ -791,7 +811,7 @@ class EntryPointEngines:
                     calendar_module,
                     _dependent(EROSION, soil_loss_function, detail),
                     _dependent(WATER, water_function, detail),
-                    *_carbon_dependent(functions, amg_configured, detail),
+                    *_carbon_dependent(functions, carbon_models, detail),
                 ),
             )
 
@@ -818,7 +838,7 @@ class EntryPointEngines:
                     calendar_module,
                     _dependent(EROSION, soil_loss_function, detail),
                     _dependent(WATER, water_function, detail),
-                    *_carbon_dependent(functions, amg_configured, detail),
+                    *_carbon_dependent(functions, carbon_models, detail),
                 ),
             )
 
@@ -847,13 +867,15 @@ class EntryPointEngines:
         climate: ClimateResult,
         soil_slope: SoilSlopeResult,
     ) -> EnginesResult:
-        """EP1, EP3, EP4 and EP5 on the calendar of one phase; the same inputs every phase."""
+        """EP1, EP3, EP4, EP5 and EP6 on the calendar of one phase; the same inputs every phase."""
         functions = self._functions
         soil_loss_function = functions.compute_soil_loss
         water_function = functions.compute_water_deficit_exposure
         residues_function = functions.build_residue_ledger
         amg_function = functions.run_amg
+        rothc_function = functions.run_rothc
         amg_configured = AMG_CARBON_MODEL in self._carbon_models
+        rothc_configured = ROTHC_CARBON_MODEL in self._carbon_models
         calendar = phase.calendar
         calendar_module = calendar_status(calendar)
         for note in phase.notes:
@@ -920,23 +942,32 @@ class EntryPointEngines:
             )
             residues_module = ledger_status(ledger)
 
-        # EP5 on the forcing built from the same inputs (PROPOSED), with the
-        # catalogue by keyword (D65). Not called when the forcing cannot be
-        # laid out: its three rows are missing with that reason. Not called
-        # either when ``amg`` is not a configured carbon model: no amg rows.
-        amg_rows: list[SoilCarbonTrend] | None = None
-        amg_module: ModuleStatus | None = None
-        if amg_function is not None and not amg_configured:
-            amg_rows = []
-            amg_module = _amg_not_configured()
-        elif amg_function is not None:
-            from_ledger = ledger is not None and ledger.years_missing is None
+        # The one forcing of this phase (PROPOSED), built once when a
+        # configured carbon engine is built: EP5 and EP6 receive the same
+        # object (D65).
+        forcing: CarbonForcing | ResultsMissing | None = None
+        if (amg_function is not None and amg_configured) or (
+            rothc_function is not None and rothc_configured
+        ):
             forcing = build_carbon_forcing(
                 calendar,
                 climate.data,
                 soil_slope.data,
                 carbon_inputs=None if ledger is None else ledger_carbon_inputs(ledger),
             )
+
+        # EP5 on that forcing, with the catalogue by keyword (D65). Not called
+        # when the forcing cannot be laid out: its three rows are missing with
+        # that reason. Not called either when ``amg`` is not a configured
+        # carbon model: no amg rows.
+        amg_rows: list[SoilCarbonTrend] | None = None
+        amg_module: ModuleStatus | None = None
+        if amg_function is not None and not amg_configured:
+            amg_rows = []
+            amg_module = _amg_not_configured()
+        elif amg_function is not None:
+            assert forcing is not None
+            from_ledger = ledger is not None and ledger.years_missing is None
             if isinstance(forcing, ResultsMissing):
                 amg_rows = missing_carbon_trend((AMG_CARBON_MODEL,), forcing)
                 amg_module = _status(
@@ -966,11 +997,39 @@ class EntryPointEngines:
                 ),
             )
 
+        # EP6 after EP5, on the same forcing object, with the catalogue by
+        # keyword (D65), under the conditions of EP5 (PROPOSED): not called
+        # when the forcing cannot be laid out (its three rows are missing with
+        # that reason) or when ``rothc`` is not a configured carbon model (no
+        # rothc rows). Its rows are copied as they come, never changed here.
+        rothc_rows: list[SoilCarbonTrend] | None = None
+        rothc_module: ModuleStatus | None = None
+        if rothc_function is not None and not rothc_configured:
+            rothc_rows = []
+            rothc_module = _rothc_not_configured()
+        elif rothc_function is not None:
+            assert forcing is not None
+            if isinstance(forcing, ResultsMissing):
+                rothc_rows = missing_carbon_trend((ROTHC_CARBON_MODEL,), forcing)
+                rothc_module = _status(
+                    ROTHC.module_id, "not_available", forcing.reason, forcing.detail
+                )
+            else:
+                rothc_balance = check_balance(
+                    rothc_function(forcing, parameters=self._parameters),
+                    forcing,
+                    ROTHC_CARBON_MODEL,
+                )
+                rothc_rows = list(rothc_balance.soil_carbon_trend)
+                rothc_module = module_status_of(
+                    ROTHC.module_id, count_values(rothc_rows)
+                )
+
         modules = (
             calendar_module,
             erosion_module,
             water_module,
-            *_carbon_modules(amg_module, residues_module),
+            *_carbon_modules(amg_module, residues_module, rothc_module),
         )
 
         def without_result(reason: ReasonCode, detail: str | None) -> EnginesResult:
@@ -1003,7 +1062,7 @@ class EntryPointEngines:
                 if water is not None
                 else part_not_built(WaterDeficitExposureNotBuilt, WATER)
             ),
-            soil_carbon_trend=carbon_trend(self._carbon_models, amg_rows),
+            soil_carbon_trend=carbon_trend(self._carbon_models, amg_rows, rothc_rows),
         )
         count = count_values(result_values(result))
         return EnginesResult(
@@ -1060,32 +1119,37 @@ def _dependent(
 
 
 def carbon_trend(
-    carbon_models: Sequence[str], amg_rows: Sequence[SoilCarbonTrend] | None
+    carbon_models: Sequence[str],
+    amg_rows: Sequence[SoilCarbonTrend] | None,
+    rothc_rows: Sequence[SoilCarbonTrend] | None = None,
 ) -> list[SoilCarbonTrend]:
     """``soil_carbon_trend`` of the result: the rows of EP5, then those of EP6.
 
     The mapping of "From the entry points to one response" of
-    contracts/ENTRYPOINTS.md (PROPOSED there, #210): for
-    ``amg``, the rows of EP5 (the three of its balance, unchanged, or the
-    three missing with the reason EP5 was not called). For every other model,
-    its three rows missing ``NOT_AVAILABLE``, the detail naming its engine
-    function. Models are never merged (C1.5). ``amg_rows`` ``None`` (EP5 not
-    built): the six rows as before EP5 existed.
+    contracts/ENTRYPOINTS.md (PROPOSED there, #210): for ``amg``, the rows of
+    EP5 (the three of its balance, unchanged, or the three missing with the
+    reason EP5 was not called); for ``rothc``, the rows of EP6 in the same
+    way. A model whose rows are ``None`` (its engine is not built): its three
+    rows missing ``NOT_AVAILABLE``, the detail naming its engine function.
+    Models are never merged (C1.5). Both ``None`` (neither built): the six
+    rows as before EP5 existed.
     """
-    if amg_rows is None:
+    if amg_rows is None and rothc_rows is None:
         return missing_carbon_trend(carbon_models)
+    by_model = {AMG_CARBON_MODEL: amg_rows, ROTHC_CARBON_MODEL: rothc_rows}
     rows: list[SoilCarbonTrend] = []
     # The list of EP5, then the list of EP6 ("From the entry points to one
     # response" of contracts/ENTRYPOINTS.md), for the configured models only.
     for carbon_model in [m for m in CARBON_ENTRY_POINTS if m in carbon_models]:
-        if carbon_model == AMG_CARBON_MODEL:
-            rows.extend(amg_rows)
+        model_rows = by_model[carbon_model]
+        if model_rows is not None:
+            rows.extend(model_rows)
             continue
         point = CARBON_ENTRY_POINTS[carbon_model]
-        not_called = ResultsMissing(
-            reason="NOT_AVAILABLE", detail=f"{NOT_CALLED}: {_name(point)}"
+        not_built = ResultsMissing(
+            reason="NOT_AVAILABLE", detail=f"{NOT_BUILT}: {_name(point)}"
         )
-        rows.extend(missing_carbon_trend((carbon_model,), not_called))
+        rows.extend(missing_carbon_trend((carbon_model,), not_built))
     return rows
 
 
