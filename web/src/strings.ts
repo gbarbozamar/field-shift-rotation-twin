@@ -316,6 +316,26 @@ export const strings = {
   // read leaves the control without a factor.
   'plant.service.rain_next_answer': 'Applies to the next answer from the service.',
   'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
+  // Wording addendum Block 6, 15 Nov 2026 (l3/stage-rail, issue #435): the
+  // stage rail of the fields screen — the label of the whole rail, the six
+  // stages in their order, the state a stage is in, and the reason each
+  // stage would show while it waits.
+  'rail.label': 'The case in six stages',
+  'rail.stage.case': 'Open the case',
+  'rail.stage.field': 'Read the field',
+  'rail.stage.rotations': 'Set the rotations',
+  'rail.stage.compare': 'Compare the runs',
+  'rail.stage.decision': 'Read the decision',
+  'rail.stage.handoff': 'Take the case with you',
+  'rail.state.done': 'done',
+  'rail.state.current': 'you are here',
+  'rail.state.waiting': 'waiting',
+  'rail.waiting.case': 'open a case first',
+  'rail.waiting.field': 'no field chosen yet',
+  'rail.waiting.rotations': 'the field is not read yet',
+  'rail.waiting.compare': 'no run has answered yet',
+  'rail.waiting.decision': 'nothing has been compared yet',
+  'rail.waiting.handoff': 'no decision to hand over yet',
 } as const
 
 /**
