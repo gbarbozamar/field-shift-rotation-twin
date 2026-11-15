@@ -7,6 +7,7 @@ import { exampleRotation } from '../rotation/exampleRotation'
 import ClocksScreen from '../clocks/ClocksScreen'
 import ResultCards from '../results/ResultCards'
 import DecisionSection from '../decision/DecisionSection'
+import StageRail from '../rail/StageRail'
 import RotationRun from '../seam/RotationRun'
 import { strings } from '../strings'
 
@@ -51,6 +52,8 @@ export default function FieldsScreen() {
       <p className="mt-1 text-sm text-slate-500">
         {strings['identity.case_label']}: {exampleCase.label}
       </p>
+
+      <StageRail />
 
       {exampleCase.example_data && (
         <div

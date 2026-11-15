@@ -11,6 +11,7 @@ import { ApiError, runRotation } from './runRotationApi'
 import type { SiteReference } from './runRotationApi'
 import { parseRunRotation } from './runRotationResponse'
 import type { IndicatorRow, RunRotationView } from './runRotationResponse'
+import { setRunAnswered } from './runAnswer'
 
 /**
  * The CP1 seam (issue #119): the interface stops reading the site-data
@@ -349,6 +350,9 @@ export default function RotationRun() {
       }
       return parseRunRotation(await runRotation(site, rotationDefinition.document))
     },
+    // The stage rail reads whether a run has answered; the flag is written
+    // only here, when the mutation succeeded with an answer.
+    onSuccess: () => setRunAnswered(true),
   })
 
   if (!idsMatch || site === null) return null
