@@ -76,6 +76,7 @@ from .trend import trend_measures
 __all__ = [
     "CARBON_MODEL",
     "FORCING_QUANTITIES",
+    "METHOD_LABEL",
     "MODIFIERS",
     "PARAMETERS",
     "POOL_QUANTITIES",
@@ -90,6 +91,26 @@ __all__ = [
 
 CARBON_MODEL = "amg"  # D1 of issue #77
 VARIANT = "amg_a"  # AMG-A of D80; the vocabulary of ``variant`` is OPEN
+
+# The label of the method (decision D210 of issue #77, which completes D192),
+# word for word as brief #313 gives it. It opens the ``source`` of every value
+# of the balance that is a number, then "; " and the rest of the source text,
+# as D162 does for the water label. A missing value carries no source. It says
+# only what is true of the method: what is true of one site (the transferred
+# soil C:N ratio and clay content, D182, D193) travels in the source of the
+# site's own records. It is a quotation of the source, printed for a reader:
+# no number is read out of it and it is used nowhere but in source texts
+# (README.md, "EP5 run_amg", item 5 of "What it builds").
+METHOD_LABEL = (
+    "AMGv2 soil carbon model (Clivot et al. 2019, Environmental Modelling & "
+    "Software 118:99-113, https://doi.org/10.1016/j.envsoft.2019.04.004), yearly "
+    "step. Parameters: the defaults of the AMGv2 parameters dataset v2.0 "
+    "(https://doi.org/10.57745/MEQQIX), for average French arable crop conditions, "
+    "not calibrated for the country of this site. The FAO-56 reference "
+    "evapotranspiration stands in for the potential evapotranspiration (Penman "
+    "1948) of the source. Mean annual temperature of the calibration sites: 9.9 "
+    "to 13.5 °C (Clivot et al. 2019, Table 1)."
+)
 # The scheme of the annual step: the exact exponential solution over the year
 # (decision D192 of issue #77; OPEN 2 of README.md).
 SCHEME = "exponential"
@@ -659,12 +680,15 @@ def run_amg(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonBal
         f"{part} '{quantity}'" for part, quantity in FORCING_QUANTITIES.values()
     )
     records = ", ".join(f"'{pid}'" for pid in catalogue.used)
+    # D210: every source text of a number opens with the label of the method.
     simulated = (
+        f"{METHOD_LABEL}; "
         f"simulated by engine.amg.run_amg, variant '{VARIANT}', scheme '{SCHEME}', "
         f"from the forcing ({quantities}, and every series of annual_carbon_inputs) "
         f"and the parameter records {records}"
     )
     derived = (
+        f"{METHOD_LABEL}; "
         f"derived by engine.amg.run_amg from starting_state "
         f"'{FORCING_QUANTITIES['starting_carbon'][1]}' of the forcing and the "
         f"parameter record '{PARAMETERS['stable_fraction'][0]}'"
