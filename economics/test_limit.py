@@ -249,6 +249,43 @@ def test_level_with_another_unit_is_refused():
         )
 
 
+@pytest.mark.parametrize(
+    "bad",
+    [True, "2.0", float("nan"), float("inf"), float("-inf")],
+    ids=["bool", "str", "nan", "inf", "minus_inf"],
+)
+def test_level_value_must_be_a_finite_real_number(bad):
+    with pytest.raises(ValueError, match="average"):
+        assess_limit(_limit(TEST_LIMIT), Level(bad), _all_below())
+    by_kind = _all_below()
+    by_kind["la_nina"] = Level(bad)
+    with pytest.raises(ValueError, match="la_nina"):
+        assess_limit(_limit(TEST_LIMIT), Level(1.0), by_kind)
+
+
+def test_level_with_a_value_and_a_reason_is_refused():
+    with pytest.raises(ValueError, match="average"):
+        assess_limit(_limit(TEST_LIMIT), Level(1.0, reason="NO_COVERAGE"), _all_below())
+    by_kind = _all_below()
+    by_kind["neutral"] = Level(1.0, reason="NOT_AVAILABLE", detail="x")
+    with pytest.raises(ValueError, match="neutral"):
+        assess_limit(_limit(TEST_LIMIT), Level(1.0), by_kind)
+
+
+def test_missing_limit_without_its_missing_part_is_refused():
+    # Built without validation, as a caller could; the contract forbids it.
+    limit = Value.model_construct(value=None, unit=UNIT, missing=None)
+    with pytest.raises(ValueError, match="missing part"):
+        assess_limit(limit, Level(1.0), _all_below())
+
+
+def test_limit_check_refuses_unknown_verdict_and_reason():
+    with pytest.raises(ValueError, match="verdict"):
+        LimitCheck("maybe")
+    with pytest.raises(ValueError, match="reason"):
+        LimitCheck("not_resolved", "SOMETHING_ELSE", "x")
+
+
 def test_limit_check_holds_reason_exactly_when_not_resolved():
     with pytest.raises(ValueError):
         LimitCheck("meets", "MISSING_INPUT", "x")

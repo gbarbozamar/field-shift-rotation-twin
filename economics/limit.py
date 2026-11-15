@@ -14,10 +14,12 @@ contracts/CONVENTIONS.md), never a default.
 
 from __future__ import annotations
 
+import math
+import numbers
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, Protocol
+from typing import Literal, Protocol, get_args
 
 from contracts.economic_facts import KINDS_OF_YEAR
 from contracts.inputs.common import ReasonCode, Value
@@ -52,6 +54,10 @@ class LimitCheck:
     detail: str | None = None
 
     def __post_init__(self) -> None:
+        if self.verdict not in get_args(Verdict):
+            raise ValueError(f"verdict: one of {get_args(Verdict)}")
+        if self.reason is not None and self.reason not in get_args(ReasonCode):
+            raise ValueError("reason: a reason code of C3.2")
         unresolved = self.verdict == "not_resolved"
         if unresolved != (self.reason is not None) or unresolved != (
             self.detail is not None
@@ -91,12 +97,27 @@ def _reason_text(reason: str | None, detail: str | None) -> str:
     return text
 
 
-def _check_unit(level: object, what: str) -> None:
+def _check_shape(level: SoilLossLevel, what: str) -> None:
+    """Refuse a level that is not a soil-loss level in t ha-1 yr-1 (misuse)."""
     # The unit is the caller's job; an object that states one must state ours.
     if hasattr(level, "unit") and level.unit != UNIT_SOIL_LOSS_ANNUAL:
         raise ValueError(
             f"{what}: the soil-loss level has unit {level.unit!r}, "
             f"not {UNIT_SOIL_LOSS_ANNUAL!r} (C1.2)"
+        )
+    value = level.value
+    if value is None:
+        return
+    # A boolean is not a soil loss, although Python treats it as a number.
+    # ValueError, not TypeError: one exception type for every structural misuse.
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise ValueError(f"{what}: the soil-loss value is a real number")  # noqa: TRY004
+    if not math.isfinite(value):
+        raise ValueError(f"{what}: the soil-loss value is a finite number")
+    if level.reason is not None:
+        raise ValueError(
+            f"{what}: a soil-loss level holds a value or a missing reason, "
+            "never both (C3.1)"
         )
 
 
@@ -138,13 +159,17 @@ def assess_limit(
             f"by_kind: the keys are exactly KINDS_OF_YEAR {KINDS_OF_YEAR}, "
             f"got {sorted(by_kind)}"
         )
-    _check_unit(average, "average")
+    _check_shape(average, "average")
     for kind in KINDS_OF_YEAR:
-        _check_unit(by_kind[kind], f"by_kind[{kind!r}]")
+        _check_shape(by_kind[kind], f"by_kind[{kind!r}]")
 
     if limit.value is None:
-        # The contract (C3.1) guarantees a missing value carries its missing part.
-        assert limit.missing is not None
+        # The contract (C3.1) makes a missing value carry its missing part; a
+        # Value built without validation may not, and that is misuse.
+        if limit.missing is None:
+            raise ValueError(
+                "limit: a missing limit carries a missing part with its reason (C3.1)"
+            )
         unresolved = LimitCheck(
             "not_resolved",
             "MISSING_INPUT",

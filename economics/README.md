@@ -88,7 +88,8 @@ def assess_limit(
 - `every_kind`: `does_not_meet` when any kind does not meet the limit, even if another kind is not resolved (one failing kind is enough); otherwise `not_resolved` when any kind is not resolved, the detail naming those kinds; otherwise `meets`.
 - A kind with no year in the record arrives missing `NO_COVERAGE`: it is `not_resolved` like any missing level (the option easiest to undo).
 - A limit of 0 is a declared limit like any other, not a missing one.
-- `ValueError` on structural misuse: `by_kind` without exactly the keys of `KINDS_OF_YEAR`; a negative limit; a limit (present or missing) in another unit; a level whose `unit` attribute is not `"t ha-1 yr-1"`.
+- `ValueError` on structural misuse: `by_kind` without exactly the keys of `KINDS_OF_YEAR`; a negative limit; a limit (present or missing) in another unit; a missing limit without its missing part (only possible for a `Value` built without validation); a level whose `unit` attribute is not `"t ha-1 yr-1"`; a level whose `value` is not `None` and is not a finite real number (a boolean, a text, NaN or infinity), the message naming the level; a level with both a `value` and a `reason` (C3.1). Every check runs before any comparison, so misuse is refused even when the limit is missing.
+- `LimitCheck` refuses a verdict outside `Verdict` and a reason outside `ReasonCode` (C3.2) with `ValueError`.
 - Inputs are not mutated; the results are frozen.
 
 ## OPEN
