@@ -65,6 +65,11 @@ _UTC_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 # store, holding placeholder records only. It is not read with its parent.
 EXAMPLES_FOLDER = "examples"
 
+# PROPOSED (issue #225): a folder with this name directly below the root of a
+# store holds the signed fixtures of whole checks (validation/fixtures/
+# README.md), read by their tests and not by this store.
+FIXTURES_FOLDER = "fixtures"
+
 _TOO_DEEP = "is nested too deeply to be a record"
 _OUTSIDE = "is outside 'expected/', 'runs/' and 'results/': a record lives in one of these three folders"
 
@@ -586,9 +591,9 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
 
     Everything inside the three record folders is read or reported. Outside
     them, every ``.json`` file below ``root`` is reported, so a record in a
-    misnamed folder is not lost. Only two things are not looked at: the
-    folder ``examples/`` directly below ``root``, and files outside the three
-    folders that are not ``.json`` files.
+    misnamed folder is not lost. Only three things are not looked at: the
+    folders ``examples/`` and ``fixtures/`` directly below ``root``, and files
+    outside the three folders that are not ``.json`` files.
 
     The extension of a record file is read without regard to case, so
     ``<id>.JSON`` is a record file too. Two files of one folder that carry
@@ -606,7 +611,7 @@ def load_store(root: Path | str, *, allow_placeholders: bool = False) -> Store:
     failed_malformed: list[str] = []
 
     if root.is_dir():
-        read_elsewhere = set(FOLDER_BY_KIND.values()) | {EXAMPLES_FOLDER}
+        read_elsewhere = set(FOLDER_BY_KIND.values()) | {EXAMPLES_FOLDER, FIXTURES_FOLDER}
         for path in sorted(root.rglob("*")):
             parts = path.relative_to(root).parts
             if parts[0] in read_elsewhere and len(parts) > 1:

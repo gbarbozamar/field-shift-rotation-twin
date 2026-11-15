@@ -18,6 +18,7 @@ Where an expected value lives with its source, where a run of the validation pro
 | `validation/runs/<id>.json` | One file per **protocol run** |
 | `validation/results/<id>.json` | One file per **result** of one test in one run, whatever its outcome |
 | `validation/examples/` | A second, separate store with the same three folders, holding placeholder records only |
+| `validation/fixtures/` | Signed fixtures of whole checks, read by their tests, not by this store: `h2_example18.json` for [H2] and `e3_ah703_tables.json` for [E3] (unit l0/validation-h2-e3-ready, issue #225; paths PROPOSED). Format and skip rule in [`fixtures/README.md`](fixtures/README.md). Not committed yet: the signed files arrive in their own commit |
 
 `expected/`, `runs/` and `results/` do not exist yet: each is created by the first unit that stores a record in it. A folder that does not exist holds no record.
 
@@ -25,9 +26,10 @@ Each of the three folders holds only files named `<id>.json`. Anything else in t
 
 The extension is read without regard to case, so `<id>.JSON` is a record file too. The name before the extension is the id, letter for letter. Where a file system allows two files that carry the same id, such as `<id>.json` and `<id>.JSON`, both are rejected: neither replaces the other.
 
-A `.json` file anywhere else below the root of a store is reported as a problem too, so a record saved in a misnamed folder such as `result/` is not lost. Exactly two things are not looked at:
+A `.json` file anywhere else below the root of a store is reported as a problem too, so a record saved in a misnamed folder such as `result/` is not lost. Exactly three things are not looked at:
 
 - the folder `examples/` directly below the root, because it is a separate store;
+- the folder `fixtures/` directly below the root, because its files are read by the tests of their checks, not by this store (PROPOSED, issue #225);
 - outside the three folders, files that are not `.json` files, such as this document and the Python files.
 
 ## Record format (PROPOSED)
@@ -306,6 +308,7 @@ For a person to approve. The code in the first column is the start of the test i
 | S33 | An integer in a file that would change when read (one above the last that a float holds exactly, one too large for a float, one with more digits than Python converts) is reported in its field, in a value, a tolerance and an observed value; integers that a float holds exactly are accepted and stay integers; a number written with a decimal point or an exponent is accepted as the float it denotes, whatever its digits; a failed result that holds such an integer is still counted as failed |
 | S34 | `summarise` raises only `ValueError` when it is given anything that is not a store of well-formed records, a store object that was never initialised included, and works on a sound store built by hand; `load_store` raises only `TypeError` when `root` is not a path, and a path that does not exist is an empty store |
 | S35 | A passed result whose observed number is written with more digits than a float keeps (`0.10000000000000001`, `1e23`, `12345678901234567890.0`) is accepted, counted as passed, and its test is not listed under `no_result` |
+| S36 | A `.json` file in `fixtures/` directly below the root is not looked at; one in a deeper folder of that name is listed |
 
 One more test, without a case code, checks that every case code above appears in this section.
 
@@ -351,6 +354,13 @@ Raised by unit l0/chain-examples (issue #168). The builder session did not decid
 17. **No soil property in the chain soil example.** EP1 reads K from the catalogue, not from the soil data; whether K should come from the soil tables (D48) is OPEN 13 of `engine/erosion/SOIL_LOSS.md`. *Lead developer; platform developer.*
 18. ~~The point of the chain climate example keeps the placeholder unit.~~ `DECIDED`: the point carries the unit strings of D55 (`degree`, `degree`, `m`), unit l0/fix-chain-test, at the orchestrator's request with the lead developer's authorization. The numbers stay 1.0, 2.0 and 3.0, so they now name a point at sea; whether other illustrative numbers are wanted is still open. *Lead developer.*
 19. **Serving the chain soil example in the running app** (`SOIL_SLOPE_EXAMPLE_FILE`, D38) is not part of this unit; which file holds the demonstration values is a person's decision. *Platform developer; lead developer.*
+
+### Fixtures of H2 and E3
+
+Raised by unit l0/validation-h2-e3-ready (issue #225). The builder session did not decide them.
+
+20. ~~The store reports the fixtures.~~ `DECIDED` by the orchestrator session for the lead developer (option A): the store leaves `fixtures/` directly below the root alone, as it leaves `examples/` (`FIXTURES_FOLDER` in `records.py`, case S36). *Lead developer.*
+21. **Two formats for an expected value.** This store keeps one expected value per record; the fixtures keep a whole worked example or table per file, signed as a whole, with the parameter records the check needs. Whether both stay is not decided (`fixtures/README.md`, OPEN 2). *Lead developer; science reviewers.*
 
 ## Environment
 
