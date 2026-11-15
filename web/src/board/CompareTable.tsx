@@ -11,6 +11,7 @@ import type { RotationDefinition } from '../rotation/exampleRotation'
 import { strings } from '../strings'
 import { SORT_KEYS, cropName, isExampleCrop, worstKind } from './boardModel'
 import type { BoardColumn, SortKey } from './boardModel'
+import { isUserRotation } from './rotationDraft'
 
 /**
  * The options side by side (PROPOSED, l3/board): one column per rotation, in
@@ -282,8 +283,15 @@ export function CompareTable({
                     className="mt-2 font-fs-heading text-xl font-extrabold leading-tight"
                     title={rotation !== null ? rotation.label : undefined}
                   >
-                    {cropsText(strip) ?? option.rotation_id}
+                    {rotation !== null && isUserRotation(rotation.rotation_id)
+                      ? rotation.label
+                      : (cropsText(strip) ?? option.rotation_id)}
                   </p>
+                  {rotation !== null && isUserRotation(rotation.rotation_id) && cropsText(strip) !== null ? (
+                    <p data-testid="board-option-crops-line" className="text-sm font-semibold">
+                      {cropsText(strip)}
+                    </p>
+                  ) : null}
                   {strip !== null && strip.years.length !== 0 ? (
                     <p className="text-xs text-fs-muted">
                       {formatString(strings['board.cycle'], { n: strip.years.length })}

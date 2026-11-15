@@ -20,7 +20,8 @@ import type { PlantAction, PlantScreenState, ServicePhase, ServiceStatus } from 
 import { CropLegend } from '../plant/PlantVisuals'
 import type { PlantAnswer, PlantOption, RainStressPart } from '../plant/plantData'
 import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../plant/plantRoute'
-import { buildRotationStrip, cropOrder, plantRotations } from '../plant/rotationStrip'
+import { buildRotationStrip, cropOrder, plantRotations, readPlantRotations } from '../plant/rotationStrip'
+import type { PlantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import { boardColumns, optionLetter } from './boardModel'
@@ -28,6 +29,9 @@ import type { SortKey } from './boardModel'
 import { AnswerBanner, AnswerLimits, BoardControls, PriceTrackPanel, RainEcho, RecordRibbon } from './BoardParts'
 import { CompareTable, SortPicker, cropsText } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
+import { RotationBuilder } from './RotationBuilder'
+import { exampleRotations } from './rotationDraft'
+import type { DraftRotation } from './rotationDraft'
 
 /**
  * The rotation board (PROPOSED, l3/board), at hash route #/board: one
@@ -119,12 +123,12 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
 }
 
 /** What the request says of each option, the colours of their crops and the scales of their bars. */
-function useBoardInfo(answer: PlantAnswer) {
+function useBoardInfo(answer: PlantAnswer, rotations: PlantRotations) {
   return useMemo(() => {
     const kind = answer.margin_of
     const byId = new Map<string, OptionInfo>()
     for (const option of answer.options) {
-      const rotation = plantRotations.rotations?.find((r) => r.rotation_id === option.rotation_id) ?? null
+      const rotation = rotations.rotations?.find((r) => r.rotation_id === option.rotation_id) ?? null
       byId.set(option.rotation_id, { rotation, strip: rotation !== null ? buildRotationStrip(rotation) : null })
     }
     const strips = [...byId.values()].flatMap((each) => (each.strip !== null ? [each.strip] : []))
@@ -139,11 +143,22 @@ function useBoardInfo(answer: PlantAnswer) {
         ]),
       },
     }
-  }, [answer])
+  }, [answer, rotations])
 }
 
-function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: RainStressPart | null }) {
-  const { info, order, scales } = useBoardInfo(answer)
+function Answered({
+  answer,
+  rainStress,
+  rotations,
+  firstStep,
+}: {
+  answer: PlantAnswer
+  rainStress: RainStressPart | null
+  rotations: PlantRotations
+  /** The number of the first step of the answer: the steps before it are numbered by the view. */
+  firstStep: number
+}) {
+  const { info, order, scales } = useBoardInfo(answer, rotations)
   const [sort, setSort] = useState<SortKey>('rule')
   const columns = useMemo(() => boardColumns(answer, sort), [answer, sort])
   const chosen = answer.options.find((option) => option.rotation_id === answer.chosen) ?? null
@@ -178,7 +193,7 @@ function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: Rai
         ) : null}
       </div>
       <div>
-        <StepTitle n={3} title={strings['board.compare.title']}>
+        <StepTitle n={firstStep} title={strings['board.compare.title']}>
           <SortPicker sort={sort} onSort={setSort} />
         </StepTitle>
         <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} />
@@ -187,14 +202,14 @@ function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: Rai
         </div>
       </div>
       <div>
-        <StepTitle n={4} title={strings['board.step.holds']} />
+        <StepTitle n={firstStep + 1} title={strings['board.step.holds']} />
         <div className="grid gap-4 xl:grid-cols-2">
           <PriceTrackPanel tipping={answer.tipping_price} nameOf={nameOf} />
           <RecordRibbon record={answer.kinds_of_year} marginOf={answer.margin_of} />
         </div>
       </div>
       <div>
-        <StepTitle n={5} title={strings['board.step.keep']} />
+        <StepTitle n={firstStep + 2} title={strings['board.step.keep']} />
         <AnswerLimits answer={answer} />
         <div className="mt-3 flex flex-wrap gap-3">
           <a
@@ -222,10 +237,14 @@ function BoardSide({
   selectedFieldId,
   apiBase,
   service,
+  rotations,
+  firstStep,
 }: {
   selectedFieldId: string | null
   apiBase: string | null
   service: ServicePhase | null
+  rotations: PlantRotations
+  firstStep: number
 }) {
   if (selectedFieldId === null) {
     return (
@@ -260,7 +279,12 @@ function BoardSide({
     )
   }
   return (
-    <Answered answer={service.answer.answer} rainStress={service.answer.rainStress} />
+    <Answered
+      answer={service.answer.answer}
+      rainStress={service.answer.rainStress}
+      rotations={rotations}
+      firstStep={firstStep}
+    />
   )
 }
 
@@ -278,6 +302,8 @@ export function BoardView({
   map = null,
   mapOpen = true,
   onToggleMap,
+  rotations = plantRotations,
+  builder = null,
 }: {
   selectedFieldId: string | null
   state: PlantScreenState
@@ -289,7 +315,15 @@ export function BoardView({
   mapOpen?: boolean
   /** Given when the map can be shown or hidden. */
   onToggleMap?: () => void
+  /** The rotations compared, as the request holds them; those of the example request by default. */
+  rotations?: PlantRotations
+  /** The step of the candidates (the rotation builder), when the rotations can be edited. */
+  builder?: ReactNode
 }) {
+  // The steps are numbered as shown: the candidates are a step only for the
+  // field whose rotations can be edited.
+  const hasCandidates = builder !== null && selectedFieldId === REQUEST_FIELD_ID
+  const scenarioStep = hasCandidates ? 3 : 2
   return (
     <section aria-labelledby="board-title" className="mx-auto max-w-[100rem] space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
@@ -340,8 +374,21 @@ export function BoardView({
         ) : null}
       </div>
 
+      {hasCandidates ? (
+        <details data-testid="board-candidates" className="group">
+          <summary className="cursor-pointer list-none">
+            <StepTitle n={2} title={strings['board.step.candidates']}>
+              <span className="rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:hidden">
+                {strings['board.builder.open']}
+              </span>
+            </StepTitle>
+          </summary>
+          {builder}
+        </details>
+      ) : null}
+
       <div>
-        <StepTitle n={2} title={strings['board.step.scenario']} />
+        <StepTitle n={scenarioStep} title={strings['board.step.scenario']} />
         <BoardControls
           marginOf={state.marginOf}
           strictness={state.strictness}
@@ -355,7 +402,13 @@ export function BoardView({
         />
       </div>
 
-      <BoardSide selectedFieldId={selectedFieldId} apiBase={apiBase} service={service} />
+      <BoardSide
+        selectedFieldId={selectedFieldId}
+        apiBase={apiBase}
+        service={service}
+        rotations={rotations}
+        firstStep={scenarioStep + 1}
+      />
 
       <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
         {strings['disclaimer.full']}
@@ -371,10 +424,17 @@ const NO_SERVICE_CLIENT = new QueryClient()
 export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase?: string | null }) {
   const selectedFieldId = useSelectedFieldId()
   const [state, dispatch] = useReducer(plantScreenReducer, null, initialBoardState)
+  // The rotations compared (sent) and those being edited (draft): the
+  // service is asked for the sent ones only, so an edit asks nothing until
+  // the user compares.
+  const [sent, setSent] = useState<DraftRotation[]>(exampleRotations)
+  const [draft, setDraft] = useState<DraftRotation[]>(exampleRotations)
+  const baseRequest = useMemo(() => ({ ...rawPlantRequest, rotations: sent }), [sent])
+  const rotations = useMemo(() => readPlantRotations(baseRequest), [baseRequest])
   const asks = apiBase !== null && selectedFieldId === REQUEST_FIELD_ID
   const request = useMemo(
-    () => (asks ? serviceRequestOf(state) : null),
-    [asks, state.mode, state.strictness, state.marginOf, state.rain],
+    () => (asks ? serviceRequestOf(state, baseRequest) : null),
+    [asks, baseRequest, state.mode, state.strictness, state.marginOf, state.rain],
   )
   const query = useQuery(
     plantScreenQueryOptions(apiBase, request),
@@ -394,6 +454,20 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       map={<FieldsMap />}
       mapOpen={mapOpen}
       onToggleMap={() => setMapChoice(!mapOpen)}
+      rotations={rotations}
+      builder={
+        <RotationBuilder
+          draft={draft}
+          sent={sent}
+          onChange={setDraft}
+          onCompare={() => setSent(draft)}
+          onReset={() => {
+            const example = exampleRotations()
+            setDraft(example)
+            setSent(example)
+          }}
+        />
+      }
     />
   )
 }
