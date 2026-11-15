@@ -42,25 +42,33 @@ the record and ends inside it is present from the first day of the record
 with its declared dates (D141). No rule of the repetition is written in this
 folder. The daily chain is
 then reduced to one ``WaterDeficitExposure`` per agricultural year of the
-record (D47). The definition of the indicator is incomplete (convention
-C1.4), so no year carries a number: a year whose daily balance was computed
-on every day is missing with ``NOT_AVAILABLE`` and a detail saying the
-definition is incomplete (D61); any other year is missing with the reason
-that applies. See EXPOSURE.md in this folder.
+record (D47). Unit ``l1/water-indicator-d157`` (issue #264) builds decision
+D157: a year whose daily balance was computed on every day carries the ratio
+of water transpired (the transpiration of the daily balance) to water
+demanded (its demanded transpiration: the basal crop coefficient times the
+reference evapotranspiration), each summed over the days of the year with a
+living crop (D105, D106, D136). Its ``source`` starts with the label "whole
+cycle, not critical period" (D105, D162). A year with no day with a living
+crop is ``NOT_APPLICABLE``; any other year is missing with the reason that
+applies. See EXPOSURE.md in this folder.
 
 Status: PROPOSED (blueprint section 3.7): the order of the checks, the
 reason of each item, the identifier and scope of each parameter, how the
-crop of a day is read from the calendar, and the format of every ``detail``.
+crop of a day is read from the calendar, the provenance label, the source
+text and the reason of the missing range of a value, and the format of every
+``detail``.
 
 Pure function (G1): no file, no network, no clock, no environment variable,
-and the arguments are not changed. The only integer is the one of month and
-day arithmetic, listed in EXPOSURE.md.
+and the arguments are not changed. The only numbers are the one of month and
+day arithmetic and the zero the demanded sum is compared with, listed in
+EXPOSURE.md.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import inspect
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, fields
 from typing import get_args, get_type_hints
@@ -329,11 +337,34 @@ MIXED_TIME_ZONES = (
     + ") do not share one time zone, and an engine never combines them (C6.3; "
     "G4, sixth row)"
 )
+# What the definition of the indicator still leaves open after D157. The name
+# is kept: validation/test_chain_examples.py (lane L0) reads this constant.
 DEFINITION_INCOMPLETE = (
-    "the definition of the indicator is incomplete (C1.4): the critical period "
-    "of each crop, and which quantities of the daily balance are water "
-    "transpired and water demanded, are not defined (decision D61 of issue #77)"
+    "the definition of the indicator is still incomplete (C1.4): the critical "
+    "period of each crop is not defined, so the ratio of water transpired to "
+    "water demanded is taken over the whole cycle of each crop (decisions D105 "
+    "and D157 of issue #77), and the state of the balance that the descriptive "
+    "measures use is not defined"
 )
+
+# --- the indicator: the ratio of D157 -----------------------------------------
+#
+# The label of the window (D105), written verbatim at the start of the
+# ``source`` of every value (D162): the results contract has no field for it.
+WINDOW_LABEL = "whole cycle, not critical period"
+# PROPOSED (C4.1, C4.3): the ratio is read from a daily balance that is run
+# through time steps, so it carries the label of a simulated value.
+PROVENANCE = "SIMULATED"
+# PROPOSED: the reason of the missing range, as EP1 gives it for its value.
+RANGE_NOT_BUILT = (
+    "no uncertainty range is computed: one call is one scenario, and how a range "
+    "passes through the daily water balance is not built (C2.3, Q6 of "
+    "contracts/ENTRYPOINTS.md, OPEN 44 of engine/water/EXPOSURE.md)"
+)
+# The reason the daily balance gives a crop quantity on a day with no crop.
+NO_CROP_ON_THE_DAY = "NOT_APPLICABLE"
+# The demanded sum of a year must lie above this for the ratio to exist.
+_ZERO = 0
 CROP_UNKNOWN = (
     "the crop of the day is not known: the day lies before the first cycle of "
     "the rotation repeated over the agricultural years of the climate record "
@@ -1305,14 +1336,118 @@ def _units_not_accepted(problems: list[str]) -> Missing:
     )
 
 
-def _definition_incomplete(ag_year: int) -> Missing:
+def _no_living_crop(ag_year: int) -> Missing:
     return Missing(
-        reason="NOT_AVAILABLE",
+        reason="NOT_APPLICABLE",
         detail=(
-            f"{INDICATOR} is not available for agricultural year {ag_year}: the daily "
-            "water balance was computed on every day of the year, but "
-            + DEFINITION_INCOMPLETE
+            f"{INDICATOR} does not apply to agricultural year {ag_year}: the daily "
+            "water balance was computed on every day of the year, and no day of the "
+            "year has a living crop (a day with no crop and a day of the tail after "
+            "maturity do not enter the ratio: decisions D106, D136 and D157 of issue "
+            "#77)"
         ),
+    )
+
+
+def _nothing_demanded(ag_year: int, days: int) -> Missing:
+    return Missing(
+        reason="NOT_COMPUTABLE",
+        detail=(
+            f"{INDICATOR} is not computed for agricultural year {ag_year}: the water "
+            "demanded (the basal crop coefficient times the reference "
+            f"evapotranspiration), summed over its {days} day(s) with a living crop, "
+            "is not above zero, so the ratio of decision D157 of issue #77 has no "
+            "denominator (reason code PROPOSED, OPEN 43 of engine/water/EXPOSURE.md)"
+        ),
+    )
+
+
+def _not_a_number(ag_year: int, what: str, day: dt.date, missing: Missing) -> Missing:
+    """A crop quantity of a computed day that is not a number: the year keeps
+    the reason of that day, and no value is put in its place."""
+    return Missing(
+        reason=missing.reason,
+        detail=(
+            f"{INDICATOR} is not computed for agricultural year {ag_year}: the {what} "
+            f"of the daily water balance has no value on {day.isoformat()} "
+            f"({missing.reason}: {missing.detail})"
+        ),
+    )
+
+
+def _source(ag_year: int, living: list[ChainDay]) -> str:
+    """The source of a value. PROPOSED (D162 gives the label and its place; the
+    rest says what the value is computed from, as EP1 does for soil loss)."""
+    first, *_ = living
+    *_, last = living
+    return (
+        f"{WINDOW_LABEL} (decisions D105 and D162 of issue #77); simulated by "
+        "engine.water.compute_water_deficit_exposure as decision D157 states it: "
+        "the transpiration of the daily water balance over its demanded "
+        "transpiration (the basal crop coefficient times the reference "
+        f"evapotranspiration), each summed over the {len(living)} day(s) with a "
+        f"living crop of agricultural year {ag_year}, the first on "
+        f"{first.date.isoformat()} and the last on {last.date.isoformat()}; days "
+        "with no crop and the tail after maturity are left out (D106, D136); the "
+        "daily balance runs on the daily series of the climate record, on the "
+        "rotation calendar repeated over the record (D47) and on the parameter "
+        "records listed in engine/water/EXPOSURE.md"
+    )
+
+
+def _computed(ag_year: int, year: list[ChainDay]) -> WaterDeficitExposure:
+    """The value of a year whose daily balance was computed on every day (D157).
+
+    Water transpired is ``transpiration`` of the daily balance and water
+    demanded is its ``transpiration_demanded`` (the basal crop coefficient
+    times the reference evapotranspiration); neither is recomputed here. A
+    day with a living crop is a day on which the balance was given a crop, so
+    its demanded transpiration is a number; on a fallow day and on a day of
+    the tail after maturity the balance was given none and answers
+    ``NOT_APPLICABLE`` (D106, D136), and the day is left out. The days are
+    those of the agricultural year, so a cycle that crosses its start gives
+    its days to each year (D157, D47).
+
+    The value is the sum of the first over the sum of the second. Not a
+    number, and never zero in its place: a year with no day with a living
+    crop is ``NOT_APPLICABLE`` (D157); a demanded sum that is not above zero
+    is ``NOT_COMPUTABLE`` (PROPOSED), as is a ratio that is not finite.
+    """
+    living: list[ChainDay] = []
+    for day in year:
+        demanded = day.balance.transpiration_demanded
+        if not isinstance(demanded, Missing):
+            living.append(day)
+        elif demanded.reason != NO_CROP_ON_THE_DAY:
+            return _for_ag_year(
+                ag_year,
+                _not_a_number(ag_year, "demanded transpiration", day.date, demanded),
+            )
+    if not living:
+        return _for_ag_year(ag_year, _no_living_crop(ag_year))
+    for day in living:
+        transpired = day.balance.transpiration
+        if isinstance(transpired, Missing):
+            return _for_ag_year(
+                ag_year, _not_a_number(ag_year, "transpiration", day.date, transpired)
+            )
+    water_demanded = math.fsum(day.balance.transpiration_demanded for day in living)
+    water_transpired = math.fsum(day.balance.transpiration for day in living)
+    if not water_demanded > _ZERO:
+        return _for_ag_year(ag_year, _nothing_demanded(ag_year, len(living)))
+    value = water_transpired / water_demanded
+    if not math.isfinite(value):
+        return _for_ag_year(ag_year, _nothing_demanded(ag_year, len(living)))
+    return WaterDeficitExposure(
+        indicator=INDICATOR,
+        direction=DIRECTION_OF[INDICATOR],
+        value=value,
+        unit=UNIT_WATER_DEFICIT_EXPOSURE,
+        provenance=PROVENANCE,
+        source=_source(ag_year, living),
+        range_missing=Missing(reason="NOT_AVAILABLE", detail=RANGE_NOT_BUILT),
+        time_basis="ag_year",
+        ag_year=ag_year,
     )
 
 
@@ -1327,7 +1462,7 @@ def _chain_missing(
             f"{INDICATOR} is not computed for agricultural year {ag_year}: the daily "
             f"water balance has no value on {len(missing_days)} day(s) of the year, "
             f"the first on {first.date.isoformat()} ({cause.reason}: {cause.detail}); "
-            + "; ".join([*items, f"indicator NOT_AVAILABLE: {DEFINITION_INCOMPLETE}"])
+            + "; ".join([*items, f"indicator: {DEFINITION_INCOMPLETE}"])
         ),
     )
 
@@ -1379,22 +1514,26 @@ def compute_water_deficit_exposure(
     ``parameters`` is the parameter catalogue as loaded by the runner (Q3,
     D46, D56), passed by keyword, with no default.
 
-    Returns a list that is never empty and holds no number:
+    Returns a list that is never empty:
 
     - one item on the time basis ``rotation``, reason ``MISSING_INPUT``, when
       the agricultural years cannot be laid out: the start month is missing,
-      or the record has no daily ``precipitation`` series;
+      or the record has no daily ``precipitation`` series (D163);
     - otherwise one item per agricultural year of the record (D47), on the
-      time basis ``ag_year``, each missing with the first reason that
+      time basis ``ag_year``. A year is missing with the first reason that
       applies: ``NOT_COMPUTABLE`` for an infeasible calendar, then
       ``NOT_COMPUTABLE`` for series in different time zones (C6.3), then
       ``NO_COVERAGE`` for a year a series does not cover (C5.5), then
       ``MISSING_INPUT`` when an input arrives in a unit string the parts do
       not accept (Q11), then the reason of the first day of the year on which
       the daily chain has no value (naming the inputs and the parameters,
-      by ``id`` and ``scope``, that are missing up to the end of the year),
-      and ``NOT_AVAILABLE`` for a year computed on every day, because the
-      definition of the indicator is incomplete (C1.4, D61).
+      by ``id`` and ``scope``, that are missing up to the end of the year).
+      A year whose daily balance was computed on every day carries the ratio
+      of decision D157 (``_computed``): a number with the label "whole cycle,
+      not critical period" at the start of its ``source`` (D105, D162), its
+      provenance label and the reason it has no range; or ``NOT_APPLICABLE``
+      when no day of the year has a living crop; or ``NOT_COMPUTABLE`` when
+      nothing was demanded on its days with a living crop.
 
     The crop of each day of the chain is read from the calendar repeated over
     the agricultural years of the record by
@@ -1476,7 +1615,7 @@ def compute_water_deficit_exposure(
             item for item in year if isinstance(item.balance.storage_end, Missing)
         ]
         if not not_computed:
-            result.append(_for_ag_year(ag_year, _definition_incomplete(ag_year)))
+            result.append(_computed(ag_year, year))
             continue
         items = (
             _input_items(absent, missing_days, first, last, ag_year)
