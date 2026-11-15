@@ -320,10 +320,12 @@ def test_functions_are_found_by_the_names_of_entrypoints(
                 "): ...\n"
             ),
             "engine/amg/__init__.py": "def run_amg(forcing, *, parameters): ...\n",
+            "engine/rothc/__init__.py": "def run_rothc(forcing, *, parameters): ...\n",
         },
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     found = discover_engine_functions()
+    assert found.run_rothc is sys.modules["engine.rothc"].run_rothc
     assert found.build_rotation_calendar is (
         sys.modules["engine.calendar"].build_rotation_calendar
     )
@@ -353,6 +355,7 @@ def test_an_absent_module_or_function_is_not_built(
     assert found.compute_soil_loss is not None
     assert found.compute_water_deficit_exposure is None  # module absent
     assert found.run_amg is None  # module absent
+    assert found.run_rothc is None  # module absent
 
 
 def test_a_module_that_raises_on_import_propagates(
@@ -827,6 +830,7 @@ def test_module_identifiers_follow_entrypoints():
         ("EP3", "engine.water", "compute_water_deficit_exposure"),
         ("EP4", "engine.residues", "build_residue_ledger"),
         ("EP5", "engine.amg", "run_amg"),
+        ("EP6", "engine.rothc", "run_rothc"),
     ]
 
 
@@ -1847,27 +1851,6 @@ def test_the_rows_are_those_of_ep5_then_ep6_whatever_the_configured_order():
     assert rows[:3] == amg.answer.soil_carbon_trend
 
 
-@pytest.mark.parametrize("point", [runner.ROTHC], ids=lambda p: p.entry)
-def test_the_carbon_engines_the_runner_does_not_call_say_so(point):
-    # The runner does not look for these, whether or not they exist: the
-    # engine may land before the unit of lane L2a that discovers and calls it
-    # (decision of the lead developer of 15 November 2026 on #247; until then
-    # this test failed as soon as the engine existed). What the runner says of
-    # them must be true in both cases, so it never says "not built".
-    assert point not in runner.DISCOVERED
-    said = f"{runner.NOT_CALLED}: {runner._name(point)}"
-    assert runner.NOT_BUILT not in said
-    result = run(with_amg(Fake(balance())), climate=climate_result(chain_climate()))
-    rows = carbon_rows(result, point.module_id)
-    assert len(rows) == len(TREND_COMPUTATIONS)
-    assert all(r.value is None for r in rows)
-    assert all(r.missing.reason == "NOT_AVAILABLE" for r in rows)
-    assert all(r.missing.detail == said for r in rows)
-    (module,) = [m for m in result.modules if m.id == point.module_id]
-    assert (module.state, module.reason) == ("not_available", "NOT_AVAILABLE")
-    assert module.detail == said
-
-
 def test_crops_that_are_not_identifiers_are_counted_in_the_amg_detail():
     amg = Fake(balance())
     result = run(with_amg(amg), climate=climate_result(chain_climate()))
@@ -1888,3 +1871,288 @@ def test_a_soil_property_of_the_site_data_reaches_ep5_unchanged():
     (forcing,) = amg.calls[0][0]
     (clay,) = [p for p in forcing.soil_properties if p.quantity == "clay_content"]
     assert clay == soil.soil_properties[0]
+
+
+# --- 17. EP6 run_rothc on the forcing of EP5 (unit l2/runner-ep6, D159) --------
+#
+# These replace the test of unit l2/rothc-tripwire (#272) that asserted EP6 was
+# not discovered and that its rows said "the runner does not call this engine
+# yet". The fake EP6 returns the PLACEHOLDER CarbonBalance example written as
+# a balance of carbon model ``rothc``.
+
+
+def rothc_balance(**update: Any) -> CarbonBalance:
+    return balance(carbon_model="rothc", **update)
+
+
+def with_carbon(amg: Any, rothc: Any, *parts: Fake | None, **extra: Any):
+    calendar_fn, soil_fn, water_fn = parts or fakes()
+    return EngineFunctions(
+        build_rotation_calendar=calendar_fn,
+        compute_soil_loss=soil_fn,
+        compute_water_deficit_exposure=water_fn,
+        run_amg=amg,
+        run_rothc=rothc,
+        **extra,
+    )
+
+
+def test_ep6_is_called_once_per_phase_on_the_object_ep5_received():
+    # A local import: api/test_phases.py imports this module.
+    from api.test_phases import THREE_YEARS, THREE_YEARS_PHASES, FakePhases
+
+    parameters = catalogue()
+    calendar_fn, soil_fn, water_fn = fakes(calendar_answer=THREE_YEARS)
+    found = FakePhases(3, THREE_YEARS_PHASES)
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    engines = EntryPointEngines(
+        with_carbon(amg, rothc, calendar_fn, soil_fn, water_fn, **found.extra()),
+        carbon_models=CARBON_MODELS,
+        parameters=parameters,
+    )
+    result = engines.run(ROTATION, climate_result(chain_climate()), soil_result())
+    assert len(result.phases) == 3
+    assert len(amg.calls) == len(rothc.calls) == 3
+    forcings = []
+    for (amg_args, _), (rothc_args, rothc_kwargs) in zip(amg.calls, rothc.calls):
+        (forcing,) = rothc_args
+        assert isinstance(forcing, CarbonForcing)
+        assert forcing is amg_args[0]  # the very object, not an equal one
+        assert set(rothc_kwargs) == {"parameters"}
+        assert rothc_kwargs["parameters"] is parameters
+        forcings.append(forcing)
+    assert len({id(f) for f in forcings}) == 3  # one forcing per phase
+
+
+def test_ep6_rows_reach_the_result_unchanged_after_those_of_ep5():
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    result = run(with_carbon(amg, rothc), climate=climate_result(chain_climate()))
+    rows = result.result.soil_carbon_trend
+    assert [r.carbon_model for r in rows] == ["amg"] * 3 + ["rothc"] * 3
+    assert rows[:3] == amg.answer.soil_carbon_trend
+    assert rows[3:] == rothc.answer.soil_carbon_trend
+    assert all(a is b for a, b in zip(rows[3:], rothc.answer.soil_carbon_trend))
+    count = count_values(rothc.answer.soil_carbon_trend)
+    expected = module_status_of("rothc", count)
+    (module,) = [m for m in result.modules if m.id == "rothc"]
+    assert (module.state, module.reason, module.detail) == (
+        expected.state,
+        expected.reason,
+        expected.detail,
+    )
+    whole = count_values(result_values(result.result))
+    assert (result.values_present, result.values_missing) == (
+        whole.present,
+        whole.missing,
+    )
+    text = json.dumps(result.result.model_dump(mode="json"))
+    assert ResultsPerRotation.model_validate_json(text) == result.result
+
+
+def test_ep6_is_called_after_ep5():
+    order: list[str] = []
+
+    def recording(name: str, answer: Any):
+        def call(*args, **kwargs):
+            order.append(name)
+            return answer
+
+        return call
+
+    calendar_fn, soil_fn, water_fn = fakes()
+    run(
+        with_carbon(
+            recording("EP5", balance()),
+            recording("EP6", rothc_balance()),
+            recording("EP2", calendar_fn.answer),
+            recording("EP1", soil_fn.answer),
+            recording("EP3", water_fn.answer),
+        ),
+        climate=climate_result(chain_climate()),
+    )
+    assert order == ["EP2", "EP1", "EP3", "EP5", "EP6"]
+
+
+def test_ep6_not_called_when_rothc_is_not_a_configured_model():
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    engines = EntryPointEngines(with_carbon(amg, rothc), carbon_models=("amg",))
+    result = engines.run(ROTATION, climate_result(chain_climate()), soil_result())
+    assert rothc.calls == []
+    assert len(amg.calls) == 1
+    assert {r.carbon_model for r in result.result.soil_carbon_trend} == {"amg"}
+    module = dict_of_modules(result)["rothc"]
+    assert (module.state, module.reason, module.detail) == (
+        "not_available",
+        "NOT_AVAILABLE",
+        runner.ROTHC_NOT_CONFIGURED,
+    )
+    # Also when an input is absent: the text says why, not the input.
+    absent = engines.run(ROTATION, climate_result(None), soil_result())
+    assert rothc.calls == []
+    assert dict_of_modules(absent)["rothc"].detail == runner.ROTHC_NOT_CONFIGURED
+
+
+def test_ep6_alone_builds_the_forcing_and_ep5_is_not_called_when_not_configured():
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    engines = EntryPointEngines(with_carbon(amg, rothc), carbon_models=("rothc",))
+    result = engines.run(ROTATION, climate_result(chain_climate()), soil_result())
+    assert amg.calls == []
+    assert len(rothc.calls) == 1
+    assert result.result.soil_carbon_trend == rothc.answer.soil_carbon_trend
+    assert dict_of_modules(result)["amg"].detail == runner.AMG_NOT_CONFIGURED
+
+
+def test_ep6_not_called_when_the_forcing_cannot_be_laid_out():
+    # The PLACEHOLDER climate holds a few days: no whole agricultural year.
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    result = run(with_carbon(amg, rothc), climate=climate_result(CLIMATE))
+    assert amg.calls == rothc.calls == []
+    amg_rows, rothc_rows = carbon_rows(result, "amg"), carbon_rows(result, "rothc")
+    assert sorted(r.computation for r in rothc_rows) == sorted(TREND_COMPUTATIONS)
+    assert all(r.value is None for r in rothc_rows)
+    # The reason of the forcing, the same for both models.
+    assert [r.missing for r in rothc_rows] == [r.missing for r in amg_rows]
+    assert all(r.missing.reason == "NO_COVERAGE" for r in rothc_rows)
+    module = dict_of_modules(result)["rothc"]
+    assert (module.state, module.reason) == ("not_available", "NO_COVERAGE")
+    assert module.detail == rothc_rows[0].missing.detail
+    assert result.result_missing is None  # the result is still assembled
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["no-climate", "no-soil", "another-field", "no-calendar-engine"],
+)
+def test_ep6_not_called_when_ep1_and_ep3_are_not(case):
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    climate, soil, parts = climate_result(chain_climate()), soil_result(), fakes()
+    if case == "no-climate":
+        climate = climate_result(None)
+    elif case == "no-soil":
+        soil = soil_result(None)
+    elif case == "another-field":
+        other = chain_climate().model_copy(update={"field_id": OTHER_FIELD})
+        climate = climate_result(other)
+    else:
+        parts = (None, *parts[1:])
+    result = run(with_carbon(amg, rothc, *parts), climate=climate, soil=soil)
+    assert rothc.calls == []
+    modules = dict_of_modules(result)
+    assert (modules["rothc"].state, modules["rothc"].reason) == (
+        "not_available",
+        "MISSING_INPUT",
+    )
+    assert modules["rothc"].detail == modules["erosion"].detail
+
+
+@pytest.mark.parametrize(
+    "wrong",
+    [
+        BALANCE_DOCUMENT,  # a dictionary, not the model
+        "balance-of-another-rotation",
+        "balance-of-another-carbon-model",
+    ],
+    ids=["dict", "other-rotation", "other-carbon-model"],
+)
+def test_ep6_returning_the_wrong_thing_is_500_with_no_engine_text(wrong):
+    if wrong == "balance-of-another-rotation":
+        wrong = rothc_balance(rotation_id="PLACEHOLDER_OTHER_ROTATION")
+    elif wrong == "balance-of-another-carbon-model":
+        wrong = balance()  # a balance of amg
+    engines = EntryPointEngines(
+        with_carbon(Fake(balance()), Fake(wrong)), carbon_models=CARBON_MODELS
+    )
+    with pytest.raises(TypeError, match="engine.rothc.run_rothc"):
+        engines.run(ROTATION, climate_result(chain_climate()), soil_result())
+    response = client(engines, climate=ChainClimate()).post(
+        ROUTE, json=BODY, headers={"Origin": ORIGIN}
+    )
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert "rothc" not in response.text
+    assert "CarbonBalance" not in response.text
+
+
+def test_ep6_that_raises_is_500():
+    engines = EntryPointEngines(
+        with_carbon(Fake(balance()), Fake(raises=True)), carbon_models=CARBON_MODELS
+    )
+    response = client(engines, climate=ChainClimate()).post(ROUTE, json=BODY)
+    assert response.status_code == 500
+    assert "PLACEHOLDER_SECRET_EXCEPTION_TEXT" not in response.text
+
+
+def test_ep6_built_and_ep5_not_built():
+    rothc = Fake(rothc_balance())
+    result = run(with_carbon(None, rothc), climate=climate_result(chain_climate()))
+    assert len(rothc.calls) == 1
+    rows = result.result.soil_carbon_trend
+    assert [r.carbon_model for r in rows] == ["amg"] * 3 + ["rothc"] * 3
+    said = f"{runner.NOT_BUILT}: engine.amg.run_amg"
+    assert all(
+        r.missing == Missing(reason="NOT_AVAILABLE", detail=said) for r in rows[:3]
+    )
+    assert rows[3:] == rothc.answer.soil_carbon_trend
+    modules = dict_of_modules(result)
+    assert (modules["amg"].state, modules["amg"].detail) == ("not_available", said)
+    assert (
+        modules["residues"].detail
+        == f"{runner.NOT_BUILT}: engine.residues.build_residue_ledger"
+    )
+
+
+def test_ep5_built_and_ep6_not_built():
+    amg = Fake(balance())
+    result = run(with_carbon(amg, None), climate=climate_result(chain_climate()))
+    rows = result.result.soil_carbon_trend
+    assert rows[:3] == amg.answer.soil_carbon_trend
+    said = f"{runner.NOT_BUILT}: engine.rothc.run_rothc"
+    assert all(
+        r.missing == Missing(reason="NOT_AVAILABLE", detail=said) for r in rows[3:]
+    )
+    module = dict_of_modules(result)["rothc"]
+    assert (module.state, module.reason, module.detail) == (
+        "not_available",
+        "NOT_AVAILABLE",
+        said,
+    )
+
+
+def test_the_real_run_rothc_gets_the_forcing_of_ep5_and_its_rows_pass_unchanged():
+    rothc_package = pytest.importorskip("engine.rothc")
+    real = getattr(rothc_package, "run_rothc", None)
+    if real is None:
+        pytest.skip("engine.rothc.run_rothc is not built")
+    calls: list[tuple[tuple, dict]] = []
+    answers: list[CarbonBalance] = []
+
+    def spy(*args, **kwargs):
+        calls.append((args, kwargs))
+        answers.append(real(*args, **kwargs))
+        return answers[-1]
+
+    amg = Fake(balance())
+    parameters = catalogue()
+    engines = EntryPointEngines(
+        with_carbon(amg, spy), carbon_models=CARBON_MODELS, parameters=parameters
+    )
+    response = client(engines, climate=ChainClimate()).post(ROUTE, json=BODY)
+    assert response.status_code == 200, response.text
+    ((args, kwargs),) = calls
+    assert args[0] is amg.calls[0][0][0]
+    assert kwargs == {"parameters": parameters} and kwargs["parameters"] is parameters
+    body = response.json()
+    result = ResultsPerRotation.model_validate_json(json.dumps(body["result"]))
+    (answer,) = answers
+    rows = [r for r in result.soil_carbon_trend if r.carbon_model == "rothc"]
+    assert rows == answer.soil_carbon_trend
+    assert [r.carbon_model for r in result.soil_carbon_trend] == (
+        ["amg"] * 3 + ["rothc"] * 3
+    )
+    expected = module_status_of("rothc", count_values(answer.soil_carbon_trend))
+    modules = {m["id"]: m for m in body["modules"]}
+    assert (modules["rothc"]["state"], modules["rothc"]["reason"]) == (
+        expected.state,
+        expected.reason,
+    )
+    assert runner.NOT_BUILT not in json.dumps(modules["rothc"])

@@ -331,6 +331,7 @@ def run_chain(parameters: dict[str, dict]) -> tuple[EnginesResult, list]:
         compute_soil_loss=spy(found.compute_soil_loss, calls),
         compute_water_deficit_exposure=spy(found.compute_water_deficit_exposure, calls),
         run_amg=found.run_amg,
+        run_rothc=found.run_rothc,
     )
     engines = EntryPointEngines(
         functions, carbon_models=DEFAULT_CARBON_MODELS, parameters=parameters
