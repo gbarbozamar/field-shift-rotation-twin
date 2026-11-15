@@ -708,8 +708,8 @@ def test_example_calendars_of_the_contracts():
 
 def test_start_of_a_phase_stays_in_year_p_when_a_crossing_runs_past_it():
     # Verifier's case on PR #228 (B1): "long" starts in year 0 and ends in
-    # year 2, so in phase 1 none of its dates is in year 1 and it does not
-    # move the start; phase 1 must not turn into phase 2.
+    # year 2; the start of phase 1 stays in year 1, so phase 1 must not
+    # turn into phase 2.
     calendar = build(
         "2030-07-01",
         "2033-06-30",
@@ -726,7 +726,8 @@ def test_start_of_a_phase_stays_in_year_p_when_a_crossing_runs_past_it():
         assert_valid_with_cycle(moved_calendar, 3)
         assert ag_year_of(moved_calendar.start_date, JULY) == 2030 + phase
         starts[phase] = moved_calendar.start_date
-    assert starts == {1: d("2031-07-01"), 2: d("2032-08-01")}
+    # The start is capped at the last day of year 1 in phase 1 (point 12).
+    assert starts == {1: d("2032-06-30"), 2: d("2032-08-01")}
     assert repeat.phase_calendar(calendar, 1) != repeat.phase_calendar(calendar, 2)
 
 
@@ -748,3 +749,46 @@ def test_start_of_a_phase_is_capped_at_the_last_day_of_year_p():
     assert ag_year_of(moved_calendar.start_date, JULY) == 2028
     laid = run(moved_calendar)
     assert ag_year_of(laid.cycles[0].start, JULY) == laid.ag_years[0]
+
+
+def test_crossing_through_all_of_year_p_is_missing_for_ep1_not_no_crop():
+    # Review B2 on PR #228: "long" runs through all of year 1. In phase 1,
+    # EP1's crop of a day of year 1 is missing (before the first cycle, or
+    # inside the bound of long's missing end), never {"management": "no_crop"}.
+    # A cross-lane check of the reading of engine/erosion/soil_loss.py.
+    from engine.erosion.soil_loss import NO_CROP_SCOPE, _crop_scope
+
+    calendar = build(
+        "2030-07-01",
+        "2033-06-30",
+        [
+            component("long", CROP_A, "2030-09-01", "2032-07-31"),
+            component("c", CROP_C, "2032-10-01", "2033-05-31"),
+        ],
+    )
+    laid = run(repeat.phase_calendar(calendar, 1))
+    one_day = dt.timedelta(days=1)
+    checked = 0
+    for cycle in laid.cycles:
+        year_p = ag_year_of(cycle.start, JULY)  # year 1, by point 12
+        day = dt.date(year_p, JULY, 1)
+        # Every day of year 1 except the cycle's own start day, which is the
+        # residual listed under OPEN (point 12) in repeat.py.
+        while day < dt.date(year_p + 1, JULY, 1):
+            if day != cycle.start and laid.first_day <= day <= laid.last_day:
+                scope = _crop_scope(laid, day)
+                assert scope != NO_CROP_SCOPE, day
+                assert scope.reason == "MISSING_INPUT", day
+                assert day < cycle.start, day
+                if cycle.index > 0:
+                    # The missing-date bound of the previous cycle's "long".
+                    (previous,) = [
+                        c
+                        for c in laid.components
+                        if c.component_id == "long" and c.cycle == cycle.index - 1
+                    ]
+                    assert previous.end is None
+                    assert previous.start <= day <= previous.cycle_last_day
+                checked += 1
+            day += one_day
+    assert checked > 365 * 8
