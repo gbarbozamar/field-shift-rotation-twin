@@ -7,6 +7,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .aggregate import (
+    KindMean,
+    MeansByKind,
+    YearValue,
+    mean_by_kind,
+    series_from_results,
+)
 from .classify import (
     SEASONS,
     KindOfYear,
@@ -27,9 +34,14 @@ def load_record(path: Path | str | None = None) -> dict[str, Any]:
 __all__ = [
     "DEFAULT_RECORD",
     "SEASONS",
+    "KindMean",
     "KindOfYear",
+    "MeansByKind",
+    "YearValue",
     "classify_agricultural_years",
     "count_kinds",
     "deciding_season",
     "load_record",
+    "mean_by_kind",
+    "series_from_results",
 ]
