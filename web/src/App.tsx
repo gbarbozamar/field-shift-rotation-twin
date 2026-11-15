@@ -5,15 +5,17 @@ import { strings } from './strings'
 import EntryScreen from './entry/EntryScreen'
 import FieldsScreen from './identity/FieldsScreen'
 import PlantScreen from './plant/PlantScreen'
+import PrintSheetScreen from './print/PrintSheetScreen'
 
 export default function App() {
   const route = useHashRoute()
   // The entry screen opens the case as the default view at "/"; the fields
   // screen (map above the list) follows at "/fields"; the plant screen
-  // is at "/plant" (S-019, PROPOSED). Other routes keep the placeholder page.
+  // is at "/plant" (S-019, PROPOSED); the printable field sheet is at
+  // "/print" (PROPOSED). Other routes keep the placeholder page.
 
   return (
-    <div className="min-h-screen bg-fs-bg text-fs-text">
+    <div className="min-h-screen bg-fs-bg text-fs-text print:bg-white">
       <header className="border-b border-slate-200 px-6 py-4">
         <h1 className="text-xl font-semibold">{strings['app.title']}</h1>
         <p className="text-sm text-slate-500">{strings['app.subtitle']}</p>
@@ -25,6 +27,8 @@ export default function App() {
           <FieldsScreen />
         ) : route === '/plant' ? (
           <PlantScreen />
+        ) : route === '/print' ? (
+          <PrintSheetScreen />
         ) : (
           <>
             <p>{strings['home.shell']}</p>
