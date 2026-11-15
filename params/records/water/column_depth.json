@@ -1,0 +1,16 @@
+{
+  "id": "column_depth",
+  "scope": {},
+  "value": 0.9,
+  "unit": "m",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Capurro, M.C., Beretta, A., García, C., Sawchik, J., Puppo, L. (2017). Rendimiento de la soja en respuesta a distintas dosis y momentos de riego. Agrociencia Uruguay 21(2):65-76.",
+    "locator": "Cuadro 1, «Caracterización del suelo para INIA Las Brujas e INIA La Estanzuela», rows «La Estanzuela», p. 67 (PDF p. 3)",
+    "url": "https://inia.uy/sites/default/files/publications/2024-10/Capurro-Ma.Cet-al2017Agrociencia-v12-65-76.pdf#page=3"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14 in the PDF. Transcribed by an AI session under D34 of issue #77. Verbatim to compare: the last row of La Estanzuela, «65-90», in «cm». The value is the bottom of the documented profile, 90 cm, written in metres (the length unit of the root depths, balance README). USER-AE and USER-AN: 0.90 m is the documented support, not a measured impermeable boundary. UPDATED on 2026-11-15 by an AI session to follow D201 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D201: the column stays at 0.90 m, and the maximum root depth of the four crops is set equal to it (a ceiling, not a measured root depth). EP3 refuses a root deeper than this value. A deeper column was not taken: there are no profile data below 90 cm. SIGNED on 2026-11-15: checked_by gbarbozamar, row 1 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

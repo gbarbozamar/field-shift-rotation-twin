@@ -1,0 +1,18 @@
+{
+  "id": "cover_fraction",
+  "scope": {
+    "management": "no_crop"
+  },
+  "value": 0,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source prints one value (zero) for a surface with no green cover.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 11, «Surface covered with dead vegetation», «Dual crop coefficient», first paragraph",
+    "url": "https://www.fao.org/4/X0490E/x0490e0h.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Therefore, in the dual Kc approach, the value for fc should be set equal to zero to reflect the lack of green cover and fw should be set equal to 1.0 to reflect the wetting of both soil and mulch cover by precipitation.» Decision D110 of issue #77: «On a fallow day: fc = 0, fw = 1». EP3 reads this record on every day with no crop (fallow, and the tail after maturity of D136) and does not check it against D110. Identifier and scope PROPOSED by unit #217. SIGNED on 2026-11-15: checked_by gbarbozamar, row 32 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

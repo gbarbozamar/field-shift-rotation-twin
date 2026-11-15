@@ -1,0 +1,21 @@
+{
+  "id": "maximum_root_depth",
+  "scope": {
+    "crop": "soybean"
+  },
+  "value": 0.9,
+  "unit": "m",
+  "range": {
+    "low": 0.6,
+    "high": 1.3,
+    "basis": "Range of maximum effective rooting depth printed in Table 22"
+  },
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 8, Table 22",
+    "url": "https://www.fao.org/4/X0490E/x0490e0e.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «Soybeans | 0.6-1.3 | 0.50». Footnote 1: «The larger values for Z r are for soils having no significant layering or other characteristics that can restrict rooting depth. The smaller values for Z r may be used for irrigation scheduling and the larger values for modeling soil water stress or for rainfed conditions.» Decision USER-AO (provisional FAO root growth). Identifier PROPOSED. Model access is capped at the documented 0.90 m of the profile (USER-AE, USER-AN). For soybean, USER-AK's local inferred curve applies. UPDATED on 2026-11-15 by an AI session to follow D201 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D201: 0.90 m for soybean, wheat, maize and alfalfa, the depth of the documented profile (column_depth 0.90 m; Capurro et al. 2017, Cuadro 1), declared as a ceiling and not as a measured root depth. EP3 refuses a root deeper than column_depth (it does not clip); the earlier wording of this note («Model access is capped …», «USER-AK's local inferred curve applies») states intentions, not the code: the root grows on a straight line during the development stage. The cap at the column with the upper end of the printed range is a lane L1 unit for after the event (D201, options not taken). For soybean the value lies inside the printed range. Local support: Capurro Bazzano, M.C. (2016). Determinación de las necesidades hídricas y respuesta al riego en el cultivo de soja. Tesis de Magíster en Ciencias Agrarias, opción Ciencias del Suelo, Facultad de Agronomía, Universidad de la República, Montevideo. Soybean at La Estanzuela: the crop could «extraer agua hasta al menos 1 m de profundidad» (conclusion 16, p. 101). LIMIT D201 DECLARES (sentence as corrected on 15 November 2026, https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6892402260): «With the straight line of the development stage the soybean root reaches 0.90 m near day 45. The local thesis infers rooting from water extraction. At La Estanzuela (field, FDR probe), extraction reached 0.40 m at V8-R1, 47 to 50 days after sowing, 0.60 m at R3 and 1 m between R4 and R5. At Las Brujas (lysimeters under a rain-out shelter, neutron probe), it reached 0.60 m at V5, 30 days after sowing, and 1 m at R1, about 43 days after sowing. The straight line lies between the two sites.» Passages of the thesis: section 3.1.2.2, PDF p. 66 (printed p. 58): «El desarrollo radicular alcanzó los 40 cm en V8-R1, 47-50 días luego de siembra»; section 3.2.2.2, PDF p. 85 (printed p. 77): «La exploración radicular alcanzó 1 m en R1, alrededor de 43 días luego de siembra». SIGNED on 2026-11-15: checked_by gbarbozamar, row 22 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

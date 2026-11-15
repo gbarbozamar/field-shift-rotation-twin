@@ -1,0 +1,16 @@
+{
+  "id": "column_capacity",
+  "scope": {},
+  "value": 151.91,
+  "unit": "mm",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Capurro, M.C., Beretta, A., García, C., Sawchik, J., Puppo, L. (2017). Rendimiento de la soja en respuesta a distintas dosis y momentos de riego. Agrociencia Uruguay 21(2):65-76.",
+    "locator": "Cuadro 1, «Caracterización del suelo para INIA Las Brujas e INIA La Estanzuela», rows «La Estanzuela», p. 67 (PDF p. 3)",
+    "url": "https://inia.uy/sites/default/files/publications/2024-10/Capurro-Ma.Cet-al2017Agrociencia-v12-65-76.pdf#page=3"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14 in the PDF. Transcribed by an AI session under D34 of issue #77. DERIVED: the sum of the four values of the column «AD horizonte-1» (mm) of La Estanzuela, «31,57», «53,31», «24,90», «42,13»; = 151.91 mm. The table prints no total, so the sum is an arithmetic step to check. It is the available water (field capacity minus wilting point) of the whole 0-90 cm column, the capacity of balance.step (balance README: TAW is the root zone's share of the capacity). Methods, p. 67: «Para determinar capacidad de campo se utilizó la metodología descripta según García et al. (2012) y PMP se estimó mediante regresión de Silva et al. (1988).» The wilting point is a regression estimate, not a measurement. Note added on 2026-11-15 by an AI session: D208 of issue #77 sets initial_storage equal to this value (a full column) in the main catalogue (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411). If this value changes when it is signed, initial_storage changes with it. SIGNED on 2026-11-15: checked_by gbarbozamar, row 2 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

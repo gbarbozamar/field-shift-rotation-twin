@@ -1,0 +1,18 @@
+{
+  "id": "fao56_stage_length_mid",
+  "scope": {
+    "crop": "soybean"
+  },
+  "value": 75,
+  "unit": "day",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 6, Table 11 \"Lengths of crop development stages for various planting periods and climatic regions (days)\", row \"Soybeans\", plant date \"June\", region \"Japan\", column \"Mid (Lmid)\"",
+    "url": "https://www.fao.org/4/X0490E/x0490e0b.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim row to compare (group \"e. Legumes (Leguminosae)\"; columns Crop | Init. (Lini) | Dev. (Ldev) | Mid (Lmid) | Late (Llate) | Total | Plant Date | Region): \"Soybeans | 20 | 25 | 75 | 30 | 150 | June | Japan\". This record is the column \"Mid (Lmid)\". Table 11, note *: \"Lengths of crop development stages provided in this table are indicative of general conditions, but may vary substantially from region to region, with climate and cropping conditions, and with crop variety. The user is strongly encouraged to obtain appropriate local information.\" One candidate row among several: the row is chosen by the lead developer (D72 dates, D78), not by this session. FAO-56 Table 11 has no row for Uruguay or the southern hemisphere; its plant dates are months of the regions listed. Identifier PROPOSED by issue #206 (branch l1/water-crop-stages, not merged). UPDATED on 2026-11-15 by an AI session to follow D209 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D209: the three rows of D139 are signed as printed in FAO-56 Table 11 (soybean 20/25/75/30, wheat 20/60/70/30, maize 30/40/50/30). LIMIT D209 DECLARES (already named by D139): for second-crop soybean the row runs 15 to 24 days long against an INASE-INIA 2023/24 report. Substitution by a traceable local phenology stays as D137 provides. Load only this folder for this crop: the other rows share the id and scope. SIGNED on 2026-11-15: checked_by gbarbozamar, row 26 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}
