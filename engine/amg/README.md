@@ -462,3 +462,14 @@ Each item is a question a person answers; the role is named. None is answered by
 - **Any value of AMG.** Every number in the tests is a PLACEHOLDER; `params/records/` holds no record of AMG (D34), so the service returns every AMG row missing.
 - **Use by the runner.** The runner does not call EP5 (see [The runner](#the-runner)).
 - **The names scan of CI** (the list is a secret) and **lint in CI** (ruff runs on `api/`, `adapters/` and `ci/` only; this session ran it on this folder and on `contracts/carbon_balance/`).
+
+## Uniform-forcing substep check (monthly.py)
+
+Unit `l1/amg-monthly-uniform-check` (blueprint section 8, Block 3 `L1 Engines`, and decision D80 of `docs/SCIENCE_DECISIONS.md`). Status: `PROPOSED`.
+
+`monthly.py` builds directly on `pools.py` (`PoolState`, `StepInput`, `Run`, `SCHEMES`, `run`) to compare a 1-step-per-year run with an equal-substep run (`substeps_per_year` substeps per year) over `years` under uniform forcing (`annual_humified_input`, `rate_coefficient`, `annual_duration`):
+
+- `run_uniform_substeps(*, initial_state, annual_humified_input, rate_coefficient, rate_coefficient_per_unit, annual_duration, duration_unit, years, substeps_per_year, scheme) -> Run`: builds `substeps_per_year * years` uniform `StepInput` items (`annual_humified_input / substeps_per_year`, unchanged `rate_coefficient`, `annual_duration / substeps_per_year`) and runs them through `pools.run`.
+- `compare_annual_and_substeps_uniform(...) -> UniformComparison`: builds and runs both the `years`-step annual reference and `run_uniform_substeps` with the same `scheme`, returning `UniformComparison(annual_run, monthly_run, active_difference, total_difference, scheme, substeps_per_year)` where each difference is `monthly_end - annual_end` (or `MISSING_INPUT` naming any missing final step).
+
+Every argument is keyword-only with no default, and no constant of AMG is written anywhere. Under uniform forcing in `test_monthly_uniform.py` (with PLACEHOLDER inputs), `scheme="exponential"` matches the annual reference to floating-point tolerance (`1e-12`) across multi-year runs and arbitrary substep counts with exact mass balance, while `scheme="explicit"` preserves mass balance and its substep solution converges monotonically toward the exponential annual reference as `substeps_per_year` increases (`4 -> 12 -> 365`).
