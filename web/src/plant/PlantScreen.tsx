@@ -178,15 +178,18 @@ function DeclaredMark({ testid }: { testid: string }) {
 }
 
 function LimitLine({ option }: { option: PlantOption }) {
-  if (option.limit === null) {
-    // The parser keeps a reason on the check whenever the limit is missing.
-    return <MissingLine what={strings['plant.limit']} missing={option.on_average.missing!} />
+  if (option.limit === null || option.limit_labels === null) {
+    // A missing limit (a declared Value) carries its own reason; the parser
+    // also keeps a reason on the check whenever the limit is missing.
+    return (
+      <MissingLine what={strings['plant.limit']} missing={option.limit_missing ?? option.on_average.missing!} />
+    )
   }
   return (
     <div>
       <MeasuredLine
         what={strings['plant.limit']}
-        item={{ value: option.limit, unit: option.limit_unit, missing: null }}
+        item={{ value: option.limit, unit: option.limit_unit, missing: null, labels: option.limit_labels }}
       />
       <DeclaredMark testid="plant-limit-declared" />
     </div>

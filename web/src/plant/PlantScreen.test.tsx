@@ -104,7 +104,7 @@ describe('PlantScreen: the chosen rotation (1)', () => {
     expect(card).toContain(
       valueLine(formatString(strings['plant.soil_loss_of'], { kind: kind('average') }), loss.value!, loss.unit),
     )
-    expect(card).toContain(valueLine(strings['plant.limit'], chosenOption.limit.limit, chosenOption.limit.unit))
+    expect(card).toContain(valueLine(strings['plant.limit'], chosenOption.limit.limit.value, chosenOption.limit.unit))
     expect(card).toContain(
       formatString(strings['plant.check_line'], {
         check: strings['plant.check.on_average'],
@@ -220,6 +220,9 @@ describe('PlantScreen: none meets the limit (2)', () => {
   raw.limit_cost = {
     ...raw.limit_cost,
     value: null,
+    // a missing cost carries no D249 labels
+    provenance: undefined,
+    range_missing: undefined,
     against: null,
     reason: 'NOT_APPLICABLE',
     detail: raw.detail,

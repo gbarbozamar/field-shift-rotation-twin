@@ -19,6 +19,13 @@ import type { MissingPart, ReasonCode } from '../components/ValueDisplay'
  *   kinds_of_year/). Each answer was validated with PlantAnswer and with
  *   check_answer_against_request; the on_average and average answer equals
  *   the contract example. No number in it was typed by hand.
+ *   For the D249 labels of #424 (c108bcc) each answer was then given, by a
+ *   scratch script, the same labels the contract example gained (provenance,
+ *   range_missing, the margin source, the declared limit Value, the declared
+ *   price range, scope and declared_limits); that script turns the old
+ *   contract example into the new one exactly, and every answer validates
+ *   with PlantAnswer and check_answer_against_request of c108bcc. No number
+ *   changed.
  *
  * EVERY NUMBER IN THESE FILES IS EXAMPLE DATA: the soil loss, the limit, the
  * prices and the economic facts are example inputs taken from no source; the
@@ -60,10 +67,35 @@ const ANSWERS: readonly AnswerKind[] = ['chosen', 'none_meets', 'not_resolved']
 const STATES: readonly OptionState[] = ['chosen', 'meets', 'does_not_meet', 'not_resolved']
 const VERDICTS: readonly Verdict[] = ['meets', 'does_not_meet', 'not_resolved']
 
+/** C4.1: the provenance labels of a value. */
+export type Provenance = 'DECLARED' | 'OBSERVED' | 'DERIVED' | 'SIMULATED'
+const PROVENANCES: readonly Provenance[] = ['DECLARED', 'OBSERVED', 'DERIVED', 'SIMULATED']
+
+/** C2.1: an uncertainty range, in the unit of its value. */
+export interface ValueRange {
+  low: number
+  high: number
+  kind: string
+}
+
+/**
+ * D249 (#77, contracts/plant_answer of #424): what a present number of the
+ * answer carries: its provenance (C4.1), and its range or the reason it has
+ * none (C2.2). A missing number carries none of them.
+ */
+export interface Labels {
+  provenance: Provenance
+  range: ValueRange | null
+  range_missing: MissingPart | null
+}
+
 /** A number with its unit, or null with the reason it is missing (C3.1). */
 export type Measured =
-  | { value: number; unit: string; missing: null }
-  | { value: null; unit: string; missing: MissingPart }
+  | { value: number; unit: string; missing: null; labels: Labels }
+  | { value: null; unit: string; missing: MissingPart; labels: null }
+
+/** C4.2 for a margin (D249): the source every present margin carries. */
+export const MARGIN_SOURCE = 'computed from the declared economic facts'
 
 /** A soil-loss mean: a measured value with the sources or the assumption mark (C4.2). */
 export type SoilLossItem = Measured & { sources: string[]; assumption: boolean }
@@ -79,8 +111,14 @@ export interface PlantOption {
   state: OptionState
   margin: Record<MarginOf, Measured>
   soil_loss: Record<MarginOf, SoilLossItem>
+  /** The soil-loss limit the user declares (a Value, D249): null when missing. */
   limit: number | null
   limit_unit: string
+  /** Why the limit is missing; set exactly when limit is null. */
+  limit_missing: MissingPart | null
+  /** The labels of a present limit (DECLARED) and its source. */
+  limit_labels: Labels | null
+  limit_source: string | null
   on_average: LimitCheck
   every_kind: LimitCheck
   limit_check: LimitCheck
@@ -90,7 +128,7 @@ export interface PlantOption {
 }
 
 export type LimitCost =
-  | { kind: 'value'; value: number; against: string; unit: string }
+  | { kind: 'value'; value: number; against: string; unit: string; labels: Labels }
   | { kind: 'nothing' }
   | { kind: 'missing'; missing: MissingPart }
 
@@ -103,14 +141,21 @@ export type TippingPoint =
       distance_percent: number | null
       distance_missing: MissingPart | null
       unit: string
+      labels: Labels
+      /** The labels of distance_percent; null when it is missing. */
+      distance_labels: Labels | null
     }
   | { direction: 'up' | 'down'; price: null; missing: MissingPart; unit: string }
 
 export interface TippingPrice {
   today: number | null
+  /** The labels of a present today; null when today is missing. */
+  today_labels: Labels | null
   unit: string
   low: number
   high: number
+  /** PriceRange: low and high are declared by the user (D249). */
+  range_provenance: 'DECLARED'
   up: TippingPoint
   down: TippingPoint
   missing: MissingPart | null
@@ -129,6 +174,10 @@ export interface PlantAnswer {
   limit_cost: LimitCost
   tipping_price: TippingPrice
   sources: PlantSource[]
+  /** D245: what the answer is, in its own words. */
+  scope: string
+  /** The limits of this release the answer declares (D250). */
+  declared_limits: string[]
 }
 
 export type SourceState = 'fresh' | 'cached' | 'unavailable' | 'example'
@@ -204,7 +253,75 @@ export function missingPart(reason: unknown, detail: unknown, what: string): Mis
   return missing
 }
 
-/** A value or a reason, never both, never neither (C3.1). */
+function isAbsent(value: unknown): boolean {
+  return value === null || value === undefined
+}
+
+function valueRange(value: unknown, what: string): ValueRange {
+  const item = record(value, what)
+  if (!isFiniteNumber(item.low) || !isFiniteNumber(item.high) || item.low > item.high) {
+    throw new Error(`${what}:not-low-at-or-below-high`)
+  }
+  if (!isNonEmptyString(item.kind)) {
+    throw new Error(`${what}:kind-empty`)
+  }
+  return { low: item.low, high: item.high, kind: item.kind }
+}
+
+/**
+ * The labels of D249, read as _labels of contracts/plant_answer does: a
+ * missing value carries no provenance and no range; a present one carries its
+ * provenance (computedAs when the answer computes it) and exactly one of its
+ * range (with the value inside) or the reason it has none.
+ */
+function labels(
+  item: Record<string, unknown>,
+  value: number | null,
+  keys: { provenance: string; range: string; range_missing: string },
+  what: string,
+  computedAs: Provenance | null,
+): Labels | null {
+  const provenance = item[keys.provenance]
+  const range = item[keys.range]
+  const rangeMissing = item[keys.range_missing]
+  if (value === null) {
+    if (!isAbsent(provenance) || !isAbsent(range) || !isAbsent(rangeMissing)) {
+      throw new Error(`${what}:missing-value-with-labels`)
+    }
+    return null
+  }
+  if (!oneOf(provenance, PROVENANCES)) {
+    throw new Error(`${what}:provenance-not-a-label`)
+  }
+  if (computedAs !== null && provenance !== computedAs) {
+    throw new Error(`${what}:provenance-not-${computedAs}`)
+  }
+  if (isAbsent(range) === isAbsent(rangeMissing)) {
+    throw new Error(`${what}:range-or-range-missing-exactly-one`)
+  }
+  if (!isAbsent(range)) {
+    const read = valueRange(range, `${what}:range`)
+    if (!(read.low <= value && value <= read.high)) {
+      throw new Error(`${what}:value-outside-its-range`)
+    }
+    return { provenance, range: read, range_missing: null }
+  }
+  const missing = record(rangeMissing, `${what}:range-missing`)
+  return {
+    provenance,
+    range: null,
+    range_missing: missingPart(missing.reason, missing.detail, `${what}:range-missing`),
+  }
+}
+
+const VALUE_LABELS = { provenance: 'provenance', range: 'range', range_missing: 'range_missing' }
+const DISTANCE_LABELS = {
+  provenance: 'distance_provenance',
+  range: 'distance_range',
+  range_missing: 'distance_range_missing',
+}
+
+/** A value or a reason, never both, never neither (C3.1), with its D249 labels. */
 function measured(value: unknown, what: string): Measured {
   const item = record(value, what)
   if (!isNonEmptyString(item.unit)) {
@@ -217,12 +334,75 @@ function measured(value: unknown, what: string): Measured {
     if (item.reason !== null && item.reason !== undefined) {
       throw new Error(`${what}:value-with-a-reason`)
     }
-    return { value: item.value, unit: item.unit, missing: null }
+    const read = labels(item, item.value, VALUE_LABELS, what, 'DERIVED') as Labels
+    return { value: item.value, unit: item.unit, missing: null, labels: read }
   }
   if (item.reason === null || item.reason === undefined) {
     throw new Error(`${what}:missing-without-a-reason`)
   }
-  return { value: null, unit: item.unit, missing: missingPart(item.reason, item.detail, what) }
+  labels(item, null, VALUE_LABELS, what, 'DERIVED')
+  return {
+    value: null,
+    unit: item.unit,
+    missing: missingPart(item.reason, item.detail, what),
+    labels: null,
+  }
+}
+
+/** A margin (MarginOut): a measured value whose present value carries MARGIN_SOURCE. */
+function margin(value: unknown, what: string): Measured {
+  const base = measured(value, what)
+  const source = record(value, what).source
+  if (base.value !== null && source !== MARGIN_SOURCE) {
+    throw new Error(`${what}:source-not-the-margin-source`)
+  }
+  if (base.value === null && !isAbsent(source)) {
+    throw new Error(`${what}:missing-margin-with-a-source`)
+  }
+  return base
+}
+
+/**
+ * The soil-loss limit (SoilLossLimit, a declared Value): a value in the unit
+ * of the limit, DECLARED and not negative, with its range or the reason it
+ * has none; or null with its missing part. A missing limit stays missing.
+ */
+function declaredLimit(value: unknown, unit: string, what: string) {
+  const item = record(value, what)
+  if (item.unit !== unit) {
+    throw new Error(`${what}:unit-not-the-limit-unit`)
+  }
+  if (item.value === null) {
+    if (isAbsent(item.missing)) {
+      throw new Error(`${what}:missing-without-a-reason`)
+    }
+    labels(item, null, VALUE_LABELS, what, null)
+    const missing = record(item.missing, `${what}:missing`)
+    return {
+      value: null,
+      missing: missingPart(missing.reason, missing.detail, `${what}:missing`),
+      labels: null,
+      source: null,
+    }
+  }
+  if (!isFiniteNumber(item.value)) {
+    throw new Error(`${what}:not-a-number`)
+  }
+  if (item.value < 0) {
+    throw new Error(`${what}:negative`)
+  }
+  if (!isAbsent(item.missing)) {
+    throw new Error(`${what}:value-with-a-missing-part`)
+  }
+  if (!isAbsent(item.source) && !isNonEmptyString(item.source)) {
+    throw new Error(`${what}:source-empty`)
+  }
+  return {
+    value: item.value,
+    missing: null,
+    labels: labels(item, item.value, VALUE_LABELS, what, 'DECLARED'),
+    source: isAbsent(item.source) ? null : (item.source as string),
+  }
 }
 
 function soilLoss(value: unknown, what: string): SoilLossItem {
@@ -286,16 +466,14 @@ function option(value: unknown, what: string, strictness: Strictness): PlantOpti
     throw new Error(`${what}:state-not-in-the-list`)
   }
   const limit = record(item.limit, `${what}:limit`)
-  if (limit.limit !== null && !isFiniteNumber(limit.limit)) {
-    throw new Error(`${what}:limit:not-a-number`)
-  }
   if (!isNonEmptyString(limit.unit)) {
     throw new Error(`${what}:limit:unit-empty`)
   }
+  const declared = declaredLimit(limit.limit, limit.unit, `${what}:limit:limit`)
   const onAverage = limitCheck(limit.on_average, `${what}:limit:on-average`)
   const everyKind = limitCheck(limit.every_kind, `${what}:limit:every-kind`)
   if (
-    limit.limit === null &&
+    declared.value === null &&
     (onAverage.verdict !== 'not_resolved' || everyKind.verdict !== 'not_resolved')
   ) {
     // With no limit no check is resolved, so the check carries the reason.
@@ -315,10 +493,13 @@ function option(value: unknown, what: string, strictness: Strictness): PlantOpti
   return {
     rotation_id: item.rotation_id,
     state: item.state,
-    margin: byMarginOf(item.margin, `${what}:margin`, measured),
+    margin: byMarginOf(item.margin, `${what}:margin`, margin),
     soil_loss: byMarginOf(item.soil_loss, `${what}:soil-loss`, soilLoss),
-    limit: limit.limit as number | null,
+    limit: declared.value,
     limit_unit: limit.unit,
+    limit_missing: declared.missing,
+    limit_labels: declared.labels,
+    limit_source: declared.source,
     on_average: onAverage,
     every_kind: everyKind,
     limit_check: check,
@@ -351,8 +532,10 @@ function limitCost(value: unknown, what: string): LimitCost {
     if (!isNonEmptyString(item.unit)) {
       throw new Error(`${what}:unit-empty`)
     }
-    return { kind: 'value', value: item.value, against: item.against, unit: item.unit }
+    const read = labels(item, item.value, VALUE_LABELS, what, 'DERIVED') as Labels
+    return { kind: 'value', value: item.value, against: item.against, unit: item.unit, labels: read }
   }
+  labels(item, null, VALUE_LABELS, what, 'DERIVED')
   if (item.against !== null && item.against !== undefined) {
     // As LimitCostOut: a rotation it is against exactly with a cost value.
     throw new Error(`${what}:against-without-a-value`)
@@ -401,6 +584,8 @@ function tippingPoint(value: unknown, what: string, direction: 'up' | 'down'): T
     if (!hasDetail) {
       throw new Error(`${what}:reason-without-its-detail`)
     }
+    labels(item, null, VALUE_LABELS, what, 'DERIVED')
+    labels(item, null, DISTANCE_LABELS, `${what}:distance`, 'DERIVED')
     return {
       direction,
       price: null,
@@ -434,15 +619,17 @@ function tippingPoint(value: unknown, what: string, direction: 'up' | 'down'): T
   if (hasReason !== hasDetail) {
     throw new Error(`${what}:reason-without-its-detail`)
   }
+  const distance = item.distance_percent as number | null
   return {
     direction,
     price: item.price,
     takes_over: item.takes_over as string | null,
     answer_after: item.answer_after,
-    distance_percent: item.distance_percent as number | null,
-    distance_missing:
-      item.distance_percent === null ? missingPart(item.reason, item.detail, what) : null,
+    distance_percent: distance,
+    distance_missing: distance === null ? missingPart(item.reason, item.detail, what) : null,
     unit: item.unit,
+    labels: labels(item, item.price, VALUE_LABELS, what, 'DERIVED') as Labels,
+    distance_labels: labels(item, distance, DISTANCE_LABELS, `${what}:distance`, 'DERIVED'),
   }
 }
 
@@ -455,6 +642,10 @@ function tippingPrice(value: unknown, what: string): TippingPrice {
   // As PriceRange: a price is not negative.
   if (range.low < 0 || range.high < 0) {
     throw new Error(`${what}:price-range-negative`)
+  }
+  // As PriceRange (D249): low and high are declared by the user.
+  if (range.provenance !== 'DECLARED') {
+    throw new Error(`${what}:price-range-not-declared`)
   }
   if (!isNonEmptyString(item.unit)) {
     throw new Error(`${what}:unit-empty`)
@@ -508,9 +699,11 @@ function tippingPrice(value: unknown, what: string): TippingPrice {
   }
   return {
     today,
+    today_labels: labels(item, today, VALUE_LABELS, `${what}:today`, null),
     unit: item.unit,
     low: range.low,
     high: range.high,
+    range_provenance: 'DECLARED',
     up,
     down,
     missing,
@@ -659,7 +852,25 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
     limit_cost: cost,
     tipping_price: tippingPrice(item.tipping_price, `${what}:tipping-price`),
     sources,
+    scope: answerScope(item.scope, `${what}:scope`),
+    declared_limits: declaredLimits(item.declared_limits, `${what}:declared-limits`),
   }
+}
+
+/** D245: the scope of the answer, a text (PlantAnswer checks its exact words). */
+function answerScope(value: unknown, what: string): string {
+  if (!isNonEmptyString(value)) {
+    throw new Error(`${what}:not-a-text`)
+  }
+  return value
+}
+
+/** D250: the limits of this release the answer declares, at least one. */
+function declaredLimits(value: unknown, what: string): string[] {
+  if (!Array.isArray(value) || value.length === 0 || !value.every(isNonEmptyString)) {
+    throw new Error(`${what}:not-a-list-of-texts`)
+  }
+  return [...value]
 }
 
 /**

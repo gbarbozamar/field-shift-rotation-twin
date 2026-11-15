@@ -184,6 +184,9 @@ describe('the parser refuses what the contract refuses (7)', () => {
     answer.limit_cost = {
       ...answer.limit_cost,
       value: null,
+      // a missing cost carries no D249 labels
+      provenance: undefined,
+      range_missing: undefined,
       against: null,
       reason: 'NOT_APPLICABLE',
       detail: answer.detail,
@@ -222,6 +225,9 @@ describe('the parser refuses what the contract refuses (7)', () => {
     answer.limit_cost = {
       ...answer.limit_cost,
       value: null,
+      // a missing cost carries no D249 labels
+      provenance: undefined,
+      range_missing: undefined,
       against: null,
       reason: 'NOT_APPLICABLE',
       detail: null,
@@ -239,6 +245,9 @@ describe('the parser refuses what the contract refuses (7)', () => {
     answer.limit_cost = {
       ...answer.limit_cost,
       value: null,
+      // a missing cost carries no D249 labels
+      provenance: undefined,
+      range_missing: undefined,
       against: null,
       reason: 'NOT_APPLICABLE',
       detail: answer.detail,
@@ -312,6 +321,9 @@ describe('the parser mirrors TippingPointOut and TippingPriceOut (code review fi
     const answer = exampleCopy()
     const up = rawExample.tipping_price.up
     answer.tipping_price.today = null
+    // a missing today carries no D249 labels
+    answer.tipping_price.provenance = undefined
+    answer.tipping_price.range_missing = undefined
     answer.tipping_price.reason = up.reason
     answer.tipping_price.detail = up.detail
     answer.tipping_price.down = { ...up, direction: 'down' }
@@ -485,5 +497,68 @@ describe('the answer at a soybean price looked at', () => {
       kind: 'unknown',
       missing: { reason: 'MISSING_INPUT', detail: rawExample.tipping_price.up.detail },
     })
+  })
+})
+
+describe('the parser reads the D249 labels of #424 strictly', () => {
+  it('reads the labels of a margin, the limit, the cost, the tipping point and its distance', () => {
+    const parsed = parsePlantAnswer(exampleCopy())
+    const option = parsed.options[0]
+    expect(option.margin.average.labels?.provenance).toBe('DERIVED')
+    expect(option.limit).toBe(rawExample.options[0].limit.limit.value)
+    expect(option.limit_labels?.provenance).toBe('DECLARED')
+    expect(option.limit_missing).toBeNull()
+    expect(parsed.tipping_price.range_provenance).toBe('DECLARED')
+    const down = parsed.tipping_price.down
+    expect(down.price === null ? null : down.distance_labels?.provenance).toBe('DERIVED')
+    expect(parsed.scope.length).toBeGreaterThan(0)
+    expect(parsed.declared_limits.length).toBeGreaterThan(0)
+  })
+
+  it('refuses a present margin without its source or its provenance', () => {
+    const noSource = exampleCopy()
+    delete noSource.options[0].margin.average.source
+    expect(() => parsePlantAnswer(noSource)).toThrow('source-not-the-margin-source')
+    const noProvenance = exampleCopy()
+    delete noProvenance.options[0].margin.average.provenance
+    expect(() => parsePlantAnswer(noProvenance)).toThrow('provenance-not-a-label')
+  })
+
+  it('refuses a present value with both a range and range_missing, or with neither', () => {
+    const neither = exampleCopy()
+    delete neither.limit_cost.range_missing
+    expect(() => parsePlantAnswer(neither)).toThrow('range-or-range-missing-exactly-one')
+    const both = exampleCopy()
+    both.limit_cost.range = { low: 0, high: 1000, kind: 'PLACEHOLDER_kind' }
+    expect(() => parsePlantAnswer(both)).toThrow('range-or-range-missing-exactly-one')
+  })
+
+  it('refuses a tipping distance without its labels', () => {
+    const answer = exampleCopy()
+    delete answer.tipping_price.down.distance_provenance
+    expect(() => parsePlantAnswer(answer)).toThrow('distance:provenance-not-a-label')
+  })
+
+  it('keeps a missing limit missing with its reason, never zero', () => {
+    const answer = exampleCopy()
+    const option = answer.options[0]
+    const open = { verdict: 'not_resolved', reason: 'NOT_DECLARED', detail: 'PLACEHOLDER detail' }
+    option.limit.limit = { value: null, unit: option.limit.unit, missing: { reason: 'NOT_DECLARED' } }
+    option.limit.on_average = { ...open }
+    option.limit.every_kind = { ...open }
+    option.limit_check = { ...open }
+    option.state = 'not_resolved'
+    const parsed = parsePlantAnswer(answer).options[0]
+    expect(parsed.limit).toBeNull()
+    expect(parsed.limit_missing).toEqual({ reason: 'NOT_DECLARED' })
+    const present = exampleCopy()
+    present.options[0].limit.limit.provenance = 'DERIVED'
+    expect(() => parsePlantAnswer(present)).toThrow('limit:limit:provenance-not-DECLARED')
+  })
+
+  it('refuses a price range not declared', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.price_range.provenance = 'DERIVED'
+    expect(() => parsePlantAnswer(answer)).toThrow('price-range-not-declared')
   })
 })
