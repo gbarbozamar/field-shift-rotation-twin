@@ -99,4 +99,14 @@ describe('FieldsScreen', () => {
     const html = renderToString(<FieldsScreen />)
     expect(html).not.toContain(strings['ribbon.title'])
   })
+  it('renders the two clocks of the results example after the field list', () => {
+    setSelectedFieldId(exampleCase.fields[0].field_id)
+    const html = renderToString(<FieldsScreen />)
+    expect(html).toContain(strings['clocks.title'])
+    expect(html).toContain(strings['clocks.example_note'])
+    const lastFieldId = exampleCase.fields[exampleCase.fields.length - 1]?.field_id ?? ''
+    expect(html.indexOf('data-testid="clocks-rotation"')).toBeGreaterThan(
+      html.indexOf(lastFieldId),
+    )
+  })
 })

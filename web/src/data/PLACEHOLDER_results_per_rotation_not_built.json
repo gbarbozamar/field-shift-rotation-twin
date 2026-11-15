@@ -1,0 +1,32 @@
+{
+  "case_id": "PLACEHOLDER_case",
+  "field_id": "PLACEHOLDER_field",
+  "rotation_id": "PLACEHOLDER_rotation_a",
+  "soil_loss": {
+    "indicator": "soil_loss",
+    "direction": "lower_is_better",
+    "units": ["t ha-1 yr-1", "t ha-1 month-1"],
+    "missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER detail: in this example the erosion engine is not built"
+    }
+  },
+  "water_deficit_exposure": {
+    "indicator": "water_deficit_exposure",
+    "direction": "higher_is_better",
+    "units": ["dimensionless"],
+    "missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER detail: in this example the water engine is not built"
+    }
+  },
+  "soil_carbon_trend": {
+    "indicator": "soil_carbon_trend",
+    "direction": "higher_is_better",
+    "units": ["t C ha-1 yr-1"],
+    "missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER detail: in this example no carbon engine is built"
+    }
+  }
+}
