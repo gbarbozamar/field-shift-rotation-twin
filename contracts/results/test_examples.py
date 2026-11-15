@@ -248,6 +248,23 @@ def remove_months_of_last_year(document):
     ]
 
 
+def on_rotation(item):
+    """One water value moved to the time basis 'rotation' (no agricultural year)."""
+    item["time_basis"] = "rotation"
+    item.pop("ag_year", None)
+
+
+def every_water_value_on_rotation(items):
+    for item in items:
+        on_rotation(item)
+
+
+def first_water_value_on_rotation(items):
+    # The example carries its water values by agricultural year (D157, D163).
+    assert len(items) > 1 and all(item["time_basis"] == "ag_year" for item in items)
+    on_rotation(items[0])
+
+
 def add_water_by_year_next_to_water_by_rotation(items):
     for item in [
         item for item in items if item["indicator"] == "water_deficit_exposure"
@@ -934,14 +951,14 @@ REJECTED = [
         "W1",
         "time basis 'rotation' with an agricultural year",
         water,
-        put(ag_year=2001),
+        put(time_basis="rotation", ag_year=2001),
         "carries no 'ag_year'",
     ),
     Case(
         "W1",
         "time basis 'ag_year' without an agricultural year",
         water,
-        put(time_basis="ag_year"),
+        put(time_basis="ag_year", ag_year=None),
         "needs an 'ag_year'",
     ),
     Case(
@@ -956,7 +973,7 @@ REJECTED = [
         "W2",
         "two values for the whole rotation",
         water_values,
-        repeat(0),
+        every_water_value_on_rotation,
         "more than one value on the time basis 'rotation'",
         (ROTATION,),
     ),
@@ -964,7 +981,7 @@ REJECTED = [
         "W2",
         "values on both time bases",
         water_values,
-        repeat(0, time_basis="ag_year", ag_year=2001),
+        first_water_value_on_rotation,
         "mixes the time bases",
         (ROTATION,),
     ),
@@ -1232,9 +1249,18 @@ def test_a6_water_indicator_can_be_carried_as_a_number(name):
 @pytest.mark.parametrize("name", BOTH)
 def test_a7_water_indicator_can_be_carried_by_agricultural_year(name):
     document = example(name)
-    for item in values_of(name, document):
-        if item["indicator"] == "water_deficit_exposure":
-            item.update(time_basis="ag_year", ag_year=2001)
+    shown = [
+        item
+        for item in values_of(name, document)
+        if item["indicator"] == "water_deficit_exposure"
+    ]
+    # One agricultural year per value of one rotation (D157, D163); the table
+    # has one water row per rotation, so each takes the first year.
+    years = {}
+    for item in shown:
+        key = item.get("rotation_id")
+        years[key] = years.get(key, 2000) + 1
+        item.update(time_basis="ag_year", ag_year=years[key])
     load(name, document)
 
 
