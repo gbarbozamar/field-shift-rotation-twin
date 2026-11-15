@@ -20,6 +20,7 @@ import PlantScreen, {
 import type { PlantScreenState, ServicePhase } from './PlantScreen'
 import { plantExamples } from './plantData'
 import {
+  PlantNotAvailableError,
   plantQueryOptions,
   plantRequestFor,
   readBaseRequest,
@@ -354,6 +355,48 @@ describe('the service fails', () => {
     )
     expect(html).not.toContain('NOT_AN_ANSWER_MARKER')
     expect(count(html, 'plant-card')).toBe(0)
+  })
+
+  it('a 200 with no answer and its reason: the reason is shown, not an error panel', async () => {
+    const missing = { reason: 'NOT_AVAILABLE', detail: 'NOT_BUILT_DETAIL_MARKER' } as const
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, { answer: null, answer_missing: missing })))
+    const state = serviceState()
+    const error = await caughtError(runPlant(BASE, serviceRequestOf(state)!))
+    expect(error).toBeInstanceOf(PlantNotAvailableError)
+    const phase = servicePhaseOf({ isPending: false, isError: true, error, data: undefined })
+    expect(phase).toEqual({ phase: 'not_available', missing })
+    const html = view(state, phase)
+    expect(visibleText(section(html, 'plant-answer-not-available'))).toContain(
+      missingPatternText(strings['plant.answer.missing_what'], missing),
+    )
+    expect(count(html, 'plant-service-error')).toBe(0)
+    expect(count(html, 'plant-service-error-code')).toBe(0)
+    expect(count(html, 'plant-card')).toBe(0)
+    expect(count(html, 'plant-option')).toBe(0)
+    expect(visibleText(section(html, 'plant-service-back'))).toContain(strings['plant.service.back'])
+  })
+
+  it('a 200 with no answer and no detail: the reason alone is shown', async () => {
+    const missing = { reason: 'NOT_AVAILABLE' } as const
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, { answer: null, answer_missing: missing })))
+    const error = await caughtError(runPlant(BASE, serviceRequestOf(serviceState())!))
+    const phase = servicePhaseOf({ isPending: false, isError: true, error, data: undefined })
+    expect(phase).toEqual({ phase: 'not_available', missing })
+  })
+
+  it.each([
+    ['no reason at all', { answer: null }],
+    ['a reason that is not a code of the conventions', { answer: null, answer_missing: { reason: 'NOT_A_CODE' } }],
+    ['an empty detail', { answer: null, answer_missing: { reason: 'NOT_AVAILABLE', detail: '' } }],
+  ])('a 200 with no answer and %s: UNEXPECTED, no reason is invented', async (_name, body) => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, body)))
+    const error = await caughtError(runPlant(BASE, serviceRequestOf(serviceState())!))
+    expect(error).toBeInstanceOf(ApiError)
+    const phase = servicePhaseOf({ isPending: false, isError: true, error, data: undefined })
+    expect(phase).toEqual({ phase: 'failed', code: 'UNEXPECTED' })
+    const html = view(serviceState(), phase)
+    expect(count(html, 'plant-answer-not-available')).toBe(0)
+    expect(count(html, 'plant-service-error')).toBe(1)
   })
 
   it('an error that is not an ApiError is UNEXPECTED too', () => {
