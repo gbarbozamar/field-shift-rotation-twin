@@ -149,6 +149,173 @@ export const strings = {
   // Approved by the interface developer, 15/11/2026.
   'soil_loss.withdrawn_c':
     'Not shown: the computed cover factor of this release overestimates the measured loss (see the check in docs/VALIDATION.md).',
+  // PROPOSED (S-019, l2/plant-screen): the screen "What should I plant?".
+  // Wording is a person's decision; the operator approves it. No kind of
+  // year is called "dry": which kind is dry is OPEN.
+  'plant.title': 'What should I plant?',
+  'plant.rule':
+    'The rule: the most margin per hectare and year among the rotations that do not lose more soil than the limit. Soil loss is a limit, not a cost.',
+  'plant.questions': 'Four questions',
+  'plant.q.price': 'What is soybean worth?',
+  'plant.q.price_hint': 'A tipping price, not a forecast: the screen shows where the answer changes.',
+  'plant.q.price_looked_at': 'Price looked at: {price} {unit}',
+  'plant.q.price_today': 'Today: {price} {unit}',
+  'plant.q.price_range': 'Range: {low} to {high} {unit}',
+  'plant.q.kind': 'Which kind of year?',
+  'plant.q.rain': 'And if the rain is heavier?',
+  'plant.q.rain_control': 'Heavier rain stress test',
+  'plant.q.rain_unavailable_detail': 'the stress test needs the service, which this page does not call',
+  'plant.q.strict': 'How strict?',
+  'plant.kind.average': 'average of the record',
+  'plant.kind.el_nino': 'El Nino',
+  'plant.kind.neutral': 'neutral',
+  'plant.kind.la_nina': 'La Nina',
+  'plant.strict.on_average': 'Meet the limit on average',
+  'plant.strict.every_kind': 'Meet the limit in every kind of year',
+  'plant.answer.heading': 'The answer at the price of today',
+  // Wording of D245 (issue #77), in place of "Plant this rotation".
+  'plant.answer.chosen': 'The most margin within the limit you declared; water and soil carbon are not part of this answer',
+  // D250 (#77): each limit of this release the answer declares, as given.
+  'plant.declared_limit': 'Limit of this release: {limit}',
+  'plant.answer.none_meets': 'None of the rotations meets the soil-loss limit',
+  'plant.answer.not_resolved': 'Not resolved: the data cannot pick one rotation',
+  'plant.answer.why': 'Why',
+  'plant.answer.tied': 'Tied: {rotations}',
+  'plant.answer.missing_what': 'Answer to these questions',
+  'plant.answer.missing_detail': 'no example answer holds these questions',
+  'plant.value_line': '{what}: {value} {unit}',
+  'plant.margin_of': 'Margin, {kind}',
+  'plant.soil_loss_of': 'Soil loss, {kind}',
+  'plant.limit': 'Soil-loss limit',
+  'plant.by_kind': 'Margin in each kind of year',
+  'plant.check.on_average': 'Limit check on average',
+  'plant.check.every_kind': 'Limit check in every kind of year',
+  'plant.check_line': '{check}: {verdict}',
+  'plant.verdict.meets': 'meets the limit',
+  'plant.verdict.does_not_meet': 'does not meet the limit',
+  'plant.cost.heading': 'What meeting the limit costs',
+  'plant.cost.what': 'Cost of meeting the limit',
+  'plant.cost.value': 'Meeting the limit costs {value} {unit} against {against}, the rotation outside the limit with the most margin',
+  'plant.cost.nothing': 'Meeting the limit costs nothing: no rotation outside the limit has more margin',
+  'plant.tip.heading': 'Tipping price',
+  'plant.tip.up': 'If soybean rises',
+  'plant.tip.down': 'If soybean falls',
+  'plant.tip.point': 'At {price} {unit} the answer becomes: {after}',
+  'plant.tip.distance': '{distance} % from the price of today',
+  'plant.tip.distance_what': 'Distance from the price of today',
+  'plant.after.chosen': '{rotation} is chosen',
+  'plant.after.none_meets': 'none of the rotations meets the limit',
+  'plant.after.not_resolved': 'not resolved',
+  'plant.price.today': 'This is the price of today.',
+  'plant.price.same':
+    'No tipping price lies between this price and the price of today: the answer is the one at the price of today. The margins shown are at the price of today.',
+  'plant.price.past':
+    'Past the tipping price of {price} {unit} the answer becomes: {after}. Whether it changes again further from today is not computed. The margins shown are at the price of today.',
+  'plant.price.unknown_what': 'Answer at {price} {unit}',
+  'plant.options.heading': 'Each option',
+  'plant.state.chosen': 'Chosen: the most margin among the rotations within the limit',
+  'plant.state.meets': 'Meets the soil-loss limit',
+  'plant.state.does_not_meet': 'Loses more soil than the limit: left out',
+  'plant.state.not_resolved': 'Not resolved: the data cannot tell whether it meets the limit',
+  'plant.kinds.not_met': 'Kinds of year over the limit: {kinds}',
+  'plant.kinds.not_resolved': 'Kinds of year not resolved: {kinds}',
+  'plant.kinds.not_in_record': 'Kinds of year not in the record: {kinds}',
+  'plant.kinds.none': 'none',
+  'plant.sources.heading': 'Sources',
+  'plant.source_line': '{id}: {detail}',
+  'plant.source.economics':
+    'margins, the cost of meeting the limit and the tipping price, computed by the economics functions from the economic facts of this answer',
+  // PROPOSED (S-019 fix round 1): the mark of a value the user declares in
+  // the request (the soil-loss limit, the soybean prices). Wording is a
+  // person's decision.
+  'plant.declared': 'Declared by the user in the request (example data)',
+  // PROPOSED (S-019 code review fixes): the attribution a source of the
+  // answer carries. Wording is a person's decision.
+  'plant.source.attribution': 'Attribution: {attribution}',
+  // PROPOSED (S-020, l2/plant-options-rows): the option rows of the screen
+  // "What should I plant?" (the strip of crops year by year, the bars, the
+  // state in plain words). Wording is a person's decision; the operator
+  // approves it. No month is called winter or summer: the season of a month
+  // depends on the hemisphere and is OPEN.
+  'plant.month.1': 'January',
+  'plant.month.2': 'February',
+  'plant.month.3': 'March',
+  'plant.month.4': 'April',
+  'plant.month.5': 'May',
+  'plant.month.6': 'June',
+  'plant.month.7': 'July',
+  'plant.month.8': 'August',
+  'plant.month.9': 'September',
+  'plant.month.10': 'October',
+  'plant.month.11': 'November',
+  'plant.month.12': 'December',
+  'plant.strip.what': 'Crops year by year',
+  'plant.strip.no_definition_detail': 'the request holds no definition of this rotation',
+  'plant.strip.year': 'Year {n}: {crops}',
+  'plant.strip.year_empty': 'Year {n}: no crop declared in it',
+  'plant.strip.year_label': 'Year {n}',
+  'plant.strip.year_join': '; ',
+  'plant.strip.crop_join': ', then ',
+  'plant.strip.crop': '{crop} sown {sowing}, harvested {harvest}',
+  'plant.strip.crop_kept': '{crop} kept from its sowing in {sowing}, harvested {harvest}',
+  'plant.strip.crop_harvest_missing': '{crop} sown {sowing}, {harvest}',
+  'plant.strip.harvest': 'harvest',
+  'plant.strip.month_of_year': '{month} of year {n}',
+  'plant.strip.purpose': 'purpose: {purpose}',
+  'plant.strip.unplaced': 'Sowing date of {crop}, placed in no year',
+  'plant.bar.limit_line': 'Limit line',
+  'plant.state.every_kind_meets': 'Meets the limit in every kind of year in the record',
+  'plant.state.on_average_only': 'Meets the limit on average, but not in: {kinds}',
+  'plant.state.out_by': 'Out, by this check: {check}',
+  'plant.state.why': 'Why it is not resolved',
+  // PROPOSED (S-020 fix round 1): the verdict of a check not resolved, when
+  // its reason is shown once elsewhere in the row; the text alternative of a
+  // crop with its purpose; the strip not available when the request cannot be
+  // read; the provenance of the strip's dates; the text mark of a negative
+  // margin bar; the verdict of the soil-loss bar for the quantity it draws.
+  // Wording is a person's decision; the operator approves it.
+  'plant.verdict.not_resolved': 'not resolved',
+  'plant.strip.crop_alt': '{crop} ({purpose})',
+  'plant.strip.request_invalid_detail': 'the rotations of the request could not be read',
+  'plant.strip.dates_provenance': 'Dates of the strip: {provenance}',
+  'plant.bar.margin_loss': 'Below zero: a loss',
+  'plant.bar.soil_against': '{what} against the limit',
+  'plant.bar.not_in_record': 'this kind of year is not in the record, so there is no verdict',
+  // PROPOSED (S-021, l2/plant-screen-service): "Ask the service" on the screen
+  // "What should I plant?": where the answer comes from, the pending line, the
+  // error panel (one text per error code of api/errors.py, plus UNEXPECTED),
+  // the factor heavier rain sends, and the rain-stress part of the answer.
+  // D251 (#77): without a configured service the screen says so and shows
+  // no example values in place of an answer.
+  'plant.service.not_available': 'The service is not available: no answer can be shown.',
+  'plant.service.origin_service': 'Answer from the service at {api}',
+  'plant.service.ask': 'Ask the service',
+  'plant.service.back': 'Back to the questions',
+  // D251 (#77), read strictly: no sample answer values are shown, with or
+  // without the service. The questions start from the example request.
+  'plant.service.not_asked': 'No answer yet: ask the service for the answer to these questions.',
+  'plant.q.example_inputs':
+    'These questions start from the example request (PLACEHOLDER inputs, declared by the user): change them to your own before asking the service.',
+  'plant.service.pending': 'Asking the service for the answer to these questions',
+  'plant.service.error_heading': 'The service did not answer',
+  'plant.service.error.MALFORMED_JSON': 'The service could not read the request as JSON.',
+  'plant.service.error.INVALID_REQUEST': 'The service refused the request: a part of it breaks the plant request contract.',
+  'plant.service.error.SITE_INVALID': 'The service refused the site of the request.',
+  'plant.service.error.ROTATION_INVALID': 'The service refused a rotation of the request.',
+  'plant.service.error.INTERNAL_ERROR': 'The service failed while computing the answer. Nothing was invented to fill in.',
+  'plant.service.error.NOT_FOUND': 'The service has no plant route at this address.',
+  'plant.service.error.METHOD_NOT_ALLOWED': 'The plant route of the service does not accept this method.',
+  'plant.service.error.UNEXPECTED': 'The connection to the service failed, or its answer could not be read as an answer to these questions.',
+  'plant.service.rain_factor': 'Factor sent: {value} {unit} ({provenance})',
+  'plant.service.rain_no_factor_detail': 'the example request declares no rain-stress factor',
+  'plant.service.rain_what': 'Heavier rain, {label}',
+  'plant.service.rain_applied': 'Heavier rain, {label}: {detail}',
+  'plant.service.rain_not_applied': 'Heavier rain, {label}, not applied: {detail}',
+  // PROPOSED (fix round 1 of S-021): with a backend configured, heavier rain in
+  // example mode applies to the next service answer; a request that cannot be
+  // read leaves the control without a factor.
+  'plant.service.rain_next_answer': 'Applies to the next answer from the service.',
+  'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
 } as const
 
 /**
