@@ -265,11 +265,20 @@ def first_water_value_on_rotation(items):
     on_rotation(items[0])
 
 
-def add_water_by_year_next_to_water_by_rotation(items):
-    for item in [
+def add_water_by_rotation_next_to_water_by_year(items):
+    # The table carries its water rows by agricultural year (D157, D163); each
+    # rotation gets one more row on the time basis 'rotation'.
+    water_rows = [
         item for item in items if item["indicator"] == "water_deficit_exposure"
-    ]:
-        items.append({**copy.deepcopy(item), "time_basis": "ag_year", "ag_year": 2001})
+    ]
+    assert water_rows and all(item["time_basis"] == "ag_year" for item in water_rows)
+    first_of_each_rotation = {}
+    for item in water_rows:
+        first_of_each_rotation.setdefault(item["rotation_id"], item)
+    for item in first_of_each_rotation.values():
+        moved = copy.deepcopy(item)
+        on_rotation(moved)
+        items.append(moved)
 
 
 # --- the invalid variants ----------------------------------------------------
@@ -989,7 +998,7 @@ REJECTED = [
         "W2",
         "values on both time bases, in the table",
         rows,
-        add_water_by_year_next_to_water_by_rotation,
+        add_water_by_rotation_next_to_water_by_year,
         "mixes the time bases",
         (TABLE,),
     ),

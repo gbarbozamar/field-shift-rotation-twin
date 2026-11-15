@@ -43,7 +43,7 @@ SOIL_LOSS_TOLERANCE = ["equal_tolerances", 0]  # a number
 SOIL_LOSS_PAIR_COUNT = ["pair_cell_counts", 0]  # counted by the sign
 CARBON_PAIR_COUNT = ["pair_cell_counts", 2]  # no tolerance, not counted by the sign
 PAIR_STATE = ["pair_states", 0]
-CARBON_DIFFERENCE = ["paired_differences", 3]  # amg, a value
+CARBON_DIFFERENCE = ["paired_differences", 4]  # amg, a value
 
 
 # The example of issue #96 as the producer wrote it. It is kept unchanged:
@@ -157,6 +157,17 @@ def _declare_a_water_limit(data: dict[str, Any]) -> None:
         "provenance": "DECLARED",
         "source": "user",
     }
+    # The water rows are per agricultural year (D163) and none holds a value,
+    # so no year is evaluated and none is within the limit (D1, D95).
+    for count in data["counts_by_year"]:
+        if count["indicator"] == "water_deficit_exposure":
+            count["years_within_limits"] = 0
+    for item in data["range_across_scenarios"]:
+        if item["indicator"] == "water_deficit_exposure":
+            item.pop("missing")
+            item.update(
+                minimum=0, maximum=0, scenario_of_the_minimum="PLACEHOLDER_scenario_one"
+            )
 
 
 def _drop_soil_loss_limit(data: dict[str, Any]) -> None:
@@ -185,6 +196,8 @@ def _soil_loss_limit_not_declared(data: dict[str, Any]) -> None:
     """D60: no row is evaluated; the year that held a value is not evaluated either."""
     data["limits"][0]["limit"] = copy.deepcopy(NO_SOIL_LOSS_LIMIT)
     for count in data["counts_by_year"]:
+        if count["indicator"] != "soil_loss":
+            continue
         count["years_evaluated"] = 0
         count["years_within_limits"] = None
         count["not_evaluated"].insert(
@@ -199,6 +212,8 @@ def _soil_loss_limit_not_declared(data: dict[str, Any]) -> None:
             },
         )
     for item in data["range_across_scenarios"]:
+        if item["indicator"] != "soil_loss":
+            continue
         item.update(
             minimum=None,
             maximum=None,
@@ -249,8 +264,15 @@ def _count_of_soil_carbon_trend(data: dict[str, Any]) -> None:
         )
 
 
-def _range_with_another_scenario_as_minimum(data: dict[str, Any]) -> None:
+def _add_scenario_two(data: dict[str, Any]) -> None:
+    """A second scenario: one soil-loss count per rotation with 1 year within the
+    limit, and the water counts of scenario one copied (no limit is declared)."""
     data["scenarios"].append("PLACEHOLDER_scenario_two")
+    water = [
+        count
+        for count in data["counts_by_year"]
+        if count["indicator"] == "water_deficit_exposure"
+    ]
     for rotation_id in data["rotations"]:
         count = copy.deepcopy(data["counts_by_year"][0])
         count.update(
@@ -259,6 +281,14 @@ def _range_with_another_scenario_as_minimum(data: dict[str, Any]) -> None:
             years_within_limits=1,
         )
         data["counts_by_year"].append(count)
+    for count in water:
+        data["counts_by_year"].append(
+            {**copy.deepcopy(count), "scenario_id": "PLACEHOLDER_scenario_two"}
+        )
+
+
+def _range_with_another_scenario_as_minimum(data: dict[str, Any]) -> None:
+    _add_scenario_two(data)
     data["range_across_scenarios"][0]["scenario_of_the_minimum"] = (
         "PLACEHOLDER_scenario_two"
     )
@@ -266,17 +296,10 @@ def _range_with_another_scenario_as_minimum(data: dict[str, Any]) -> None:
 
 def _range_over_two_scenarios(data: dict[str, Any]) -> None:
     """Two scenarios: the minimum is 0 in scenario one, the maximum 1 in scenario two."""
-    data["scenarios"].append("PLACEHOLDER_scenario_two")
-    for rotation_id in data["rotations"]:
-        count = copy.deepcopy(data["counts_by_year"][0])
-        count.update(
-            rotation_id=rotation_id,
-            scenario_id="PLACEHOLDER_scenario_two",
-            years_within_limits=1,
-        )
-        data["counts_by_year"].append(count)
+    _add_scenario_two(data)
     for item in data["range_across_scenarios"]:
-        item["maximum"] = 1
+        if item["indicator"] == "soil_loss":
+            item["maximum"] = 1
 
 
 def _state(**fields: Any) -> Mutation:
@@ -660,7 +683,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ),
     (
         "range-of-an-uncounted-indicator",
-        put(SOIL_LOSS_RANGE + ["indicator"], "water_deficit_exposure"),
+        put(SOIL_LOSS_RANGE + ["indicator"], "soil_carbon_trend"),
         "summarises no count",
     ),
     (
@@ -907,7 +930,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ),
     (
         "coverage-compared-greater-than-cells",
-        put(PAIR_STATE + ["coverage", "cells_compared"], 6),
+        put(PAIR_STATE + ["coverage", "cells_compared"], 7),
         "D91",
     ),
     (
