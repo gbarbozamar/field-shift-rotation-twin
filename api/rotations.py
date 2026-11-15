@@ -37,6 +37,9 @@ from api.ports import (
 logger = logging.getLogger(__name__)
 
 PERIOD_NOT_CONFIGURED = "the climate record period is not configured"
+# The reason code (contracts/CONVENTIONS.md C3.2) of an absent period, on the
+# climate source row (get_climate) and in the plant answer (api/plant.py).
+PERIOD_NOT_CONFIGURED_REASON = "NOT_AVAILABLE"
 # The identifier of the run on the calendar unchanged (api/phases.py, PROPOSED).
 FIRST_SCENARIO = "phase_1"
 
@@ -353,7 +356,7 @@ def get_climate(
                 id=climate.source_id,
                 contract=climate.contract,
                 state="unavailable",
-                missing_reason="NOT_AVAILABLE",
+                missing_reason=PERIOD_NOT_CONFIGURED_REASON,
                 detail=PERIOD_NOT_CONFIGURED,
             ),
         )

@@ -74,7 +74,17 @@ from api.rain_stress import (
     scales_to_finite,
 )
 from api.rotation_validator import field_names, safe_message, submitted_texts
-from api.rotations import PERIOD_NOT_CONFIGURED, get_climate, source_out
+from api.rotations import (
+    PERIOD_NOT_CONFIGURED,
+    get_climate,
+    source_out,
+)
+
+# PROPOSED (S-034, F3): the reason code (C3.2) of an absent period, the one
+# ``api.rotations.get_climate`` writes on the climate source row.
+from api.rotations import (
+    PERIOD_NOT_CONFIGURED_REASON as PERIOD_REASON,
+)
 from contracts.plant_answer import PlantRequest
 from contracts.rotation_definition import RotationDefinition
 
@@ -130,9 +140,6 @@ NOT_FINITE = (
     "the rainfall erosivity of the parameter catalogue times the factor is not "
     "a finite number"
 )
-# PROPOSED (S-034, F3): the reason code (C3.2) of an absent period, the one
-# ``api.rotations.get_climate`` writes on the climate source row.
-PERIOD_REASON = "NOT_AVAILABLE"
 NO_WHOLE_YEAR = (
     "the climate record period holds no whole agricultural year for the start "
     "month of the rotations"

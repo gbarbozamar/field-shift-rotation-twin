@@ -914,3 +914,6 @@ def test_f2_a_request_message_never_quotes_a_submitted_id(
     assert any(fragment in message for message in messages)
     for message in messages:
         assert SHORT_ID not in message
+    # Fix round 1: a list index (0-based), not the component's position field.
+    assert any("list ind" in message for message in messages)
+    assert not any("position" in message for message in messages)
