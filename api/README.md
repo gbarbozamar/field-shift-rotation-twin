@@ -287,12 +287,13 @@ removed.
 carbon_models=(), parameters=None)` implements `RotationEngines`.
 
 - `EngineFunctions(build_rotation_calendar, compute_soil_loss,
-  compute_water_deficit_exposure)`: each an injected callable, `None` when the
-  engine is not built.
+  compute_water_deficit_exposure, run_amg)`: each an injected callable, `None`
+  when the engine is not built.
 - `discover_engine_functions()` imports each one by the module path and name
   of `contracts/ENTRYPOINTS.md`: `engine.calendar.build_rotation_calendar`
   (EP2), `engine.erosion.compute_soil_loss` (EP1),
-  `engine.water.compute_water_deficit_exposure` (EP3). A module (or a package
+  `engine.water.compute_water_deficit_exposure` (EP3), `engine.amg.run_amg`
+  (EP5, unit `l2/runner-amg`). A module (or a package
   above it) or a function that does not exist gives `None`. Any other import
   error, including a module that imports something absent, propagates; a
   name that exists and is not callable is a `TypeError`. Engines land in the
@@ -320,17 +321,25 @@ Call order (accepted in issue 18):
 2. EP1 and EP3 with the keyword arguments `calendar`, `climate`, `soil_slope`
    (G3), also when the calendar is infeasible (G4), and `parameters`, always
    (below). EP2 never gets `parameters`.
-3. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
+3. EP5 `run_amg(forcing, parameters=...)` (D65), under the same conditions
+   as EP1 and EP3 (calendar built, climate and soil-and-slope present and of
+   the calendar's field), on the `CarbonForcing` built by
+   `api.carbon_forcing.build_carbon_forcing` (below). When the forcing cannot
+   be laid out, EP5 is not called (see the table of absences).
+4. `ResultsPerRotation`: `case_id`, `field_id`, `rotation_id` from the
    calendar; `soil_loss` from EP1 and `water_deficit_exposure` from EP3,
    unchanged, or in the not-built form when that engine is not built (D12);
-   `soil_carbon_trend` written by the runner.
+   `soil_carbon_trend` by the mapping below.
 
 The runner computes nothing scientific, converts no unit, fills no gap and
 never builds a number. It catches nothing an engine raises (G5, Q7): the route
 answers `500` `INTERNAL_ERROR` with the CORS headers and no exception text. An
 engine that returns something other than the type its signature names
 (`RotationCalendar`; `SoilLossResults` or the results `Missing`; a `list` of
-`WaterDeficitExposure`) is a defect: `TypeError`, so also `500`. That includes
+`WaterDeficitExposure`; `CarbonBalance`) is a defect: `TypeError`, so also
+`500`. So is a `CarbonBalance` whose `case_id`, `field_id` or `rotation_id`
+differs from the forcing, or whose `carbon_model` is not `amg`: the forcing is
+the runner's own, so the mismatch is the engine's (`check_balance`). That includes
 a built engine that returns the not-built form of its own part: D12 allows
 that form only for an engine that is not built.
 
@@ -364,7 +373,8 @@ that form only for an engine that is not built.
   would be ignored). The runner passes the same object, by keyword, on every
   call; it does not copy it per request, and it does not check it again: the
   check is the one of start-up.
-- **Always passed:** EP1 and EP3 get `parameters=` by keyword on every call,
+- **Always passed:** EP1, EP3 and EP5 get `parameters=` by keyword on every
+  call (EP5 since unit `l2/runner-amg`, D65),
   as `contracts/ENTRYPOINTS.md` states (decided by the platform developer
   once both engines take it; unit `l2/runner-always-parameters`). The runner
   reads no signature and does not adapt: an engine function that does not
@@ -377,7 +387,7 @@ that form only for an engine that is not built.
 |---|---|---|
 | `soil_loss` | What EP1 returns, unchanged | `SoilLossNotBuilt`, reason `NOT_AVAILABLE` |
 | `water_deficit_exposure` | What EP3 returns, unchanged | `WaterDeficitExposureNotBuilt`, reason `NOT_AVAILABLE` |
-| `soil_carbon_trend` | (no carbon engine exists) | The six missing rows (`amg`, `rothc`, three computations each, `NOT_AVAILABLE`), not `SoilCarbonTrendNotBuilt`: the rows say which models are absent (platform developer, on #100) |
+| `soil_carbon_trend` | `amg`: the three rows of the `CarbonBalance` of EP5, unchanged (mapping below); `rothc` stays missing | The six missing rows (`amg`, `rothc`, three computations each, `NOT_AVAILABLE`), not `SoilCarbonTrendNotBuilt`: the rows say which models are absent (platform developer, on #100) |
 
 `part_not_built(model, entry point)` builds the part only through the
 contract: the indicator from the model's own field, the direction and units
@@ -408,13 +418,63 @@ OPEN).
 | EP1 or EP3 not built, or both (a built one is still called) | `ResultsPerRotation` with that part in the not-built form (D12) | `null` | that module `not_available` / `NOT_AVAILABLE`; the other from its output |
 | EP1 returns a bare `Missing` (Q4), whether EP3 is built or not | `None` | its reason and detail, copied | `erosion` `not_available` with that reason and detail |
 | No carbon model identifier configured (an explicit `carbon_models=()`; not the app's default) | `None` | `NOT_AVAILABLE`, detail says the carbon model identifiers are not configured | `residues`, `amg`, `rothc` `not_available` / `NOT_AVAILABLE` |
-| Carbon model identifiers configured (the app's default `amg`, `rothc`; no carbon engine is built, always true today) | `ResultsPerRotation` | `null` | For each identifier, the three computations of C1.6 as missing `SoilCarbonTrend` items, reason `NOT_AVAILABLE`, with the identifier, direction and unit of `contracts/results/models.py` (C3.1). `residues`, `amg`, `rothc` `not_available` / `NOT_AVAILABLE` |
+| Carbon model identifiers configured, EP5 not built | `ResultsPerRotation` | `null` | For each identifier, the three computations of C1.6 as missing `SoilCarbonTrend` items, reason `NOT_AVAILABLE`, detail "no carbon engine is built yet", with the identifier, direction and unit of `contracts/results/models.py` (C3.1). `residues`, `amg`, `rothc` `not_available` / `NOT_AVAILABLE`, the same detail (the answer before EP5 existed, unchanged) |
+| EP5 built, the forcing cannot be laid out (no start month, no daily series, no whole agricultural year in the record) | `ResultsPerRotation` | `null` | EP5 is not called. The three `amg` rows missing with the reason of the producer (`MISSING_INPUT` or `NO_COVERAGE`); `amg` `not_available` with it. `rothc` rows missing `NOT_AVAILABLE`, detail naming `engine.rothc.run_rothc` |
+| EP5 built and called | `ResultsPerRotation` | `null` | The three `amg` rows of the balance, unchanged; `amg` state from their counts (`available`, `degraded` or `not_available`, as every module). `rothc` rows missing `NOT_AVAILABLE`, detail naming `engine.rothc.run_rothc`; `residues` and `rothc` `not_available` / `NOT_AVAILABLE`, detail naming their engine function |
+
+With EP5 built, it is not called whenever EP1 and EP3 are not (EP2 not built,
+an input absent, site data of another field): `amg` is then `not_available` /
+`MISSING_INPUT` with the same detail as `erosion` and `water`, and the
+`residues` and `rothc` details name their engine function.
 
 **Precedence rule (PROPOSED):** a module whose function is not built is
 `not_available` / `NOT_AVAILABLE` whatever else is absent; `MISSING_INPUT` is
 written only for a module that is built and was not called because an input
 is missing. So in the default app (nothing built) every module is
 `NOT_AVAILABLE`.
+
+### The producer of `CarbonForcing` (`api/carbon_forcing.py`, PROPOSED)
+
+`build_carbon_forcing(calendar, climate, soil_slope) -> CarbonForcing | Missing`
+builds the one forcing of one rotation (L2a is the producer of the contract,
+#155, D62) from what the runner already holds. It computes nothing
+scientific: no aggregation, no unit conversion, no gap filling, no number of
+its own. Every quantity whose definition, aggregation or source is not
+decided is missing with its reason, never zero. It reads no file, calls no
+network and never imports `engine/`; the identifiers below are those
+`engine/amg/entry.py` reads (`FORCING_QUANTITIES`), and
+`api/test_carbon_forcing.py` checks them against the engine when it is
+importable. Every row is PROPOSED (platform developer, issue #18).
+
+| Part | Value |
+|---|---|
+| `contract`, `example_data` | `"carbon_forcing"`; `example_data` true if the calendar, the climate or the soil and slope says so |
+| `case_id`, `field_id`, `rotation_id` | From the calendar (the runner has already compared climate and soil with it, D14) |
+| `horizon` | The whole agricultural years of the climate record (D47, D29), cut by the calendar's start month (`ag_year_start`): from the first month of the first whole agricultural year to the last month of the last one (C5.3, C5.5). The record's period is read from the document: the days every daily series covers (latest `start_date`, earliest `end_date`); monthly series are not read |
+| `soil_depth` | Missing `NOT_AVAILABLE`, unit `OPEN`, detail naming C1.6 (depth OPEN) |
+| `annual_climate` | `mean_temperature` and `water_balance`, one item per agricultural year of the horizon, every year missing `NOT_AVAILABLE`: the yearly aggregation of the daily mean temperature (D30) is not decided (contracts/carbon_forcing/README.md OPEN 7); `water_balance` is not defined (asked on #18). Unit `OPEN`: `engine/amg/entry.py` states none for either (it compares them with the units of its parameter records) |
+| `annual_carbon_inputs` | One series per crop of the calendar, once each in order of first appearance, `origin` and `quantity` both the `crop_id` (`run_amg` looks the humification coefficient up under scope key `crop` = `origin`, `ORIGIN_SCOPE_KEY`). Every year missing `NOT_AVAILABLE`: the residue ledger (EP4) is not built. Unit `t C ha-1`, the unit `run_amg` requires (`STOCK_UNIT`, derived from C1.5 as the engine derives it). A `crop_id` that is not a quantity identifier (`^[a-z][a-z0-9_]*$`) is left out, never renamed. Why series and not an empty list: with no series `run_amg` answers `NOT_COMPUTABLE` ("no origin") for the humified input; with all-missing series it answers `MISSING_INPUT` naming the reason, the residue ledger |
+| `soil_properties` | `clay_content`, `carbonate_content`, `ph`: copied from `SiteSoilSlope.soil_properties` only if an item with exactly that `quantity` is there (never converted, never renamed); otherwise missing `NOT_AVAILABLE`, unit `OPEN`, detail: no source decided (asked on #18) |
+| `starting_state` | `soil_organic_carbon`, missing `NOT_AVAILABLE`, unit `t C ha-1`, detail: no value or source decided (asked on #18) |
+| `climate`, `carbon_inputs`, `soil_cover` | Empty lists: `run_amg` (AMG-A, D80) reads annual series only |
+| Series headers | All-missing series carry no `provenance`, `source` or `range_missing` (the contract's rule) |
+
+No forcing is built, and EP5 is not called, when the calendar has no start
+month (`MISSING_INPUT`, naming `ag_year_start` and its reason), when the
+climate document has no daily series (`MISSING_INPUT`), or when the record
+covers no whole agricultural year (`NO_COVERAGE`, C5.5).
+
+### From a `CarbonBalance` to `soil_carbon_trend` (PROPOSED)
+
+`carbon_trend(carbon_models, amg_rows)`: model by model, in the configured
+order, three rows each. For `amg`, the three `soil_carbon_trend` items of the
+balance EP5 returned, unchanged (or the three missing rows when EP5 was not
+called). For `rothc`, three missing rows `NOT_AVAILABLE`, detail "the module
+is not built yet: engine.rothc.run_rothc". Values of the two models are
+never merged (C1.5). The balance itself (stocks and flows by year) is not in
+the response (OPEN below). Issue #208 (lane L0) proposes the mapping in
+`contracts/ENTRYPOINTS.md`; no pull request of it existed when this was
+written, so this mapping is the platform lane's proposal for it.
 
 ### Module states (PROPOSED)
 
@@ -493,6 +553,16 @@ result and not both zero with one (checked at construction).
   is `no_result` in the test, because the PLACEHOLDER water output holds no
   present value and no number is written in a test to change that.
 
+- Unit `l2/runner-amg`: EP5 in discovery and in the call order; the producer
+  `api/carbon_forcing.py` and every row of its table (the record period as
+  the days every daily series covers, the horizon, the identifiers, the unit
+  `OPEN`, one carbon-input series per crop with the crop as `origin` and
+  `quantity`, a crop that is not an identifier left out, the detail texts);
+  `check_balance`; the mapping `carbon_trend`; the rows of the absence table
+  for EP5; the details of `residues` and `rothc` once EP5 is built; the test
+  cases of `api/test_carbon_forcing.py` and section 15 of
+  `api/test_engines.py`.
+
 - Unit `l2/soil-tables`: the variables `SOIL_TABLE_FILES` and
   `SOIL_GROUPS_FILE` (both or neither), `SoilTablesConfig`,
   `AppConfig.soil_tables`, the `ConfigError` for the example and the tables
@@ -525,6 +595,32 @@ here.
 | D46, D56 (Q3 of `contracts/ENTRYPOINTS.md`) | The runner loads the parameter catalogue and passes it to EP1 and EP3 as the keyword argument `parameters`; EP2 does not change; a parameter not in the catalogue is the engine's `MISSING_INPUT` (unit `l2/runner-parameters`). What the runner does when the catalogue has a problem, left to the platform developer by Q3: start-up fails (PROPOSED above). Replaces the OPEN "D46, the argument `parameters`" |
 
 ## OPEN
+
+- **The inputs of AMG (asked on #18).** Until they are answered, AMG runs and
+  its values are missing with their reason:
+  - the definition of `water_balance` (which water balance, which unit);
+  - the source of `clay_content`, `carbonate_content` and `ph`, and their units;
+  - the value or source of the starting soil organic carbon (`starting_state`);
+  - the residue ledger (EP4, `engine/residues/`), which the carbon inputs
+    come from, and the vocabulary of `origin` and of the carbon-input
+    quantities (Q14 (b));
+  - the yearly aggregation of the daily mean air temperature (D30; OPEN 7 of
+    `contracts/carbon_forcing/README.md`), and what a year with missing days
+    becomes.
+  For the lead developer and the science reviewers.
+- **The soil depth and its unit** (C1.6), for the science reviewers.
+- **Whether the forcing horizon must equal the agricultural years of the
+  record** (OPEN 3 of `contracts/carbon_forcing/README.md`); proposed here:
+  yes.
+- **Expose the `CarbonBalance` (stocks and flows by year) to the interface.**
+  Not in the response of this unit, to keep its shape. For the platform
+  developer and the interface developer.
+- **RothC (EP6, `engine.rothc.run_rothc`)**: discovered and called on the same
+  forcing once it exists, in a later unit of this lane.
+- **The chain test of lane L0 compares the route with a runner without EP5.**
+  `validation/test_chain_examples.py` CH07 builds `EngineFunctions` with EP2,
+  EP1 and EP3 only, while the route discovers EP5 too, so the `amg` rows
+  differ. Lane L0 adds `run_amg=found.run_amg` to its `run_chain`.
 
 - **With an input absent and no engine built, should the route already
   answer with three not-built parts** (the form of
