@@ -2,7 +2,7 @@
 
 What to type, in order, and what you should see: clone, install, run the tests, start the backend without Docker, send the example rotation, read the answer, build and open the interface.
 
-**Checked against commit `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9` of `main`, on 15 November 2026.** Every command below was run, in this order, in a fresh `git clone` of the public repository at that commit, and every output shown is the output seen then. A second fresh clone, made later that day at `2e5caf99086080a36a13d5972b493708258393a9` (which changes only documentation files after `3ced36f`), was taken through this page from top to bottom and gave the same outputs. The module states of steps 7 and 8 were checked again at commit `f060a09` (15 November 2026), by sending the same request to the backend in process in configurations A and B: since the runner calls RothC, `rothc` answers like the other engines, and the tables below show that. `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
+**Checked against commit `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` of `main`, on 15 November 2026.** The full test suite, the contract suite, the frontend tests and build, and the module states of steps 7 and 8 (in process in configurations A and B) were re-run and checked at `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730`; the interactive clone-to-browser walk was originally run in order in fresh clones at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9` and `2e5caf99086080a36a13d5972b493708258393a9` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
 
 The commands are written for a POSIX shell (bash); the `NAME=value command` form sets a variable for one command. They come from `CLAUDE.md`, `api/README.md`, `web/README.md` and `.github/workflows/ci.yml`.
 
@@ -40,10 +40,10 @@ uv run pytest
 At the checked commit, on a machine where the Docker command is installed but Docker itself was not running, the last line read:
 
 ```text
-1 failed, 4763 passed, 17 skipped, 7 warnings
+1 failed, 6545 passed, 16 skipped, 3 xfailed
 ```
 
-The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (the skipped count can go down as well as up). What you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). The run took between ten and twenty minutes on the machines it was run on; how long depends on the machine.
+The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (the skipped count can go down as well as up, and the `xfailed` items are open tests marked expected failure). What you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine"). The run took about seven minutes at the checked commit (and between ten and twenty minutes on earlier machines); how long depends on the machine.
 
 The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml`):
 
@@ -51,10 +51,10 @@ The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml
 uv run pytest contracts/
 ```
 
-At the checked commit the last line read (it also grows with new tests; what matters is no failure):
+At the checked commit the last line read (it also grows with new tests; what matters is no failure, and the `xfailed` item is an open contract test):
 
 ```text
-930 passed, 1 warning
+1465 passed, 1 xfailed
 ```
 
 ## 4. Start the backend (no Docker)
@@ -86,7 +86,7 @@ curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:800
 200
 ```
 
-The body of `GET /health` is `{"status":"ok"}`. The interactive page of the backend, `http://localhost:8000/docs`, opens and lists the routes of the backend, among them the two this page uses: `GET /health` and `POST /api/rotations/run`.
+The body of `GET /health` is `{"status":"ok"}`. The interactive page of the backend, `http://localhost:8000/docs`, opens and lists the product routes of the backend, including `GET /health`, `POST /api/rotations/run`, `POST /api/decisions/run` (PROPOSED), and `POST /api/plant/run` (PROPOSED).
 
 ## 5. Build the interface
 
@@ -102,7 +102,7 @@ npm run build
 Seen at the checked commit:
 
 - `npm ci` ends with `found 0 vulnerabilities`;
-- `npm test`: `Test Files  14 passed (14)`, `Tests  170 passed (170)`;
+- `npm test`: `Test Files  22 passed (22)`, `Tests  404 passed (404)`;
 - `npm run build` writes `dist/` and ends with `✓ built in` and a time.
 
 ## 6. Open the interface and send the example rotation
@@ -131,11 +131,11 @@ no_result
 Illustrative rotation: missing input: input not available: climate (site data: climate); soil_slope (site data: soil and slope)
 ```
 
-Everything else on the Fields screen (Site data, Rotation timeline, Two clocks, Results, Decision) is **example data written by hand**, labelled "Example data — synthetic, not a real field" on screen. It is not the answer of your backend; only the lines under the button are.
+Everything else on the Fields screen (Site data, Rotation timeline, Two clocks, Results) is **example data written by hand**, labelled "Example data — synthetic, not a real field" on screen. On `North field` (`example-field-1`), **Decision** automatically posts `web/src/data/demo_rotations_d128.json` to `POST /api/decisions/run`: in Configurations A and B (no climate source), the backend answers without a decision, so Decision shows the backend's missing-input reason above the example banner and renders the hand-written example beneath `"Example data — synthetic, not a real field"`.
 
 ## 7. Read the answer
 
-The backend answered HTTP `200` with a JSON body. To see it, open the browser's developer tools (F12 in most browsers), go to the **Network** tab, press the button of step 6 again, and select the request named `run` (a `POST`; an `OPTIONS` request of the same name may come first); its response is the JSON. The parts that matter:
+The backend answered HTTP `200` with a JSON body. To see it, open the browser's developer tools (F12 in most browsers), go to the **Network** tab, press the button of step 6 again, and select the `POST /api/rotations/run` request triggered by the button (it appears as `run` alongside the automatic `POST /api/decisions/run` request of the Decision section, and an `OPTIONS` preflight of the same name may come first); its response is the JSON. The parts that matter:
 
 | Field | Value seen |
 |---|---|
