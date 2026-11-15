@@ -16,7 +16,11 @@ the daily maximum and minimum); and the monthly ``climate`` of RothC of D220:
 reference evapotranspiration, which stands in for the potential
 evapotranspiration (D80); and ``mean_temperature``, the mean over the month
 of the daily means of D30. A month with any day missing is missing with its
-reason (C3.3, C3.4). ``soil_depth`` is the 20 cm of D180. Soil properties and the starting carbon are
+reason (C3.3, C3.4). The yearly ``water_balance`` of AMG is that of D181: the
+sum over the agricultural year of the daily ``precipitation`` minus the sum of
+the daily reference evapotranspiration, which stands in for the Penman (1948)
+PET of the source, with no irrigation (IW = 0), in m; a year with any day
+missing is missing with its reason. ``soil_depth`` is the 20 cm of D180. Soil properties and the starting carbon are
 copied unchanged from ``SiteSoilSlope`` when present (D120, D121). Every
 quantity whose definition, aggregation or source is not decided, or not yet
 usable, is written missing with its reason, never zero (C3.1). The identifiers of the quantities
@@ -103,6 +107,23 @@ STOCK_UNIT = UNIT_SOIL_CARBON_TREND.removesuffix(" yr-1")
 DAILY_DEPTH_UNIT = "mm day-1"
 MONTHLY_DEPTH_UNIT = "mm"
 
+# --- D181: the annual water balance of AMG ----------------------------------------
+
+# D181 of #77: "P + IW − ET0, each summed over the agricultural year, with ET0
+# of FAO-56 (D44) declared as a substitute for the Penman (1948) PET; IW = 0
+# (rainfed rotations); in m (mm / 1000)." IW = 0 adds nothing, so no
+# irrigation term is read. The unit is the one D181 writes; engine/amg
+# compares it with the unit of amg_moisture_sensitivity (``m-1``).
+WATER_BALANCE_UNIT = "m"
+# Millimetres in one metre, by the SI definition of the prefixes: the
+# conversion D181 states ("mm / 1000"). A definition, not a value of the method.
+MM_PER_M = 1000
+# D181 of #77 quotes the range of P − PET over which the source calibrated AMG,
+# "−290 to 595 mm yr-1 (p. 107)" (Clivot et al. 2019), and says that outside it
+# the sensitivity is not known and is stated. The values of a decision, written
+# as decided; they only label a year in the source text, never change its number.
+D181_CALIBRATED_RANGE_MM = (-290.0, 595.0)
+
 # --- D180: the soil depth --------------------------------------------------------
 
 # D180 of #77: "`soil_depth` = 20 cm, the carbon benchmark depth of D71,
@@ -122,11 +143,10 @@ PET_NOT_PASSED = (
     "potential_evapotranspiration (D220 of #77) is the monthly sum of the daily "
     "FAO-56 reference evapotranspiration of D44, which the runner did not pass"
 )
-WATER_BALANCE_OPEN = (
-    "water_balance (D119 of #77: precipitation minus the FAO-56 reference "
-    "evapotranspiration, each summed over the agricultural year) is not written: "
-    "D119 waits for a science reviewer to check it against the AMG description, "
-    "and no reference evapotranspiration series reaches the producer"
+WATER_BALANCE_NO_ET0 = (
+    "water_balance (D181 of #77: precipitation minus the FAO-56 reference "
+    "evapotranspiration of D44, each summed over the agricultural year, in m) "
+    "needs the daily reference evapotranspiration, which the runner did not pass"
 )
 CARBON_INPUTS_OPEN = (
     "the residue ledger (EP4, engine/residues/) is not built (D122 of #77)"
@@ -553,6 +573,26 @@ def _monthly_rainfall(
     )
 
 
+def _reference_evapotranspiration_by_day(
+    reference_evapotranspiration: Mapping[
+        dt.date, float | InputMissing | ResultsMissing
+    ],
+) -> dict[dt.date, DayValue]:
+    """The days of the runner's daily reference evapotranspiration: the
+    number, or why it is missing."""
+    by_day: dict[dt.date, DayValue] = {}
+    for day, value in reference_evapotranspiration.items():
+        if isinstance(value, InputMissing | ResultsMissing):
+            by_day[day] = _missing(
+                value.reason,
+                "the reference evapotranspiration of the day is missing"
+                + (f": {value.detail}" if value.detail else ""),
+            )
+        else:
+            by_day[day] = float(value)
+    return by_day
+
+
 def _monthly_potential_evapotranspiration(
     reference_evapotranspiration: ReferenceEvapotranspiration,
     months: list[tuple[int, int]],
@@ -580,21 +620,11 @@ def _monthly_potential_evapotranspiration(
                 + (f": {given.detail}" if given.detail else ""),
             ),
         )
-    by_day: dict[dt.date, DayValue] = {}
-    for day, value in reference_evapotranspiration.items():
-        if isinstance(value, InputMissing | ResultsMissing):
-            by_day[day] = _missing(
-                value.reason,
-                "the reference evapotranspiration of the day is missing"
-                + (f": {value.detail}" if value.detail else ""),
-            )
-        else:
-            by_day[day] = float(value)
     return _by_month(
         POTENTIAL_EVAPOTRANSPIRATION,
         MONTHLY_DEPTH_UNIT,
         months,
-        by_day,
+        _reference_evapotranspiration_by_day(reference_evapotranspiration),
         "the daily FAO-56 reference evapotranspiration (D44)",
         math.fsum,
         {
@@ -671,6 +701,143 @@ def _monthly_mean_temperature(
             "assumption": high.assumption or low.assumption,
             "range_missing": _range_missing([high, low]),
         },
+    )
+
+
+def _annual_water_balance(
+    climate: SiteClimate,
+    start_month: int,
+    years: tuple[int, int],
+    reference_evapotranspiration: ReferenceEvapotranspiration,
+) -> AnnualSeries:
+    """D181: (Σ daily precipitation − Σ daily FAO-56 ET0) / 1000 over each
+    agricultural year, in m, with IW = 0.
+
+    The precipitation is the daily series ``precipitation`` (CQ1, D23) that
+    EP1 and EP3 read; the ET0 is the runner's daily FAO-56 reference
+    evapotranspiration of D44. A year with a day absent from either is
+    ``NO_COVERAGE``, a day held missing keeps its reason; the year is never
+    filled or partly summed (C3.3, C3.4). A year outside the range of P − PET
+    the source calibrated keeps its number; the source text names it.
+    """
+
+    def every_year(reason: str, detail: str) -> AnnualSeries:
+        return AnnualSeries(
+            **_all_missing(
+                WATER_BALANCE, WATER_BALANCE_UNIT, years, _missing(reason, detail)
+            )
+        )
+
+    found = {series.quantity: series for series in climate.daily_series}
+    series = found.get(PRECIPITATION)
+    if series is None:
+        return every_year(
+            "MISSING_INPUT",
+            f"water_balance (D181) needs the daily series {PRECIPITATION!r} of site "
+            "data: climate, which it does not carry",
+        )
+    if series.unit != DAILY_DEPTH_UNIT:
+        return every_year(
+            "NOT_COMPUTABLE",
+            f"water_balance (D181): the daily series {PRECIPITATION!r} is in "
+            f"{series.unit!r}, not {DAILY_DEPTH_UNIT!r}; nothing is converted",
+        )
+    if reference_evapotranspiration is None:
+        return every_year("NOT_AVAILABLE", WATER_BALANCE_NO_ET0)
+    if isinstance(reference_evapotranspiration, InputMissing | ResultsMissing):
+        given = reference_evapotranspiration
+        return every_year(
+            given.reason,
+            "water_balance (D181): the daily FAO-56 reference evapotranspiration "
+            "of D44 could not be computed"
+            + (f": {given.detail}" if given.detail else ""),
+        )
+    inputs = (
+        (f"the daily series {PRECIPITATION!r}", _daily_values(series)),
+        (
+            "the daily FAO-56 reference evapotranspiration (D44)",
+            _reference_evapotranspiration_by_day(reference_evapotranspiration),
+        ),
+    )
+    low, high = D181_CALIBRATED_RANGE_MM
+    items: list[AnnualValue] = []
+    outside: list[int] = []
+    for year in range(years[0], years[1] + 1):
+        first = dt.date(year, start_month, 1)
+        after = dt.date(year + 1, start_month, 1)
+        days = [first + dt.timedelta(days=n) for n in range((after - first).days)]
+        sums: list[float] = []
+        gap: InputMissing | None = None
+        for what, by_day in inputs:
+            values: list[float] = []
+            for day in days:
+                value = by_day.get(day)
+                if value is None:
+                    gap = _missing(
+                        "NO_COVERAGE",
+                        f"water_balance (D181): {what} has no item for {day.isoformat()}",
+                    )
+                    break
+                if isinstance(value, InputMissing):
+                    gap = _missing(
+                        value.reason,
+                        f"water_balance (D181): {what} is missing on {day.isoformat()}"
+                        + (f" ({value.detail})" if value.detail else "")
+                        + "; a year with a missing day is not filled (C3.3, C3.4)",
+                    )
+                    break
+                values.append(value)
+            if gap is not None:
+                break
+            sums.append(math.fsum(values))
+        if gap is not None:
+            items.append(AnnualValue(ag_year=year, value=None, missing=gap))
+            continue
+        precipitation, evapotranspiration = sums
+        depth = precipitation - evapotranspiration  # mm over the year; IW = 0
+        if not low <= depth <= high:
+            outside.append(year)
+        items.append(AnnualValue(ag_year=year, value=depth / MM_PER_M))
+
+    header: dict = {}
+    if any(item.value is not None for item in items):
+        calibrated = (
+            f"The source calibrated AMG for P - PET from {low:g} to {high:g} mm yr-1 "
+            "(Clivot et al. 2019, p. 107; D181): outside that range its sensitivity "
+            "is not known. "
+            + (
+                "Outside the calibrated range, kept as computed: agricultural "
+                f"year(s) {', '.join(str(year) for year in outside)}"
+                if outside
+                else "Every year with a value lies inside that range"
+            )
+        )
+        header = {
+            "provenance": "DERIVED",  # C4.3: a fixed formula of other values
+            "source": (
+                "derived by api.carbon_forcing: D181 of #77, P + IW - ET0 over each "
+                "agricultural year: the sum of the daily "
+                f"{PRECIPITATION} (CQ1, D23) minus the sum of the daily FAO-56 "
+                "Penman-Monteith reference evapotranspiration of D44 (eq. 6), which "
+                "stands in for the Penman (1948) potential evapotranspiration of the "
+                "source: a declared adaptation; IW = 0 (rainfed rotations); mm "
+                f"divided by {MM_PER_M} to m. "
+                + calibrated
+                + (f". Input series: {series.source}" if series.source else "")
+            ),
+            "assumption": series.assumption,
+            "range_missing": _missing(
+                "NOT_AVAILABLE",
+                "no range is derived for the water balance (C2.2)",
+            ),
+        }
+    return AnnualSeries(
+        quantity=WATER_BALANCE,
+        unit=WATER_BALANCE_UNIT,
+        first_ag_year=years[0],
+        last_ag_year=years[1],
+        years=items,
+        **header,
     )
 
 
@@ -912,13 +1079,8 @@ def build_carbon_forcing(
         carbon_inputs=monthly_carbon_input_series(horizon, monthly_carbon_inputs),
         annual_climate=[
             _annual_mean_temperature(climate, start.month, years),
-            AnnualSeries(
-                **_all_missing(
-                    WATER_BALANCE,
-                    UNIT_OPEN,
-                    years,
-                    _missing("NOT_AVAILABLE", WATER_BALANCE_OPEN),
-                )
+            _annual_water_balance(
+                climate, start.month, years, reference_evapotranspiration
             ),
         ],
         annual_carbon_inputs=annual_carbon_inputs,
