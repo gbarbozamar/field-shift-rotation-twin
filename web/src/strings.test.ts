@@ -129,6 +129,19 @@ const WORDING_SHEET: Record<string, string> = {
   'cards.availability': 'Availability',
   'cards.model_label': 'Model: {model}',
   'cards.computation_label': 'Computation: {computation}',
+  'decision.title': 'Decision',
+  'decision.pairs': 'Rotation pairs',
+  'decision.pair_of': '{first} against {second}',
+  'decision.state': 'State',
+  'decision.counts': 'Counts',
+  'decision.counts_by_point': 'By point value',
+  'decision.counts_by_range': 'By range',
+  'decision.better': 'Better',
+  'decision.worse': 'Worse',
+  'decision.equal': 'Equal',
+  'decision.missing_side': 'Missing side',
+  'decision.coverage': '{k} of {n} cells compared',
+  'decision.years_within': 'Years within the limit: {min} to {max}, minimum at {scenario}',
 }
 
 /** Source of the shell page as it was before the strings unit. */
