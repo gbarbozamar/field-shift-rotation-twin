@@ -312,6 +312,35 @@ describe('PlantScreen: a missing value shows its reason, never 0 (4)', () => {
   })
 })
 
+describe('PlantScreen: the sources and the price (code review fixes)', () => {
+  it('shows the attribution of the ONI record from the example data', () => {
+    const oni = rawExample.sources.find((s) => s.id === 'oni_v6')!
+    expect(oni.attribution).not.toBeNull()
+    const text = visibleText(render())
+    expect(text).toContain(
+      formatString(strings['plant.source.attribution'], { attribution: oni.attribution! }),
+    )
+  })
+
+  it('shows an unavailable source with its reason', () => {
+    const raw = JSON.parse(JSON.stringify(rawExample))
+    raw.sources[0].state = 'unavailable'
+    raw.sources[0].missing_reason = 'SOURCE_UNAVAILABLE'
+    const set = parsePlantAnswers({ example_data: true, answers: [raw] })
+    const source = visibleText(section(render(set), 'plant-source'))
+    expect(source).toContain(
+      missingPatternText(raw.sources[0].id, { reason: 'SOURCE_UNAVAILABLE', detail: raw.sources[0].detail }),
+    )
+  })
+
+  it("renders with no price looked at as the answer at the price of today, never a crash", () => {
+    const html = renderToString(
+      <PlantView set={plantExamples} strictness="on_average" marginOf="average" price={null} />,
+    )
+    expect(visibleText(section(html, 'plant-price-answer'))).toContain(strings['plant.price.today'])
+  })
+})
+
 describe('PlantScreen: the route #/plant', () => {
   afterEach(() => {
     vi.unstubAllGlobals()

@@ -35,7 +35,14 @@ import type { MissingPart, ReasonCode } from '../components/ValueDisplay'
  * limit, a limit check that is not the check of the strictness used, a limit
  * check that is not resolved without its reason and detail, a missing limit
  * cost without its reason and detail, tied rotations fewer than two or not
- * all in state meets, a tipping point with a price and a reason together. Pure: value in, typed answer out, or an Error with a technical
+ * all in state meets, a costs_nothing that is not a flag, the rules of
+ * TippingPointOut (a missing tipping price carries only a reason and its
+ * detail; a reason travels with its detail; a present price with its answer
+ * after and its distance or the distance's reason) and of TippingPriceOut (a
+ * shared reason on both points, today's price inside the range unless a
+ * reason is shared, the tipping prices inside the range, up at or above
+ * today, down at or below today, the sign of each distance), and a source of
+ * an unknown state or unavailable without its missing_reason. Pure: value in, typed answer out, or an Error with a technical
  * code (no wording; nothing user-visible lives here).
  */
 
@@ -121,7 +128,20 @@ export interface PlantAnswer {
   options: PlantOption[]
   limit_cost: LimitCost
   tipping_price: TippingPrice
-  sources: { id: string; detail: string | null }[]
+  sources: PlantSource[]
+}
+
+export type SourceState = 'fresh' | 'cached' | 'unavailable' | 'example'
+const SOURCE_STATES: readonly SourceState[] = ['fresh', 'cached', 'unavailable', 'example']
+
+/** One source of the answer, the parts of SourceOut the screen renders. */
+export interface PlantSource {
+  id: string
+  state: SourceState
+  attribution: string | null
+  /** Set exactly when the state is unavailable (SourceOut requires it then). */
+  missing_reason: ReasonCode | null
+  detail: string | null
 }
 
 export interface PlantAnswerSet {
@@ -306,6 +326,10 @@ function option(value: unknown, what: string, strictness: Strictness): PlantOpti
 
 function limitCost(value: unknown, what: string): LimitCost {
   const item = record(value, what)
+  // As LimitCostOut: costs_nothing is a boolean.
+  if (typeof item.costs_nothing !== 'boolean') {
+    throw new Error(`${what}:costs-nothing-not-a-flag`)
+  }
   if (item.value !== null) {
     if (!isFiniteNumber(item.value)) {
       throw new Error(`${what}:value-not-a-number`)
@@ -356,9 +380,22 @@ function tippingPoint(value: unknown, what: string, direction: 'up' | 'down'): T
   if (!isNonEmptyString(item.unit)) {
     throw new Error(`${what}:unit-empty`)
   }
+  const hasReason = item.reason !== null && item.reason !== undefined
+  const hasDetail = item.detail !== null && item.detail !== undefined
   if (item.price === null) {
-    if (item.reason === null || item.reason === undefined) {
+    if (!hasReason) {
       throw new Error(`${what}:missing-without-a-reason`)
+    }
+    // As TippingPointOut: a missing tipping price carries only a reason and a detail.
+    if (
+      (item.takes_over !== null && item.takes_over !== undefined) ||
+      (item.answer_after !== null && item.answer_after !== undefined) ||
+      (item.distance_percent !== null && item.distance_percent !== undefined)
+    ) {
+      throw new Error(`${what}:missing-price-with-an-answer`)
+    }
+    if (!hasDetail) {
+      throw new Error(`${what}:reason-without-its-detail`)
     }
     return {
       direction,
@@ -386,8 +423,12 @@ function tippingPoint(value: unknown, what: string, direction: 'up' | 'down'): T
     if (item.reason !== null && item.reason !== undefined) {
       throw new Error(`${what}:value-with-a-reason`)
     }
-  } else if (item.reason === null || item.reason === undefined) {
+  } else if (!hasReason) {
     throw new Error(`${what}:missing-distance-without-a-reason`)
+  }
+  // As TippingPointOut: a reason travels with its detail.
+  if (hasReason !== hasDetail) {
+    throw new Error(`${what}:reason-without-its-detail`)
   }
   return {
     direction,
@@ -407,25 +448,68 @@ function tippingPrice(value: unknown, what: string): TippingPrice {
   if (!isFiniteNumber(range.low) || !isFiniteNumber(range.high) || !(range.low < range.high)) {
     throw new Error(`${what}:price-range-not-low-below-high`)
   }
+  // As PriceRange: a price is not negative.
+  if (range.low < 0 || range.high < 0) {
+    throw new Error(`${what}:price-range-negative`)
+  }
   if (!isNonEmptyString(item.unit)) {
     throw new Error(`${what}:unit-empty`)
   }
+  if (item.today !== null && !isFiniteNumber(item.today)) {
+    throw new Error(`${what}:today-not-a-number`)
+  }
+  const today = item.today as number | null
   const shared = item.reason !== null && item.reason !== undefined
-  if (item.today !== null) {
-    if (!isFiniteNumber(item.today)) {
-      throw new Error(`${what}:today-not-a-number`)
+  // As TippingPriceOut: a reason travels with its detail.
+  if (shared !== (item.detail !== null && item.detail !== undefined)) {
+    throw new Error(`${what}:reason-without-its-detail`)
+  }
+  const up = tippingPoint(item.up, `${what}:up`, 'up')
+  const down = tippingPoint(item.down, `${what}:down`, 'down')
+  const missing = shared ? missingPart(item.reason, item.detail, what) : null
+  // The rules of TippingPriceOut, in its order.
+  if (missing !== null) {
+    // A shared cause: both points missing with it.
+    for (const point of [up, down]) {
+      if (
+        point.price !== null ||
+        point.missing.reason !== missing.reason ||
+        point.missing.detail !== missing.detail
+      ) {
+        throw new Error(`${what}:shared-reason-not-on-both-points`)
+      }
     }
-  } else if (!shared) {
+  } else if (today === null) {
     throw new Error(`${what}:today-missing-without-a-reason`)
+  } else if (!(range.low <= today && today <= range.high)) {
+    throw new Error(`${what}:today-outside-the-range-without-a-reason`)
+  }
+  for (const point of [up, down]) {
+    if (point.price !== null && !(range.low <= point.price && point.price <= range.high)) {
+      throw new Error(`${what}:tipping-price-outside-the-range`)
+    }
+  }
+  if (today !== null) {
+    if (up.price !== null && up.price < today) {
+      throw new Error(`${what}:up-price-below-today`)
+    }
+    if (down.price !== null && down.price > today) {
+      throw new Error(`${what}:down-price-above-today`)
+    }
+  }
+  const upDistance = up.price !== null ? up.distance_percent : null
+  const downDistance = down.price !== null ? down.distance_percent : null
+  if ((upDistance !== null && upDistance < 0) || (downDistance !== null && downDistance > 0)) {
+    throw new Error(`${what}:distance-of-the-wrong-sign`)
   }
   return {
-    today: item.today as number | null,
+    today,
     unit: item.unit,
     low: range.low,
     high: range.high,
-    up: tippingPoint(item.up, `${what}:up`, 'up'),
-    down: tippingPoint(item.down, `${what}:down`, 'down'),
-    missing: shared ? missingPart(item.reason, item.detail, what) : null,
+    up,
+    down,
+    missing,
   }
 }
 
@@ -477,8 +561,13 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
   if (new Set(ids).size !== ids.length) {
     throw new Error(`${what}:options-share-a-rotation-id`)
   }
-  const inStateChosen = options.filter((o) => o.state === 'chosen').map((o) => o.rotation_id)
-  if (inStateChosen.join('\n') !== (isChosen ? String(item.chosen) : '')) {
+  // As PlantAnswer: exactly one option in state chosen when the answer is
+  // chosen, and it is the chosen rotation; none otherwise.
+  const inStateChosen = options.filter((o) => o.state === 'chosen')
+  const chosenStateWrong = isChosen
+    ? inStateChosen.length !== 1 || inStateChosen[0].rotation_id !== item.chosen
+    : inStateChosen.length !== 0
+  if (chosenStateWrong) {
     throw new Error(`${what}:state-chosen-not-on-the-chosen-rotation`)
   }
   if (item.answer === 'none_meets' && options.some((o) => o.state !== 'does_not_meet')) {
@@ -517,10 +606,34 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
   }
   const sources = item.sources.map((entry, index) => {
     const source = record(entry, `${what}:sources[${index}]`)
+    const at = `${what}:sources[${index}]`
     if (!isNonEmptyString(source.id)) {
-      throw new Error(`${what}:sources[${index}]:id-empty`)
+      throw new Error(`${at}:id-empty`)
     }
-    return { id: source.id, detail: isNonEmptyString(source.detail) ? source.detail : null }
+    if (!oneOf(source.state, SOURCE_STATES)) {
+      throw new Error(`${at}:state-not-in-the-list`)
+    }
+    if (source.attribution !== null && typeof source.attribution !== 'string') {
+      throw new Error(`${at}:attribution-not-a-text`)
+    }
+    if (source.missing_reason !== null && !oneOf(source.missing_reason, REASON_CODES)) {
+      throw new Error(`${at}:missing-reason-not-a-code`)
+    }
+    // As SourceOut: an unavailable source carries its missing_reason.
+    if (source.state === 'unavailable' && source.missing_reason === null) {
+      throw new Error(`${at}:unavailable-without-a-reason`)
+    }
+    if (source.detail !== null && typeof source.detail !== 'string') {
+      throw new Error(`${at}:detail-not-a-text`)
+    }
+    const plantSource: PlantSource = {
+      id: source.id,
+      state: source.state,
+      attribution: isNonEmptyString(source.attribution) ? source.attribution : null,
+      missing_reason: source.missing_reason as ReasonCode | null,
+      detail: isNonEmptyString(source.detail) ? source.detail : null,
+    }
+    return plantSource
   })
   const cost = limitCost(item.limit_cost, `${what}:limit-cost`)
   // As PlantAnswer: a cost only when a rotation is chosen, against another option.
@@ -585,6 +698,42 @@ export function selectAnswer(
   return (
     set.answers.find((a) => a.strictness === strictness && a.margin_of === marginOf) ?? null
   )
+}
+
+/**
+ * The soybean price the slider starts at for an answer: its price of today,
+ * kept inside its price range; null when the answer has no price of today
+ * (or there is no answer). The parser already refuses a price of today
+ * outside the range without a shared reason; the clamp keeps the slider
+ * inside the range in every case.
+ */
+export function startPrice(answer: PlantAnswer | null): number | null {
+  const tipping = answer?.tipping_price ?? null
+  if (tipping === null || tipping.today === null) {
+    return null
+  }
+  return Math.min(Math.max(tipping.today, tipping.low), tipping.high)
+}
+
+/** The questions asked on the screen. */
+export interface PlantQuestions {
+  strictness: Strictness
+  marginOf: MarginOf
+  price: number | null
+}
+
+/**
+ * The questions after the user selects how strict and the kind of year:
+ * another answer is selected, so the price looked at goes back to that
+ * answer's price of today (inside its range). A price moved on one answer is
+ * never carried to another.
+ */
+export function selectQuestions(
+  set: PlantAnswerSet,
+  strictness: Strictness,
+  marginOf: MarginOf,
+): PlantQuestions {
+  return { strictness, marginOf, price: startPrice(selectAnswer(set, strictness, marginOf)) }
 }
 
 /**

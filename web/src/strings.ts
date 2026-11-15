@@ -226,6 +226,9 @@ export const strings = {
   // the request (the soil-loss limit, the soybean prices). Wording is a
   // person's decision.
   'plant.declared': 'Declared by the user in the request (example data)',
+  // PROPOSED (S-019 code review fixes): the attribution a source of the
+  // answer carries. Wording is a person's decision.
+  'plant.source.attribution': 'Attribution: {attribution}',
 } as const
 
 /**

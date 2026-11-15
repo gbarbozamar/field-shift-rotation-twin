@@ -3,8 +3,17 @@ import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { KINDS_OF_YEAR, MARGINS_OF, STRICTNESSES, answerAtPrice, plantExamples, selectAnswer } from './plantData'
+import {
+  KINDS_OF_YEAR,
+  MARGINS_OF,
+  STRICTNESSES,
+  answerAtPrice,
+  plantExamples,
+  selectAnswer,
+  selectQuestions,
+} from './plantData'
 import type {
+  PlantQuestions,
   AnswerKind,
   KindOfYear,
   LimitCheck,
@@ -284,11 +293,18 @@ function AnswerCard({ answer }: { answer: PlantAnswer }) {
 /** What the answer says at the price looked at, as the tipping price function computed it. */
 function PriceAnswer({ answer, price }: { answer: PlantAnswer; price: number | null }) {
   const tipping = answer.tipping_price
+  // A price looked at that is not given is the price of today of this answer.
+  const looked = price ?? tipping.today
   let content
-  if (price === null) {
-    content = <MissingLine what={strings['plant.q.price']} missing={tipping.missing!} />
+  if (looked === null) {
+    // No price of today: the parser keeps the shared reason of the tipping
+    // price then; without one nothing is claimed.
+    content =
+      tipping.missing !== null ? (
+        <MissingLine what={strings['plant.q.price']} missing={tipping.missing} />
+      ) : null
   } else {
-    const at = answerAtPrice(tipping, price)
+    const at = answerAtPrice(tipping, looked)
     if (at.kind === 'today') {
       content = <p className="text-sm">{strings['plant.price.today']}</p>
     } else if (at.kind === 'same') {
@@ -310,7 +326,7 @@ function PriceAnswer({ answer, price }: { answer: PlantAnswer; price: number | n
     } else {
       content = (
         <MissingLine
-          what={formatString(strings['plant.price.unknown_what'], { price: num(price), unit: tipping.unit })}
+          what={formatString(strings['plant.price.unknown_what'], { price: num(looked), unit: tipping.unit })}
           missing={at.missing}
         />
       )
@@ -352,10 +368,28 @@ function Sources({ answer }: { answer: PlantAnswer }) {
       <h3 className="text-sm font-semibold">{strings['plant.sources.heading']}</h3>
       <ul className="text-xs text-slate-500">
         {answer.sources.map((source) => (
-          <li key={source.id}>
-            {source.detail !== null
-              ? formatString(strings['plant.source_line'], { id: source.id, detail: source.detail })
-              : source.id}
+          <li key={source.id} data-testid="plant-source">
+            {source.state === 'unavailable' && source.missing_reason !== null ? (
+              <p>
+                {missingPatternText(
+                  source.id,
+                  source.detail !== null
+                    ? { reason: source.missing_reason, detail: source.detail }
+                    : { reason: source.missing_reason },
+                )}
+              </p>
+            ) : (
+              <p>
+                {source.detail !== null
+                  ? formatString(strings['plant.source_line'], { id: source.id, detail: source.detail })
+                  : source.id}
+              </p>
+            )}
+            {source.attribution !== null ? (
+              <p data-testid="plant-source-attribution">
+                {formatString(strings['plant.source.attribution'], { attribution: source.attribution })}
+              </p>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -536,20 +570,25 @@ const FIRST_MARGIN_OF: MarginOf = 'average'
 
 /** The screen at #/plant, on the example answers, with the questions in its state. */
 export default function PlantScreen() {
-  const [strictness, setStrictness] = useState<Strictness>(FIRST_STRICTNESS)
-  const [marginOf, setMarginOf] = useState<MarginOf>(FIRST_MARGIN_OF)
-  const [price, setPrice] = useState<number | null>(
-    () => selectAnswer(plantExamples, FIRST_STRICTNESS, FIRST_MARGIN_OF)?.tipping_price.today ?? null,
+  // One state for the three questions: selecting another answer (how strict,
+  // the kind of year) resets the price looked at to that answer's price of
+  // today, inside its range (selectQuestions).
+  const [questions, setQuestions] = useState<PlantQuestions>(() =>
+    selectQuestions(plantExamples, FIRST_STRICTNESS, FIRST_MARGIN_OF),
   )
   return (
     <PlantView
       set={plantExamples}
-      strictness={strictness}
-      marginOf={marginOf}
-      price={price}
-      onStrictness={setStrictness}
-      onMarginOf={setMarginOf}
-      onPrice={setPrice}
+      strictness={questions.strictness}
+      marginOf={questions.marginOf}
+      price={questions.price}
+      onStrictness={(strictness) =>
+        setQuestions((q) => selectQuestions(plantExamples, strictness, q.marginOf))
+      }
+      onMarginOf={(marginOf) =>
+        setQuestions((q) => selectQuestions(plantExamples, q.strictness, marginOf))
+      }
+      onPrice={(price) => setQuestions((q) => ({ ...q, price }))}
     />
   )
 }

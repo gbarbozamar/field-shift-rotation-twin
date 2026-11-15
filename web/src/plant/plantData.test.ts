@@ -12,6 +12,8 @@ import {
   parsePlantAnswers,
   plantExamples,
   selectAnswer,
+  selectQuestions,
+  startPrice,
 } from './plantData'
 
 /**
@@ -251,6 +253,194 @@ describe('the parser refuses what the contract refuses (7)', () => {
     const answer = exampleCopy()
     answer.options[0].soil_loss.el_nino.sources = []
     expect(() => parsePlantAnswer(answer)).toThrow('value-without-source-or-assumption')
+  })
+})
+
+describe('the parser mirrors TippingPointOut and TippingPriceOut (code review fixes)', () => {
+  const today = rawExample.tipping_price.today
+  const low = rawExample.tipping_price.price_range.low
+  const high = rawExample.tipping_price.price_range.high
+
+  it('the example has a present tipping point down and a missing one up', () => {
+    expect(rawExample.tipping_price.down.price).not.toBeNull()
+    expect(rawExample.tipping_price.up.price).toBeNull()
+    expect(rawExample.tipping_price.reason).toBeNull()
+    expect(today).toBeGreaterThan(low)
+    expect(today).toBeLessThan(high)
+  })
+
+  it('refuses a missing tipping price that still names a rotation, an answer or a distance', () => {
+    for (const [field, value] of [
+      ['takes_over', rawExample.options[0].rotation_id],
+      ['answer_after', 'chosen'],
+      ['distance_percent', rawExample.tipping_price.down.distance_percent],
+    ] as const) {
+      const answer = exampleCopy()
+      answer.tipping_price.up[field] = value
+      expect(() => parsePlantAnswer(answer), field).toThrow('missing-price-with-an-answer')
+    }
+  })
+
+  it('refuses a missing tipping price whose reason comes without its detail', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.up.detail = null
+    expect(() => parsePlantAnswer(answer)).toThrow('reason-without-its-detail')
+  })
+
+  it('refuses a present tipping price with a detail and no reason', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.down.detail = rawExample.tipping_price.up.detail
+    expect(() => parsePlantAnswer(answer)).toThrow('reason-without-its-detail')
+  })
+
+  it('refuses a shared reason without its detail', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.reason = rawExample.tipping_price.up.reason
+    expect(() => parsePlantAnswer(answer)).toThrow('reason-without-its-detail')
+  })
+
+  it('refuses a shared reason that is not on both points', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.reason = rawExample.tipping_price.up.reason
+    answer.tipping_price.detail = rawExample.tipping_price.up.detail
+    expect(() => parsePlantAnswer(answer)).toThrow('shared-reason-not-on-both-points')
+  })
+
+  it('accepts a shared reason on both points with no price of today', () => {
+    const answer = exampleCopy()
+    const up = rawExample.tipping_price.up
+    answer.tipping_price.today = null
+    answer.tipping_price.reason = up.reason
+    answer.tipping_price.detail = up.detail
+    answer.tipping_price.down = { ...up, direction: 'down' }
+    const parsed = parsePlantAnswer(answer).tipping_price
+    expect(parsed.today).toBeNull()
+    expect(parsed.missing).toEqual({ reason: up.reason, detail: up.detail })
+  })
+
+  it("refuses today's price outside the range without a shared reason", () => {
+    const answer = exampleCopy()
+    answer.tipping_price.today = high + (high - low)
+    expect(() => parsePlantAnswer(answer)).toThrow('today-outside-the-range-without-a-reason')
+  })
+
+  it('refuses a tipping price outside the range', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.down.price = low - (high - low)
+    expect(() => parsePlantAnswer(answer)).toThrow('tipping-price-outside-the-range')
+  })
+
+  it('refuses up.price below today', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.up = { ...rawExample.tipping_price.down, direction: 'up' }
+    expect(() => parsePlantAnswer(answer)).toThrow('up-price-below-today')
+  })
+
+  it('refuses down.price above today', () => {
+    const answer = exampleCopy()
+    answer.tipping_price.down.price = (today + high) / 2
+    expect(() => parsePlantAnswer(answer)).toThrow('down-price-above-today')
+  })
+
+  it('refuses a distance of the wrong sign', () => {
+    const answer = exampleCopy()
+    const distance = rawExample.tipping_price.down.distance_percent
+    expect(distance).not.toBe(0)
+    answer.tipping_price.down.distance_percent = -distance
+    expect(() => parsePlantAnswer(answer)).toThrow('distance-of-the-wrong-sign')
+  })
+})
+
+describe('the parser mirrors LimitCostOut and the chosen rule (code review fixes)', () => {
+  it('refuses a costs_nothing that is not a boolean', () => {
+    for (const value of [null, 'false', 0]) {
+      const answer = exampleCopy()
+      answer.limit_cost.costs_nothing = value
+      expect(() => parsePlantAnswer(answer), String(value)).toThrow('costs-nothing-not-a-flag')
+    }
+  })
+
+  it('refuses a chosen answer with no option in state chosen', () => {
+    const answer = exampleCopy()
+    const chosen = answer.options.find((o: { state: string }) => o.state === 'chosen')
+    chosen.state = chosen.limit_check.verdict
+    expect(() => parsePlantAnswer(answer)).toThrow('state-chosen-not-on-the-chosen-rotation')
+  })
+
+  it('refuses an option in state chosen when the answer is not chosen', () => {
+    const answer = exampleCopy()
+    answer.answer = 'not_resolved'
+    answer.chosen = null
+    answer.reason = 'NOT_APPLICABLE'
+    answer.detail = rawExample.options[2].limit_check.detail
+    expect(() => parsePlantAnswer(answer)).toThrow('state-chosen-not-on-the-chosen-rotation')
+  })
+})
+
+describe('the parser keeps the sources as SourceOut gives them (code review fixes)', () => {
+  it('keeps the state, the attribution and the missing reason', () => {
+    const parsed = parsePlantAnswer(exampleCopy()).sources
+    expect(parsed).toEqual(
+      rawExample.sources.map((s) => ({
+        id: s.id,
+        state: s.state,
+        attribution: s.attribution,
+        missing_reason: s.missing_reason,
+        detail: s.detail,
+      })),
+    )
+    const oni = rawExample.sources.find((s) => s.attribution !== null)
+    expect(oni).toBeDefined()
+  })
+
+  it('refuses an unavailable source without its missing_reason', () => {
+    const answer = exampleCopy()
+    answer.sources[0].state = 'unavailable'
+    expect(() => parsePlantAnswer(answer)).toThrow('unavailable-without-a-reason')
+  })
+
+  it('refuses a source of an unknown state, or with a reason that is not a code', () => {
+    const answer = exampleCopy()
+    answer.sources[0].state = 'stale'
+    expect(() => parsePlantAnswer(answer)).toThrow('state-not-in-the-list')
+    const other = exampleCopy()
+    other.sources[0].missing_reason = 'GONE'
+    expect(() => parsePlantAnswer(other)).toThrow('missing-reason-not-a-code')
+  })
+})
+
+describe('the price looked at follows the answer selected (code review fixes)', () => {
+  it("starts at the selected answer's price of today", () => {
+    for (const strictness of STRICTNESSES) {
+      for (const marginOf of MARGINS_OF) {
+        const answer = selectAnswer(plantExamples, strictness, marginOf)!
+        const q = selectQuestions(plantExamples, strictness, marginOf)
+        expect(q).toEqual({ strictness, marginOf, price: answer.tipping_price.today })
+      }
+    }
+  })
+
+  it('is reset when another answer is selected, never carried from the previous one', () => {
+    const low = rawExample.tipping_price.price_range.low
+    const moved = { ...selectQuestions(plantExamples, 'on_average', 'average'), price: low }
+    const next = selectQuestions(plantExamples, 'every_kind', moved.marginOf)
+    const selected = selectAnswer(plantExamples, 'every_kind', 'average')!
+    expect(next.price).toBe(selected.tipping_price.today)
+    expect(next.price).not.toBe(moved.price)
+    const back = selectQuestions(plantExamples, moved.strictness, 'la_nina')
+    expect(back.price).toBe(selectAnswer(plantExamples, 'on_average', 'la_nina')!.tipping_price.today)
+  })
+
+  it('is kept inside the range, and null without a price of today', () => {
+    const answer = parsePlantAnswer(exampleCopy())
+    const { low, high } = answer.tipping_price
+    const above = { ...answer, tipping_price: { ...answer.tipping_price, today: high + (high - low) } }
+    const below = { ...answer, tipping_price: { ...answer.tipping_price, today: low - (high - low) } }
+    const none = { ...answer, tipping_price: { ...answer.tipping_price, today: null } }
+    expect(startPrice(above)).toBe(high)
+    expect(startPrice(below)).toBe(low)
+    expect(startPrice(none)).toBeNull()
+    expect(startPrice(null)).toBeNull()
   })
 })
 
