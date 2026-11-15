@@ -58,7 +58,7 @@ Not carried, because the rotation calendar has no field for them: `label`, `repe
 - [D141](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887747713): "A component that starts before the first agricultural year of the record and ends inside it keeps its declared dates." Points 11 and 13, for every phase (points 8 to 12 are the phases of D109 and D132).
 - [D188](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6889974874), part (2), built in [#403](https://github.com/gbarbozamar/field-shift-rotation-twin/pull/403): "the cycle before the first is laid out whenever the first cycle starts after the first day of the record's years, not only when one of its components ends inside them". Points 6 and 13: the cycle before the first (index -1), so every day of the record's years is described.
 
-The questions the repetition leaves are under OPEN at the end of that docstring; Q5 of `contracts/ENTRYPOINTS.md` keeps "how the rotation is repeated" open.
+The questions the repetition leaves are under OPEN at the end of that docstring; Q5 of `contracts/ENTRYPOINTS.md` records the repetition as decided (D109) and keeps two points open: what the first agricultural year of the record is when the start month is not January, and which daily series marks the record.
 
 ## PROPOSED choices
 
