@@ -1,0 +1,3706 @@
+{
+  "contract": "saved_case",
+  "example_data": true,
+  "case_id": "example-case",
+  "field_id": "example-field-1",
+  "saved_on": "2026-11-15",
+  "field_identity": {
+    "contract": "field_identity",
+    "example_data": true,
+    "case_id": "example-case",
+    "label": "Example case",
+    "fields": [
+      {
+        "field_id": "example-field-1",
+        "name": "North field",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -57.01,
+                -33.01
+              ],
+              [
+                -57.003,
+                -33.01
+              ],
+              [
+                -57.003,
+                -33.016
+              ],
+              [
+                -57.01,
+                -33.016
+              ],
+              [
+                -57.01,
+                -33.01
+              ]
+            ]
+          ]
+        },
+        "geometry_missing": null
+      },
+      {
+        "field_id": "example-field-2",
+        "name": "Long field by the creek",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -56.998,
+                -33.011
+              ],
+              [
+                -56.99,
+                -33.011
+              ],
+              [
+                -56.99,
+                -33.013
+              ],
+              [
+                -56.998,
+                -33.013
+              ],
+              [
+                -56.998,
+                -33.011
+              ]
+            ]
+          ]
+        },
+        "geometry_missing": null
+      },
+      {
+        "field_id": "example-field-3",
+        "name": "Small triangle field",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -57.006,
+                -33.019
+              ],
+              [
+                -57.002,
+                -33.019
+              ],
+              [
+                -57.004,
+                -33.023
+              ],
+              [
+                -57.006,
+                -33.019
+              ]
+            ]
+          ]
+        },
+        "geometry_missing": null
+      }
+    ]
+  },
+  "field_identity_missing": null,
+  "results_table": {
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "rows": [
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 8.2,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 7.8,
+          "high": 8.6,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 7.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.6,
+          "high": 7.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 9.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 8.7,
+          "high": 9.5,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NO_COVERAGE",
+          "detail": "the approved matrix holds no 2023 soil-loss value of rotation A"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": -0.4,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": -0.5,
+          "high": -0.3,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 5.8,
+          "high": 6.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.5,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.2,
+          "high": 6.8,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 5.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 4.7,
+          "high": 5.3,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.8,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.5,
+          "high": 7.1,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.3,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": 0.2,
+          "high": 0.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 5.8,
+          "high": 6.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.5,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.2,
+          "high": 6.8,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 5.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 4.7,
+          "high": 5.3,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.8,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.5,
+          "high": 7.1,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.5,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": 0.4,
+          "high": 0.6,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 8.2,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 7.8,
+          "high": 8.6,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 7.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.6,
+          "high": 7.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 9.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 8.7,
+          "high": 9.5,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NO_COVERAGE",
+          "detail": "the approved matrix holds no 2023 soil-loss value of rotation A"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": -0.4,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": -0.5,
+          "high": -0.3,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 5.8,
+          "high": 6.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.5,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.2,
+          "high": 6.8,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 7.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.6,
+          "high": 7.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.8,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.5,
+          "high": 7.1,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.3,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": 0.2,
+          "high": 0.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 5.8,
+          "high": 6.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.5,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.2,
+          "high": 6.8,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 7.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.6,
+          "high": 7.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.8,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.5,
+          "high": 7.1,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.5,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": 0.4,
+          "high": 0.6,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 8.2,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 7.8,
+          "high": 8.6,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 7.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.6,
+          "high": 7.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 9.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 8.7,
+          "high": 9.5,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": null,
+        "unit": "t ha-1 yr-1",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NO_COVERAGE",
+          "detail": "the approved matrix holds no 2023 soil-loss value of rotation A"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": -0.4,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": -0.5,
+          "high": -0.3,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 5.8,
+          "high": 6.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.5,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.2,
+          "high": 6.8,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 9.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 8.6,
+          "high": 9.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.8,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.5,
+          "high": 7.1,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.3,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": 0.2,
+          "high": 0.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.1,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 5.8,
+          "high": 6.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.5,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.2,
+          "high": 6.8,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 9.0,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 8.6,
+          "high": 9.4,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_loss",
+        "direction": "lower_is_better",
+        "value": 6.8,
+        "unit": "t ha-1 yr-1",
+        "range": {
+          "low": 6.5,
+          "high": 7.1,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "DERIVED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "direction": "higher_is_better",
+        "value": 0.5,
+        "unit": "t C ha-1 yr-1",
+        "range": {
+          "low": 0.4,
+          "high": 0.6,
+          "kind": "PLACEHOLDER_kind"
+        },
+        "range_missing": null,
+        "missing": null,
+        "provenance": "SIMULATED",
+        "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start"
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "direction": "higher_is_better",
+        "value": null,
+        "unit": "dimensionless",
+        "range": null,
+        "range_missing": null,
+        "missing": {
+          "reason": "NOT_AVAILABLE",
+          "detail": "the approved matrix holds water_deficit_exposure missing on every rotation and scenario (D61)"
+        },
+        "provenance": null,
+        "source": null,
+        "assumption": false,
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null
+      }
+    ]
+  },
+  "results_table_missing": null,
+  "carbon_balances": [
+    {
+      "rotation_id": "A",
+      "carbon_model": "amg",
+      "carbon_balance": null,
+      "carbon_balance_missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "the CarbonForcing of rotation 'A': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP5 (run_amg) is not run and no balance is computed"
+      }
+    },
+    {
+      "rotation_id": "A",
+      "carbon_model": "rothc",
+      "carbon_balance": null,
+      "carbon_balance_missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "the CarbonForcing of rotation 'A': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed"
+      }
+    },
+    {
+      "rotation_id": "B",
+      "carbon_model": "amg",
+      "carbon_balance": null,
+      "carbon_balance_missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "the CarbonForcing of rotation 'B': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP5 (run_amg) is not run and no balance is computed"
+      }
+    },
+    {
+      "rotation_id": "B",
+      "carbon_model": "rothc",
+      "carbon_balance": null,
+      "carbon_balance_missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "the CarbonForcing of rotation 'B': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed"
+      }
+    },
+    {
+      "rotation_id": "C",
+      "carbon_model": "amg",
+      "carbon_balance": null,
+      "carbon_balance_missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "the CarbonForcing of rotation 'C': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP5 (run_amg) is not run and no balance is computed"
+      }
+    },
+    {
+      "rotation_id": "C",
+      "carbon_model": "rothc",
+      "carbon_balance": null,
+      "carbon_balance_missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "the CarbonForcing of rotation 'C': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed"
+      }
+    }
+  ],
+  "decision_output": {
+    "contract": "decision_output",
+    "example_data": true,
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "rotations": [
+      "A",
+      "B",
+      "C"
+    ],
+    "scenarios": [
+      "s1",
+      "s2",
+      "s3"
+    ],
+    "limits": [
+      {
+        "indicator": "soil_loss",
+        "limit": {
+          "missing": null,
+          "provenance": "DECLARED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 7.0,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "the approved matrix declares the limit without a range"
+          }
+        }
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "limit": {
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "no limit is declared for water_deficit_exposure in the approved matrix"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        }
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "limit": {
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "no limit is declared for soil_carbon_trend in the approved matrix"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t C ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        }
+      }
+    ],
+    "counts_by_year": [
+      {
+        "rotation_id": "A",
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 3,
+        "years_within_limits": 1,
+        "not_evaluated": [
+          {
+            "time_basis": "ag_year",
+            "ag_year": 2023,
+            "carbon_model": null,
+            "computation": null,
+            "missing": {
+              "reason": "NO_COVERAGE",
+              "detail": "the approved matrix holds no 2023 soil-loss value of rotation A"
+            }
+          }
+        ]
+      },
+      {
+        "rotation_id": "A",
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 3,
+        "years_within_limits": 1,
+        "not_evaluated": [
+          {
+            "time_basis": "ag_year",
+            "ag_year": 2023,
+            "carbon_model": null,
+            "computation": null,
+            "missing": {
+              "reason": "NO_COVERAGE",
+              "detail": "the approved matrix holds no 2023 soil-loss value of rotation A"
+            }
+          }
+        ]
+      },
+      {
+        "rotation_id": "A",
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 3,
+        "years_within_limits": 1,
+        "not_evaluated": [
+          {
+            "time_basis": "ag_year",
+            "ag_year": 2023,
+            "carbon_model": null,
+            "computation": null,
+            "missing": {
+              "reason": "NO_COVERAGE",
+              "detail": "the approved matrix holds no 2023 soil-loss value of rotation A"
+            }
+          }
+        ]
+      },
+      {
+        "rotation_id": "B",
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 4,
+        "years_within_limits": 4,
+        "not_evaluated": []
+      },
+      {
+        "rotation_id": "B",
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 4,
+        "years_within_limits": 4,
+        "not_evaluated": []
+      },
+      {
+        "rotation_id": "B",
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 4,
+        "years_within_limits": 3,
+        "not_evaluated": []
+      },
+      {
+        "rotation_id": "C",
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 4,
+        "years_within_limits": 4,
+        "not_evaluated": []
+      },
+      {
+        "rotation_id": "C",
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 4,
+        "years_within_limits": 4,
+        "not_evaluated": []
+      },
+      {
+        "rotation_id": "C",
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "years_evaluated": 4,
+        "years_within_limits": 3,
+        "not_evaluated": []
+      }
+    ],
+    "range_across_scenarios": [
+      {
+        "rotation_id": "A",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "minimum": 1,
+        "maximum": 1,
+        "scenario_of_the_minimum": "s1",
+        "missing": null
+      },
+      {
+        "rotation_id": "B",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "minimum": 3,
+        "maximum": 4,
+        "scenario_of_the_minimum": "s3",
+        "missing": null
+      },
+      {
+        "rotation_id": "C",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "minimum": 3,
+        "maximum": 4,
+        "scenario_of_the_minimum": "s3",
+        "missing": null
+      }
+    ],
+    "paired_differences": [
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.7,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.5,
+            "high": 0.9,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.8,
+            "high": -1.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.5,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -1.2000000000000002,
+            "high": 0.20000000000000018,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -4.1,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -4.8,
+            "high": -3.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' and 'B' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.7,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.5,
+            "high": 0.9,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.8,
+            "high": -1.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.5,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -1.2000000000000002,
+            "high": 0.20000000000000018,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.9000000000000004,
+            "high": -1.299999999999999,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' and 'B' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.7,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.5,
+            "high": 0.9,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.8,
+            "high": -1.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.5,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -1.2000000000000002,
+            "high": 0.20000000000000018,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.09999999999999964,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.9000000000000004,
+            "high": 0.7000000000000011,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' and 'B' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.9,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.7,
+            "high": 1.1,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.8,
+            "high": -1.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.5,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -1.2000000000000002,
+            "high": 0.20000000000000018,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -4.1,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -4.8,
+            "high": -3.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' and 'C' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.9,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.7,
+            "high": 1.1,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.8,
+            "high": -1.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.5,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -1.2000000000000002,
+            "high": 0.20000000000000018,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.9000000000000004,
+            "high": -1.299999999999999,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' and 'C' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.9,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.7,
+            "high": 1.1,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -2.0999999999999996,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -2.8,
+            "high": -1.3999999999999995,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.5,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -1.2000000000000002,
+            "high": 0.20000000000000018,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": -0.09999999999999964,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.9000000000000004,
+            "high": 0.7000000000000011,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'A' and 'C' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.2,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.0,
+            "high": 0.39999999999999997,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.6000000000000005,
+            "high": 0.6000000000000005,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'B' and 'C' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.2,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.0,
+            "high": 0.39999999999999997,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.6000000000000005,
+            "high": 0.6000000000000005,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.8000000000000007,
+            "high": 0.8000000000000007,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'B' and 'C' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_carbon_trend",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "difference": {
+          "missing": null,
+          "provenance": "SIMULATED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.2,
+          "unit": "t C ha-1 yr-1",
+          "range": {
+            "low": 0.0,
+            "high": 0.39999999999999997,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2020,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.6000000000000005,
+            "high": 0.6000000000000005,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2021,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2022,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.8000000000000007,
+            "high": 0.8000000000000007,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "time_basis": "ag_year",
+        "ag_year": 2023,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": null,
+          "provenance": "DERIVED",
+          "source": "the thin matrix approved by the designer of the case, 14 November 2026 (issue #240)",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": {
+            "low": -0.5999999999999996,
+            "high": 0.5999999999999996,
+            "kind": "PLACEHOLDER_kind"
+          },
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "water_deficit_exposure",
+        "time_basis": "rotation",
+        "ag_year": null,
+        "carbon_model": null,
+        "computation": null,
+        "difference": {
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "the value of the pair's side 'B' and 'C' of this cell is missing (C3.3)"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        },
+        "method": "OPEN: paired-difference method and citation, person-supplied"
+      }
+    ],
+    "equal_tolerances": [
+      {
+        "indicator": "soil_loss",
+        "tolerance": {
+          "missing": null,
+          "provenance": "DECLARED",
+          "source": "demo reading of issue #240: exact point equality — the expected point-sign counts hold for every tolerance below 0.5; to be confirmed by the designer of the case",
+          "assumption": false,
+          "value": 0.0,
+          "unit": "t ha-1 yr-1",
+          "range": null,
+          "range_missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "the tolerance of 'equal' carries no range"
+          }
+        }
+      },
+      {
+        "indicator": "water_deficit_exposure",
+        "tolerance": {
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "the designer of the case set no tolerance of 'equal' for water_deficit_exposure"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "dimensionless",
+          "range": null,
+          "range_missing": null
+        }
+      },
+      {
+        "indicator": "soil_carbon_trend",
+        "tolerance": {
+          "missing": {
+            "reason": "NOT_DECLARED",
+            "detail": "the designer of the case set no tolerance of 'equal' for soil_carbon_trend"
+          },
+          "provenance": null,
+          "source": null,
+          "assumption": false,
+          "value": null,
+          "unit": "t C ha-1 yr-1",
+          "range": null,
+          "range_missing": null
+        }
+      }
+    ],
+    "pair_cell_counts": [
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 2,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": {
+          "better": 3,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s1",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 2,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": {
+          "better": 3,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s2",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 2
+        },
+        "by_sign_of_point_value": {
+          "better": 3,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "scenario_id": "s3",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 2,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": {
+          "better": 3,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 2,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": {
+          "better": 3,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 1,
+          "deterioration": 0,
+          "not_separated": 2
+        },
+        "by_sign_of_point_value": {
+          "better": 3,
+          "worse": 0,
+          "equal": 0,
+          "missing_side": 1
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 4
+        },
+        "by_sign_of_point_value": {
+          "better": 0,
+          "worse": 0,
+          "equal": 4,
+          "missing_side": 0
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s1",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 4
+        },
+        "by_sign_of_point_value": {
+          "better": 0,
+          "worse": 0,
+          "equal": 4,
+          "missing_side": 0
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s2",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_carbon_trend",
+        "carbon_model": "amg",
+        "computation": "end_minus_start",
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 1
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'soil_carbon_trend', so its cells are counted by the range of their difference only (D87)"
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "soil_loss",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 4
+        },
+        "by_sign_of_point_value": {
+          "better": 0,
+          "worse": 0,
+          "equal": 4,
+          "missing_side": 0
+        },
+        "by_sign_of_point_value_missing": null
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "scenario_id": "s3",
+        "indicator": "water_deficit_exposure",
+        "carbon_model": null,
+        "computation": null,
+        "by_difference_range": {
+          "strict_improvement": 0,
+          "deterioration": 0,
+          "not_separated": 0
+        },
+        "by_sign_of_point_value": null,
+        "by_sign_of_point_value_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "the designer of the case set no tolerance of 'equal' for 'water_deficit_exposure', so its cells are counted by the range of their difference only (D87)"
+        }
+      }
+    ],
+    "pair_states": [
+      {
+        "pair": [
+          "A",
+          "B"
+        ],
+        "value": "Not robust across scenarios",
+        "missing": null,
+        "reason": "not robust across the admitted scenarios",
+        "reason_missing": null,
+        "preferred_rotation_id": null,
+        "coverage": {
+          "cells_compared": 12,
+          "cells_of_the_pair": 18
+        }
+      },
+      {
+        "pair": [
+          "A",
+          "C"
+        ],
+        "value": "Not robust across scenarios",
+        "missing": null,
+        "reason": "not robust across the admitted scenarios",
+        "reason_missing": null,
+        "preferred_rotation_id": null,
+        "coverage": {
+          "cells_compared": 12,
+          "cells_of_the_pair": 18
+        }
+      },
+      {
+        "pair": [
+          "B",
+          "C"
+        ],
+        "value": "Not robust across scenarios",
+        "missing": null,
+        "reason": "not robust across the admitted scenarios",
+        "reason_missing": null,
+        "preferred_rotation_id": null,
+        "coverage": {
+          "cells_compared": 15,
+          "cells_of_the_pair": 18
+        }
+      }
+    ],
+    "state": {
+      "value": null,
+      "missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "no decision says how the document's one state relates to the states of its pairs (issue #96, OPEN 5, to be settled with the tipping point of D3), so the decision layer gives no document-level state; the states of the pairs are in 'pair_states'"
+      },
+      "indicators_not_resolved": [
+        "soil_loss"
+      ],
+      "reasons": [
+        "the pair ('A', 'B') is 'Not robust across scenarios' (indicators not resolved: soil_loss); in each scenario: 's1' 'Not separated: within uncertainty', 's2' 'Not separated: within uncertainty', 's3' 'Not separated: within uncertainty'",
+        "the pair ('A', 'C') is 'Not robust across scenarios' (indicators not resolved: soil_loss); in each scenario: 's1' 'Not separated: within uncertainty', 's2' 'Not separated: within uncertainty', 's3' 'Not separated: within uncertainty'",
+        "the pair ('B', 'C') is 'Not robust across scenarios' (indicators not resolved: soil_loss); in each scenario: 's1' 'Not separated: within uncertainty', 's2' 'Not separated: within uncertainty', 's3' 'Not separated: within uncertainty'",
+        "water_deficit_exposure is not evaluated on this matrix: every value is missing NOT_AVAILABLE, so it enters no state and no ranking (D6)"
+      ]
+    },
+    "measure_first": [
+      {
+        "rank": 2,
+        "what": "'u' (the 2022 soil loss of rotations B and C, t ha-1 yr-1) for the pair ('A', 'B')",
+        "why": "the admitted values of 'u' never change the state of the pair (every other uncertain input at its reference value): 'Not separated: within uncertainty' at every value"
+      },
+      {
+        "rank": 2,
+        "what": "'u' (the 2022 soil loss of rotations B and C, t ha-1 yr-1) for the pair ('A', 'C')",
+        "why": "the admitted values of 'u' never change the state of the pair (every other uncertain input at its reference value): 'Not separated: within uncertainty' at every value"
+      },
+      {
+        "rank": 2,
+        "what": "'u' (the 2022 soil loss of rotations B and C, t ha-1 yr-1) for the pair ('B', 'C')",
+        "why": "the admitted values of 'u' never change the state of the pair (every other uncertain input at its reference value): 'Not separated: within uncertainty' at every value"
+      }
+    ]
+  },
+  "decision_output_missing": null
+}
