@@ -2300,8 +2300,11 @@ def test_year_without_a_last_harvest_leaves_only_its_c_missing_without_fallback(
 
 
 RECORDS = ROOT / "params" / "records"
-# The records of the computed C, taken out of the catalogue the service loads
-# (D148 and D158 of issue #77; unit l0/computed-c-out-of-catalogue).
+# The 61 records that only the computed C reads, taken out of the catalogue
+# the service loads (D148, D158 and D164 of issue #77; unit
+# l0/computed-c-out-of-catalogue). The six the residue ledger (EP4) also reads,
+# the residue/yield ratio and the yield of each crop, stay in the catalogue
+# (D164), under params/records/residues/.
 WITHDRAWN_C_RECORDS = ROOT / "params" / "withdrawn" / "computed_c"
 DEMO_SOIL = ROOT / "data" / "demo" / "la_estanzuela_soil_slope.json"
 
@@ -2326,10 +2329,21 @@ def service_catalogue() -> dict[str, dict]:
 
 def withdrawn_c_records() -> dict[str, dict]:
     """The records of params/withdrawn/computed_c/, loaded by the path of that
-    folder and checked, under the keys they had under params/records/."""
+    folder and checked, keyed from params/."""
     records, problems = load_folder(WITHDRAWN_C_RECORDS)
     assert problems == [] and check_catalogue(records) == []
-    return {f"computed_c/{name}": record for name, record in records.items()}
+    return {f"withdrawn/computed_c/{name}": record for name, record in records.items()}
+
+
+def computed_c_ids() -> set[str]:
+    """Every identifier only the computed C of the main route reads."""
+    return {
+        *module.MAIN_C_CROP_ONLY_IDS,
+        *module.MAIN_C_SITE_ONLY_IDS,
+        *module.CANOPY_IDS,
+        *module.MAIN_C_RESIDUE_IDS,
+        *module.MAIN_C_SITE_IDS,
+    }
 
 
 def repository_demo_inputs() -> tuple[
@@ -2407,18 +2421,31 @@ def repository_declared_product(
 
 
 def test_service_catalogue_gives_the_declared_c_for_both_demo_rotations_in_every_phase():
-    """The catalogue the service loads, params/records/, holds no record of
-    the computed C (D148, D158). With it, the demonstration soil file
-    and both rotations of D128, their crops carrying the words of the
-    withdrawn records, every covered year of every phase (D109, D141) is the
-    declared product: R K LS C P with the declared rusle_c_factor (D125),
-    computed again here from the records; the source says DECLARED, D125 and
-    the fallback, and never the computed C. That product is the headline
-    figure D146 and D148 print, to the decimals they give."""
+    """The catalogue the service loads, params/records/, holds none of the
+    withdrawn records of the computed C (D148, D158). It holds six of the
+    computed C's records, the residue/yield ratio and the yield of each crop,
+    because the residue ledger reads them too (D164): a C is not computed from
+    those alone. With it, the demonstration soil file and both rotations of
+    D128, their crops carrying the words of the records, every covered year of
+    every phase (D109, D141) is the declared product: R K LS C P with the
+    declared rusle_c_factor (D125), computed again here from the records; the
+    source says DECLARED, D125 and the fallback, never the computed C, and
+    names as missing the withdrawn records and not the six that are present.
+    That product is the headline figure D146 and D148 print, to the decimals
+    they give."""
     records = service_catalogue()
     c_only_ids = {record["id"] for record in withdrawn_c_records().values()}
     assert c_only_ids
     assert c_only_ids.isdisjoint(record["id"] for record in records.values())
+    # D164: of the identifiers of the computed C, the catalogue holds the two
+    # the residue ledger reads, for each crop of D128, and no other.
+    kept_ids = set(module.MAIN_C_CROP_ONLY_IDS)
+    assert computed_c_ids() - c_only_ids == kept_ids
+    kept = [record for record in records.values() if record["id"] in computed_c_ids()]
+    assert all(set(record["scope"]) == {"crop"} for record in kept)
+    assert sorted((r["id"], r["scope"]["crop"]) for r in kept) == sorted(
+        (pid, crop) for pid in kept_ids for crop in REPOSITORY_CROP_WORDS.values()
+    )
     soil_, climate_, calendars = repository_demo_inputs()
     expected = repository_declared_product(records, soil_)
     assert round(expected, 3) == HEADLINE_SOIL_LOSS_D148
@@ -2440,31 +2467,34 @@ def test_service_catalogue_gives_the_declared_c_for_both_demo_rotations_in_every
                 assert "DECLARED" in item.source and "D125" in item.source
                 assert f"'{module.C_ID}' with scope {{}}" in item.source
                 assert module.COMPUTED_C not in item.source, where
+                # The fallback names what is missing: records of the withdrawn
+                # identifiers, and none of the six that are present.
+                missing = fallback_missing_part(item.source)
+                named_ids = set(re.findall(r"parameter '([a-z0-9_]+)'", missing))
+                assert named_ids and named_ids <= c_only_ids, (where, named_ids)
+                assert named_ids.isdisjoint(kept_ids), where
     # A one-year rotation has one phase; the other has one per year (D109).
     assert [len(phases_of[rotation]) for rotation in DEMO_ROTATIONS] == [1, 2]
 
 
 def test_withdrawn_c_records_added_to_the_catalogue_compute_c_for_both_demo_rotations():
-    """The capability of #229 stays tested after D148: the records of the
-    computed C (unit l0/c-records, D129) are loaded from
+    """The capability of #229 stays tested after D148: the 61 records that
+    only the computed C reads (unit l0/c-records, D129) are loaded from
     params/withdrawn/computed_c/ by its path and added, in memory, to the
-    catalogue the service loads. With the demonstration soil file and both
-    rotations of D128, whose crops carry the words of the records, every
-    covered year is a number computed through c_factor/, none falls back to
-    the declared record, and the two rotations do not give the same soil
-    loss. No expected value is asserted."""
+    catalogue the service loads, which holds the other six (D164). Together
+    they are every record of the computed C. With the demonstration soil file
+    and both rotations of D128, whose crops carry the words of the records,
+    every covered year is a number computed through c_factor/, none falls
+    back to the declared record, and the two rotations do not give the same
+    soil loss. No expected value is asserted."""
     service, withdrawn = service_catalogue(), withdrawn_c_records()
     assert set(service).isdisjoint(withdrawn)
     records = {**service, **withdrawn}
     assert check_catalogue(records) == []
-    c_ids = {
-        *module.MAIN_C_CROP_ONLY_IDS,
-        *module.MAIN_C_SITE_ONLY_IDS,
-        *module.CANOPY_IDS,
-        *module.MAIN_C_RESIDUE_IDS,
-        *module.MAIN_C_SITE_IDS,
-    }
-    assert {r["id"] for r in withdrawn.values()} == c_ids
+    c_ids = computed_c_ids()
+    withdrawn_ids = {r["id"] for r in withdrawn.values()}
+    assert withdrawn_ids == c_ids - set(module.MAIN_C_CROP_ONLY_IDS)
+    assert {r["id"] for r in records.values() if r["id"] in c_ids} == c_ids
     soil_, climate_, calendars = repository_demo_inputs()
     span = daily_years()
     by_rotation = {}
