@@ -36,7 +36,7 @@ from api.ports import (
     RunSettings,
 )
 from api.test_decision_layer import smallest_document
-from api.test_rotations import FakeClimate, FakeSoilSlope, PERIOD
+from api.test_rotations import PERIOD, FakeClimate, FakeSoilSlope
 from contracts.decision_output import DecisionOutput
 from contracts.inputs import SiteClimate
 from contracts.results.models import ResultsPerRotation, ResultsTable
@@ -545,7 +545,6 @@ class _BrokenDecisionModule(MetaPathFinder):
                 "No module named 'PLACEHOLDER_absent_dependency'",
                 name="PLACEHOLDER_absent_dependency",
             )
-        return None
 
 
 @pytest.fixture
