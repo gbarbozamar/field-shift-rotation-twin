@@ -7,9 +7,11 @@ rule — through the decision functions of ``decision/functions.py``: the
 counts by year (D1, with no limit declared, so D60 judges nothing), the
 paired differences and their ranges (D2, D92: every difference is missing
 ``MISSING_INPUT`` naming its sides, so no range exists to compute), the
-counts of the cells of a pair and the coverage (D87, D99, D91), the state
-of each pair (D7, D85: no paired difference holds a value, so every pair
-is not evaluated and has no state), dominance (D5), the ranking of an
+counts of the cells of a pair and the coverage (D87, D99, D91, one count
+per carbon model and computation, D169), the state of each pair (D7, D85
+with D166 and D175: no paired difference holds a value in any scenario,
+so every pair is not evaluated and has no state, the state of each member
+shown beside the state of the set), dominance (D5), the ranking of an
 indicator (D6: every value of every indicator is missing, so nothing is
 ranked) and the measurement priority (D4: no uncertain input's mapping can
 be declared over this table, so the machinery answers over none and the
@@ -27,19 +29,41 @@ than hides (the contract is never changed here):
   indicator (D87), so the count by the sign of the point value stays
   missing (C3.1) and only the count by the range exists — all zeros, no
   cell being compared;
+- the counts of the cells of a pair are one per carbon model and
+  computation (D169): the six carbon cells of a level are six counts of
+  one cell each, and every item of the document names its model and its
+  computation, so the cells of AMG and of RothC are never added in one
+  count (D155, D169);
+- the state of each pair is read level by level (D166, D175): each
+  scenario on its own, the set not evaluated because every member is
+  (D85 — no paired difference holds a value in either), and the state of
+  each member shown beside the state of the set (D152). The rule of D165
+  and the worst-case arithmetic of D92 have no cell to speak of on this
+  table — no difference holds a value, so no range exists to touch or
+  cross zero — and the computation of the trend that enters the state is
+  ``end_minus_start`` (D173, C1.6), the default no user has overridden;
 - the tipping point of D3 is not computed: the ``UncertainInput`` form
   cannot honestly carry the residue-cover block (the cover drives no cell
   of the table, D116, and its upper level holds no single admitted value,
   the caps of D115 being per sequence and missing before a winter cereal),
   so no ``(value, scenario)`` mapping is declared — a gap reported beside
   the document, to be settled with the form when the runner's outputs
-  arrive;
+  arrive. D176 answers the form of the question for #267: yes, this block
+  at these two levels is the input of the sweep, with its conditions —
+  the phases of D117 built first (D166), a level D115 leaves missing
+  making that member not evaluated and never a tipping point of the cover
+  (D175), and, until the water balance carries a number (the only engine
+  that reads the declared cover, D110 and D116; with the declared ``C`` of
+  D148 and D158 EP1 gives one figure for both rotations), the expected
+  result of the real sweep is "no tipping point", for that reason;
 - the phases of D109 nested inside each level (D117) are not materialized:
   the rotations hold one, two and four phases, and the results contract
   requires the same cells for every rotation, so per-phase scenarios
   cannot be written without inventing rows; each level stands as one
   scenario, the degenerate single-phase reading the machinery accepts and
-  names as such (see ``demo/bounded.py``).
+  names as such (see ``demo/bounded.py``). When they materialize, the
+  scenarios of a pair are every combination of the phases of the two
+  rotations, N x M of them (D172).
 
 The return path this unit documents: when the runner's outputs arrive, the
 cells of ``demo/bounded.py`` fill with real engine values, the mapping of
@@ -77,6 +101,7 @@ from contracts.inputs.common import Missing, Range, Value
 from contracts.results.models import ResultsTable
 from decision.functions import (
     LimitCounts,
+    NOT_EVALUATED,
     indicator_ranking,
     limit_counts,
     measurement_priority,
@@ -264,13 +289,18 @@ def paired_difference_items(
 def pair_cell_count_items(
     table: ResultsTable | None = None,
 ) -> list[PairCellCount]:
-    """The two counts of the cells of each pair (D87 with D99) and the
-    tolerance each needs (D87).
+    """The two counts of the cells of each pair (D87 with D99, keyed by
+    D169) and the tolerance each needs (D87).
 
     No tolerance of "equal" is set for any indicator of the bounded case,
     so every count by the sign of the point value is missing with its
     reason (C3.1, D87) and the count by the range alone remains — all
-    zeros, no cell holding a value on both sides.
+    zeros, no cell holding a value on both sides. D169 ("One count per
+    pair, scenario, indicator, carbon model and computation, so that the
+    cells of AMG and of RothC, which D155 never reads together, are never
+    added in one count") splits the six carbon cells of a level into six
+    counts of one cell each: each item names its carbon model and its
+    computation, as the machinery's ``PairCounts`` does.
     """
     table = bounded.bounded_matrix() if table is None else table
     items: list[PairCellCount] = []
@@ -284,6 +314,8 @@ def pair_cell_count_items(
                     pair=[first, second],
                     scenario_id=count.scenario_id,
                     indicator=count.indicator,
+                    carbon_model=count.carbon_model,  # D169
+                    computation=count.computation,  # D169
                     by_difference_range=CountByDifferenceRange(
                         strict_improvement=count.by_range.strict_improvement,
                         deterioration=count.by_range.deterioration,
@@ -308,8 +340,9 @@ def pair_states_of_the_set(
     table: ResultsTable | None = None,
 ) -> list[PairState]:
     """The state of each pair over the whole admitted set (D7, D74): not
-    evaluated, with no state (D85), and the coverage of D91 — no cell
-    compared out of all the cells of the pair."""
+    evaluated, with no state (D85 — every member is, D166 and D175), and
+    the coverage of D91 — no cell compared out of all the cells of the
+    pair."""
     table = bounded.bounded_matrix() if table is None else table
     items: list[PairState] = []
     for first, second in PAIRS:
@@ -356,14 +389,27 @@ def the_state(table: ResultsTable | None = None) -> State:
             for indicator in state.indicators_not_resolved
         }
     )
-    reasons = [
-        (
+    reasons = []
+    for (first, second), state in zip(PAIRS, states):
+        reason = (
             f"the pair ('{first}', '{second}') is not evaluated: no paired "
             "difference holds a value, so it has no state (D85) and no "
             "indicator is resolved by it"
         )
-        for first, second in PAIRS
-    ]
+        if state.by_scenario:
+            # D152: "The conditions that did not give the state are still
+            # shown"; D166: the state of each scenario is shown beside the
+            # state of the set. A member without a state is written with
+            # the label D151 gives that absence (D175 keeps it from ever
+            # making the set a robust preference).
+            reason += (
+                "; in each scenario: "
+                + ", ".join(
+                    f"'{scenario_id}' '{member or NOT_EVALUATED}'"
+                    for scenario_id, member in state.by_scenario
+                )
+            )
+        reasons.append(reason)
     for indicator in INDICATORS:
         ranking = indicator_ranking(table, indicator)
         if ranking.every_value_missing:
@@ -546,11 +592,16 @@ def main() -> None:
         "No tipping point of D3 is computed and the priority list of D4 is "
         "empty: no uncertain input's mapping can be declared over this "
         "table (the cover block drives no cell of it and its upper level "
-        "holds no single admitted value). Every cell is missing "
-        "NOT_AVAILABLE, 'the engine's real outputs are not wired to the "
-        "demo yet' (the real-or-missing rule, approved 15 November 2026): "
-        "when the runner's outputs arrive the cells fill and the same "
-        "tests assert real values."
+        "holds no single admitted value). D176 confirms the block, at these "
+        "two levels, as the input of the sweep of #267, with its "
+        "conditions: until the water balance carries a number (the only "
+        "engine that reads the declared cover) the expected result of the "
+        "real sweep is \"no tipping point\", for that reason, and a level "
+        "D115 leaves missing makes that member not evaluated (D175). Every "
+        "cell is missing NOT_AVAILABLE, 'the engine's real outputs are not "
+        "wired to the demo yet' (the real-or-missing rule, approved 15 "
+        "November 2026): when the runner's outputs arrive the cells fill "
+        "and the same tests assert real values."
     )
 
 
