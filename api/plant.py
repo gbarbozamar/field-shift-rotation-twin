@@ -182,6 +182,11 @@ NOT_FINITE = (
     "the rainfall erosivity of the parameter catalogue times the factor is not "
     "a finite number"
 )
+# PROPOSED (S-032, decision R25, fix round 1): the heavier-rain stress test is
+# a modelling choice inside api/ until the erosion lane takes it as an option
+# of EP1, so a person switches it on with RAIN_STRESS_TEST=on (api/config.py).
+# The sentence is shown to public users: it names no server variable.
+NOT_SWITCHED_ON = "heavier rain is not switched on in this service"
 NO_WHOLE_YEAR = (
     "the climate record period holds no whole agricultural year for the start "
     "month of the rotations"
@@ -370,6 +375,8 @@ def stressed_run(
     engines: RotationEngines,
     factory: EnginesFactory | None,
     catalogue: dict[str, dict] | None,
+    *,
+    rain_stress_switched_on: bool,
 ) -> StressedRun:
     """The engines for this request and the rain-stress echo. PROPOSED (R10).
 
@@ -390,6 +397,11 @@ def stressed_run(
     factor is not applied either, with ``NOT_FINITE`` in the detail, never a
     ``500``. Any ``ValueError`` of ``scale_erosivity`` still surfaces (the
     route's ``500``): it is a defect, not a reason of the echo.
+
+    PROPOSED (S-032, decision R25): ``rain_stress_switched_on`` is required
+    (no default, so a forgotten pass fails loudly). False: a declared factor is not applied: the engines unchanged,
+    the echo ``applied`` false with ``NOT_SWITCHED_ON`` in its detail, and
+    the factory never called. No factor and a missing factor are unchanged.
     """
     factor = request.questions.rain_stress_factor
     if factor is None:
@@ -397,6 +409,8 @@ def stressed_run(
     stress = rain_stress(factor)
     if isinstance(stress, RainStressMissing):
         return StressedRun(engines, stress)
+    if not rain_stress_switched_on:
+        return StressedRun(engines, _not_applied(stress, NOT_SWITCHED_ON))
     if factory is None or catalogue is None:
         why = NO_FACTORY if factory is None else NO_CATALOGUE
         return StressedRun(engines, _not_applied(stress, why))
@@ -429,9 +443,15 @@ def make_plant_router(
     kinds_of_year_record: Mapping[str, Any] | None,
     engines_factory: EnginesFactory | None,
     parameters: dict[str, dict] | None,
+    rain_stress_switched_on: bool,
     plant_layer: PlantLayer | None = None,
 ) -> APIRouter:
     """The plant route, bound to the given implementations.
+
+    PROPOSED (S-032, decision R25): ``rain_stress_switched_on`` is required
+    (no default; ``create_app`` holds the default, off). False means a declared rain-stress factor is echoed not applied with
+    ``NOT_SWITCHED_ON``, and ``engines_factory`` is never called; true means
+    the factor is applied as ``stressed_run`` describes.
 
     PROPOSED (S-031): ``kinds_of_year_record`` ``None`` means no record is
     configured (never "the committed one"). ``plant_layer`` ``None`` means
@@ -480,7 +500,13 @@ def make_plant_router(
             soil_result = soil_slope.get_soil_slope(
                 request.site.case_id, request.site.field_id
             )
-            run = stressed_run(request, engines, engines_factory, parameters)
+            run = stressed_run(
+                request,
+                engines,
+                engines_factory,
+                parameters,
+                rain_stress_switched_on=rain_stress_switched_on,
+            )
             runs = [
                 run.engines.run(rotation, climate_result, soil_result)
                 for rotation in rotations

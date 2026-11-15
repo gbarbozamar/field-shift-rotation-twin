@@ -383,6 +383,16 @@ In order:
    `engines` and a factory both given, the catalogue of the injected engines
    is not known: the factory is not called and the echo says `applied: false`
    with that reason (PROPOSED).
+
+   **The switch (PROPOSED, S-032, decision R25).** The stress test is off
+   unless a person sets `RAIN_STRESS_TEST=on` (`create_app(...,
+   rain_stress_switched_on=True)` in tests). Switched off, a declared factor
+   is echoed `applied: false` with `api.plant.NOT_SWITCHED_ON` in its detail,
+   the engines run unchanged and `engines_factory` is never called; no factor
+   and a missing factor are answered as above. Why: how rain enters erosion
+   and how its uncertainty scales is a science choice (review point 3 of PR
+   310), to be proposed to the erosion lane as an option of EP1; until it is
+   one, `api/` never applies it silently.
 10. `erosivity` is `"mean_annual"` (S-026 may add `"per_year"`).
 11. `example_data` is true when the request says so, when a rotation, the
     climate or the soil and slope carries the mark
@@ -469,6 +479,7 @@ only its path and the reason.
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
 | `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on, such as `kinds_of_year/records/oni_v6.json`; read once at start-up (parsed with `json.loads`, then classified once by `kinds_of_year.classify_agricultural_years` as a check) and passed to `create_app`. `compose.yaml` sets it to `kinds_of_year/records/oni_v6.json` for the local stack only (PROPOSED, R24; start with `KINDS_OF_YEAR_RECORD_FILE=` to run without it) | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
+| `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` sets it to `on` for the local stack only (`${RAIN_STRESS_TEST-on}`; start with `RAIN_STRESS_TEST=` to switch it off). The detail shown to users (`NOT_SWITCHED_ON`) names no variable | Off: a declared rain-stress factor is echoed `applied: false` with the reason `NOT_SWITCHED_ON`, and the engines run unchanged |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -512,6 +523,9 @@ on `httpx.MockTransport`.
   row; fix round 1, F3), or `kinds_of_year` cannot be imported (F4, the
   cause chained). Checked once, here, never per request (F9 of
   review-whole-4). PROPOSED.
+- `RAIN_STRESS_TEST` set to anything but `on` (after stripping spaces; `ON`,
+  `yes`, `true` and `1` included); the message names the variable and never
+  repeats the value. PROPOSED (S-032).
 - The parameter catalogue in `params/records/` has any problem of
   `load_folder` or `check_catalogue` (not a variable; see "The parameter
   catalogue" under the engine runner). An empty catalogue starts.
@@ -535,6 +549,7 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
 | `KINDS_OF_YEAR_RECORD_FILE` | Unset until the operator switches the record on after signing it; then `kinds_of_year/records/oni_v6.json` | S-031 (PROPOSED) |
+| `RAIN_STRESS_TEST` | Unset (off) unless a person decides to switch the heavier-rain stress test on; then `on` | S-032 (PROPOSED) |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
 

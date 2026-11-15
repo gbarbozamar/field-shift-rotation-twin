@@ -36,6 +36,9 @@ services:
       # without it:  KINDS_OF_YEAR_RECORD_FILE= docker compose watch
       # PROPOSED (R24): local stack only; the record still carries UNSIGNED_AI_PRECHECK; a person switches it on in the host settings after signing it.
       KINDS_OF_YEAR_RECORD_FILE: ${KINDS_OF_YEAR_RECORD_FILE-kinds_of_year/records/oni_v6.json}
+      # PROPOSED (S-032): the local stack switches the heavier-rain stress test on; the deployed service leaves it off unless a person sets it in the host settings.
+      # Start with it empty to switch it off:  RAIN_STRESS_TEST= docker compose watch
+      RAIN_STRESS_TEST: ${RAIN_STRESS_TEST-on}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:

@@ -63,6 +63,7 @@ def create_app(
     kinds_of_year_record: Mapping[str, Any] | None = None,
     engines_factory: EnginesFactory | None = None,
     plant_layer: PlantLayer | None = None,
+    rain_stress_switched_on: bool = False,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -108,6 +109,15 @@ def create_app(
     on each request, never when the app is built, and answers "not built"
     when one is absent. Nothing of ``economics/``, ``kinds_of_year/`` or
     ``contracts.plant_answer`` is imported by this module.
+
+    PROPOSED (unit ``l2/rain-stress-switch``, S-032, decision R25):
+    ``rain_stress_switched_on`` false (the default) means the plant route
+    applies no rain-stress factor: a declared one is echoed not applied with
+    the reason ``api.plant.NOT_SWITCHED_ON`` and ``engines_factory`` is never
+    called. How rain enters erosion and how its uncertainty scales is a
+    science choice, to be proposed to the erosion lane as an option of EP1;
+    until then a person switches it on (``RAIN_STRESS_TEST=on``, read by
+    ``api.config``).
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -175,6 +185,7 @@ def create_app(
             engines_factory=engines_factory,
             parameters=plant_catalogue,
             plant_layer=plant_layer,
+            rain_stress_switched_on=rain_stress_switched_on,
         )
     )
 

@@ -37,6 +37,13 @@ imported, is a ``ConfigError`` naming the variable.
 ``build_app`` passes the record to ``create_app``; it is never read again on
 a request.
 
+``RAIN_STRESS_TEST`` (PROPOSED, unit ``l2/rain-stress-switch``, S-032,
+decision R25) switches the heavier-rain stress test of the plant route on.
+Unset or blank: off (a declared factor is echoed not applied, with its
+reason). The only accepted value is exactly ``on`` (after stripping spaces);
+any other value is a ``ConfigError`` naming the variable, never repeating the
+value.
+
 Status: PROPOSED (blueprint section 3.7), including the variable names, the
 rules above and the message texts.
 """
@@ -83,6 +90,9 @@ SOIL_SLOPE_EXAMPLE_FILE = "SOIL_SLOPE_EXAMPLE_FILE"
 SOIL_TABLE_FILES = "SOIL_TABLE_FILES"
 SOIL_GROUPS_FILE = "SOIL_GROUPS_FILE"
 KINDS_OF_YEAR_RECORD_FILE = "KINDS_OF_YEAR_RECORD_FILE"
+RAIN_STRESS_TEST = "RAIN_STRESS_TEST"
+# PROPOSED (S-032): the one value of RAIN_STRESS_TEST that switches it on.
+SWITCHED_ON = "on"
 
 VARIABLES: tuple[str, ...] = (
     CORS_ORIGINS,
@@ -94,6 +104,7 @@ VARIABLES: tuple[str, ...] = (
     SOIL_TABLE_FILES,
     SOIL_GROUPS_FILE,
     KINDS_OF_YEAR_RECORD_FILE,
+    RAIN_STRESS_TEST,
 )
 
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -139,6 +150,8 @@ class AppConfig:
     # PROPOSED (S-031): the ONI record KINDS_OF_YEAR_RECORD_FILE names, read
     # and checked once; ``None`` when the variable is not set.
     kinds_of_year_record: Mapping[str, Any] | None = None
+    # PROPOSED (S-032): RAIN_STRESS_TEST=on; off when the variable is not set.
+    rain_stress_switched_on: bool = False
 
 
 # --- reading the variables ----------------------------------------------------
@@ -401,6 +414,23 @@ def _kinds_of_year_record(environ: Mapping[str, str]) -> Mapping[str, Any] | Non
     return record
 
 
+def _rain_stress_switched_on(environ: Mapping[str, str]) -> bool:
+    """``RAIN_STRESS_TEST``: exactly ``on``, or unset. PROPOSED (S-032, R25).
+
+    The message of a wrong value names the variable, never the value.
+    """
+    value = _value(environ, RAIN_STRESS_TEST)
+    if value is None:
+        return False
+    if value != SWITCHED_ON:
+        raise ConfigError(
+            f"{RAIN_STRESS_TEST} has a value other than '{SWITCHED_ON}': set it "
+            f"to '{SWITCHED_ON}' to switch the heavier-rain stress test on, or "
+            "leave it unset"
+        )
+    return True
+
+
 def load_parameters(folder: Path) -> dict[str, dict]:
     """The parameter catalogue under ``folder``, loaded and checked.
 
@@ -438,6 +468,7 @@ def load_config(
         soil_tables=_soil_tables(environ),
         parameters=load_parameters(parameters_folder),
         kinds_of_year_record=_kinds_of_year_record(environ),
+        rain_stress_switched_on=_rain_stress_switched_on(environ),
     )
 
 
@@ -500,6 +531,7 @@ def build_app(
         settings=config.run_settings,
         parameters=config.parameters,
         kinds_of_year_record=config.kinds_of_year_record,
+        rain_stress_switched_on=config.rain_stress_switched_on,
     )
     if client is not None:
         _close_on_shutdown(app, client)
