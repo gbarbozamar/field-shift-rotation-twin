@@ -580,7 +580,7 @@ The two context blocks of this section (soil loss measured with ¹³⁷Cs, and t
   - accumulation at the last point (200 m, near the foot of the slope): 37.9 and 12.4 respectively;
   - the four erosion points of the continuous-cropping plot "oscilan entre 4,0 y 11,7 Mg/ha/año". For the rotation plot the text prints no range; Cuadro 1 prints 2.4 as the lowest and 5.7 as the highest of its four erosion points.
 - What it is not:
-  - It is another experiment, on other plots, than the Wischmeier runoff plots of the check above and than the demonstration point. D71 keeps the experiments of La Estanzuela separate from the demonstration.
+  - It is another experiment, on other plots, than the Wischmeier runoff plots of the check above and than the demonstration point. [D71](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885437753) makes the La Estanzuela station the base of the demonstration and keeps the runoff plots of Grahmann et al. (2022) and the long-term carbon experiment LEELP1 as separate experiments: "a contrast from one is never merged with the other".
   - It integrates about six decades and the past tillage of the plots. It is not a measurement under the no-till rotations of D128.
   - It does not check the rotations of D128, nor the declared-`C` figure of D125 with the label of [D148](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333), nor what [D213](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6892169953) says about erosion and the two rotations. No ratio with any value of an engine is computed here.
 - Transcribed by an AI session (D34), from the pages cited, on 15 November 2026. Checked by: OPEN.
@@ -597,7 +597,7 @@ The two context blocks of this section (soil loss measured with ¹³⁷Cs, and t
 - Source: Mazzilli, S., Piñeiro, G., Kemanian, A. (2012). "Priming effects on soil organic carbon decomposition induced by high C:N crop inputs". *Agrociencia (Uruguay)* 16(3):191-198, https://doi.org/10.31285/AGRO.16.669. Read in a copy of the article.
 - Site:
   - 10 km south of Paysandú (31° 21' S, 58° 02' W), a Typic Argiudol with 280 g kg−1 of clay in the first 0.3 m (p. 192);
-  - continuous wheat from 1940 to 1970, crops rotated with tall fescue from 1970 to 1993, not cropped from 1993 until the experiment of 2007 (pp. 192-193);
+  - continuous wheat from 1940 to 1970, from 1970 to 1993 a six-year crop–pasture rotation of three years of a mixed pasture (white clover, birdsfoot trefoil and tall fescue) and three years of crops, not cropped from 1993 until the experiment of 2007 (pp. 192-193);
   - no-till corn and soybean sown on 6 December 2007 and 28 November 2008 (p. 193).
 - What the article prints:
   - Table 1, "Crop Production (Mg of C ha-1)", p. 194:
@@ -606,8 +606,8 @@ The two context blocks of this section (soil loss measured with ¹³⁷Cs, and t
     - Aboveground: "Grain is not included". Belowground: "In the first 30 cm of soil".
     - Table 1 does not print the period its values cover.
   - Text, p. 194: "Carbon inputs per year from corn were on average 4.4 and 0.9 Mg ha-1 for aboveground and belowground, respectively". The same paragraph says these were "approximately 1.2 and 0.5 Mg.ha-1 higher than those for soybean". **The article prints no per-year value for soybean, and none is written here.**
-  - Abstract, p. 191: corn and soybean C inputs of "10.7 and 7.0 Mg ha-1". Reading of the transcriber, not printed: the corn total is the sum of the two corn values of Table 1 (8.8 + 1.9), and the per-year corn values of the text are half of them, so Table 1 and the abstract read as totals over the two seasons. The soybean values of Table 1 add up to 7.4, not the 7.0 of the abstract, and the article does not say why.
-  - Carbon concentration, Table 1, p. 194, in g g-1: soybean 0.50 ± 0.1 aboveground and 0.39 ± 0.04 belowground; corn 0.44 ± 0.1 aboveground and 0.37 ± 0.04 belowground.
+  - Abstract, p. 191: corn and soybean C inputs of "10.7 and 7.0 Mg ha-1". Reading of the transcriber, not printed: the corn total is the sum of the two corn values of Table 1 (8.8 + 1.9), and the per-year corn values of the text are about half of them, so Table 1 and the abstract read as totals over the two seasons. The soybean values of Table 1 add up to 7.4, not the 7.0 of the abstract, and the article does not say why.
+  - Carbon concentration, Table 1, p. 194, in g g-1 (written here because the 0.44 and 0.40 of D197 are compared with it): soybean 0.50 ± 0.1 aboveground and 0.39 ± 0.04 belowground; corn 0.44 ± 0.1 aboveground and 0.37 ± 0.04 belowground.
 - Limits the article states:
   - "Crop biomass production in both years was high in relation to that expected for rainfed crops in this region" (p. 194);
   - roots were measured at flowering with soil cores (p. 193);
