@@ -29,6 +29,12 @@ start. No variable has a default.
   never with ``SOIL_SLOPE_EXAMPLE_FILE``. Set: the soil-and-slope source is
   ``adapters.soil_tables.SoilTableSource`` (soil by soil group, D48, D49;
   slope not built).
+- ``KINDS_OF_YEAR_RECORD_FILE``: path of the ONI record the plant route
+  classifies the kinds of year on, read once at start-up. Unset: every kind
+  of year of a plant answer is missing ``NOT_AVAILABLE``.
+- ``RAIN_STRESS_TEST``: exactly ``on`` switches the heavier-rain stress test
+  of ``POST /api/plant/run`` on; any other value stops start-up. Unset: off,
+  a declared rain-stress factor is echoed not applied.
 
 The parameter catalogue is not a variable: ``load_config`` loads it once from
 ``params/records/`` and checks it; a problem stops start-up, an empty
