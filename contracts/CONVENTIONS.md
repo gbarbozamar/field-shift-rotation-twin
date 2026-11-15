@@ -86,11 +86,12 @@ Still to be supplied by a person:
 
 While the definition is incomplete (critical period, state of the balance), no engine reports `water_deficit_exposure` as anything but missing, with its reason. See the first clash below.
 
-`OPEN`, clashes between texts. Neither is resolved here; a person decides:
+- **Phases and the one-input sweep (D117).** Decision of [issue #77, D117](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886636603), 15 November 2026: "The phases are nested inside each value of the input. The state at a value of the input is the state over all the phases at that value, read as D74 reads a set of scenarios: a robust preference only if it is one in every phase, otherwise 'Not robust across scenarios' (D88). The tipping point of D3 is the bracket between adjacent values where that state changes. A phase is not an uncertain input: it repeats the comparison over how each crop falls on the historical years, the person knows the phase of the field, and it never enters the priority list of D4." It is a logic decision of the lead developer and answers the question that the comment recording D109 left open: how the phases of D109 combine with the one-input sweep of D3 as D103 reads it. See also Q5 in `contracts/ENTRYPOINTS.md`.
+
+`OPEN`, clashes between texts. They are not from a decision of issue #77: they were found by the session that wrote this section, between this file and the decisions. Neither is resolved here; a person decides:
 
 1. **The window of the ratio.** D105: "The whole cycle of each crop, from sowing to harvest, with the declared dates of D72". Section C1.3 of this file, rows "Quantity" and "Time basis": "over the critical period of the crop (C1.4)", "The critical period of the crop (C1.4)". C1.3 is outside this unit and is not changed. Question for the lead developer: **does C1.3 now read "whole cycle" until growth stages travel in the calendar?**
 2. **When the indicator may be a number.** The paragraph above: "no engine reports `water_deficit_exposure` as anything but missing, with its reason" while the critical period and the state of the balance are not defined. D105 gives the window of the ratio for the event and D79 gives the summary ("sum of actual over sum of potential transpiration over the supported windows"), but no decision says that the critical period and the state of the balance are no longer needed for a number. Question for the lead developer: **may an engine report the ratio over the whole cycle, with the state of the balance still open?**
-3. **Phases and scenarios (D109, D103).** The comment that records D109 says, as still open for the lead developer: "how the phases of D109 combine with the one-input sweep of D3 as D103 reads it (each value of the input is one admitted scenario), now that each phase is a scenario too." See also Q5 in `contracts/ENTRYPOINTS.md`.
 
 ### C1.5 Trend of soil carbon: identifier, unit, time basis and direction
 
