@@ -226,6 +226,8 @@ def client(**kwargs: Any) -> TestClient:
     # S-031: create_app no longer loads the committed ONI record; the tests
     # that relied on it inject it here.
     kwargs.setdefault("kinds_of_year_record", load_record())
+    # S-032: every test here expects the factor path of the request to run.
+    kwargs.setdefault("rain_stress_switched_on", True)
     if "engines" not in kwargs:
         kwargs.setdefault("parameters", CATALOGUE)
         kwargs.setdefault("engines_factory", Factory())
@@ -823,7 +825,7 @@ def test_the_default_app_answers_the_example_request():
     """The engines of the repository, the stand-in sources and no period: a
     200 with every soil-loss mean missing and the stress applied through the
     default factory on the catalogue."""
-    app = create_app([], parameters=CATALOGUE)
+    app = create_app([], parameters=CATALOGUE, rain_stress_switched_on=True)
     data = answered(TestClient(app).post(ROUTE, json=REQUEST))
     checked(REQUEST, data)
     assert data["rain_stress"]["applied"] is True
@@ -1115,7 +1117,9 @@ def test_f3_a_catalogue_without_the_r_record_never_calls_the_factory():
     factory, calls = _counting_factory()
     engines = FakeEngines()
     request = PlantRequest.model_validate_json(json.dumps(REQUEST))
-    run = stressed_run(request, engines, factory, WITHOUT_R)
+    run = stressed_run(
+        request, engines, factory, WITHOUT_R, rain_stress_switched_on=True
+    )
     assert calls == []
     assert run.engines is engines
     assert run.echo.applied is False
