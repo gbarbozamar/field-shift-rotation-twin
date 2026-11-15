@@ -131,7 +131,7 @@ class ScenarioOut(BaseModel):
     ``scenario_id`` is ``phase_1`` ... ``phase_N``; ``first_ag_year`` is the
     agricultural year (C5.3) of the calendar built by EP2 that comes first in
     this phase, ``null`` when it cannot be told. ``calendar`` is the calendar
-    the phase ran on (moved by api/phases.py). The sources are those of the
+    the phase ran on (laid out by lane L1, api/phases.py). The sources are those of the
     envelope: the inputs are the same for every phase.
     """
 

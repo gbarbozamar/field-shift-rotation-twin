@@ -37,9 +37,10 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    form; every other absence keeps ``result=None`` with its reason.
 
 Steps 2 to 5 run once per phase of the rotation (decision D109 of issue
-#77; ``api/phases.py``, PROPOSED), on a calendar moved so that the phase's
-year comes first; phase 1 is the calendar of EP2 unchanged and is the
-top-level answer. ``EnginesResult.phases`` holds one ``PhaseResult`` per
+#77; ``api/phases.py``, PROPOSED), on the calendar of the phase that
+``engine.calendar.repeat.phase_calendar`` returns (D141: no phase is
+refused); phase 1 is the calendar of EP2 unchanged and is the top-level
+answer. Without those phase functions only phase 1 runs. ``EnginesResult.phases`` holds one ``PhaseResult`` per
 phase. An infeasible calendar, and every absence before step 2, runs once.
 
 Each engine function is injected (``EngineFunctions``). ``None`` means "this
@@ -71,7 +72,6 @@ from adapters.ports import ClimateResult, SoilSlopeResult
 from api.carbon_forcing import STOCK_UNIT, build_carbon_forcing, crops_left_out
 from api.phases import (
     REPEAT_MODULE,
-    RUNNER_COPY,
     Phase,
     PhaseFunctions,
     first_phase,
@@ -198,7 +198,7 @@ class EngineFunctions:
     # EP5
     run_amg: Callable[..., CarbonBalance] | None = None
     # The phase rule of lane L1 (issue #221), not an entry point. Used only
-    # when both are given; otherwise the runner's copy in api/phases.py.
+    # when both are given; otherwise only phase 1 runs.
     phase_calendar: Callable[..., RotationCalendar] | None = None
     list_phases: Callable[..., list[int]] | None = None
 
@@ -227,7 +227,7 @@ def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
 
 
 # The two functions of the phase rule agreed on issue #221, found by name in
-# ``engine.calendar.repeat`` like the entry points (PROPOSED transition).
+# ``engine.calendar.repeat`` like the entry points.
 PHASE_FUNCTIONS: tuple[EntryPoint, ...] = (
     EntryPoint("D109", "calendar", REPEAT_MODULE, "phase_calendar"),
     EntryPoint("D109", "calendar", REPEAT_MODULE, "list_phases"),
@@ -238,7 +238,7 @@ def discover_engine_functions() -> EngineFunctions:
     """Import each engine function by its exact module path and name.
 
     Also the two phase functions of issue #221; either one absent leaves both
-    ``None`` in effect (the runner then uses its own copy).
+    ``None`` in effect (the runner then runs phase 1 only).
     """
     return EngineFunctions(
         **{point.function: _import_function(point) for point in DISCOVERED},
@@ -246,13 +246,13 @@ def discover_engine_functions() -> EngineFunctions:
     )
 
 
-def phase_functions_of(functions: EngineFunctions) -> PhaseFunctions:
-    """Lane L1's phase functions when both exist, else the runner's copy."""
+def phase_functions_of(functions: EngineFunctions) -> PhaseFunctions | None:
+    """Lane L1's phase functions when both exist, else ``None`` (phase 1 only)."""
     if functions.phase_calendar is not None and functions.list_phases is not None:
         return PhaseFunctions(
             functions.phase_calendar, functions.list_phases, REPEAT_MODULE
         )
-    return RUNNER_COPY
+    return None
 
 
 def takes_parameters(function: Callable[..., Any]) -> bool:
@@ -609,7 +609,8 @@ def ledger_carbon_inputs(ledger: Any) -> Any:
 def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     """The note on the carbon inputs copied from the ledger (PROPOSED text).
 
-    States the unit question (OPEN 3 of the residue ledger), that the ledger
+    States, when a series is not in the unit AMG requires, that D147 has EP4
+    write that unit (the runner converts none), that the ledger
     wrote no series when it wrote none, and how many series carry
     ``NOT_COMPUTABLE`` years, copied, never left out.
     """
@@ -628,8 +629,8 @@ def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     )
     if any(unit != STOCK_UNIT for unit in units):
         note += (
-            f" and {_name(AMG)} requires {STOCK_UNIT!r}: who converts is OPEN "
-            "(OPEN 3 of the residue ledger, for the lead developer)"
+            f" and {_name(AMG)} requires {STOCK_UNIT!r}: by D147 of issue #77 "
+            f"{_name(RESIDUES)} writes these series in {STOCK_UNIT!r}"
         )
     not_computable = sum(
         1
@@ -798,8 +799,9 @@ class EntryPointEngines:
             )
 
         # 4. The phases of D109 (api/phases.py, PROPOSED): one run of EP1, EP3
-        # and EP5 per phase, on the calendar of that phase; phase 1 is the
-        # calendar unchanged. An infeasible calendar runs once, unmoved.
+        # and EP5 per phase, on the calendar lane L1 lays out for it (D141);
+        # phase 1 is the calendar unchanged. An infeasible calendar runs once,
+        # unmoved; so does every calendar when the phase functions are absent.
         if calendar.feasibility.feasible:
             phases = phase_calendars(calendar, phase_functions_of(functions))
         else:
@@ -828,8 +830,6 @@ class EntryPointEngines:
         residues_function = functions.build_residue_ledger
         amg_function = functions.run_amg
         amg_configured = AMG_CARBON_MODEL in self._carbon_models
-        if phase.calendar is None:
-            return _phase_not_laid_out(phase, functions, amg_configured)
         calendar = phase.calendar
         calendar_module = calendar_status(calendar)
         for note in phase.notes:
@@ -990,28 +990,6 @@ class EntryPointEngines:
             values_present=count.present,
             values_missing=count.missing,
         )
-
-
-def _phase_not_laid_out(
-    phase: Phase, functions: EngineFunctions, amg_configured: bool
-) -> EnginesResult:
-    """A phase whose calendar the phase function refused (the OPEN rule of a
-    crossing component): no engine is called, no result, the reason kept."""
-    assert phase.not_laid_out is not None
-    detail = "; ".join([*phase.notes, phase.not_laid_out])
-    reason: ReasonCode = "NOT_COMPUTABLE"  # PROPOSED
-    calendar_input = f"the rotation calendar of this phase: {detail}"
-    return EnginesResult(
-        calendar=None,
-        result=None,
-        result_missing=Missing(reason=reason, detail=detail),
-        modules=(
-            _status(CALENDAR.module_id, "not_available", reason, detail),
-            _dependent(EROSION, functions.compute_soil_loss, calendar_input),
-            _dependent(WATER, functions.compute_water_deficit_exposure, calendar_input),
-            *_carbon_dependent(functions, amg_configured, calendar_input),
-        ),
-    )
 
 
 def _once(built: RotationCalendar | None, **fields: Any) -> EnginesResult:

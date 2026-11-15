@@ -21,8 +21,8 @@ What each part gets is the table "The producer of CarbonForcing" of
 api/README.md. Every choice there is PROPOSED (blueprint section 3.7).
 
 ``annual_carbon_inputs`` are the series of the residue ledger (EP4) when the
-runner has one, copied unchanged and never converted (OPEN 3 of the ledger:
-its unit is not the one ``run_amg`` requires); otherwise one all-missing
+runner has one, copied unchanged and never converted (D147 of issue #77: EP4
+writes them in the unit ``run_amg`` requires); otherwise one all-missing
 series per crop (D122). See ``carbon_input_series``.
 
 When the horizon cannot be laid out (the calendar has no start month, the
@@ -384,7 +384,7 @@ def carbon_input_series(
       the same per-crop series, every year missing with that reason.
     - A sequence (the ``annual_carbon_inputs`` of a residue ledger): copied
       unchanged, the same objects in the same order. No unit is converted
-      (OPEN 3 of the residue ledger). A series that is not an
+      (D147: EP4 writes the unit ``run_amg`` requires). A series that is not an
       ``AnnualCarbonInputSeries``, or whose agricultural years are not those
       of the horizon, is a defect of the producer: ``TypeError``.
     """
