@@ -1885,31 +1885,546 @@ def test_calendar_with_no_component_has_no_following_crop_naming_open_31():
     assert f"the first on {first.isoformat()}" in result[0].missing.detail
 
 
-def test_depletion_above_the_reduced_evaporable_water_is_not_computable_naming_open_30():
+def check_carried_depletion(
+    days: list[module.ChainDay],
+    given: dict[dt.date, tuple[Any, Any, dict]],
+    initial: float,
+) -> int:
+    """Decision D185 of issue #77 (OPEN 30), written out here independently of
+    ``exposure._layer_start``, day by day: the step starts from the depletion
+    carried in, or from the total of the day when the depletion is above it;
+    the infiltration of the day (precipitation less the runoff applied)
+    refills the part above the total first, and only the rest is given to the
+    step; the part not refilled is carried on top of the depletion at the end
+    of the day, and while some is left the layer evaporates nothing. Across
+    days the carried depletion closes its mass with the real infiltration:
+    its change is -I + DP + E/few. Returns the number of days that started
+    above their total."""
+    carried = initial
+    days_above = 0
+    for day in days:
+        depletion_start, day_input, constants = given[day.date]
+        layer = day.surface_layer
+        total = constants["total_evaporable_water"]
+        precipitation = day.precipitation
+        infiltration = precipitation - min(day.runoff.runoff, precipitation)
+        if carried > total:
+            days_above += 1
+            above = carried - total
+            refill = min(above, infiltration)
+            left = above - refill
+            assert depletion_start == pytest.approx(total)
+            assert day_input.precipitation == pytest.approx(precipitation - refill)
+            if left > 0:
+                # The layer stays at its limit all day: neither it nor the
+                # column evaporates, whatever the readily evaporable water.
+                assert layer.evaporation == 0
+                assert day.balance.evaporation == 0
+            expected = layer.depletion_end + left
+        else:
+            assert depletion_start == pytest.approx(carried)
+            assert day_input.precipitation == precipitation
+            expected = layer.depletion_end
+        assert day.surface_depletion_carried == pytest.approx(expected)
+        change = day.surface_depletion_carried - carried
+        flows = (
+            -infiltration
+            + layer.deep_percolation
+            + layer.evaporation_from_exposed_fraction
+        )
+        scale = max(abs(term) for term in (carried, infiltration, change, flows))
+        assert abs(change - flows) <= 64 * sys.float_info.epsilon * max(scale, 1.0)
+        # The column balance is given the whole precipitation of the day.
+        assert day.balance.precipitation == precipitation
+        carried = day.surface_depletion_carried
+    return days_above
+
+
+def test_depletion_above_the_reduced_evaporable_water_is_kept_and_refilled_first(
+    monkeypatch,
+):
     # An initial depletion within the total evaporable water of a day with a
     # crop and above the one of the fallow (both PLACEHOLDER).
     start = 4.22
-    assert mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"]) < start < PLACEHOLDER_TEW
+    reduced = mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"])
+    assert reduced < start < PLACEHOLDER_TEW
     above = {("initial_depletion", None): site_record("initial_depletion", start)}
-    result = run(parameters=catalogue_with(above))
-    assert_loads(result)
-    for item in result:
-        # The surface layer is NOT_COMPUTABLE; the balance that reads its Ke
-        # is missing with that input, as after any refused value upstream.
-        assert not is_computed(item)
-        assert f"chain NOT_COMPUTABLE: {module.FALLOW_DEPLETION_ABOVE}" in items_of(
-            item.missing.detail
-        )
-        assert "OPEN 30" in item.missing.detail
-    # With no cover the same depletion lies within the total, and is computed.
-    bare = run(
+    given = spy_surface_layer(monkeypatch)
+    days = chain(parameters=catalogue_with(above))
+    # D185: the first day of the fallow starts at its
+    # reduced total, with Kr zero and no evaporation, and the depletion above
+    # it is carried, not dropped (it is a dry day of the PLACEHOLDER cycle).
+    first = days[0]
+    assert first.precipitation == 0
+    assert first.surface_layer.depletion_start == pytest.approx(reduced)
+    assert first.surface_layer.evaporation == 0
+    assert first.surface_depletion_carried == pytest.approx(start)
+    assert check_carried_depletion(days, given, start) > 0
+    assert all(is_number(day.balance.storage_end) for day in days)
+    for item in run(parameters=catalogue_with(above)):
+        assert_computed(item)
+    # With no cover the same depletion lies within the total: unchanged.
+    given.clear()
+    bare = chain(
         parameters=catalogue_with(
             above
             | {("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", 0.0)}
         )
     )
-    for item in bare:
+    assert bare[0].surface_layer.depletion_start == pytest.approx(start)
+    assert check_carried_depletion(bare, given, start) == 0
+
+
+# A precipitation cycle (PLACEHOLDER): two dry days, a rain smaller than the
+# depletion above a fully covered fallow's total, two dry days, then a rain
+# larger than what is left of it, then dry days.
+PARTIAL_REFILL = [0.0, 0.0, 0.555, 0.0, 0.0, 14.44] + [0.0] * 6  # zero: a dry day
+
+
+def climate_with_partial_refill() -> SiteClimate:
+    first, last = several_full_years()
+    series = [daily_series(name, first, last) for name in DAILY_INPUTS]
+    (precipitation,) = [item for item in series if item["quantity"] == PRECIPITATION]
+    for position, day in enumerate(precipitation["days"]):
+        day["value"] = PARTIAL_REFILL[position % len(PARTIAL_REFILL)]
+    return climate_with(series)
+
+
+def test_depletion_above_the_total_is_refilled_by_rain_before_evaporation_resumes(
+    monkeypatch,
+):
+    full = 1.0  # one, structurally: the whole surface is covered
+    start = 4.4
+    reduced = mulched(full)
+    assert reduced < start < PLACEHOLDER_TEW
+    parameters = catalogue_with(
+        {
+            ("initial_depletion", None): site_record("initial_depletion", start),
+            ("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", full),
+        }
+    )
+    given = spy_surface_layer(monkeypatch)
+    days = chain(climate_=climate_with_partial_refill(), parameters=parameters)
+    assert check_carried_depletion(days, given, start) > 0
+
+    def infiltration(day: module.ChainDay) -> float:
+        return day.precipitation - min(day.runoff.runoff, day.precipitation)
+
+    # Day three's rain refills part of the depletion above the total, not all.
+    assert 0 < infiltration(days[2]) < start - reduced
+    # Day six's rain refills the rest.
+    assert infiltration(days[5]) > start - reduced - infiltration(days[2])
+    # Under D185 the layer evaporates nothing while the depletion is at or
+    # above the reduced total: on days one to six the step starts at it, and
+    # here (the readily evaporable water below the reduced total) Kr is zero
+    # there; the column evaporates nothing either. Brought down to the total
+    # instead (option (b)), the layer would already evaporate on day four.
+    # Here the layer evaporates again from day seven, since Kr follows the
+    # depletion at the start of the day; with the readily evaporable water at
+    # the total it can do so on the day of the rain that refills the rest
+    # (test_column_evaporates_nothing_while_the_layer_is_at_its_limit).
+    rew = PLACEHOLDER_SITE["readily_evaporable_water"]
+    assert rew < reduced
+    for day in days[:6]:
+        assert day.surface_layer.depletion_start == pytest.approx(reduced)
+        assert day.surface_layer.reduction_coefficient == 0
+        assert day.surface_layer.evaporation == 0
+        assert day.balance.evaporation == 0
+    assert days[2].surface_depletion_carried == pytest.approx(
+        start - infiltration(days[2])
+    )
+    assert days[4].surface_depletion_carried == pytest.approx(
+        start - infiltration(days[2])
+    )
+    assert days[6].surface_layer.evaporation > 0
+    for item in run(climate_=climate_with_partial_refill(), parameters=parameters):
         assert_computed(item)
+
+
+def test_initial_depletion_above_the_total_of_the_layer_is_still_not_computable():
+    # The chain never carries a depletion above the total of the layer before
+    # any residue, so one above it can only be a record the part refuses
+    # (choice 12): the rule of D185 is not applied to it (PLACEHOLDER value).
+    start = 4.444
+    assert start > PLACEHOLDER_TEW
+    result = run(
+        parameters=catalogue_with(
+            {("initial_depletion", None): site_record("initial_depletion", start)}
+        )
+    )
+    assert_loads(result)
+    refused = (
+        "chain NOT_COMPUTABLE: the surface-layer balance refuses a value: "
+        "depletion_start must not be greater than total_evaporable_water"
+    )
+    for item in result:
+        # The surface layer is NOT_COMPUTABLE from the first day; the balance
+        # that reads its Ke is missing with that input, as after any refused
+        # value upstream.
+        assert item.missing.reason != "NOT_AVAILABLE"
+        assert refused in items_of(item.missing.detail)
+
+
+def test_carried_depletion_closes_its_mass_across_fallow_and_crop_days(monkeypatch):
+    # On the calendar with crops, the first days are a fallow before crop-a
+    # whose reduced total lies below this initial depletion (PLACEHOLDER); the
+    # later fallows before crop-a and crop-b and the crop days follow.
+    start = 4.22
+    assert mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"]) < start < PLACEHOLDER_TEW
+    parameters = catalogue_with(
+        {("initial_depletion", None): site_record("initial_depletion", start)}
+    )
+    given = spy_surface_layer(monkeypatch)
+    calendar_ = chain_calendar()
+    days = chain(calendar_, parameters=parameters)
+    kinds = {"fallow": 0, "crop": 0}
+    for day in days:
+        kinds["crop" if crop_period_of(calendar_, day.date) else "fallow"] += 1
+    assert all(count > 0 for count in kinds.values()), kinds
+    assert check_carried_depletion(days, given, start) > 0
+    assert all(is_number(day.balance.storage_end) for day in days)
+    # With long dry spells the layer ends crops drier than the reduced total
+    # of the fallow that follows: the entry from a crop into a fallow above
+    # its total, and the return from a fallow to a crop, both close the mass.
+    given.clear()
+    days = chain(calendar_, climate_with_dry_spells())
+    initial = PLACEHOLDER_SITE["initial_depletion"]
+    assert check_carried_depletion(days, given, initial) > 0
+    entries = returns = 0
+    before = days[0]
+    for day in days[1:]:
+        crop_before = crop_period_of(calendar_, before.date) is not None
+        crop_now = crop_period_of(calendar_, day.date) is not None
+        total = given[day.date][2]["total_evaporable_water"]
+        if crop_before and not crop_now and before.surface_depletion_carried > total:
+            entries += 1
+        if crop_now and not crop_before:
+            returns += 1
+        before = day
+    assert entries > 0 and returns > 0, (entries, returns)
+    assert all(is_number(day.balance.storage_end) for day in days)
+
+
+def pass_through(depletion, total, layer_total, precipitation, runoff):
+    """The start of the step with no rule: the depletion and the precipitation
+    of the day passed through unchanged, as the chain gave them to the step
+    before D185 on every day."""
+    return module.LayerStart(
+        depletion=depletion, precipitation=precipitation, above=None
+    )
+
+
+def test_without_a_depletion_above_the_total_the_chain_is_the_one_before_d185(
+    monkeypatch,
+):
+    # D185 changes nothing where no day starts above its total: on the runs
+    # of the existing cases, the chain is identical, day by day and field by
+    # field, to the one computed with its two rules replaced by pass-throughs
+    # (the start of the step, and the Ke the column is given), which is the
+    # chain before this unit. In these runs the readily evaporable water is
+    # below every total, so a day at its limit already has Kr of zero.
+    runs = {
+        "bare calendar": {},
+        "calendar with crops": {"calendar_": chain_calendar()},
+        "bare calendar, dry spells": {"climate_": climate_with_dry_spells()},
+    }
+    for name, arguments in runs.items():
+        given = spy_surface_layer(monkeypatch)
+        days = chain(**arguments)
+        carried = PLACEHOLDER_SITE["initial_depletion"]
+        for day in days:
+            depletion_start, _, constants = given[day.date]
+            assert carried <= constants["total_evaporable_water"], (name, day.date)
+            assert depletion_start == carried
+            carried = day.surface_depletion_carried
+        result = run(**arguments)
+        monkeypatch.setattr(module, "_layer_start", pass_through)
+        monkeypatch.setattr(
+            module,
+            "_column_evaporation_coefficient",
+            lambda surface, start, total, no_crop: surface.evaporation_coefficient,
+        )
+        assert chain(**arguments) == days, name
+        assert run(**arguments) == result, name
+        monkeypatch.undo()
+
+
+def option_b(depletion, total, layer_total, precipitation, runoff):
+    """Option (b) of OPEN 30, not taken by D185, written out here: a depletion
+    above the total of the day (and within the total of the layer) is brought
+    down to the total; nothing is refilled and nothing is carried above it."""
+    if (
+        isinstance(depletion, Missing)
+        or isinstance(total, Missing)
+        or isinstance(layer_total, Missing)
+        or depletion <= total
+        or depletion > layer_total
+    ):
+        return pass_through(depletion, total, layer_total, precipitation, runoff)
+    return module.LayerStart(depletion=total, precipitation=precipitation, above=None)
+
+
+def test_option_b_evaporates_no_less_and_at_most_the_excess_more(monkeypatch):
+    # Two runs with days above their total: the fully covered fallow of the
+    # partial refill, and the calendar with crops under long dry spells.
+    full = 1.0  # one, structurally: the whole surface is covered
+    partial = {
+        "climate_": climate_with_partial_refill(),
+        "parameters": catalogue_with(
+            {
+                ("initial_depletion", None): site_record("initial_depletion", 4.4),
+                ("surface_residue_cover", "fallow:crop-a"): fallow_record(
+                    "crop-a", full
+                ),
+            }
+        ),
+    }
+    dry = {"calendar_": chain_calendar(), "climate_": climate_with_dry_spells()}
+    initial_of = {
+        "partial refill": 4.4,
+        "dry spells": PLACEHOLDER_SITE["initial_depletion"],
+    }
+    for name, arguments in (("partial refill", partial), ("dry spells", dry)):
+        given = spy_surface_layer(monkeypatch)
+        kept = chain(**arguments)
+        # The bound rests on the daily step never ending drier from a wetter
+        # start: its stage-2 loss per millimetre of depletion is not above
+        # one, (Kc_max - Kcb) x ET0 / few <= TEW - REW, on every day.
+        for day in kept:
+            _, day_input, constants = given[day.date]
+            layer = day.surface_layer
+            if layer.exposed_and_wetted_fraction == 0:
+                continue  # zero: no exposed soil, so Ke is zero that day
+            loss = (
+                (layer.upper_limit - day_input.basal_crop_coefficient)
+                * day_input.reference_evapotranspiration
+                / layer.exposed_and_wetted_fraction
+            )
+            span = (
+                constants["total_evaporable_water"]
+                - constants["readily_evaporable_water"]
+            )
+            assert loss <= span, (name, day.date, loss, span)
+        # The days that start above their total after a day that did not,
+        # with the excess of each.
+        excess = {}
+        carried = initial_of[name]
+        above_before = False
+        for day in kept:
+            total = given[day.date][2]["total_evaporable_water"]
+            above = carried > total
+            if above and not above_before:
+                excess[day.date] = carried - total
+            above_before = above
+            carried = day.surface_depletion_carried
+        assert excess, name
+        few = max(day.surface_layer.exposed_and_wetted_fraction for day in kept)
+        monkeypatch.undo()
+        monkeypatch.setattr(module, "_layer_start", option_b)
+        brought_down = chain(**arguments)
+        monkeypatch.undo()
+        for b, d in zip(brought_down, kept):
+            scale = max(b.surface_layer.evaporation, d.surface_layer.evaporation, 1.0)
+            assert b.surface_layer.evaporation >= d.surface_layer.evaporation - (
+                64 * sys.float_info.epsilon * scale
+            ), (name, d.date)
+        sum_b = sum(day.surface_layer.evaporation for day in brought_down)
+        sum_d = sum(day.surface_layer.evaporation for day in kept)
+        bound = few * sum(excess.values())
+        message = (name, sorted(excess), sum_b, sum_d, bound)
+        assert sum_b - sum_d >= 0, message
+        assert sum_b - sum_d <= bound, message
+        if name == "partial refill":
+            # The small rain lets option (b) evaporate part of the excess
+            # before the large rain wets both layers: it evaporates more.
+            assert sum_b - sum_d > 0, message
+
+
+# A precipitation cycle (PLACEHOLDER): two dry days, a rain whose runoff is
+# above zero and whose infiltration is below the depletion above the reduced
+# total, two dry days, a rain that refills the rest and more, then dry days.
+RUNOFF_REFILL = [0.0, 0.0, 3.33, 0.0, 0.0, 14.44] + [0.0] * 6  # zero: a dry day
+
+
+def climate_with_runoff_refill() -> SiteClimate:
+    first, last = several_full_years()
+    series = [daily_series(name, first, last) for name in DAILY_INPUTS]
+    (precipitation,) = [item for item in series if item["quantity"] == PRECIPITATION]
+    for position, day in enumerate(precipitation["days"]):
+        day["value"] = RUNOFF_REFILL[position % len(RUNOFF_REFILL)]
+    return climate_with(series)
+
+
+@pytest.mark.parametrize(
+    "reduction",
+    [
+        0.0555,  # PLACEHOLDER: a full cover leaves the reduced total at REW
+        0.0666,  # PLACEHOLDER: a full cover leaves it below REW (REW capped)
+    ],
+)
+def test_column_evaporates_nothing_while_the_layer_is_at_its_limit(
+    monkeypatch, reduction
+):
+    # D185: while the depletion is at or above the reduced total the layer has
+    # no evaporable water, whatever the readily evaporable water. With REW at
+    # the reduced total (D110: "REW not above TEW") the stage-1 rule of the
+    # step gives Kr of one there; the column is still given no evaporation
+    # while the layer stays at its limit, and both balances close.
+    full = 1.0  # one, structurally: the whole surface is covered
+    start = 4.4
+    reduced = mulched(full, reduction)
+    assert reduced <= PLACEHOLDER_SITE["readily_evaporable_water"]
+    assert reduced < start < PLACEHOLDER_TEW
+    curve_number = unmarked(
+        placeholder_record(module.CURVE_NUMBER, 1.666, scope_of("no_crop"))
+    )
+    parameters = catalogue_with(
+        {
+            ("initial_depletion", None): site_record("initial_depletion", start),
+            ("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", full),
+            ("mulch_total_evaporable_water_reduction", None): site_record(
+                "mulch_total_evaporable_water_reduction", reduction
+            ),
+            ("curve_number", "no_crop"): curve_number,
+        }
+    )
+    given = spy_surface_layer(monkeypatch)
+    days = chain(climate_=climate_with_runoff_refill(), parameters=parameters)
+    assert check_carried_depletion(days, given, start) > 0
+    at_limit = with_kr_one = same_day = 0
+    carried = start
+    for day in days:
+        depletion_start, _, constants = given[day.date]
+        total = constants["total_evaporable_water"]
+        layer, column = day.surface_layer, day.balance
+        if carried >= total:
+            at_limit += 1
+            assert depletion_start == pytest.approx(total)
+            if layer.reduction_coefficient > 0:
+                with_kr_one += 1
+            if layer.evaporation == 0:
+                assert column.evaporation == 0, day.date
+            else:
+                # A rain refilled the part above the total and more: the layer
+                # evaporates that same day, and the column no more than it.
+                same_day += 1
+                assert column.evaporation <= layer.evaporation * (
+                    1 + 64 * sys.float_info.epsilon
+                )
+        terms = (column.precipitation, column.runoff, column.evaporation)
+        balance = (
+            column.precipitation
+            - column.runoff
+            - column.evaporation
+            - column.transpiration
+            - column.drainage
+        )
+        scale = max(abs(t) for t in (column.storage_start, column.storage_end, *terms))
+        assert abs(column.storage_end - column.storage_start - balance) <= (
+            64 * sys.float_info.epsilon * max(scale, 1.0)
+        )
+        carried = day.surface_depletion_carried
+    # The case of the finding is met: days at the limit with Kr above zero,
+    # and days on which the layer evaporates on the day of the refill.
+    assert at_limit > 0 and with_kr_one > 0 and same_day > 0, (
+        at_limit,
+        with_kr_one,
+        same_day,
+    )
+    # Day three's rain runs off in part, and its infiltration refills only
+    # part of the depletion above the total: the refill is the infiltration,
+    # not the precipitation.
+    third = days[2]
+    infiltration = third.precipitation - min(third.runoff.runoff, third.precipitation)
+    assert third.runoff.runoff > 0
+    assert infiltration < start - reduced < third.precipitation
+    assert third.surface_depletion_carried == pytest.approx(start - infiltration)
+    assert third.balance.evaporation == 0
+    for item in run(climate_=climate_with_runoff_refill(), parameters=parameters):
+        assert_computed(item)
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "runoff", "refill"),
+    [
+        (3.33, 2.22, 1.11),  # the infiltration refills part of the excess
+        (1.11, 2.22, 0.0),  # zero: runoff above the precipitation, nothing infiltrates
+        (3.33, 0.0, 2.18),  # zero runoff: the whole excess is refilled
+    ],
+)
+def test_the_refill_is_the_infiltration_not_the_precipitation(
+    precipitation, runoff, refill
+):
+    # D185: infiltration first refills the depletion above the reduced total.
+    # The infiltration is the precipitation less the runoff the step applies,
+    # min(runoff, precipitation), never the precipitation itself
+    # (PLACEHOLDER numbers).
+    depletion, total = 4.4, 2.22
+    above = depletion - total
+    start = module._layer_start(
+        depletion, total, PLACEHOLDER_TEW, precipitation, runoff
+    )
+    expected_refill = min(above, precipitation - min(runoff, precipitation))
+    assert expected_refill == pytest.approx(refill)
+    assert start.depletion == total
+    assert start.precipitation == pytest.approx(precipitation - expected_refill)
+    assert start.above == pytest.approx(above - expected_refill)
+
+
+def test_a_fallow_day_that_starts_exactly_at_a_total_equal_to_rew_evaporates_nothing(
+    monkeypatch,
+):
+    # D185: "while the depletion is at or above the reduced total, Kr is
+    # zero". A fully covered fallow with a PLACEHOLDER reduction that leaves
+    # the reduced total equal to REW (D110: "REW not above TEW"), and an
+    # initial depletion exactly at that total, with no part above it: the
+    # first day (dry) starts exactly at the total, the stage-1 rule of the step
+    # reports a reduction coefficient of one there, and neither the layer nor
+    # the column evaporates. Runs of this shape differ from the chain before
+    # D185, whose column took the Ke of the step: shown at the end.
+    full = 1.0  # one, structurally: the whole surface is covered
+    reduction = 0.0555  # PLACEHOLDER: a full cover leaves the reduced total at REW
+    assert mulched(full, reduction) == pytest.approx(
+        PLACEHOLDER_SITE["readily_evaporable_water"]
+    )
+    records = {
+        ("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", full),
+        ("mulch_total_evaporable_water_reduction", None): site_record(
+            "mulch_total_evaporable_water_reduction", reduction
+        ),
+    }
+    # The reduced total exactly as the chain computes it, read from its step.
+    given = spy_surface_layer(monkeypatch)
+    chain(parameters=catalogue_with(records))
+    first_day = several_full_years()[0]
+    total = given[first_day][2]["total_evaporable_water"]
+    assert given[first_day][2]["readily_evaporable_water"] == total
+    parameters = catalogue_with(
+        records | {("initial_depletion", None): site_record("initial_depletion", total)}
+    )
+    given.clear()
+    first, *_ = chain(parameters=parameters)
+    assert first.date == first_day and first.precipitation == 0
+    depletion_start, _, constants = given[first_day]
+    assert constants["total_evaporable_water"] == total
+    assert depletion_start == total
+    layer = first.surface_layer
+    assert layer.reduction_coefficient == 1.0
+    assert layer.evaporation_coefficient > 0
+    assert layer.evaporation == 0
+    assert first.balance.evaporation == 0
+    assert first.surface_depletion_carried == total
+    for item in run(parameters=parameters):
+        assert_computed(item)
+    # Before D185 the column took the Ke of the step on that day.
+    monkeypatch.setattr(
+        module,
+        "_column_evaporation_coefficient",
+        lambda surface, start, total, no_crop: surface.evaporation_coefficient,
+    )
+    before, *_ = chain(parameters=parameters)
+    assert before.surface_layer.evaporation == 0
+    assert before.balance.evaporation > 0
 
 
 @pytest.mark.parametrize(
