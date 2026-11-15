@@ -20,13 +20,22 @@ that follows it: the cover of D115 is the cover at the sowing of that crop.
 Unit ``l1/water-ep3-repeat-d47`` (issue #253): ``following_crop`` takes the
 sowings of the repeated rotation instead of a calendar, so the fallow after
 the last component of a cycle is followed by the first sowing of the next
-cycle, when that sowing is laid out inside the record. The repetition itself
-is ``engine.calendar.repeat_over_record``; this module holds no rule of it
-and is given plain dates.
+cycle, when that sowing is laid out inside the record. The fallow after the
+last sowing laid out, whose next sowing lies after the record, has no
+following crop and its days stay missing with their reason (decision D187 of
+#77). The repetition itself is ``engine.calendar.repeat_over_record``; this
+module holds no rule of it and is given plain dates.
+
+Decision D186 of #77 confirms D110 as written: the total evaporable water is
+reduced, by 5 % for each 10 % of surface covered, with the readily
+evaporable water not above it, ``fc = 0`` and ``fw = 1``. A depletion of the
+surface layer carried into a fallow above its reduced total is kept and only
+the limit changes (decision D185 of #77); that rule lives in ``exposure.py``.
 
 This module holds the three pure steps of that day; ``exposure.py`` reads the
 records and chains them. Status: PROPOSED (blueprint section 3.7); see
-engine/water/EXPOSURE.md, choices 18 to 21 and OPEN 30 to 35.
+engine/water/EXPOSURE.md, choices 18 to 21 and OPEN 31 to 35 (OPEN 30 is
+closed by D185, and the first part of OPEN 32 by D186).
 
 Pure functions: no file, no network, no clock, no global state; arguments are
 not changed. The numbers are ``0`` and ``1``, the bounds of a fraction and the
@@ -163,10 +172,13 @@ def mulched_total_evaporable_water(
 ) -> Number:
     """The total evaporable water of a fallow day, reduced by its residue cover.
 
-    Decision D110 of #77, after FAO-56 chapter 11, "Surface covered with dead
-    vegetation": the total evaporable water is "reduced by 5 % for each 10 %
-    of soil surface effectively covered by an organic mulch". Form PROPOSED,
-    the reduction taken in proportion to the cover (choice 20):
+    Decision D110 of #77, confirmed by D186, after FAO-56 chapter 11,
+    "Surface covered with dead vegetation", "Dual crop coefficient": "reducing
+    the value for TEW by 5% for each 10% of soil surface that is effectively
+    covered by an organic mulch". The reduction is taken in proportion to the
+    cover, a reading D186 declares (FAO-56 says neither proportional nor by
+    whole steps of 10 %, and the covers of D115 are multiples of 10 %, where
+    both readings agree; choice 20):
 
         TEW_fallow = TEW * (1 - reduction_per_increment * cover / cover_increment)
 
@@ -237,7 +249,9 @@ def readily_evaporable_water_not_above(
 ) -> Number:
     """The readily evaporable water of a fallow day: not above its total evaporable water.
 
-    D110: "with REW not above TEW" (FAO-56 chapter 11). The smaller of the two;
+    D110, confirmed by D186; FAO-56 chapter 11, "Surface covered with dead
+    vegetation": "The value for REW should be limited to less than or equal to
+    that for TEW." The smaller of the two;
     a missing operand is ``MISSING_INPUT`` naming it, a ``NOT_COMPUTABLE``
     total is passed on as it is.
     """
