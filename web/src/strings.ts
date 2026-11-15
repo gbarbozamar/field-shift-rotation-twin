@@ -29,6 +29,9 @@
  *                clock, water clock, year columns), Block 2 addendum
  * - cards.*      the results cards (title, rotation heading, availability
  *                heading, carbon model and computation labels)
+ * - decision.*   the decision section of the decision output example (title,
+ *                rotation pairs, pair state, the two counts apart, coverage
+ *                and the years-within summary), Block 5 addendum
  * - seam.*       the platform-route seam (live-data label), Block 4 addendum
  * - soil_loss.*  the D148 display rules of the soil-loss values of a run: the
  *                science label beside the declared-C headline figure, the
@@ -86,6 +89,19 @@ export const strings = {
   'cards.availability': 'Availability',
   'cards.model_label': 'Model: {model}',
   'cards.computation_label': 'Computation: {computation}',
+  'decision.title': 'Decision',
+  'decision.pairs': 'Rotation pairs',
+  'decision.pair_of': '{first} against {second}',
+  'decision.state': 'State',
+  'decision.counts': 'Counts',
+  'decision.counts_by_point': 'By point value',
+  'decision.counts_by_range': 'By range',
+  'decision.better': 'Better',
+  'decision.worse': 'Worse',
+  'decision.equal': 'Equal',
+  'decision.missing_side': 'Missing side',
+  'decision.coverage': '{k} of {n} cells compared',
+  'decision.years_within': 'Years within the limit: {min} to {max}, minimum at {scenario}',
   'identity.title': 'Fields',
   'identity.case_label': 'Case',
   'identity.banner_title': 'Example data',
@@ -130,7 +146,7 @@ export const strings = {
   // renders it, it does not edit it.
   'soil_loss.headline_label':
     'based on a Uruguayan no-till measurement; overestimates about 6 times the loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)',
-  // Approved by Martín (interface developer), 15/11/2026.
+  // Approved by the interface developer, 15/11/2026.
   'soil_loss.withdrawn_c':
     'Not shown: the computed cover factor of this release overestimates the measured loss (see the check in docs/VALIDATION.md).',
 } as const
