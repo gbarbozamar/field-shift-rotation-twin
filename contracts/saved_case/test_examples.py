@@ -1,4 +1,8 @@
-"""Acceptance test of unit l0/contracts-saved-case.
+"""Acceptance test of units l0/contracts-saved-case and l0/saved-case-review-297.
+
+The second unit (brief #370) brings in the three changes of the producer and
+consumer's approval on #297: complete carbon items, ``variant`` in the key of
+a carbon item, and ``saved_on`` with the time to the minute.
 
 The PLACEHOLDER example loads into its model, each part it carries loads into
 the model of its own contract, and the example written with
@@ -13,6 +17,7 @@ Run from the repository root: ``python -m pytest contracts/saved_case/``.
 from __future__ import annotations
 
 import copy
+import datetime as dt
 import json
 import re
 from collections.abc import Callable
@@ -194,18 +199,24 @@ def leave_out_the_missing_members_of_present_parts() -> Mutation:
     return mutate
 
 
-def add_carbon_item(rotation_id: str, carbon_model: str) -> Mutation:
+def add_carbon_item(
+    rotation_id: str, carbon_model: str, variant: str = "placeholder_variant"
+) -> Mutation:
     def mutate(data: dict[str, Any]) -> None:
         data["carbon_balances"].append(
             {
                 "rotation_id": rotation_id,
                 "carbon_model": carbon_model,
+                "variant": variant,
                 "carbon_balance": None,
                 "carbon_balance_missing": copy.deepcopy(REASON),
             }
         )
 
     return mutate
+
+
+SAVED_ON_RULE = "saved_on is written YYYY-MM-DDTHH:MMZ"
 
 
 # (case identifier, mutation, location, message).
@@ -226,8 +237,8 @@ INVALID: list[tuple[str, Mutation, str, str]] = [
     ),
     (
         "unknown-member-of-a-carbon-item",
-        put([*ROTHC_1, "variant"], "placeholder_variant"),
-        "carbon_balances.1.variant",
+        put([*ROTHC_1, "label"], "PLACEHOLDER label"),
+        "carbon_balances.1.label",
         "Extra inputs are not permitted",
     ),
     (
@@ -256,21 +267,45 @@ INVALID: list[tuple[str, Mutation, str, str]] = [
     ),
     (
         "saved-on-not-a-date",
-        put(["saved_on"], "15 November 2026"),
+        put(["saved_on"], "15 November 2026 11:56"),
         "saved_on",
-        "a date is written YYYY-MM-DD (C5.2)",
+        SAVED_ON_RULE,
     ),
     (
-        "saved-on-with-a-time",
-        put(["saved_on"], "2026-11-15T05:35:00"),
+        "saved-on-without-a-time",
+        put(["saved_on"], "2026-11-15"),
         "saved_on",
-        "a date is written YYYY-MM-DD (C5.2)",
+        SAVED_ON_RULE,
+    ),
+    (
+        "saved-on-with-seconds",
+        put(["saved_on"], "2026-11-15T11:56:00Z"),
+        "saved_on",
+        SAVED_ON_RULE,
+    ),
+    (
+        "saved-on-without-its-time-zone",
+        put(["saved_on"], "2026-11-15T11:56"),
+        "saved_on",
+        SAVED_ON_RULE,
+    ),
+    (
+        "saved-on-in-another-time-zone",
+        put(["saved_on"], "2026-11-15T08:56-03:00"),
+        "saved_on",
+        SAVED_ON_RULE,
+    ),
+    (
+        "saved-on-not-a-time-of-the-day",
+        put(["saved_on"], "2026-11-15T24:56Z"),
+        "saved_on",
+        SAVED_ON_RULE,
     ),
     (
         "saved-on-null",
         put(["saved_on"], None),
         "saved_on",
-        "a date is written YYYY-MM-DD (C5.2)",
+        SAVED_ON_RULE,
     ),
     # --- A part and its missing part ------------------------------------------
     (
@@ -347,10 +382,52 @@ INVALID: list[tuple[str, Mutation, str, str]] = [
     ),
     # --- The carbon items -----------------------------------------------------
     (
-        "two-carbon-items-for-one-rotation-and-model",
+        "two-carbon-items-for-one-rotation-model-and-variant",
         put([*ROTHC_1, "carbon_model"], "amg"),
         DOCUMENT,
-        "two carbon items for rotation 'example-rotation-1' and carbon model 'amg'",
+        (
+            "two carbon items for rotation 'example-rotation-1', carbon model 'amg' "
+            "and variant 'placeholder_variant'"
+        ),
+    ),
+    (
+        "no-carbon-item",
+        put(["carbon_balances"], []),
+        DOCUMENT,
+        "no carbon item for rotation 'example-rotation-1' and carbon model 'amg'",
+    ),
+    (
+        "rotation-of-the-results-without-a-carbon-item",
+        both(drop(AMG_2), drop(AMG_2)),  # both items of example-rotation-2
+        DOCUMENT,
+        "no carbon item for rotation 'example-rotation-2' and carbon model 'amg'",
+    ),
+    (
+        "carbon-model-of-a-rotation-without-an-item",
+        drop(ROTHC_1),
+        DOCUMENT,
+        "no carbon item for rotation 'example-rotation-1' and carbon model 'rothc'",
+    ),
+    (
+        "carbon-item-of-a-rotation-not-in-the-results",
+        add_carbon_item("example-rotation-3", "amg"),
+        DOCUMENT,
+        (
+            "a carbon item for rotation 'example-rotation-3', which the results "
+            "table does not name"
+        ),
+    ),
+    (
+        "carbon-item-of-another-variant-than-its-balance",
+        put([*AMG_1, "variant"], "placeholder_other_variant"),
+        CARBON_ITEM_0,
+        "the variant of the item is the variant of the balance",
+    ),
+    (
+        "carbon-item-variant-not-an-identifier",
+        put([*ROTHC_1, "variant"], "RothC 26.3"),
+        "carbon_balances.1.variant",
+        "String should match pattern",
     ),
     (
         "carbon-item-of-another-rotation-than-its-balance",
@@ -480,19 +557,19 @@ VALID: list[tuple[str, Mutation]] = [
         "accepted-missing-members-left-out",
         leave_out_the_missing_members_of_present_parts(),
     ),
+    (
+        "accepted-two-variants-of-one-model",
+        add_carbon_item("example-rotation-1", "amg", "placeholder_other_variant"),
+    ),
+    ("accepted-another-minute-of-the-same-day", put(["saved_on"], "2026-11-15T11:57Z")),
     # --- Accepted only while a question is open -------------------------------
     (
         "accepted-while-open-example-data-true-while-no-part-says-so",
         both(example_data_everywhere(False), put(["example_data"], True)),
     ),
-    ("accepted-while-open-no-carbon-item", put(["carbon_balances"], [])),
     (
-        "accepted-while-open-carbon-item-of-a-rotation-not-in-the-results",
-        add_carbon_item("example-rotation-3", "amg"),
-    ),
-    (
-        "accepted-while-open-rotation-of-the-results-without-a-carbon-item",
-        both(drop(AMG_2), drop(AMG_2)),  # both items of example-rotation-2
+        "accepted-while-open-no-carbon-item-without-a-results-table",
+        both(missing("results_table", REASON), put(["carbon_balances"], [])),
     ),
 ]
 
@@ -545,6 +622,37 @@ def test_example_written_with_model_dump_loads_back_equal_to_itself() -> None:
     # D177: the document is written with every null kept.
     assert written["field_identity_missing"] is None
     assert written["carbon_balances"][1]["carbon_balance"] is None
+    # #297, change 3: the date and time travel as written, to the minute.
+    assert written["saved_on"] == load()["saved_on"] == "2026-11-15T11:56Z"
+
+
+def test_two_saves_on_one_day_are_two_cases() -> None:
+    """#297, change 3: the time to the minute tells two saves of one day apart."""
+    first = SavedCase.model_validate(load())
+    variant = load()
+    variant["saved_on"] = "2026-11-15T11:57Z"
+    second = SavedCase.model_validate(variant)
+    assert first.saved_on.date() == second.saved_on.date()
+    assert first != second
+    assert first.model_dump(mode="json") != second.model_dump(mode="json")
+
+
+def test_saved_on_from_python_is_a_utc_time_to_the_minute() -> None:
+    """A writer may give a datetime: aware, in UTC, with no seconds."""
+    data = load()
+    data["saved_on"] = dt.datetime(2026, 11, 15, 11, 56, tzinfo=dt.UTC)
+    loaded = SavedCase.model_validate(data)
+    assert loaded.model_dump(mode="json")["saved_on"] == "2026-11-15T11:56Z"
+    for wrong in (
+        dt.datetime(2026, 11, 15, 11, 56),  # no time zone
+        dt.datetime(2026, 11, 15, 11, 56, 30, tzinfo=dt.UTC),  # seconds
+        dt.datetime(2026, 11, 15, 8, 56, tzinfo=dt.timezone(dt.timedelta(hours=-3))),
+        dt.date(2026, 11, 15),  # a date without a time
+    ):
+        data["saved_on"] = wrong
+        with pytest.raises(ValidationError) as rejected:
+            SavedCase.model_validate(data)
+        _assert_one_error(rejected.value, "saved_on", SAVED_ON_RULE)
 
 
 def test_a_document_written_without_its_nulls_does_not_load() -> None:
@@ -651,7 +759,7 @@ DOCUMENT_KEYS = (
     "carbon_balances",
     "decision_output",
 )
-CARBON_ITEM_KEYS = ("rotation_id", "carbon_model", "carbon_balance")
+CARBON_ITEM_KEYS = ("rotation_id", "carbon_model", "variant", "carbon_balance")
 
 
 @pytest.mark.parametrize(
