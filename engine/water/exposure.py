@@ -40,7 +40,12 @@ record runs on the years of the record, a calendar moved by
 ``phase_calendar`` (D132) runs unchanged, and a component that starts before
 the record and ends inside it is present from the first day of the record
 with its declared dates (D141). No rule of the repetition is written in this
-folder. The daily chain is
+folder. Unit ``l1/water-open30-d`` builds decision D185 of issue #77, which
+closes OPEN 30: when the total evaporable water of
+a day (reduced on a fallow day, D110) is below the depletion the surface
+layer carries, the depletion is kept and only the limit changes; the layer
+starts the day at its limit, so it evaporates nothing, and the infiltration
+refills the part above the limit first (``_layer_start``). The daily chain is
 then reduced to one ``WaterDeficitExposure`` per agricultural year of the
 record (D47). Unit ``l1/water-indicator-d157`` (issue #264) builds decision
 D157: a year whose daily balance was computed on every day carries the ratio
@@ -400,14 +405,6 @@ STAGE_UNKNOWN = (
 CROPS_OVERLAP = (
     "two components of the calendar cover the day, and the water chain takes "
     "one crop per day"
-)
-FALLOW_DEPLETION_ABOVE = (
-    "the depletion of the surface layer at the start of a day with no crop is "
-    "greater than the total evaporable water of that day, reduced by the residue "
-    "cover of the fallow (decision D110 of issue #77). The surface-layer balance "
-    "holds the depletion within the total evaporable water, and how a depletion "
-    "carried from a day with a larger total is brought within the reduced one is "
-    "not decided (OPEN 30 of engine/water/EXPOSURE.md), so no rule is applied"
 )
 
 
@@ -810,6 +807,11 @@ class ChainDay:
     reference_evapotranspiration: float | Missing
     runoff: RunoffDayResult
     surface_layer: evaporation.DayResult
+    # The depletion of the surface layer carried to the next day: the
+    # depletion at the end of the day, plus the part above the total
+    # evaporable water of the day that the infiltration has not refilled yet
+    # (``_layer_start``; decision D185 of issue #77).
+    surface_depletion_carried: float | Missing
     balance: balance.DayResult
 
 
@@ -972,6 +974,112 @@ def _fallow_surface(
             readily_evaporable_water, total
         ),
     )
+
+
+@dataclass(frozen=True)
+class LayerStart:
+    """How the surface-layer step of a day starts (``_layer_start``)."""
+
+    # The depletion the step starts from, within the total of the day.
+    depletion: float | Missing
+    # The precipitation the step is given: the precipitation of the day, less
+    # the infiltration that refilled the part of the depletion above the total.
+    precipitation: float | Missing
+    # The part of the depletion above the total that the infiltration of the
+    # day leaves; ``None`` when the depletion carried in is within the total.
+    above: float | None
+
+
+def _layer_start(
+    depletion: float | Missing,
+    total: float | Missing,
+    layer_total: float | Missing,
+    precipitation: float | Missing,
+    runoff: float | Missing,
+) -> LayerStart:
+    """The start of the surface-layer step when the total may be below the depletion.
+
+    Decision D185 of issue #77, which closes OPEN 30. The
+    depletion of the surface layer is the evaporation accumulated since the
+    layer was last wetted (FAO-56 chapter 7, Eq. 77); its total evaporable
+    water, the limit at which evaporation stops (Eq. 78), is lower on a fallow
+    day than on a day with a crop (D110). When the depletion carried into a
+    day is above the total of the day, it is kept: the step starts at the
+    total, its limit, so the layer evaporates nothing that day (``Kr`` is
+    zero, or no room is left when the readily evaporable water equals the
+    total), and on a day with no crop the column is given no evaporation
+    either (``_column_evaporation_coefficient``); the infiltration of the day (the precipitation less the runoff the
+    step applies, never more than the precipitation) refills the part above
+    the total first, and only what is left of it is given to the step. What
+    the infiltration has not refilled is carried to the next day on top of
+    the depletion at the end of the day. No water is created or removed in the
+    surface layer: across the change, the change of the carried depletion is
+    the evaporation less the infiltration plus the percolation. When the total
+    rises again (a day with a crop after a fallow), the depletion is kept as
+    it is. The precipitation of the column balance is not changed.
+
+    The rule applies only to a depletion within ``layer_total``, the total
+    evaporable water of the layer before any residue (the one of a day with
+    a crop): the chain never carries more than that, so a depletion above it
+    can only come from the record ``initial_depletion``, and it is passed to
+    the step unchanged, which refuses it (``NOT_COMPUTABLE``, choice 12), as
+    before this unit.
+    """
+    if (
+        isinstance(depletion, Missing)
+        or isinstance(total, Missing)
+        or isinstance(layer_total, Missing)
+        or depletion <= total
+        or depletion > layer_total
+    ):
+        return LayerStart(depletion=depletion, precipitation=precipitation, above=None)
+    above = depletion - total
+    if isinstance(precipitation, Missing) or isinstance(runoff, Missing):
+        # The step answers the missing input of the day.
+        return LayerStart(depletion=total, precipitation=precipitation, above=above)
+    infiltration = precipitation - min(runoff, precipitation)
+    refill = min(above, infiltration)
+    return LayerStart(
+        depletion=total, precipitation=precipitation - refill, above=above - refill
+    )
+
+
+def _column_evaporation_coefficient(
+    surface: evaporation.DayResult,
+    start: LayerStart,
+    total: float | Missing,
+    no_crop: bool,
+) -> float | Missing:
+    """The evaporation coefficient the column balance is given (D185).
+
+    As the surface layer gives it (choice 10), except on a day with no crop
+    whose step starts at the total of the day, the depletion carried in
+    being at or above it. D185: while the depletion is at or above the
+    reduced total, ``Kr`` is zero, since under the residue the layer has no
+    evaporable water left. When the readily evaporable water equals the
+    reduced total, which D110 allows ("REW not above TEW"), the stage-1 rule
+    of the step gives ``Kr`` of one at that depletion, so its ``Ke`` is above
+    zero although the layer has no room and supplies nothing. On such a day
+    the column is given the coefficient of the evaporation the layer
+    supplied, ``Ke`` times the supplied over the demanded evaporation: none
+    while the layer stays at its limit, whatever the readily evaporable
+    water; and, on a day a rain refills the part above the total and more,
+    the evaporation the layer supplies that day (D185: "evaporation resumes
+    when the depletion falls below it").
+    """
+    coefficient = surface.evaporation_coefficient
+    operands = (
+        coefficient,
+        surface.evaporation,
+        surface.evaporation_demanded,
+        start.depletion,
+        total,
+    )
+    if not no_crop or any(isinstance(operand, Missing) for operand in operands):
+        return coefficient
+    if start.depletion < total or surface.evaporation >= surface.evaporation_demanded:
+        return coefficient
+    return coefficient * surface.evaporation / surface.evaporation_demanded
 
 
 def _run_chain(
@@ -1161,7 +1269,6 @@ def _run_chain(
             constants=upper_limit_constants,
         )
         day_constants = surface_constants
-        surface: object = None
         if fallow_surface is None:
             upper_limit = _guarded(
                 "the upper limit of the crop coefficient",
@@ -1192,39 +1299,41 @@ def _run_chain(
                 "readily_evaporable_water": fallow_surface.readily_evaporable_water,
                 "wetted_fraction": fallow_surface.wetted_fraction,
             }
-            reduced = fallow_surface.total_evaporable_water
-            if (
-                not isinstance(depletion.value, Missing)
-                and not isinstance(reduced, Missing)
-                and depletion.value > reduced
-            ):
-                surface = Missing(
-                    reason="NOT_COMPUTABLE", detail=FALLOW_DEPLETION_ABOVE
-                )
-                notes.note(surface, day)
-        if surface is None:
-            surface = _guarded(
-                "the surface-layer balance",
-                notes,
-                day,
-                evaporation.step,
-                depletion.value,
-                evaporation.DayInput(
-                    date=day,
-                    precipitation=precipitation,
-                    runoff=runoff.runoff,
-                    reference_evapotranspiration=et0,
-                    basal_crop_coefficient=kcb,
-                    cover_fraction=cover_fraction,
-                    climate_adjusted_upper_limit=climate_term,
-                ),
-                **day_constants,
-            )
+        # D185 (OPEN 30): a depletion above the total of the day is
+        # kept; the step starts at the total and the infiltration refills the
+        # part above it first (``_layer_start``).
+        layer_start = _layer_start(
+            depletion.value,
+            day_constants[TOTAL_EVAPORABLE_WATER],
+            surface_constants[TOTAL_EVAPORABLE_WATER],
+            precipitation,
+            runoff.runoff,
+        )
+        surface = _guarded(
+            "the surface-layer balance",
+            notes,
+            day,
+            evaporation.step,
+            layer_start.depletion,
+            evaporation.DayInput(
+                date=day,
+                precipitation=layer_start.precipitation,
+                runoff=runoff.runoff,
+                reference_evapotranspiration=et0,
+                basal_crop_coefficient=kcb,
+                cover_fraction=cover_fraction,
+                climate_adjusted_upper_limit=climate_term,
+            ),
+            **day_constants,
+        )
         if isinstance(surface, Missing):
             surface = _missing_result(
                 evaporation.DayResult, evaporation.RESULT_QUANTITIES, day, surface
             )
-        depletion.carry(surface.depletion_end, day)
+        carried = surface.depletion_end
+        if layer_start.above is not None and not isinstance(carried, Missing):
+            carried = carried + layer_start.above
+        depletion.carry(carried, day)
 
         # 4. The daily balance of the column.
         balance_day = balance.DayInput(
@@ -1232,7 +1341,14 @@ def _run_chain(
             precipitation=precipitation,
             runoff=runoff.runoff,
             reference_evapotranspiration=et0,
-            evaporation_coefficient=surface.evaporation_coefficient,
+            # D185: none from a day with no crop whose surface layer stays at
+            # its limit, whatever the readily evaporable water.
+            evaporation_coefficient=_column_evaporation_coefficient(
+                surface,
+                layer_start,
+                day_constants[TOTAL_EVAPORABLE_WATER],
+                fallow_surface is not None,
+            ),
             crop=crop_day,
         )
         if column_missing:
@@ -1265,6 +1381,7 @@ def _run_chain(
                 reference_evapotranspiration=et0,
                 runoff=runoff,
                 surface_layer=surface,
+                surface_depletion_carried=depletion.value,
                 balance=result,
             )
         )
