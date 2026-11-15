@@ -198,7 +198,7 @@ def test_a8_example_files_are_well_formed_placeholders():
 
 
 def test_a9_the_catalogue_in_this_repository_passes():
-    """Checks the whole params/ folder. Today it holds no record."""
+    """Checks the whole params/ folder, the records of records/ included."""
     assert catalogue.check_layout(HERE) == []
 
 

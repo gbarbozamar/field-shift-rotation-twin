@@ -1,0 +1,19 @@
+{
+  "id": "rusle_k_factor",
+  "scope": {},
+  "value": 0.03,
+  "unit": "t ha h ha-1 MJ-1 mm-1",
+  "range": {
+    "low": 0.019,
+    "high": 0.041,
+    "basis": "Derived from the source (D70): class mean ± one class standard deviation, μ − σ to μ + σ, with μ = 0.0300 and σ = 0.0110 (n = 26) from S9, Table 1, column «K_Puentes‡». Not an interval the source publishes as such."
+  },
+  "citation": {
+    "reference": "Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. Ciencia e Investigación Agraria 44(1):100-112. https://doi.org/10.7764/rcia.v44i1.1622 (CC BY 4.0).",
+    "locator": "Table 1, row «T¶ Brunosol», column «K_Puentes‡», row μ, p. 104 (PDF p. 5). Unit: text of p. 105 («All K-values were expressed in compatible SI units»)",
+    "url": "https://ijanr.cl/index.php/ijanr/article/download/36711/28565#page=5"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «T¶ Brunosol» μ … «0.0300» (column K_Puentes). This is the MEAN of the class (n = 26; standard deviation σ = 0.0110), not the K of one soil. How the class is turned into the K of the field is an open decision. Table 1 header, read in the PDF: the label «mg kg-1» is printed directly under «K_Puentes‡» (second header row), and the columns Ca to «Sum of Bases» have no label of their own; the text of p. 105 says «All K-values were expressed in compatible SI units, i.e., in (t ha h)(ha MJ mm)-1». Recorded as a note, not corrected (D70). The string accepted by D11 is `t ha h ha-1 MJ-1 mm-1`. Range μ ± σ per D70 (issue #77). Scope set to {} because EP1 looks K up with the empty scope (SOIL_LOSS.md). Soil of the demonstration point decided by the lead developer in D112 of issue #77 (2026-11-14): one soil, the Brunosol eutrico tipico of the Unidad del Lago at La Estanzuela, the soil of the accepted water profile (USER-AE; Capurro 2016, pp. 43 and 46); its class in S9 Table 1 is 'T Brunosol' (S9: 'T is typical'), so the class and K of D100 are unchanged and D100's vertic limit no longer applies. K is the class mean, not a measurement at the site. Unit string set to «t ha h ha-1 MJ-1 mm-1» (the string of D11 that EP1 accepts; M1.7 asks the lead developer to confirm the published unit); the source prints «(t ha h)(ha MJ mm)-1». Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-14 against a crop of the source page (D34, D66). Value selected for the demonstration point La Estanzuela (D83 for R, D100 for K); scope {} is PROPOSED until EP1 reads a site scope."
+}
