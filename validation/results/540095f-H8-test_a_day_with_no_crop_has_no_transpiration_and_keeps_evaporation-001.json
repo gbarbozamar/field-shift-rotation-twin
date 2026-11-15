@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "540095f-H8-test_a_day_with_no_crop_has_no_transpiration_and_keeps_evaporation-001",
+  "run_id": "run-20261115T194950Z-540095f",
+  "test_code": "H8",
+  "expected": {
+    "missing_reason": "the entry H8 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/water/balance/test_bucket.py::test_a_day_with_no_crop_has_no_transpiration_and_keeps_evaporation"
+  },
+  "notes": "Test engine/water/balance/test_bucket.py::test_a_day_with_no_crop_has_no_transpiration_and_keeps_evaporation. Placed under H8: listed by name on the 'Test' line of entry H8 of docs/VALIDATION.md."
+}
