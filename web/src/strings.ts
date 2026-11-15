@@ -336,6 +336,27 @@ export const strings = {
   'rail.waiting.compare': 'no run has answered yet',
   'rail.waiting.decision': 'nothing has been compared yet',
   'rail.waiting.handoff': 'no decision to hand over yet',
+  // PROPOSED (l3/printable-field-sheet): printable field sheet at #/print.
+  'print.open_link': 'Printable field sheet',
+  'print.title': 'Printable field sheet',
+  'print.action': 'Print sheet',
+  'print.back_to_fields': 'Back to fields',
+  'print.select_hint': 'Select a field on the fields screen before printing its sheet.',
+  'print.field_section': 'Field',
+  'print.field_name_label': 'Field name',
+  'print.case_id_label': 'Case identifier',
+  'print.geometry_section': 'Geometry and location',
+  'print.geometry': 'Field geometry',
+  'print.geometry_type': 'Geometry type',
+  'print.geometry_vertices': '{count} vertices in exterior ring',
+  'print.geometry_center': 'Bounding-box centre (decimal degrees)',
+  'print.geometry_bounds': 'Bounding box (south, west to north, east)',
+  'print.site_section': 'Site notes',
+  'print.site_example_scope':
+    'Site data is example data for {field_id}, not a measurement of {selected_field_id}.',
+  'print.rotations_section': 'Declared rotations',
+  'print.rotations': 'Declared rotations',
+  'print.rotation_id_label': 'Rotation identifier',
 } as const
 
 /**
