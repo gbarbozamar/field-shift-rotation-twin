@@ -1,0 +1,993 @@
+{
+  "status": "SIGNED_TRANSCRIPTION_BY_EXPLICIT_USER_AUTHORIZATION",
+  "test": "engine/water/evaporation/test_surface_layer.py::test_fao56_chapter_7_worked_example",
+  "path_in_repository": "validation/fixtures/fao56_example35_surface_layer.json",
+  "source": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and drainage paper 56. FAO, Rome. Example 35, corrected by errata February 2006.",
+    "locator": "Chapter 7, EXAMPLE 35 'Calculation of the soil evaporation coefficient, Ke' (corrected by errata February 2006): statement (PDF page 329) and ten-day table (printed page 155, PDF page 330)",
+    "url": "https://www.wcc.nrcs.usda.gov/ftpref/wntsc/waterMgt/irrigation/fao56.pdf",
+    "pdf_page": 330,
+    "printed_page": 155,
+    "statement_pdf_page": 329,
+    "corrected_errata": "February 2006",
+    "read": "2026-11-15"
+  },
+  "transcribed_by": "AI session, 2026-11-15",
+  "checked_by": "gbarbozamar",
+  "method_acceptance": {
+    "early_wetting_option": "ACCEPTED_BY_USER",
+    "wetting_ordering": "de_after_wetting",
+    "full_precision_interpolation": "ACCEPTED_BY_USER",
+    "half_digit_criterion": "ACCEPTED_AFTER_RESULTS",
+    "surface_only_scope": "ACCEPTED_BY_USER",
+    "accepted_by": "gbarbozamar",
+    "accepted_at_utc": "2026-11-15T19:29:54.249639+00:00",
+    "results_seen_before_acceptance": true,
+    "full_ep3_reproduction": false
+  },
+  "constants": {
+    "theta_fc": {
+      "value": 0.23,
+      "printed": "0.23",
+      "unit": "m3/m3",
+      "locator": "Example 35, statement"
+    },
+    "theta_wp": {
+      "value": 0.1,
+      "printed": "0.1",
+      "unit": "m3/m3",
+      "locator": "Example 35, statement"
+    },
+    "ze_m": {
+      "value": 0.1,
+      "printed": "0.1",
+      "unit": "m",
+      "locator": "Example 35, statement"
+    },
+    "rew_mm": {
+      "value": 8.0,
+      "printed": "8.0",
+      "unit": "mm",
+      "locator": "Example 35, statement"
+    },
+    "initial_de_mm": {
+      "value": 18.0,
+      "printed": "18.0",
+      "unit": "mm",
+      "locator": "Example 35, statement"
+    },
+    "h_m": {
+      "value": 0.3,
+      "printed": "0.3",
+      "unit": "m",
+      "locator": "Example 35, statement"
+    },
+    "u2_m_s": {
+      "value": 1.6,
+      "printed": "1.6",
+      "unit": "m/s",
+      "locator": "Example 35, statement"
+    },
+    "rhmin_percent": {
+      "value": 35.0,
+      "printed": "35.0",
+      "unit": "percent",
+      "locator": "Example 35, statement"
+    },
+    "base": {
+      "value": 1.2,
+      "printed": "1.2",
+      "unit": "dimensionless",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "wind_coefficient": {
+      "value": 0.04,
+      "printed": "0.04",
+      "unit": "s/m",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "reference_wind_speed": {
+      "value": 2.0,
+      "printed": "2.0",
+      "unit": "m/s",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "humidity_coefficient": {
+      "value": 0.004,
+      "printed": "0.004",
+      "unit": "per percent",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "reference_minimum_relative_humidity": {
+      "value": 45.0,
+      "printed": "45.0",
+      "unit": "percent",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "reference_crop_height": {
+      "value": 3.0,
+      "printed": "3.0",
+      "unit": "m",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "height_exponent": {
+      "value": 0.3,
+      "printed": "0.3",
+      "unit": "dimensionless",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "margin_above_basal": {
+      "value": 0.05,
+      "printed": "0.05",
+      "unit": "dimensionless",
+      "locator": "FAO-56 Chapter 7, Eq. 72"
+    },
+    "unit_factor": {
+      "value": 1000.0,
+      "printed": "1000.0",
+      "unit": "mm/m",
+      "locator": "FAO-56 Chapter 7, Eq. 73"
+    },
+    "wilting_point_weight": {
+      "value": 0.5,
+      "printed": "0.5",
+      "unit": "dimensionless",
+      "locator": "FAO-56 Chapter 7, Eq. 73"
+    }
+  },
+  "interpolation": {
+    "kcb_start": 0.3,
+    "kcb_end": 0.4,
+    "uncovered_start": 0.92,
+    "uncovered_end": 0.86,
+    "days": 10
+  },
+  "rows": [
+    {
+      "day": 1,
+      "eto": {
+        "value": 4.5,
+        "printed": "4.5",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 50.0,
+        "printed": "50",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.92,
+        "printed": "0.92",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 0.8,
+        "printed": "0.8",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.8,
+        "printed": "0.80",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.3,
+        "printed": "0.30",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 1.0,
+        "printed": "1.00",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.91,
+        "printed": "0.91",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 5.1,
+        "printed": "5.1",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 32.0,
+        "printed": "32",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 5.0,
+        "printed": "5",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 4.1,
+        "printed": "4.1",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 1.21,
+        "printed": "1.21",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 5.5,
+        "printed": "5.5",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 2,
+      "eto": {
+        "value": 5.0,
+        "printed": "5.0",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.91,
+        "printed": "0.91",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 0.8,
+        "printed": "0.8",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.8,
+        "printed": "0.80",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.31,
+        "printed": "0.31",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 5.0,
+        "printed": "5",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 1.0,
+        "printed": "1.00",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.9,
+        "printed": "0.90",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 5.6,
+        "printed": "5.6",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 11.0,
+        "printed": "11",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 4.5,
+        "printed": "4.5",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 1.21,
+        "printed": "1.21",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 6.1,
+        "printed": "6.1",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 3,
+      "eto": {
+        "value": 3.9,
+        "printed": "3.9",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.91,
+        "printed": "0.91",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 0.8,
+        "printed": "0.8",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.8,
+        "printed": "0.80",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.32,
+        "printed": "0.32",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 11.0,
+        "printed": "11",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.72,
+        "printed": "0.72",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.64,
+        "printed": "0.64",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 3.1,
+        "printed": "3.1",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 14.0,
+        "printed": "14",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 2.5,
+        "printed": "2.5",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.97,
+        "printed": "0.97",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 3.8,
+        "printed": "3.8",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 4,
+      "eto": {
+        "value": 4.2,
+        "printed": "4.2",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.9,
+        "printed": "0.90",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 0.8,
+        "printed": "0.8",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.8,
+        "printed": "0.80",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.33,
+        "printed": "0.33",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 14.0,
+        "printed": "14",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.41,
+        "printed": "0.41",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.36,
+        "printed": "0.36",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 1.9,
+        "printed": "1.9",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 16.0,
+        "printed": "16",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 1.5,
+        "printed": "1.5",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.69,
+        "printed": "0.69",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 2.9,
+        "printed": "2.9",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 5,
+      "eto": {
+        "value": 4.8,
+        "printed": "4.8",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.89,
+        "printed": "0.89",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 0.8,
+        "printed": "0.8",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.8,
+        "printed": "0.80",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.34,
+        "printed": "0.34",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 16.0,
+        "printed": "16",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.22,
+        "printed": "0.22",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.19,
+        "printed": "0.19",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 1.1,
+        "printed": "1.1",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 17.0,
+        "printed": "17",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 0.9,
+        "printed": "0.9",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.54,
+        "printed": "0.54",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 2.6,
+        "printed": "2.6",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 6,
+      "eto": {
+        "value": 2.7,
+        "printed": "2.7",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 6.0,
+        "printed": "6",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.89,
+        "printed": "0.89",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 1.0,
+        "printed": "1",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.89,
+        "printed": "0.89",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.36,
+        "printed": "0.36",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 11.0,
+        "printed": "11",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.71,
+        "printed": "0.71",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.6,
+        "printed": "0.60",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 1.8,
+        "printed": "1.8",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 13.0,
+        "printed": "13",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 1.6,
+        "printed": "1.6",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.96,
+        "printed": "0.96",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 2.6,
+        "printed": "2.6",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 7,
+      "eto": {
+        "value": 5.8,
+        "printed": "5.8",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.88,
+        "printed": "0.88",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 1.0,
+        "printed": "1",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.88,
+        "printed": "0.88",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.37,
+        "printed": "0.37",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 13.0,
+        "printed": "13",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.52,
+        "printed": "0.52",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.44,
+        "printed": "0.44",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 2.9,
+        "printed": "2.9",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 16.0,
+        "printed": "16",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 2.6,
+        "printed": "2.6",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.81,
+        "printed": "0.81",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 4.7,
+        "printed": "4.7",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 8,
+      "eto": {
+        "value": 5.1,
+        "printed": "5.1",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.87,
+        "printed": "0.87",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 1.0,
+        "printed": "1",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.87,
+        "printed": "0.87",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.38,
+        "printed": "0.38",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 16.0,
+        "printed": "16",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.23,
+        "printed": "0.23",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.19,
+        "printed": "0.19",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 1.1,
+        "printed": "1.1",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 17.0,
+        "printed": "17",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 1.0,
+        "printed": "1.0",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.57,
+        "printed": "0.57",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 2.9,
+        "printed": "2.9",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 9,
+      "eto": {
+        "value": 4.7,
+        "printed": "4.7",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.87,
+        "printed": "0.87",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 1.0,
+        "printed": "1",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.87,
+        "printed": "0.87",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.39,
+        "printed": "0.39",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 17.0,
+        "printed": "17",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.12,
+        "printed": "0.12",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.1,
+        "printed": "0.10",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 0.5,
+        "printed": "0.5",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 17.0,
+        "printed": "17",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 0.5,
+        "printed": "0.5",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.49,
+        "printed": "0.49",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 2.3,
+        "printed": "2.3",
+        "unit": "mm/day"
+      }
+    },
+    {
+      "day": 10,
+      "eto": {
+        "value": 5.2,
+        "printed": "5.2",
+        "unit": "mm/day"
+      },
+      "rain_minus_runoff": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "irrigation_div_fw": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "uncovered": {
+        "value": 0.86,
+        "printed": "0.86",
+        "unit": "dimensionless"
+      },
+      "fw": {
+        "value": 1.0,
+        "printed": "1",
+        "unit": "dimensionless"
+      },
+      "few": {
+        "value": 0.86,
+        "printed": "0.86",
+        "unit": "dimensionless"
+      },
+      "kcb": {
+        "value": 0.4,
+        "printed": "0.40",
+        "unit": "dimensionless"
+      },
+      "de_start": {
+        "value": 17.0,
+        "printed": "17",
+        "unit": "mm"
+      },
+      "kr": {
+        "value": 0.07,
+        "printed": "0.07",
+        "unit": "dimensionless"
+      },
+      "ke": {
+        "value": 0.05,
+        "printed": "0.05",
+        "unit": "dimensionless"
+      },
+      "evap_div_few": {
+        "value": 0.3,
+        "printed": "0.3",
+        "unit": "mm/day"
+      },
+      "deep_percolation": {
+        "value": 0.0,
+        "printed": "0",
+        "unit": "mm/day"
+      },
+      "de_end": {
+        "value": 18.0,
+        "printed": "18",
+        "unit": "mm"
+      },
+      "evap": {
+        "value": 0.3,
+        "printed": "0.3",
+        "unit": "mm/day"
+      },
+      "kc": {
+        "value": 0.45,
+        "printed": "0.45",
+        "unit": "dimensionless"
+      },
+      "etc": {
+        "value": 2.4,
+        "printed": "2.4",
+        "unit": "mm/day"
+      }
+    }
+  ],
+  "tolerance": {
+    "uncovered": 0.005,
+    "few": 0.005,
+    "kcb": 0.005,
+    "de_start": 0.5,
+    "kr": 0.005,
+    "ke": 0.005,
+    "evap_div_few": 0.05,
+    "deep_percolation": 0.5,
+    "de_end": 0.5,
+    "evap": 0.05,
+    "kc": 0.005,
+    "etc": 0.05
+  },
+  "tolerance_rule": "Half a unit of the last printed digit of each compared cell (12 columns x 10 days = 120 cells): 0.5 for integer columns (de_start, deep_percolation, de_end), 0.05 for one-decimal columns (evap_div_few, evap, etc), and 0.005 for two-decimal columns (uncovered, few, kcb, kr, ke, kc).",
+  "human_check_record": "SIGNATURE_RECORD.json"
+}
