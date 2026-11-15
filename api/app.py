@@ -8,7 +8,8 @@ a server runs. Both names are re-exported by ``api/main.py``.
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,10 +24,12 @@ from api.engines import (
     discover_engine_functions,
 )
 from api.errors import install_error_handlers
+from api.plant import EnginesFactory, make_plant_router
 from api.ports import RotationEngines, RotationValidator, RunSettings, SoilSlopeSource
 from api.rotation_validator import RotationDefinitionValidator
 from api.rotations import make_router
 from api.standins import ClimateUnavailable, SoilSlopeNotLoaded
+from kinds_of_year import load_record
 
 
 class Health(BaseModel):
@@ -52,6 +55,8 @@ def create_app(
     settings: RunSettings | None = None,
     parameters: dict[str, dict] | None = None,
     decision_layer: DecisionLayer | None = None,
+    kinds_of_year_record: Mapping[str, Any] | None = None,
+    engines_factory: EnginesFactory | None = None,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -71,8 +76,21 @@ def create_app(
     ``POST /api/decisions/run``; ``None`` means ``DiscoveredDecisionLayer``,
     which looks the function of ``decision/`` up by name on each request,
     never when the app is built (``api/decision_layer.py``), and answers "not
-    built" when it is not there. Both routes share the same sources, engines,
-    validator and settings.
+    built" when it is not there. The three routes share the same sources,
+    engines, validator and settings.
+
+    PROPOSED (unit ``l2/plant-route``), both for ``POST /api/plant/run`` only:
+    ``kinds_of_year_record`` is the ONI record the kinds of year are
+    classified on; ``None`` loads the committed one
+    (``kinds_of_year.load_record()``) once, here. ``engines_factory`` builds
+    the engines of a run with a rain-stress factor from the catalogue whose
+    erosivity is scaled (``parameters`` or ``{}``, through
+    ``api.rain_stress.scale_erosivity``). ``None`` means: with the default
+    engines, ``EntryPointEngines`` on the same engine functions; with
+    ``engines`` given, no factory, and the answer says the factor was not
+    applied, and why. With ``engines`` and a factory both given, the
+    catalogue of the injected engines is not known, so the factory is not
+    called and the answer says the factor was not applied, and why.
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -93,18 +111,28 @@ def create_app(
         """Liveness: the process is up and answering. Checks nothing else."""
         return Health(status="ok")
 
+    # PROPOSED (code review): the catalogue the plant route scales for a
+    # rain-stress run is the one the default engines use (``parameters``, or
+    # ``{}`` for None, as EntryPointEngines reads it); with ``engines`` given
+    # it is not known (None), and a factory is then not called.
+    plant_catalogue = None if engines is not None else (parameters or {})
+    if engines is None:
+        functions = discover_engine_functions()
+
+        def default_factory(catalogue: dict[str, dict]) -> RotationEngines:
+            return EntryPointEngines(
+                functions, carbon_models=DEFAULT_CARBON_MODELS, parameters=catalogue
+            )
+
+        engines = EntryPointEngines(
+            functions, carbon_models=DEFAULT_CARBON_MODELS, parameters=parameters
+        )
+        if engines_factory is None:
+            engines_factory = default_factory
     shared = {
         "climate": climate if climate is not None else ClimateUnavailable(),
         "soil_slope": soil_slope if soil_slope is not None else SoilSlopeNotLoaded(),
-        "engines": (
-            engines
-            if engines is not None
-            else EntryPointEngines(
-                discover_engine_functions(),
-                carbon_models=DEFAULT_CARBON_MODELS,
-                parameters=parameters,
-            )
-        ),
+        "engines": engines,
         "rotation_validator": (
             rotation_validator
             if rotation_validator is not None
@@ -121,6 +149,18 @@ def create_app(
                 if decision_layer is not None
                 else DiscoveredDecisionLayer()
             ),
+        )
+    )
+    app.include_router(
+        make_plant_router(
+            **shared,
+            kinds_of_year_record=(
+                kinds_of_year_record
+                if kinds_of_year_record is not None
+                else load_record()
+            ),
+            engines_factory=engines_factory,
+            parameters=plant_catalogue,
         )
     )
 
