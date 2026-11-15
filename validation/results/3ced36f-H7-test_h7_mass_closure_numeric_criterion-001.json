@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "3ced36f-H7-test_h7_mass_closure_numeric_criterion-001",
+  "run_id": "run-20261115T061340Z-3ced36f",
+  "test_code": "H7",
+  "expected": {
+    "missing_reason": "the entry H7 of docs/VALIDATION.md is not defined: it has no expected value"
+  },
+  "outcome": "not_evaluated",
+  "observed": {
+    "missing_reason": "pytest skipped engine/water/balance/test_bucket.py::test_h7_mass_closure_numeric_criterion, so nothing was obtained"
+  },
+  "reason": "[H7] numeric criterion waits for docs/VALIDATION.md H7: the definition of the closure check and its tolerance, supplied and checked by people. The structure of H7 is tested above to floating-point precision",
+  "notes": "Test engine/water/balance/test_bucket.py::test_h7_mass_closure_numeric_criterion. Placed under H7: the test names [H7] in its skip reason."
+}

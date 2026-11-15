@@ -14,13 +14,14 @@ Where an expected value lives with its source, where a run of the validation pro
 | `validation/records.py` | The record format in code and the check that rejects a malformed record |
 | `validation/test_layout.py` | Acceptance test. Run with `python -m pytest validation/` |
 | `validation/test_chain_examples.py` | End-to-end chain on the examples (unit l0/chain-examples, issue #168): the rotation definition example and the chain examples of `contracts/inputs/examples/` through EP2, EP1 and EP3 and the real runner of `api/engines.py`, in process, no network. It shows that the chain is wired; it is not a result. Unlike the rest of this folder it imports the application (`api/`, `engine/`, `params/`), so it needs the project's dependencies, not only the standard library |
+| `validation/test_recorded_run.py` | Checks the recorded runs of the real store (unit l0/validation-run-record, issue #289): the store is accepted by every check of `records.py`; `summarise` gives the counts pytest reported for the tests that have a result; every skipped test is in the store with its reason; no code whose entry of `docs/VALIDATION.md` is `not defined` holds a `passed` result |
 | `validation/expected/<id>.json` | One file per **expected value**, with its citation and the two persons who transcribed and checked it |
 | `validation/runs/<id>.json` | One file per **protocol run** |
 | `validation/results/<id>.json` | One file per **result** of one test in one run, whatever its outcome |
 | `validation/examples/` | A second, separate store with the same three folders, holding placeholder records only |
 | `validation/fixtures/` | Signed fixtures of whole checks, read by their tests, not by this store: `h2_example18.json` for [H2] and `e3_ah703_tables.json` for [E3] (unit l0/validation-h2-e3-ready, issue #225; paths PROPOSED). Format and skip rule in [`fixtures/README.md`](fixtures/README.md). Not committed yet: the signed files arrive in their own commit |
 
-`expected/`, `runs/` and `results/` do not exist yet: each is created by the first unit that stores a record in it. A folder that does not exist holds no record.
+`runs/` and `results/` exist since the first recorded run (unit l0/validation-run-record, issue #289). `expected/` does not exist yet: it is created by the first unit that stores a record in it. A folder that does not exist holds no record.
 
 Each of the three folders holds only files named `<id>.json`. Anything else in them is reported as a problem, including a file whose name starts with a dot and a directory whose name ends in `.json`.
 
@@ -277,7 +278,7 @@ For a person to approve. The code in the first column is the start of the test i
 | S02 | A store with only failed results reports all of them |
 | S03 | `validation/examples/` holds an accepted record of each kind and a result of each outcome |
 | S04 | Every example is a placeholder, and the real store refuses all of them |
-| S05 | The real store has no malformed record (it is empty today) |
+| S05 | The real store has no malformed record (it holds the records of one run since issue #289) |
 | S06 | Folders that do not exist yet mean an empty store, not an error |
 | S07 | A file that is not valid JSON is listed with its path, and the other records still load |
 | S08 | A file that writes the same field twice is rejected |
