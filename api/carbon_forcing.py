@@ -32,6 +32,19 @@ when it is importable.
 What each part gets is the table "The producer of CarbonForcing" of
 api/README.md. Every choice there is PROPOSED (blueprint section 3.7).
 
+``soil_cover`` is the monthly cover of RothC of D222: quantity
+``soil_cover_state``, unit ``dimensionless``, 1.0 when a living crop of the
+repeated calendar stands on most days of the month and 0.0 otherwise,
+including the fallow under residue. "Most days" is read as more than half of
+the days of the month, so a month with exactly half of its days with a live
+crop is 0.0 (PROPOSED reading, brief #373). The runner counts, for each month,
+the days with a live crop and the days of the month, from the calendar of the
+phase repeated over the record and the public rule of D135 and D136 (the
+window of D157, the days on which EP3 asks transpiration); this module only
+applies the rule to the counts (``soil_cover_series``). A month with a day
+whose live status is not known is missing with that day's reason. No climate
+value enters the cover.
+
 ``annual_carbon_inputs`` are the series of the residue ledger (EP4) when the
 runner has one, copied unchanged and never converted (D147 of issue #77: EP4
 writes them in the unit ``run_amg`` requires); otherwise one all-missing
@@ -52,6 +65,7 @@ import math
 import re
 import statistics
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 
 from contracts.carbon_forcing import (
     AnnualCarbonInputSeries,
@@ -61,6 +75,7 @@ from contracts.carbon_forcing import (
     CarbonInputSeries,
     ClimateSeries,
     ForcingHorizon,
+    SoilCoverSeries,
     StartingStateValue,
 )
 from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
@@ -135,6 +150,32 @@ SOIL_DEPTH_UNIT = "cm"
 SOIL_DEPTH_SOURCE = (
     "D180 of #77: the carbon benchmark depth of D71 (0-20 cm), written in cm "
     "because RothC compares it with the unit of rothc_tsmd_reference_depth"
+)
+
+# --- D222: the monthly soil cover of RothC -----------------------------------------
+
+# D222 of #77: "Quantity `soil_cover_state`, unit `dimensionless`: 1.0 when a
+# living crop of the repeated calendar is present on most days of the month,
+# 0.0 otherwise, including the fallow under residue." The identifier and unit
+# engine/rothc/entry.py reads (FORCING_QUANTITIES, DIMENSIONLESS), and the two
+# values of the encoding, written as decided.
+SOIL_COVER_STATE = "soil_cover_state"  # soil_cover
+SOIL_COVER_UNIT = "dimensionless"
+COVERED = 1.0  # D222: a living crop on most days of the month
+BARE = 0.0  # D222: otherwise, including the fallow under residue
+SOIL_COVER_SOURCE = (
+    "derived by api.carbon_forcing: D222 of #77, 1.0 when a living crop of the "
+    "repeated calendar stands on more than half of the days of the month and "
+    "0.0 otherwise, including the fallow under residue; a month with exactly "
+    'half of its days with a live crop is 0.0 ("most days" read as more than '
+    "half, brief #373); the days with a live crop are those of D135 and D136, "
+    "the window of D157 on which EP3 asks transpiration, counted by the runner "
+    "with engine.water.living_crop.live_crop_by_day on the calendar repeated "
+    "over the record; no climate value is read"
+)
+SOIL_COVER_NOT_PASSED = (
+    "soil_cover_state (D222 of #77) is made from the days with a live crop of "
+    "the repeated calendar, which the runner did not pass"
 )
 
 # --- the detail texts (PROPOSED; English for developers, never shown to users) --
@@ -903,6 +944,142 @@ def _soil_property(soil_slope: SiteSoilSlope, quantity: str) -> SoilProperty:
     )
 
 
+# --- D222: the monthly soil cover ----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LiveCropMonth:
+    """One calendar month as the runner counts it for D222: the days with a
+    live crop and the days of the month. Plain data: no engine type."""
+
+    live_days: int
+    days: int
+
+
+# What the runner passes for the soil cover (see ``build_carbon_forcing``): a
+# count or why it is missing, by (calendar year, month); a single Missing; or
+# None.
+LiveCropMonths = (
+    Mapping[tuple[int, int], LiveCropMonth | InputMissing | ResultsMissing]
+    | InputMissing
+    | ResultsMissing
+    | None
+)
+
+
+def soil_cover_state(month: LiveCropMonth) -> float:
+    """D222: 1.0 when live days are more than half of the month's days, else 0.0.
+
+    "Most days" is read as more than half: a month with exactly half of its
+    days with a live crop is 0.0 (brief #373).
+    """
+    return COVERED if month.live_days * 2 > month.days else BARE
+
+
+def soil_cover_series(
+    horizon: ForcingHorizon, live_crop_months: LiveCropMonths
+) -> list[SoilCoverSeries]:
+    """``soil_cover`` of the forcing (D222 of #77): one ``soil_cover_state`` series.
+
+    - ``None`` (the runner passed no counts): every month missing
+      ``NOT_AVAILABLE`` (``SOIL_COVER_NOT_PASSED``), never zero.
+    - A ``Missing``: every month missing with that reason.
+    - A mapping: for each month of the horizon, ``soil_cover_state`` of its
+      count; a month held missing keeps its reason (a day whose live status is
+      not known, C3.3); a month with no item is ``NO_COVERAGE``. A count that
+      is not a ``LiveCropMonth`` of the month's own number of days, with no
+      more live days than days, is a defect of the runner: ``TypeError``.
+    """
+    months = _months(horizon)
+    if live_crop_months is None or isinstance(
+        live_crop_months, InputMissing | ResultsMissing
+    ):
+        missing = (
+            _missing("NOT_AVAILABLE", SOIL_COVER_NOT_PASSED)
+            if live_crop_months is None
+            else InputMissing(
+                reason=live_crop_months.reason, detail=live_crop_months.detail
+            )
+        )
+        return [
+            SoilCoverSeries(
+                quantity=SOIL_COVER_STATE,
+                unit=SOIL_COVER_UNIT,
+                months=[
+                    MonthlyValue(year=year, month=month, value=None, missing=missing)
+                    for year, month in months
+                ],
+                **_span(months),
+            )
+        ]
+    items: list[MonthlyValue] = []
+    for year, month in months:
+        count = live_crop_months.get((year, month))
+        if count is None:
+            items.append(
+                MonthlyValue(
+                    year=year,
+                    month=month,
+                    value=None,
+                    missing=_missing(
+                        "NO_COVERAGE",
+                        f"{SOIL_COVER_STATE} (D222): the runner counted no days "
+                        f"with a live crop for {year:04d}-{month:02d}",
+                    ),
+                )
+            )
+            continue
+        if isinstance(count, InputMissing | ResultsMissing):
+            items.append(
+                MonthlyValue(
+                    year=year,
+                    month=month,
+                    value=None,
+                    missing=_missing(
+                        count.reason,
+                        f"{SOIL_COVER_STATE} (D222): {year:04d}-{month:02d} has a day "
+                        "whose live status is not known"
+                        + (f" ({count.detail})" if count.detail else "")
+                        + "; the month is not filled (C3.3, C3.4)",
+                    ),
+                )
+            )
+            continue
+        if (
+            not isinstance(count, LiveCropMonth)
+            or count.days != len(_days_of(year, month))
+            or not 0 <= count.live_days <= count.days
+        ):
+            raise TypeError(
+                f"live_crop_months: {year:04d}-{month:02d} is not a LiveCropMonth "
+                "of the days of that month"
+            )
+        items.append(
+            MonthlyValue(year=year, month=month, value=soil_cover_state(count))
+        )
+    present = any(item.value is not None for item in items)
+    header = (
+        {
+            "provenance": "DERIVED",  # C4.3: a fixed rule of the calendar
+            "source": SOIL_COVER_SOURCE,
+            "range_missing": _missing(
+                "NOT_AVAILABLE", "the soil cover state of D222 has no range (C2.2)"
+            ),
+        }
+        if present
+        else {}
+    )
+    return [
+        SoilCoverSeries(
+            quantity=SOIL_COVER_STATE,
+            unit=SOIL_COVER_UNIT,
+            months=items,
+            **_span(months),
+            **header,
+        )
+    ]
+
+
 # --- the producer ---------------------------------------------------------------------
 
 
@@ -1002,6 +1179,7 @@ def build_carbon_forcing(
     carbon_inputs: Sequence[AnnualCarbonInputSeries] | InputMissing | None = None,
     reference_evapotranspiration: ReferenceEvapotranspiration = None,
     monthly_carbon_inputs: Sequence[CarbonInputSeries] | None = None,
+    live_crop_months: LiveCropMonths = None,
 ) -> CarbonForcing | ResultsMissing:
     """The ``CarbonForcing`` of one rotation, or why it cannot be laid out.
 
@@ -1016,7 +1194,9 @@ def build_carbon_forcing(
     when the runner passed none. It is plain data: this module imports nothing
     of ``engine/``. ``monthly_carbon_inputs`` is the ``monthly_carbon_inputs``
     of the residue ledger, copied into ``carbon_inputs`` unchanged (D221), or
-    ``None`` (``monthly_carbon_input_series``).
+    ``None`` (``monthly_carbon_input_series``). ``live_crop_months`` is the
+    runner's count of the days with a live crop of each month (D222), a single
+    ``Missing``, or ``None`` (``soil_cover_series``).
     """
     for name, given, model in (
         ("calendar", calendar, RotationCalendar),
@@ -1088,6 +1268,6 @@ def build_carbon_forcing(
         soil_properties=[
             _soil_property(soil_slope, quantity) for quantity in SOIL_PROPERTIES
         ],
-        soil_cover=[],
+        soil_cover=soil_cover_series(horizon, live_crop_months),
         starting_state=[_starting_carbon(soil_slope)],
     )
