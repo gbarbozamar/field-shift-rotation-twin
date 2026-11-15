@@ -633,7 +633,7 @@
       "request": null,
       "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
       "missing_reason": null,
-      "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
+      "detail": "transcribed record oni_v6, read on 2026-11-15"
     }
   ]
 }
