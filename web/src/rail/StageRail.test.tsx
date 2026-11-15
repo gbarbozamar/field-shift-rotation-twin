@@ -137,6 +137,34 @@ describe('StageRail', () => {
     expect(itemHtml(html, 2)).toContain(strings['rail.state.done'])
   })
 
+  it('marks exactly the current stage with aria-current="step"', () => {
+    const html = renderRail()
+    expect(count(html, 'aria-current="step"'), 'exactly one stage is the current one').toBe(1)
+    for (let n = 1; n <= 6; n += 1) {
+      expect(
+        itemHtml(html, n).includes('aria-current="step"'),
+        `stage ${n} carries aria-current only when it is the current one`,
+      ).toBe(n === 2)
+    }
+
+    // with every stage done the marker follows the handoff stage
+    setSelectedFieldId(exampleRotation.field_id)
+    setRunAnswered(true)
+    const done = renderRail()
+    expect(count(done, 'aria-current="step"')).toBe(1)
+    expect(itemHtml(done, 6)).toContain('aria-current="step"')
+    expect(itemHtml(done, 2)).not.toContain('aria-current="step"')
+  })
+
+  it('becomes a wrapping horizontal row on wide screens', () => {
+    const html = renderRail()
+    const at = html.indexOf('data-testid="stage-rail"')
+    if (at === -1) throw new Error('stage-rail was not rendered')
+    const tag = html.slice(at, html.indexOf('>', at))
+    expect(tag).toContain('min-[1100px]:flex-row')
+    expect(tag).toContain('min-[1100px]:flex-wrap')
+  })
+
   it('names the rail for assistive technology, shows every waiting reason, and draws no percentage', () => {
     const html = renderRail()
 

@@ -45,7 +45,7 @@ export default function FieldsScreen() {
     exampleCase.fields.find((field) => field.field_id === selectedFieldId) ?? null
 
   return (
-    <section aria-labelledby="fields-screen-title" className="max-w-2xl">
+    <section aria-labelledby="fields-screen-title" className="max-w-6xl mx-auto">
       <h2 id="fields-screen-title" className="text-lg font-semibold">
         {strings['identity.title']}
       </h2>
@@ -66,66 +66,79 @@ export default function FieldsScreen() {
         </div>
       )}
 
-      <div className="mt-6">
-        <h3 className="text-base font-semibold">{strings['map.title']}</h3>
-        <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
-        <div className="mt-2">
-          <FieldsMap />
+      {/* The workbench shell of issue #454: one source order, two columns
+          from 1100px. The two wrappers below are plain block flow under
+          1100px, so the small-screen stacking is exactly the order of this
+          file; the grid variant places the first wrapper (the map over the
+          field list) in the flexible column and the second (the six
+          inspector pieces, in their today order) in the fixed inspector
+          column. Every component still mounts exactly once. */}
+      <div className="min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1fr)_380px] min-[1100px]:items-start min-[1100px]:gap-6">
+        <div>
+          <div className="mt-6">
+            <h3 className="text-base font-semibold">{strings['map.title']}</h3>
+            <p className="mt-1 text-sm text-slate-500">{strings['map.select_hint']}</p>
+            <div className="mt-2 h-[60dvh] min-h-[24rem] max-h-[80dvh]">
+              <FieldsMap />
+            </div>
+          </div>
+
+          <ul className="mt-6 space-y-3">
+            {exampleCase.fields.map((field) => {
+            const isSelected = field.field_id === selectedFieldId
+            return (
+              <li key={field.field_id}>
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedFieldId(field.field_id)}
+                  className={[
+                    'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
+                    isSelected ? 'border-emerald-500' : 'border-slate-200',
+                    ...(isSelected
+                      ? ['bg-emerald-50', 'ring-2', 'ring-emerald-500']
+                      : ['bg-white', 'hover:border-slate-300', 'hover:bg-slate-50']),
+                  ].join(' ')}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-slate-900">{field.name}</span>
+                    {isSelected && (
+                      <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                        {strings['identity.selected']}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-500">
+                    {strings['identity.field_id_label']}: {field.field_id}
+                  </span>
+                </button>
+              </li>
+            )
+            })}
+          </ul>
+
+          {exampleCase.fields.length === 0 && (
+            <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
+          )}
+        </div>
+
+        <div className="min-[1100px]:w-[380px]">
+          <RotationRun />
+
+          <SiteSheet />
+
+          {selectedFieldId === exampleRotation.field_id && (
+            <div className="mt-8">
+              <RotationRibbon rotation={exampleRotation} />
+            </div>
+          )}
+          {selectedFieldId !== null && <ClocksScreen />}
+
+          {selectedFieldId !== null && <ResultCards />}
+
+          {selectedFieldId !== null && <DecisionSection />}
         </div>
       </div>
-
-      <ul className="mt-6 space-y-3">
-        {exampleCase.fields.map((field) => {
-          const isSelected = field.field_id === selectedFieldId
-          return (
-            <li key={field.field_id}>
-              <button
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => setSelectedFieldId(field.field_id)}
-                className={[
-                  'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
-                  isSelected ? 'border-emerald-500' : 'border-slate-200',
-                  ...(isSelected
-                    ? ['bg-emerald-50', 'ring-2', 'ring-emerald-500']
-                    : ['bg-white', 'hover:border-slate-300', 'hover:bg-slate-50']),
-                ].join(' ')}
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-900">{field.name}</span>
-                  {isSelected && (
-                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                      {strings['identity.selected']}
-                    </span>
-                  )}
-                </span>
-                <span className="mt-1 block text-sm text-slate-500">
-                  {strings['identity.field_id_label']}: {field.field_id}
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-
-      {exampleCase.fields.length === 0 && (
-        <p className="mt-6 text-sm text-slate-500">{strings['identity.empty_list']}</p>
-      )}
-
-      <RotationRun />
-
-      <SiteSheet />
-
-      {selectedFieldId === exampleRotation.field_id && (
-        <div className="mt-8">
-          <RotationRibbon rotation={exampleRotation} />
-        </div>
-      )}
-      {selectedFieldId !== null && <ClocksScreen />}
-
-      {selectedFieldId !== null && <ResultCards />}
-
-      {selectedFieldId !== null && <DecisionSection />}
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${strings['identity.selected']}: ${selectedField.name}` : ''}

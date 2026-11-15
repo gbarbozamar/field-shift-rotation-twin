@@ -130,4 +130,35 @@ describe('FieldsScreen', () => {
     expect(html).toContain(strings['example.banner'])
     expect(html).toContain(strings['cards.availability'])
   })
+
+  it('carries the workbench two-column layout at the desktop variant', () => {
+    const html = renderScreen()
+    expect(html).toContain('max-w-6xl mx-auto')
+    expect(html).toContain('min-[1100px]:grid')
+    expect(html).toContain('min-[1100px]:grid-cols-[minmax(0,1fr)_380px]')
+    expect(html).toContain('min-[1100px]:w-[380px]')
+  })
+
+  it('keeps the inspector order: run, site sheet, ribbon, clocks, results, decision', () => {
+    // the rotation's field, so all six inspector pieces render at once
+    setSelectedFieldId(exampleRotation.field_id)
+    const html = renderScreen()
+    const anchors: Array<[string, number]> = [
+      ['the seam run', html.indexOf('data-testid="rotation-run"')],
+      ['the site sheet', html.indexOf('id="site-sheet-title"')],
+      ['the rotation ribbon', html.indexOf('id="rotation-ribbon-title"')],
+      ['the clocks', html.indexOf('id="clocks-title"')],
+      ['the results', html.indexOf('id="results-title"')],
+      ['the decision', html.indexOf('id="decision-title"')],
+    ]
+    for (const [what, at] of anchors) {
+      expect(at, `${what} must render`).toBeGreaterThan(-1)
+    }
+    for (let index = 1; index < anchors.length; index += 1) {
+      expect(
+        anchors[index][1],
+        `${anchors[index - 1][0]} must come before ${anchors[index][0]}`,
+      ).toBeGreaterThan(anchors[index - 1][1])
+    }
+  })
 })

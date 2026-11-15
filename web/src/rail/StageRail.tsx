@@ -72,7 +72,11 @@ export default function StageRail() {
   const currentIndex = firstNotDone === -1 ? stages.length - 1 : firstNotDone
 
   return (
-    <ol data-testid="stage-rail" aria-label={strings['rail.label']} className="mt-4 space-y-2">
+    <ol
+      data-testid="stage-rail"
+      aria-label={strings['rail.label']}
+      className="mt-4 space-y-2 min-[1100px]:flex min-[1100px]:flex-row min-[1100px]:flex-wrap min-[1100px]:gap-2 min-[1100px]:space-y-0"
+    >
       {stages.map((stage, index) => {
         const isCurrent = index === currentIndex
         const nameClass = isCurrent
@@ -84,6 +88,7 @@ export default function StageRail() {
           <li
             key={stage.name}
             data-testid={`stage-rail-item-${index + 1}`}
+            aria-current={isCurrent ? 'step' : undefined}
             className={[
               'flex',
               'flex-wrap',
