@@ -6,7 +6,13 @@ decided it on 14 November 2026 together with the decisions D74 and D85
 to D99 of issue #77 that those entries record and, for D3, D4, D10 and
 D12, with D103 and D117 of the same issue and with the person-approved
 case of issue #223 (the v2.1 tables of #177, approved by the table
-designer and confirmed by the lead developer in review of #177). What
+designer and confirmed by the lead developer in review of #177). The
+decisions D151 to D156 and D165 to D176 of the same issue (15 November
+2026) settle how the state reads a range that touches zero (D165), a set
+of scenarios and the phases of an input value (D166, D175, D117), the
+counts of the carbon trend (D169), the computation of the trend that
+enters the state (D173) and the label of dominance (D174); unit
+l2/decision-rule-d165-d176 brought this module in line with them. What
 those entries leave OPEN stays OPEN and is marked where it touches this
 module.
 
@@ -36,6 +42,8 @@ from pydantic import BaseModel, ConfigDict
 
 from contracts.results import models
 from contracts.results.models import (
+    DEFAULT_TREND_COMPUTATION,
+    TREND_COMPUTATIONS,
     Missing,
     Range,
     ResultsTable,
@@ -48,8 +56,9 @@ from contracts.results.models import (
 # uncertainty missing" · "Not robust across scenarios" · "Robust
 # preference" (D74); D97 adds "Not separated: within uncertainty".
 # "Not evaluated" is the absence of a state (D85: the pair is "not
-# evaluated", with no state), so ``PairState.state`` is ``None`` for it;
-# whether it is a state or the absence of one is OPEN as K1 of entry D7.
+# evaluated", with no state), so ``PairState.state`` is ``None`` for it.
+# D151 decides it: "Not evaluated" is "the label shown for that absence,
+# not a sixth state name".
 NOT_EVALUATED = "Not evaluated"
 IDENTICAL = "Identical"
 NOT_SEPARATED_UNCERTAINTY_MISSING = "Not separated: uncertainty missing"
@@ -63,10 +72,20 @@ ROBUST_PREFERENCE = "Robust preference"
 # improvement" only when the whole range of the difference lies on the
 # better side of zero; a "deterioration" only when the whole range lies
 # on the worse side; a range that touches or crosses zero is "not
-# separated" for that cell. D98: such a cell blocks a robust preference.
+# separated" for that cell (the count by range of D99 keeps these three
+# classes, D167). Whether a cell blocks a robust preference is another
+# question, which D98 answers as D165 reads it: a cell is non-deteriorating
+# when the whole range of its difference lies on the side of zero that is
+# not worse, zero included, so a cell that touches zero from that side is
+# "not separated" and still does not block; a range that crosses zero, or
+# that touches it from the worse side, blocks (see ``_blocks``).
 NOT_SEPARATED = "not separated"
 STRICT_IMPROVEMENT = "strict improvement"
 DETERIORATION = "deterioration"
+
+# D174 on #77: the output of dominance "is labelled "by point value", as
+# D99 labels its second count".
+BY_POINT_VALUE = "by point value"
 
 
 # --- a limit declared by a person (D1) ----------------------------------------
@@ -437,11 +456,11 @@ def never_preferred_less(
     against either rotation (D6: a missing value does not enter the
     state). The direction of each row is read from the row and never
     assumed, so one indicator may be ``lower_is_better`` and another
-    ``higher_is_better``. Whether "no worse" and "better" here are read
-    by the range of the difference (D93, D98) or stay comparisons of the
-    two values is OPEN as K7 of entry D5; this function keeps the
-    comparisons of the two values, and the coverage of the cells it
-    judges is carried by ``pair_counts`` (D91).
+    ``higher_is_better``. "No worse" and "better" are comparisons of the
+    two values (D156: "Dominance compares the point values over the cells
+    that hold a value on both sides"); the record of ``dominance`` carries
+    this result with its label "by point value" (D174) and the coverage
+    "k of N" of D91.
     """
 
     first_rows = _rows_of(table, first_rotation)
@@ -456,6 +475,50 @@ def never_preferred_less(
         if _better(second.value, first.value, second.direction):
             better_somewhere = True
     return better_somewhere
+
+
+@dataclass(frozen=True)
+class Dominance:
+    """Dominance of one pair, with its label and its coverage (D5, D156,
+    D174, D91).
+
+    ``never_preferred_less`` is the result of the function of that name;
+    ``basis`` is always "by point value" (D174: the comparison returns its
+    basis); ``cells_compared`` counts the cells of the pair with a value
+    on both sides, with or without a range, out of ``cells_of_the_pair``
+    (D156: "The coverage "k of N" of D91 counts the cells with a value on
+    both sides, with or without a range"). It is descriptive and never
+    names a preference: the state of a pair is ``pair_state`` (D156).
+    PROPOSED form.
+    """
+
+    first_rotation: str
+    second_rotation: str
+    never_preferred_less: bool
+    basis: str
+    cells_compared: int
+    cells_of_the_pair: int
+
+
+def dominance(
+    table: ResultsTable, first_rotation: str, second_rotation: str
+) -> Dominance:
+    """Whether ``second_rotation`` is never preferred less than
+    ``first_rotation``, labelled "by point value", with the coverage of
+    the cells compared (D5, D156, D174, D91)."""
+    differences = paired_differences(table, first_rotation, second_rotation)
+    return Dominance(
+        first_rotation=first_rotation,
+        second_rotation=second_rotation,
+        never_preferred_less=never_preferred_less(
+            table, first_rotation, second_rotation
+        ),
+        basis=BY_POINT_VALUE,
+        cells_compared=sum(
+            1 for difference in differences if difference.value is not None
+        ),
+        cells_of_the_pair=len(differences),
+    )
 
 
 # --- D6: missing values in the decision ----------------------------------------
@@ -520,10 +583,10 @@ def _cell_class(difference: PairedDifference) -> str | None:
     whole range strictly on the better side of zero, not touching it, is
     a strict improvement; the whole range on the worse side is a
     deterioration; a range that touches or crosses zero is not separated
-    for that cell and blocks a robust preference. A cell whose range
-    lies on the side of zero that is not worse, zero included (D98,
-    non-deteriorating), without touching zero is exactly a strict
-    improvement.
+    for that cell (D93). These are the three classes of the count by range
+    of D99 (D167). Which of them block a robust preference is
+    ``_blocks``: a cell that is not separated because its range touches
+    zero from the side that is not worse does not (D165).
     """
     if difference.range is None:
         return None
@@ -541,6 +604,47 @@ def _cell_class(difference: PairedDifference) -> str | None:
     return NOT_SEPARATED
 
 
+def _non_deteriorating(difference: PairedDifference) -> bool:
+    """Whether a computed difference shows non-deterioration (D98, D165).
+
+    D98: "A cell is non-deteriorating only when the whole range of its
+    difference lies on the side of zero that is not worse, zero included
+    (consistent with D90)." A difference without its range cannot show it
+    (D92).
+    """
+    if difference.range is None:
+        return False
+    if difference.direction == "lower_is_better":
+        return difference.range.high <= 0.0
+    return difference.range.low >= 0.0
+
+
+def _blocks(difference: PairedDifference) -> bool:
+    """Whether a computed difference blocks a robust preference (D165).
+
+    D165: "A cell blocks a robust preference when its range is missing
+    (D92), crosses zero, touches zero from the worse side (it is not
+    non-deteriorating), or lies wholly on the worse side (D93)." That is
+    every computed difference that is not non-deteriorating.
+    """
+    return not _non_deteriorating(difference)
+
+
+def _enters_the_state(difference: PairedDifference, trend_computation: str) -> bool:
+    """Whether a paired cell enters the state (D173).
+
+    D173: the computation of the soil carbon trend that enters the
+    separation rule is "the one used to compare rotations: the one the user
+    chose, and `end_minus_start` when the user has not chosen" (C1.6); "The
+    other two are shown and counted (D99, by computation, D169) and do not
+    enter the state."
+    """
+    return (
+        difference.computation is None
+        or difference.computation == trend_computation
+    )
+
+
 @dataclass(frozen=True)
 class PairState:
     """The state of one pair of rotations (D7): the separation rule of D74
@@ -548,32 +652,42 @@ class PairState:
     with the name D97 adds.
 
     ``state`` is ``None`` when no paired difference of the pair holds a
-    value: the pair is not evaluated and has no state (D85; whether that
-    absence is itself a state is OPEN as K1 of entry D7). Otherwise the
-    state is "Robust preference" when no cell of the pair blocks or
-    deteriorates and at least one cell is a strict improvement (D74 with
-    D93 and D98), or the first of these reasons that applies, in the
-    order the approved unit brief (#202) lists them: "Identical" (D85:
-    at least one difference holds a value and every difference is zero);
-    "Not separated: uncertainty missing" (a computed difference without
-    its range, D92); "Not separated: within uncertainty" (a known range
-    that touches or crosses zero, D97); "Not robust across scenarios"
-    (D74 asks for paired non-deterioration in every admitted scenario:
-    this is the state of a pair that is not a robust preference and none
-    of the other reasons applies). Which state comes first when several
-    conditions hold is OPEN as K2 of entry D7, which scenarios are
-    admitted is OPEN there as well, and so is whether the rule is applied
-    per carbon model (K6); this function reads the scenarios and the
-    cells of the table it is given, cell by cell.
+    value: the pair is not evaluated and has no state (D85; D151: "Not
+    evaluated" is the label shown for that absence). In one scenario the
+    state is the first that applies in the order of D152: "Robust
+    preference" when no cell blocks (D165: a range that is missing,
+    crosses zero, touches zero from the worse side or lies wholly on the
+    worse side) and at least one cell is a strict improvement (D74, D93,
+    D98, D153); "Identical" (D85: at least one difference holds a value
+    and every difference is zero); "Not separated: uncertainty missing" (a
+    computed difference without its range, D92); "Not separated: within
+    uncertainty" (a known range that touches or crosses zero, D97);
+    otherwise "Not robust across scenarios".
 
-    A cell where either side holds no value counts neither for nor
-    against either rotation (D59, D6) and never blocks: D91 sets no
-    minimum coverage. ``identical_rows`` follows D85: at least one
-    difference holds a value and every difference of an indicator the
+    Over a table of more than one scenario the state is the one D166
+    gives: each scenario is read on its own, in the order above, and the
+    pair is a robust preference only if it is one in every member;
+    otherwise "Not robust across scenarios", even when every member has
+    the same state that is not a robust preference; a member without a
+    state is not a robust preference (D175). The cells of different
+    scenarios are never read as one scenario. ``by_scenario`` carries the
+    state of each member, in scenario order, so that it is shown beside
+    the state of the set (D152: "The conditions that did not give the
+    state are still shown"); it is empty for a table of one scenario. The
+    table is the admitted set: which scenarios it holds is the caller's
+    (D171).
+
+    The cells of the carbon models are separate cells (D155). Of the soil
+    carbon trend only the computation used to compare rotations enters
+    the state (D173). A cell where either side holds no value counts
+    neither for nor against either rotation (D59, D6) and never blocks:
+    D91 sets no minimum coverage. ``identical_rows`` follows D85: at least
+    one difference holds a value and every difference of an indicator the
     pair evaluated is zero; a difference of an indicator the pair never
-    evaluated (no difference of it holds a value) does not enter the
-    state (D6), and a missing difference within an indicator the pair
-    evaluated makes the pair never identical.
+    evaluated (no difference of it holds a value) does not enter the state
+    (D6), and a missing difference within an indicator the pair evaluated
+    makes the pair never identical. Over several scenarios it is true only
+    when it is true in every member.
     """
 
     first_rotation: str
@@ -581,20 +695,21 @@ class PairState:
     state: str | None
     identical_rows: bool
     indicators_not_resolved: tuple[str, ...]
+    by_scenario: tuple[tuple[str, str | None], ...] = ()
 
 
-def pair_state(
-    table: ResultsTable, first_rotation: str, second_rotation: str
+def _pair_state_in_one_scenario(
+    table: ResultsTable,
+    first_rotation: str,
+    second_rotation: str,
+    trend_computation: str,
 ) -> PairState:
-    """The state of one pair of rotations, and the indicators not resolved (D7).
-
-    An indicator is named in ``indicators_not_resolved`` when the pair
-    holds at least one computed difference of that indicator and one of
-    its cells is not a strict improvement. An indicator with no computed
-    difference for the pair is never named: it was not evaluated, and
-    what was not evaluated does not enter the state (D6).
-    """
-    differences = paired_differences(table, first_rotation, second_rotation)
+    """The state of one pair in a table of one scenario (D152, D165, D173)."""
+    differences = [
+        difference
+        for difference in paired_differences(table, first_rotation, second_rotation)
+        if _enters_the_state(difference, trend_computation)
+    ]
     computed = [
         difference for difference in differences if difference.value is not None
     ]
@@ -619,25 +734,19 @@ def pair_state(
             identical_rows=False,
             indicators_not_resolved=(),
         )
-    by_indicator: dict[str, list[PairedDifference]] = {}
-    for difference in computed:
-        by_indicator.setdefault(difference.indicator, []).append(difference)
+    # D165, follow-up: "indicators_not_resolved names only indicators with a
+    # blocking cell".
     indicators_not_resolved = tuple(
-        indicator
-        for indicator in sorted(by_indicator)
-        if any(
-            _cell_class(difference) != STRICT_IMPROVEMENT
-            for difference in by_indicator[indicator]
+        sorted(
+            {difference.indicator for difference in computed if _blocks(difference)}
         )
     )
     classes = [_cell_class(difference) for difference in computed]
     a_range_missing = any(cell is None for cell in classes)
     a_not_separated = any(cell == NOT_SEPARATED for cell in classes)
-    a_deterioration = any(cell == DETERIORATION for cell in classes)
     a_strict_improvement = any(cell == STRICT_IMPROVEMENT for cell in classes)
-    if not (a_range_missing or a_not_separated or a_deterioration) and (
-        a_strict_improvement
-    ):
+    a_blocking_cell = any(_blocks(difference) for difference in computed)
+    if not a_blocking_cell and a_strict_improvement:
         state = ROBUST_PREFERENCE
     elif identical_rows:
         state = IDENTICAL
@@ -653,6 +762,79 @@ def pair_state(
         state=state,
         identical_rows=identical_rows,
         indicators_not_resolved=indicators_not_resolved,
+    )
+
+
+def pair_state(
+    table: ResultsTable,
+    first_rotation: str,
+    second_rotation: str,
+    *,
+    trend_computation: str = DEFAULT_TREND_COMPUTATION,
+) -> PairState:
+    """The state of one pair of rotations, and the indicators not resolved (D7).
+
+    In a table of one scenario, the state of that scenario (D152, D165).
+    In a table of several, the state of the set (D166, D175), with the
+    state of each member in ``by_scenario``. ``trend_computation`` is the
+    computation of the soil carbon trend used to compare rotations, the
+    one the user chose; ``DEFAULT_TREND_COMPUTATION`` when the user has not
+    chosen (D173, C1.6).
+
+    An indicator is named in ``indicators_not_resolved`` when the pair
+    holds at least one computed difference of that indicator that blocks
+    a robust preference (D165); over several scenarios, when it is named
+    in at least one member. An indicator with no computed difference for
+    the pair is never named: it was not evaluated, and what was not
+    evaluated does not enter the state (D6).
+    """
+    if trend_computation not in TREND_COMPUTATIONS:
+        raise ValueError(
+            f"'{trend_computation}' is not a computation of the soil carbon "
+            f"trend: {list(TREND_COMPUTATIONS)} (C1.6, D173)"
+        )
+    scenarios = sorted({row.scenario_id for row in table.rows})
+    if len(scenarios) == 1:
+        return _pair_state_in_one_scenario(
+            table, first_rotation, second_rotation, trend_computation
+        )
+    members = [
+        (
+            scenario_id,
+            _pair_state_in_one_scenario(
+                _scenario_table(table, scenario_id),
+                first_rotation,
+                second_rotation,
+                trend_computation,
+            ),
+        )
+        for scenario_id in scenarios
+    ]
+    if all(member.state is None for _, member in members):
+        # D85: no paired difference of the pair holds a value in any
+        # scenario; the pair is not evaluated, with no state.
+        state = None
+    elif all(member.state == ROBUST_PREFERENCE for _, member in members):
+        state = ROBUST_PREFERENCE
+    else:
+        # D166: "otherwise it is "Not robust across scenarios""; D175: a
+        # member without a state is not a robust preference.
+        state = NOT_ROBUST_ACROSS_SCENARIOS
+    return PairState(
+        first_rotation=first_rotation,
+        second_rotation=second_rotation,
+        state=state,
+        identical_rows=all(member.identical_rows for _, member in members),
+        indicators_not_resolved=tuple(
+            sorted(
+                {
+                    indicator
+                    for _, member in members
+                    for indicator in member.indicators_not_resolved
+                }
+            )
+        ),
+        by_scenario=tuple((scenario_id, member.state) for scenario_id, member in members),
     )
 
 
@@ -694,21 +876,26 @@ class RangeClassCounts:
 
 @dataclass(frozen=True)
 class PairCounts:
-    """The two counts of one pair, scenario and indicator, and the coverage
-    of the cells compared (D87 with D99; D91).
+    """The two counts of one pair, scenario, indicator, carbon model and
+    computation, and the coverage of the cells compared (D87 with D99; D91;
+    D169).
 
-    ``cells_compared`` is the number of the cells of the pair where both
-    rotations hold a value, out of ``cells_of_the_pair``, all the cells
-    of the pair for that scenario and indicator (D91: "k of N"); no
-    minimum coverage is set (D91). Whether these counts are also keyed
-    by carbon model and computation is OPEN (entry D2); they are keyed
-    by pair, scenario and indicator, as D87 keys them.
+    ``carbon_model`` and ``computation`` are those of the cells counted:
+    ``None`` for an indicator that names neither, and one count per carbon
+    model and computation for the soil carbon trend (D169: "One count per
+    pair, scenario, indicator, carbon model and computation, so that the
+    cells of AMG and of RothC, which D155 never reads together, are never
+    added in one count"). ``cells_compared`` is the number of those cells
+    where both rotations hold a value, out of ``cells_of_the_pair``, all
+    of them (D91: "k of N"); no minimum coverage is set (D91).
     """
 
     first_rotation: str
     second_rotation: str
     scenario_id: str
     indicator: str
+    carbon_model: str | None
+    computation: str | None
     by_point_sign: PointSignCounts
     by_range: RangeClassCounts
     cells_compared: int
@@ -722,30 +909,44 @@ def pair_counts(
     *,
     equal_tolerance: float,
 ) -> tuple[PairCounts, ...]:
-    """The two counts of the cells of one pair of rotations, per scenario and
-    indicator, and the coverage of the cells compared (D87 with D99; D91).
+    """The two counts of the cells of one pair of rotations, per scenario,
+    indicator, carbon model and computation, and the coverage of the cells
+    compared (D87 with D99; D91; D169).
 
     The two counts are shown apart and never added (D99): by the sign of
     the point value of each difference, and, where the difference has a
-    range, by the class of the cell (D93, D98). A cell without a range
-    appears only in the count of the point signs; a cell with a missing
-    side appears only as such. ``equal_tolerance`` is the absolute
-    tolerance within which a difference counts as equal: the designer of
-    the case sets it (D87); this module sets none.
+    range, by the class of the cell (D93, D98; the three classes of D167).
+    A cell without a range appears only in the count of the point signs; a
+    cell with a missing side appears only as such. Every computation of
+    the soil carbon trend is counted, each apart (D169, D173).
+    ``equal_tolerance`` is the absolute tolerance within which a difference
+    counts as equal, inclusive (D168): the designer of the case sets it
+    (D87); this module sets none.
     """
     if equal_tolerance < 0:
         raise ValueError(
             "equal_tolerance is an absolute tolerance (D87): it cannot be negative"
         )
     differences = paired_differences(table, first_rotation, second_rotation)
-    groups: dict[tuple[str, str], list[PairedDifference]] = {}
+    groups: dict[
+        tuple[str, str, str | None, str | None], list[PairedDifference]
+    ] = {}
     for difference in differences:
         groups.setdefault(
-            (difference.scenario_id, difference.indicator), []
+            (
+                difference.scenario_id,
+                difference.indicator,
+                difference.carbon_model,
+                difference.computation,
+            ),
+            [],
         ).append(difference)
     counts = []
-    for scenario_id, indicator in sorted(groups):
-        of_the_group = groups[(scenario_id, indicator)]
+    for key in sorted(
+        groups, key=lambda item: (item[0], item[1], item[2] or "", item[3] or "")
+    ):
+        scenario_id, indicator, carbon_model, computation = key
+        of_the_group = groups[key]
         better = worse = equal = missing_side = 0
         strict_improvement = deterioration = not_separated = 0
         compared = 0
@@ -775,21 +976,23 @@ def pair_counts(
                 second_rotation=second_rotation,
                 scenario_id=scenario_id,
                 indicator=indicator,
+                carbon_model=carbon_model,
+                computation=computation,
                 by_point_sign=PointSignCounts(
                     better=better,
                     worse=worse,
                     equal=equal,
                     missing_side=missing_side,
                 ),
-            by_range=RangeClassCounts(
-                strict_improvement=strict_improvement,
-                deterioration=deterioration,
-                not_separated=not_separated,
-            ),
-            cells_compared=compared,
-            cells_of_the_pair=len(of_the_group),
+                by_range=RangeClassCounts(
+                    strict_improvement=strict_improvement,
+                    deterioration=deterioration,
+                    not_separated=not_separated,
+                ),
+                cells_compared=compared,
+                cells_of_the_pair=len(of_the_group),
+            )
         )
-    )
     return tuple(counts)
 
 
@@ -809,22 +1012,51 @@ class UncertainInput:
     rows whose value, in every scenario, is the input's value ("u1
     (B2021)" drives the soil-loss cell of rotation B of agricultural
     year 2021). ``values`` is the person's ordered mapping of the
-    admitted values: each entry pairs one value with the ``scenario_id``
-    of the scenario of the table that holds this input at that value
-    with every other uncertain input at its reference value. D103: each
-    value of the input is one admitted scenario. D117: the phases of a
-    rotation nest inside a value, and the state at a value is the state
-    over all the phases at that value, read as D74 reads a set of
-    scenarios; this module reads the state of the one scenario the
-    mapping names — the degenerate single-phase case of the approved
-    unit, which the machinery accepts — and decides nothing of the
-    multi-phase case.
+    admitted values: each entry pairs one value with the scenario of the
+    table that holds this input at that value with every other uncertain
+    input at its reference value, given as one ``scenario_id`` or, when
+    the phases of the rotations nest inside the value, as the tuple of the
+    ``scenario_id`` of those phases. D103: each value of the input is one
+    admitted scenario. D117: "The state at a value of the input is the
+    state over all the phases at that value, read as D74 reads a set of
+    scenarios"; that is the state ``pair_state`` gives over the scenarios
+    the value names (D166, D175). A phase is not an uncertain input
+    (D117).
     """
 
     name: str
     unit: str
     cell: tuple[str, str, str, int | None, str | None, str | None]
-    values: tuple[tuple[float, str], ...]
+    values: tuple[tuple[float, str | tuple[str, ...]], ...]
+
+
+def _scenarios_of(entry: str | tuple[str, ...]) -> tuple[str, ...]:
+    """The scenarios one admitted value of an input names: one scenario, or
+    the scenarios of the phases nested inside it (D117)."""
+    scenario_ids = (entry,) if isinstance(entry, str) else tuple(entry)
+    if not scenario_ids:
+        raise ValueError(
+            "an admitted value of an uncertain input names no scenario (D103, D117)"
+        )
+    return scenario_ids
+
+
+def _scenarios_table(
+    table: ResultsTable, scenario_ids: tuple[str, ...]
+) -> ResultsTable:
+    """The rows of the scenarios one admitted value names, as a table."""
+    known = {row.scenario_id for row in table.rows}
+    absent = [scenario_id for scenario_id in scenario_ids if scenario_id not in known]
+    if absent:
+        raise ValueError(
+            f"scenarios {absent} are not scenarios of the table: {sorted(known)}"
+        )
+    wanted = set(scenario_ids)
+    return ResultsTable(
+        case_id=table.case_id,
+        field_id=table.field_id,
+        rows=[row for row in table.rows if row.scenario_id in wanted],
+    )
 
 
 def _drives_the_cell(row: ResultsTableRow, cell: tuple) -> bool:
@@ -853,8 +1085,7 @@ def _scenario_table(table: ResultsTable, scenario_id: str) -> ResultsTable:
 
 def _named_state(state: str | None) -> str:
     """The name a state carries in the output text; a pair without a state
-    (D85) is written with the name D88 lists for it, which says nothing
-    of K1 (whether that name is a state or the absence of one)."""
+    (D85) is written with the label D151 gives that absence."""
     return NOT_EVALUATED if state is None else state
 
 
@@ -866,10 +1097,8 @@ class TippingPoint:
     robust preference and not, with the name and unit of the input.
 
     ``states`` carries each admitted value, in the person's order, with
-    the state of the pair in the scenario that holds it (D103; under
-    D117 that state is in general the state over all the phases at that
-    value, which this module reads off the one scenario the person's
-    mapping names — the degenerate single-phase case). The change D3
+    the state of the pair at that value: in the one scenario that holds
+    it (D103), or over the phases nested inside it (D117, D166). The change D3
     reads is robust preference against not: a change between two states
     that are both not a robust preference (in the approved case, "Not
     separated: within uncertainty" into "Not robust across scenarios" at
@@ -893,13 +1122,17 @@ def tipping_point(
     first_rotation: str,
     second_rotation: str,
     uncertain_input: UncertainInput,
+    *,
+    trend_computation: str = DEFAULT_TREND_COMPUTATION,
 ) -> TippingPoint:
     """The tipping point of one uncertain input of the decision, or the
-    reason there is none (D3, as D103 reads it).
+    reason there is none (D3, as D103 and D117 read it).
 
     The state at each admitted value is the state of the pair over the
-    scenario of the table that holds the input at that value, computed by
-    ``pair_state`` (D74 with D93, D97 and D98). The tipping point is the
+    scenario of the table that holds the input at that value, or over the
+    phases nested inside it (D117), computed by ``pair_state`` (D74 with
+    D93, D97, D98, D165 and, over phases, D166 and D175);
+    ``trend_computation`` is passed to it (D173). The tipping point is the
     bracket between the two adjacent values, in the person's order, where
     that state changes between a robust preference and not; the approved
     case holds one such bracket, and this function reports the first, in
@@ -910,10 +1143,18 @@ def tipping_point(
     robust preference.
     """
     states: list[tuple[float, str | None]] = []
-    for value, scenario_id in uncertain_input.values:
-        scenario = _scenario_table(table, scenario_id)
+    for value, entry in uncertain_input.values:
+        at_the_value = _scenarios_table(table, _scenarios_of(entry))
         states.append(
-            (value, pair_state(scenario, first_rotation, second_rotation).state)
+            (
+                value,
+                pair_state(
+                    at_the_value,
+                    first_rotation,
+                    second_rotation,
+                    trend_computation=trend_computation,
+                ).state,
+            )
         )
     if not states:
         return TippingPoint(
@@ -976,7 +1217,8 @@ class MeasurementPriorityItem:
     ``states`` carries each admitted value of the input, in the person's
     order, with the state of the pair in the scenario that holds the
     input at that value, every other uncertain input at its reference
-    value: the evidence the rank is read from. The values of an input
+    value, or over the phases nested inside it (D117): the evidence the
+    rank is read from. The values of an input
     change the set's state when those states are not all the same; such
     an input holds rank 1, an input whose values never change it holds
     rank 2. The ordering among the rank-1 inputs is OPEN for the science
@@ -999,9 +1241,10 @@ class MeasurementPriority:
     is built from.
 
     ``base_state`` is the state of the pair over the whole admitted
-    scenario set — the table as given, every scenario together (D103: the
-    set-level state of ``pair_state``, "Not robust across scenarios" when
-    any member of the set is not a robust preference). The list exists
+    scenario set, the table as given: the state ``pair_state`` gives over
+    a set, each scenario read on its own (D103: "Not robust across
+    scenarios" when any member is not a robust preference; D166, D175).
+    The list exists
     only from a base that is not a robust preference: a resolved (robust)
     set gives the empty list.
     """
@@ -1017,22 +1260,28 @@ def measurement_priority(
     first_rotation: str,
     second_rotation: str,
     uncertain_inputs: tuple[UncertainInput, ...],
+    *,
+    trend_computation: str = DEFAULT_TREND_COMPUTATION,
 ) -> MeasurementPriority:
     """What to measure first, in rank order, and from which base state (D4,
     with the base state of D103).
 
     The base state is the state of the pair over the whole admitted
-    scenario set, the table as given; a robust preference there gives the
-    empty list. Otherwise every input of ``uncertain_inputs`` is ranked
-    by its admitted values: for each value, the state of the pair in the
-    scenario the person's mapping names (the scenario that holds the
-    input at that value with every other uncertain input at its
-    reference value). An input whose values change the set's state (those
+    scenario set, the table as given, each scenario read on its own (D103,
+    D166, D175); a robust preference there gives the empty list. Otherwise
+    every input of ``uncertain_inputs`` is ranked by its admitted values:
+    for each value, the state of the pair in the scenario the person's
+    mapping names (the scenario that holds the input at that value with
+    every other uncertain input at its reference value), or over the
+    phases nested inside it (D117). ``trend_computation`` is passed to
+    ``pair_state`` (D173). An input whose values change the set's state (those
     states are not all the same) holds rank 1; an input whose values
     never change it holds rank 2. The items of one rank keep the person's
     order, and each carries why it holds its rank.
     """
-    base = pair_state(table, first_rotation, second_rotation)
+    base = pair_state(
+        table, first_rotation, second_rotation, trend_computation=trend_computation
+    )
     if base.state == ROBUST_PREFERENCE:
         return MeasurementPriority(
             first_rotation=first_rotation,
@@ -1043,10 +1292,18 @@ def measurement_priority(
     items: list[MeasurementPriorityItem] = []
     for uncertain_input in uncertain_inputs:
         states: list[tuple[float, str | None]] = []
-        for value, scenario_id in uncertain_input.values:
-            scenario = _scenario_table(table, scenario_id)
+        for value, entry in uncertain_input.values:
+            at_the_value = _scenarios_table(table, _scenarios_of(entry))
             states.append(
-                (value, pair_state(scenario, first_rotation, second_rotation).state)
+                (
+                    value,
+                    pair_state(
+                        at_the_value,
+                        first_rotation,
+                        second_rotation,
+                        trend_computation=trend_computation,
+                    ).state,
+                )
             )
         changes_the_state = len({state for _, state in states}) > 1
         if not states:
@@ -1236,6 +1493,8 @@ def measurement_consistency(
     measurement: Measurement,
     bracket: tuple[float, float],
     uncertain_inputs: tuple[UncertainInput, ...],
+    *,
+    trend_computation: str = DEFAULT_TREND_COMPUTATION,
 ) -> MeasurementConsistency:
     """The state a measured value gives on its side of the tipping point,
     and the priority list over the recomputed set (D12 over D3, D10 and
@@ -1243,14 +1502,22 @@ def measurement_consistency(
 
     The decision is recomputed with the input fixed at the measured value
     (D10, ``recompute_with_measurement``); the state is read over that
-    recomputed admitted set and the priority list is built from it (D4):
-    a robust preference empties the list, any other state keeps it. The
-    bracket is the one ``tipping_point`` reported (D3).
+    recomputed admitted set, each scenario on its own (D166, D175), and
+    the priority list is built from it (D4): a robust preference empties
+    the list, any other state keeps it. The bracket is the one
+    ``tipping_point`` reported (D3). ``trend_computation`` is passed to
+    ``pair_state`` (D173).
     """
     recomputed = recompute_with_measurement(table, uncertain_input, measurement)
-    state = pair_state(recomputed, first_rotation, second_rotation).state
+    state = pair_state(
+        recomputed, first_rotation, second_rotation, trend_computation=trend_computation
+    ).state
     priority = measurement_priority(
-        recomputed, first_rotation, second_rotation, uncertain_inputs
+        recomputed,
+        first_rotation,
+        second_rotation,
+        uncertain_inputs,
+        trend_computation=trend_computation,
     )
     below, above = bracket
     if measurement.value < below:

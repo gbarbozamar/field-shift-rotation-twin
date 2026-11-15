@@ -20,15 +20,19 @@ ranges, are:
    cell is not separated (D93) and blocks (D98) in EVERY scenario — the
    brief's "every valued year's difference range wholly better for B at
    s1 and s2" holds at 2020 and 2022 but not at 2021. The pair is
-   "Not separated: within uncertainty" at every admitted value, not
-   "Not robust across scenarios" over the set, and the tipping point of
-   u the brief reads (the state changing between s2 and s3) does not
-   appear: the state never changes, so no bracket is reported (D3).
+   "Not separated: within uncertainty" at every admitted value, and the
+   tipping point of u the brief reads (the state changing between s2 and
+   s3) does not appear: the state never changes, so no bracket is
+   reported (D3). Over the set it is "Not robust across scenarios", as
+   the brief reads it (D166: each scenario is read on its own).
 2. B vs C, carbon: the difference range is [0.4 - 0.4, 0.6 - 0.2] =
-   [0.0, +0.4], which touches zero, so the cell is not a strict
-   improvement (D93) and blocks (D98) — the brief reads +0.2 [0.1, 0.3]
-   wholly better for C and a "Robust preference (C)". The pair is "Not
-   separated: within uncertainty".
+   [0.0, +0.4], which touches zero from the side that is not worse, so
+   the cell is not a strict improvement (D93) and does not block (D165)
+   — the brief reads +0.2 [0.1, 0.3] wholly better for C and a "Robust
+   preference (C)". The pair is still not a robust preference: its
+   soil-loss cells cross zero (3. below), so it is "Not separated:
+   within uncertainty" in each scenario and "Not robust across
+   scenarios" over the set.
 3. B vs C, soil loss: every difference is zero, but every range crosses
    zero ([-0.6, +0.6] at each shared year), so the cells are not
    separated and block; and the pair as a whole is never "Identical"
@@ -53,6 +57,12 @@ as a gap (the contract is never changed here):
   enters no state at all (D6: a missing value does not enter the state)
   and its not being evaluated is carried by ``indicator_ranking`` and by
   a reason of the document's state;
+- the carbon model and computation of a count of a pair's cells (D169):
+  ``PairCellCount`` has no field for them and the document refuses two
+  counts of one pair, scenario and indicator. On this matrix each holds
+  one carbon model and one computation (amg, end minus start), so no
+  count repeats; a table with more is refused by the contract until
+  lane L0 adds the two fields;
 - ``measure_first`` is not keyed by a pair, so each item names its pair
   in ``what`` (three items, one per pair; the ranks stay the machinery's);
 - the document's one ``state`` (D7): no decision says how it relates to
@@ -91,6 +101,7 @@ from contracts.decision_output.models import REASON_OF_A_STATE
 from contracts.inputs.common import Missing, Range, Value
 from contracts.results.models import ResultsTable
 from decision.functions import (
+    NOT_EVALUATED,
     DeclaredLimit,
     LimitCounts,
     TippingPoint,
@@ -413,11 +424,22 @@ def the_state(table: ResultsTable | None = None) -> State:
             for indicator in state.indicators_not_resolved
         }
     )
+    # D152: "The conditions that did not give the state are still shown";
+    # D166: the state of each scenario is shown beside the state of the set.
     reasons = [
         (
             f"the pair ('{first}', '{second}') is '{state.state}' "
             "(indicators not resolved: "
             f"{', '.join(state.indicators_not_resolved) or 'none'})"
+            + (
+                "; in each scenario: "
+                + ", ".join(
+                    f"'{scenario_id}' '{member or NOT_EVALUATED}'"
+                    for scenario_id, member in state.by_scenario
+                )
+                if state.by_scenario
+                else ""
+            )
         )
         for (first, second), state in zip(PAIRS, states)
     ]
