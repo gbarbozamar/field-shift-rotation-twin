@@ -15,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from adapters.ports import ClimateSource
+from api.decision_layer import DecisionLayer, DiscoveredDecisionLayer
+from api.decisions import make_decision_router
 from api.engines import (
     DEFAULT_CARBON_MODELS,
     EntryPointEngines,
@@ -49,6 +51,7 @@ def create_app(
     rotation_validator: RotationValidator | None = None,
     settings: RunSettings | None = None,
     parameters: dict[str, dict] | None = None,
+    decision_layer: DecisionLayer | None = None,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -64,6 +67,12 @@ def create_app(
     caller (``api.config.build_app`` does both at start-up). ``None`` is the
     empty catalogue ``{}``; no file is read here. It is not used when
     ``engines`` is given, so giving both is a ``TypeError``.
+    ``decision_layer`` turns a results table into a decision output for
+    ``POST /api/decisions/run``; ``None`` means ``DiscoveredDecisionLayer``,
+    which looks the function of ``decision/`` up by name on each request,
+    never when the app is built (``api/decision_layer.py``), and answers "not
+    built" when it is not there. Both routes share the same sources, engines,
+    validator and settings.
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -84,25 +93,34 @@ def create_app(
         """Liveness: the process is up and answering. Checks nothing else."""
         return Health(status="ok")
 
+    shared = {
+        "climate": climate if climate is not None else ClimateUnavailable(),
+        "soil_slope": soil_slope if soil_slope is not None else SoilSlopeNotLoaded(),
+        "engines": (
+            engines
+            if engines is not None
+            else EntryPointEngines(
+                discover_engine_functions(),
+                carbon_models=DEFAULT_CARBON_MODELS,
+                parameters=parameters,
+            )
+        ),
+        "rotation_validator": (
+            rotation_validator
+            if rotation_validator is not None
+            else RotationDefinitionValidator()
+        ),
+        "settings": settings if settings is not None else RunSettings(),
+    }
+    app.include_router(make_router(**shared))
     app.include_router(
-        make_router(
-            climate=climate if climate is not None else ClimateUnavailable(),
-            soil_slope=soil_slope if soil_slope is not None else SoilSlopeNotLoaded(),
-            engines=(
-                engines
-                if engines is not None
-                else EntryPointEngines(
-                    discover_engine_functions(),
-                    carbon_models=DEFAULT_CARBON_MODELS,
-                    parameters=parameters,
-                )
+        make_decision_router(
+            **shared,
+            decision_layer=(
+                decision_layer
+                if decision_layer is not None
+                else DiscoveredDecisionLayer()
             ),
-            rotation_validator=(
-                rotation_validator
-                if rotation_validator is not None
-                else RotationDefinitionValidator()
-            ),
-            settings=settings if settings is not None else RunSettings(),
         )
     )
 

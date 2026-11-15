@@ -52,6 +52,9 @@ services:
         - action: sync
           path: ./params
           target: /app/params
+        - action: sync
+          path: ./decision
+          target: /app/decision
         - action: rebuild
           path: pyproject.toml
         - action: rebuild
