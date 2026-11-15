@@ -364,19 +364,24 @@ def assert_round_trip(result: ResultsPerRotation) -> None:
 def assert_water_missing_for_every_covered_year(
     outcome: EnginesResult, parameters: dict[str, dict]
 ) -> None:
-    """EP3 gives no number (C1.4, D61), so its reason is asserted instead.
+    """EP3 gives no number here, so its reason is asserted instead.
 
-    Every item is missing, none with an identity absence, none ``NO_COVERAGE``
-    in a covered year, and the part is EP3's own output for the same
-    arguments, passed on unchanged.
+    Since #296 EP3 gives the ratio of D157 as a number for a year whose daily
+    balance was computed on every day (``_computed`` in
+    engine/water/exposure.py). In this chain no year is computed on every
+    day, so every item is missing, none with an identity absence, none
+    ``NO_COVERAGE`` in a covered year, and the part is EP3's own output for
+    the same arguments, passed on unchanged.
 
     With the point in the unit strings of D55, EP3 passes its unit guard, so
     a covered year is ``MISSING_INPUT`` for what the daily chain lacks, not for
     a unit (Q11): every site parameter of EP3 has no record (D56: neither test
-    catalogue holds one), the crop of each day is not known (the calendar's
-    dates lie outside the record and the repetition of the rotation over the
-    years is not decided, Q5), and the definition of the indicator is
-    incomplete (C1.4, D61). The texts are EP3's own constants.
+    catalogue holds one), and the crop of some days is not known (they lie
+    before the first cycle of the rotation repeated over the record, D47,
+    D109, D141). The detail of such a year also names what the definition of
+    the indicator still leaves open after D157 (C1.4). The texts are EP3's own
+    constants (``SITE_PARAMETERS``, ``CROP_UNKNOWN``,
+    ``DEFINITION_INCOMPLETE``).
     """
     result = outcome.result
     assert result is not None
