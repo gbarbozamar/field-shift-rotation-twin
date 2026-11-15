@@ -68,6 +68,53 @@ const CLIMATE_UNAVAILABLE = {
 
 const SOURCE_TEXT = 'PLACEHOLDER source: written by hand, not the output of an engine'
 
+// --- the C routes of EP1's source text, verbatim (engine/erosion/soil_loss.py) --
+
+// The two clauses the engine embeds in the source of every soil-loss value
+// (COMPUTED_C and DECLARED_C of soil_loss.py): the source of a run carries
+// exactly one of them, and D148 withdraws only the computed one. Copied
+// verbatim so the suite pins the real wire text, not a paraphrase of it.
+const COMPUTED_C_CLAUSE =
+  'C of the agricultural year computed through engine/erosion/c_factor/ ' +
+  '(docs/METHODS.md M1.5, decisions D45, PC-1 and D129 of issue #77): canopy ' +
+  'cover and fall height read by days after planting, the residue mass at ' +
+  'harvest as the residue/yield ratio times the yield, the residue coefficient ' +
+  'by the crop of the last harvest, over the rotation repeated over the years ' +
+  'of the record (D47, engine/calendar/repeat.py), each month weighted by the ' +
+  'climatological monthly fraction of the twelve records (D84, D101; ' +
+  'engine/erosion/r_factor/climatology.py), not the declared record ' +
+  "'rusle_c_factor'"
+
+const DECLARED_C_CLAUSE =
+  'C is the single declared value of the record ' +
+  "'rusle_c_factor' (DECLARED; docs/METHODS.md M1.2, decisions D69, D84, D101 " +
+  'and D125 of issue #77, USER-G), by the PROPOSED fallback of brief #218: C ' +
+  'computed through engine/erosion/c_factor/ (M1.5, decisions D45, PC-1 and ' +
+  'D129) from the rotation repeated over the years of the record (D47, ' +
+  'engine/calendar/repeat.py) is not computed because these records are missing'
+
+/** A main-route annual source around one C clause (the shape of _main_source). */
+function mainRouteSource(cClause: string): string {
+  return (
+    'derived by engine.erosion.compute_soil_loss with the product of ' +
+    "docs/METHODS.md M1.1: R as the mean annual level of the record " +
+    "'rusle_r_factor' for every agricultural year, the variation between " +
+    'years deferred (USER-G, decision D69 of issue #77); ' +
+    `${cClause}; LS from engine/erosion/ls.py with the slope of the ` +
+    'soil-and-slope data; K and P from their records; parameter records read: ' +
+    'PLACEHOLDER records'
+  )
+}
+
+/** A monthly source inherits the annual one (the shape of _monthly_source). */
+function monthlySource(annualSource: string): string {
+  return (
+    `${annualSource}; the month: R of the month as the level times the ` +
+    'climatological monthly fraction of docs/METHODS.md M1.2, times K, LS, C ' +
+    'and P; records read for the month: PLACEHOLDER records'
+  )
+}
+
 const RESULT_PRESENT = {
   case_id: 'example-case',
   field_id: 'example-field-1',
@@ -202,6 +249,20 @@ function wireResult(result: Record<string, unknown>): Record<string, unknown> {
 
 const RESULT_PRESENT_WIRE = wireResult(RESULT_PRESENT)
 
+/** The soil-loss part of the example with one C route's real source text. */
+function withCRoute(cClause: string): Record<string, unknown> {
+  const annualSource = mainRouteSource(cClause)
+  const soil = RESULT_PRESENT.soil_loss
+  return {
+    ...soil,
+    annual: [{ ...soil.annual[0], source: annualSource }, soil.annual[1]],
+    monthly: [
+      { ...soil.monthly[0], source: monthlySource(annualSource) },
+      soil.monthly[1],
+    ],
+  }
+}
+
 const ENVELOPE_200 = {
   outcome: 'partial',
   calendar: null,
@@ -217,6 +278,18 @@ const ENVELOPE_200 = {
     },
   ],
   sources: [CLIMATE_FRESH, SOIL_EXAMPLE],
+}
+
+/** A 200 answer whose soil loss went through the computed C (the D129 route D148 withdraws). */
+const ENVELOPE_200_COMPUTED_C = {
+  ...ENVELOPE_200,
+  result: wireResult({ ...RESULT_PRESENT, soil_loss: withCRoute(COMPUTED_C_CLAUSE) }),
+}
+
+/** A 200 answer whose soil loss fell back to the declared C record (brief #218). */
+const ENVELOPE_200_DECLARED_C = {
+  ...ENVELOPE_200,
+  result: wireResult({ ...RESULT_PRESENT, soil_loss: withCRoute(DECLARED_C_CLAUSE) }),
 }
 
 /** A 200 answer with no result: the shape the default app answers with. */
@@ -546,6 +619,80 @@ describe('RotationRunPanel: a completed run, through the real fetcher and parser
     expect(text).toContain('Illustrative rotation: module not built or not enabled')
     expect(countTestIds(html, 'missing-line')).toBe(0)
     expect(countTestIds(html, 'value-line')).toBe(0)
+  })
+})
+
+// --- the C routes of D148 ----------------------------------------------------------
+
+describe('RotationRunPanel: the C routes of D148', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('withdraws a computed-C soil-loss value: the decided reason renders, its number does not', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, ENVELOPE_200_COMPUTED_C)))
+    const view = parseRunRotation(await runRotation(SITE, rotationDefinition.document))
+    vi.unstubAllGlobals()
+
+    const html = renderPanel({ phase: 'success', view })
+    const text = visibleText(html)
+
+    // the two present computed-C values (the year and the month) show the
+    // approved not-shown reason where the value would have shown
+    expect(countTestIds(html, 'withdrawn-line')).toBe(2)
+    expect(text).toContain(
+      'Not shown: the computed cover factor of this release overestimates the measured loss (see the check in',
+    )
+    expect(text).toContain('docs/VALIDATION.md')
+    // the reason links to the La Estanzuela check of the validation entry D148 names
+    expect(countTestIds(html, 'withdrawn-validation-link')).toBe(2)
+    expect(html).toContain(
+      'href="https://github.com/gbarbozamar/field-shift-rotation-twin/blob/main/docs/VALIDATION.md#ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019"',
+    )
+    // their numbers render nowhere, as absolute values
+    expect(text).not.toContain('12 t ha-1 yr-1')
+    expect(text).not.toContain('1 t ha-1 month-1')
+    expect(countTestIds(html, 'value-line')).toBe(1)
+    // no declared-C headline on the computed route
+    expect(html).not.toContain('data-testid="soil-loss-headline"')
+    expect(text).not.toContain(strings['soil_loss.headline_label'])
+    // the missing soil-loss values keep their reasons, and so do water and carbon
+    expect(text).toContain('soil_loss 2002: no coverage for this place or period')
+    expect(text).toContain('soil_loss 2002-01: no coverage for this place or period')
+    expect(text).toContain('water_deficit_exposure: module not built or not enabled')
+    expect(text).toContain('soil_carbon_trend rothc mean_over_cycles: not computable for this case')
+    expect(countTestIds(html, 'missing-line')).toBe(4)
+    // every value that is not a computed-C soil loss keeps the value display
+    expect(text).toContain('0.5 t C ha-1 yr-1 Simulated')
+  })
+
+  it('headlines the declared-C figure with the decided label, verbatim', async () => {
+    // the trap the markers must survive: the declared clause itself says
+    // "C computed through engine/erosion/c_factor/" inside its own text, so
+    // a looser marker would withdraw the declared route too
+    expect(DECLARED_C_CLAUSE).toContain('C computed through engine/erosion/c_factor/')
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, ENVELOPE_200_DECLARED_C)))
+    const view = parseRunRotation(await runRotation(SITE, rotationDefinition.document))
+    vi.unstubAllGlobals()
+
+    const html = renderPanel({ phase: 'success', view })
+    const text = visibleText(html)
+
+    expect(countTestIds(html, 'soil-loss-headline')).toBe(1)
+    expect(countTestIds(html, 'headline-label')).toBe(1)
+    // the headline figure renders beside the decided label, verbatim
+    expect(text).toContain('12 t ha-1 yr-1 Derived')
+    expect(text).toContain(strings['soil_loss.headline_label'])
+    // the declared route is not withdrawn
+    expect(countTestIds(html, 'withdrawn-line')).toBe(0)
+    expect(text).not.toContain('Not shown')
+    // everything else is unchanged: the month keeps its value, the absences
+    // their reasons
+    expect(text).toContain('1 t ha-1 month-1 Derived')
+    expect(countTestIds(html, 'value-line')).toBe(4)
+    expect(countTestIds(html, 'missing-line')).toBe(4)
+    expect(text).toContain('water_deficit_exposure: module not built or not enabled')
+    expect(text).toContain('soil_carbon_trend rothc mean_over_cycles: not computable for this case')
   })
 })
 
