@@ -3,6 +3,8 @@
 Both PLACEHOLDER examples load into their models; the literals of the contract
 equal those of ``economics/``, ``kinds_of_year/`` and ``api/rain_stress.py``;
 the examples say they are example data; and each invalid variant is rejected.
+The tests that read ``kinds_of_year/`` or ``api/rain_stress.py`` are skipped
+while those modules are not on ``main`` (#387); the contract imports neither.
 The variants are listed in ``README.md`` under "PROPOSED cases"; a test checks
 that the two lists agree.
 
@@ -11,6 +13,7 @@ Run from the repository root: ``uv run pytest contracts/plant_answer/``.
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
 import re
@@ -24,8 +27,14 @@ from pydantic import ValidationError
 from contracts.economic_facts import KINDS_OF_YEAR
 
 from .plant_answer import (
+    ANSWER_SCOPE,
+    D148_SOIL_LOSS_LABEL,
+    D249_DISTANCE_LABELS,
+    D249_LABELS,
     DIMENSIONLESS,
+    MARGIN_SOURCE,
     MARGINS_OF,
+    PHASE_ONE_ONLY,
     STRESS_TEST_LABEL,
     Answer,
     Direction,
@@ -79,6 +88,40 @@ def both(*mutations: Mutation) -> Mutation:
     def mutate(data: dict[str, Any]) -> None:
         for mutation in mutations:
             mutation(data)
+
+    return mutate
+
+
+def drop(path: list[Any], *keys: str) -> Mutation:
+    def mutate(data: dict[str, Any]) -> None:
+        item = at(data, path)
+        for key in keys:
+            del item[key]
+
+    return mutate
+
+
+def label_real_soil_losses(data: dict[str, Any]) -> None:
+    """D148: every present soil-loss value carries the label of D148."""
+    for option in data["options"]:
+        for item in option["soil_loss"].values():
+            if item["value"] is not None:
+                item["label"] = D148_SOIL_LOSS_LABEL
+
+
+def limit_range_missing_not_declared(data: dict[str, Any]) -> None:
+    """Every option's limit with another range_missing reason than the request's."""
+    for option in data["options"]:
+        option["limit"]["limit"]["range_missing"]["reason"] = "NOT_AVAILABLE"
+
+
+def range_around(path: list[Any], low: float, high: float) -> Mutation:
+    """The item's range instead of its range_missing (C2.1, C2.2)."""
+
+    def mutate(data: dict[str, Any]) -> None:
+        item = at(data, path)
+        item.pop("range_missing")
+        item["range"] = {"low": low, "high": high, "kind": "PLACEHOLDER"}
 
     return mutate
 
@@ -255,7 +298,18 @@ TIPPING_UP_AT = {
     "reason": None,
     "detail": None,
     "unit": "USD t-1",
+    "provenance": "DERIVED",
+    "range_missing": {"reason": "NOT_AVAILABLE", "detail": "example detail"},
+    "distance_provenance": "DERIVED",
+    "distance_range_missing": {"reason": "NOT_AVAILABLE", "detail": "example detail"},
 }
+MISSING_LIMIT = {
+    "value": None,
+    "unit": "t ha-1 yr-1",
+    "missing": {"reason": "NOT_DECLARED"},
+}
+MARGIN = [*CHOSEN, "margin", "average"]
+SOIL_LOSS = [*CHOSEN, "soil_loss", "average"]
 
 INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
     (
@@ -338,7 +392,7 @@ INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
     ),
     (
         "answer-limit-missing-with-a-resolved-check",
-        put([*NOT_MET, "limit", "limit"], None),
+        put([*NOT_MET, "limit", "limit"], MISSING_LIMIT),
         "with no limit, no check is resolved",
     ),
     (
@@ -463,40 +517,115 @@ INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
         put([*NOT_MET, "limit", "kinds_not_met"], ["dry"]),
         "only kinds of KINDS_OF_YEAR",
     ),
-    # PROPOSED (S-031): a null record source only when every year is missing.
     (
-        "answer-kinds-source-null-with-a-classified-year",
-        put(["kinds_of_year", "source"], None),
-        "a null source only when every year is missing",
+        "answer-margin-without-its-provenance",
+        drop(MARGIN, "provenance"),
+        "a present value carries its provenance",
     ),
     (
-        "answer-source-state-not-in-the-list",
-        put(["sources", 1, "state"], "stored"),
-        "state",
+        "answer-margin-not-derived",
+        put([*MARGIN, "provenance"], "DECLARED"),
+        "the provenance is DERIVED",
+    ),
+    (
+        "answer-margin-without-its-source",
+        drop(MARGIN, "source"),
+        f"the source is {MARGIN_SOURCE!r}",
+    ),
+    (
+        "answer-margin-with-a-range-and-its-absence",
+        put([*MARGIN, "range"], {"low": 0.0, "high": 900.0, "kind": "PLACEHOLDER"}),
+        "never both",
+    ),
+    (
+        "answer-margin-outside-its-range",
+        lambda d: range_around(MARGIN, 0.0, at(d, MARGIN)["value"] - 1.0)(d),
+        "the value is inside its range",
+    ),
+    (
+        "answer-missing-margin-with-a-provenance",
+        both(
+            put([*MARGIN, "value"], None),
+            put([*MARGIN, "reason"], "NOT_COMPUTABLE"),
+        ),
+        "a missing value carries no provenance and no range",
+    ),
+    (
+        "answer-soil-loss-without-a-range-or-its-absence",
+        drop(SOIL_LOSS, "range_missing"),
+        "its range or range_missing",
+    ),
+    (
+        "answer-soil-loss-not-of-c4-6",
+        put([*SOIL_LOSS, "provenance"], "SIMULATED"),
+        "the provenance is DERIVED",
+    ),
+    (
+        "answer-soil-loss-label-not-the-one-of-d148",
+        put([*SOIL_LOSS, "label"], "example label"),
+        "the label is the one D148 words",
+    ),
+    (
+        "answer-real-soil-loss-without-the-label-of-d148",
+        put(["example_data"], False),
+        "carries the label of D148",
+    ),
+    (
+        "answer-limit-cost-without-its-provenance",
+        drop(["limit_cost"], "provenance"),
+        "limit cost: a present value carries its provenance",
+    ),
+    (
+        "answer-tipping-point-not-derived",
+        put(["tipping_price", "down", "provenance"], "OBSERVED"),
+        "tipping point: the provenance is DERIVED",
+    ),
+    (
+        "answer-tipping-today-without-its-provenance",
+        drop(["tipping_price"], "provenance"),
+        "tipping price: a present value carries its provenance",
+    ),
+    (
+        "answer-distance-without-its-provenance",
+        drop(["tipping_price", "down"], "distance_provenance"),
+        "tipping distance: a present value carries its provenance",
+    ),
+    (
+        "answer-distance-not-derived",
+        put(["tipping_price", "down", "distance_provenance"], "OBSERVED"),
+        "tipping distance: the provenance is DERIVED",
+    ),
+    (
+        "answer-limit-without-its-labels",
+        drop([*NOT_MET, "limit", "limit"], "provenance", "range_missing"),
+        "carries a provenance label",
+    ),
+    (
+        "answer-limit-not-declared",
+        put([*NOT_MET, "limit", "limit", "provenance"], "OBSERVED"),
+        "its provenance is DECLARED",
+    ),
+    (
+        "answer-price-range-without-its-provenance",
+        drop(["questions", "soybean_price_range"], "provenance"),
+        "soybean_price_range.provenance: Field required",
+    ),
+    (
+        "answer-price-range-not-declared",
+        put(["tipping_price", "price_range", "provenance"], "OBSERVED"),
+        "price range: low and high are declared by the user",
+    ),
+    (
+        "answer-scope-not-the-words-of-d245",
+        put(["scope"], "Plant this rotation"),
+        "the scope is",
+    ),
+    (
+        "answer-without-the-limit-phase-one-only",
+        put(["declared_limits"], []),
+        "the declared limits include",
     ),
 ]
-
-
-def _no_record(data: dict[str, Any]) -> None:
-    """PROPOSED (S-031): the kinds of year when no record is configured."""
-    kinds = data["kinds_of_year"]
-    kinds["source"] = None
-    for year in kinds["years"]:
-        year.update(
-            kind=None,
-            missing_reason="NOT_AVAILABLE",
-            detail="example detail: the kinds-of-year record is not configured",
-            season=None,
-            season_year=None,
-        )
-    kinds["counts"] = {"el_nino": None, "neutral": None, "la_nina": None}
-    data["sources"][1].update(
-        state="unavailable",
-        attribution=None,
-        missing_reason="NOT_AVAILABLE",
-        detail="example detail: the kinds-of-year record is not configured",
-    )
-
 
 VALID_ANSWER: list[tuple[str, Mutation]] = [
     (
@@ -524,6 +653,12 @@ VALID_ANSWER: list[tuple[str, Mutation]] = [
         both(
             put([*UNRESOLVED, "margin", "la_nina", "value"], None),
             put([*UNRESOLVED, "margin", "la_nina", "reason"], "MISSING_INPUT"),
+            drop(
+                [*UNRESOLVED, "margin", "la_nina"],
+                "provenance",
+                "range_missing",
+                "source",
+            ),
         ),
     ),
     (
@@ -566,12 +701,21 @@ VALID_ANSWER: list[tuple[str, Mutation]] = [
     ),
     (
         "accepted-answer-not-example-data",
-        put(["example_data"], False),
+        both(put(["example_data"], False), label_real_soil_losses),
     ),
-    ("accepted-answer-without-a-record", _no_record),
     (
-        "accepted-answer-record-source-cached",
-        put(["sources", 1, "state"], "cached"),
+        "accepted-answer-margin-with-a-range",
+        lambda d: range_around(
+            MARGIN, at(d, MARGIN)["value"] - 1.0, at(d, MARGIN)["value"] + 1.0
+        )(d),
+    ),
+    (
+        "accepted-answer-example-soil-loss-with-the-label-of-d148",
+        label_real_soil_losses,
+    ),
+    (
+        "accepted-answer-with-a-second-declared-limit",
+        put(["declared_limits"], [PHASE_ONE_ONLY, "example limit"]),
     ),
 ]
 
@@ -682,7 +826,7 @@ def test_literals_equal_those_of_economics() -> None:
 
 
 def test_constants_equal_those_of_rain_stress() -> None:
-    from api import rain_stress
+    rain_stress = pytest.importorskip("api.rain_stress")
 
     assert DIMENSIONLESS == rain_stress.DIMENSIONLESS
     assert STRESS_TEST_LABEL == rain_stress.STRESS_TEST_LABEL
@@ -697,41 +841,120 @@ def test_kinds_of_year_keys_follow_kinds_of_year() -> None:
     assert list(answer["kinds_of_year"]["counts"]) == list(KINDS_OF_YEAR)
 
 
-def test_answer_fields_mirror_the_dataclasses() -> None:
-    """Field for field where it can be (brief S-018a)."""
+def _names(cls: type) -> set[str]:
     import dataclasses
 
+    return {f.name for f in dataclasses.fields(cls)}
+
+
+def test_answer_fields_mirror_the_dataclasses() -> None:
+    """Field for field where it can be (brief S-018a), plus the labels D249 adds."""
     from economics.decide import LimitCost
     from economics.limit import LimitAssessment, LimitCheck
     from economics.margin import MarginResult
     from economics.tipping import TippingPoint, TippingPrice
+
+    from . import plant_answer as m
+
+    margin = set(m.MarginOut.model_fields)
+    assert margin == _names(MarginResult) | D249_LABELS | {"source"}
+    assert set(m.LimitCheckOut.model_fields) == _names(LimitCheck)
+    assert set(m.LimitAssessmentOut.model_fields) == _names(LimitAssessment)
+    assert set(m.LimitCostOut.model_fields) == _names(LimitCost) | D249_LABELS
+    assert (
+        set(m.TippingPointOut.model_fields)
+        == _names(TippingPoint) | D249_LABELS | D249_DISTANCE_LABELS
+    )
+    assert (
+        set(m.TippingPriceOut.model_fields)
+        == (_names(TippingPrice) - {"decision"}) | D249_LABELS
+    )
+
+    from api.rotations import SiteReference, SourceOut
+
+    assert set(m.SourceOut.model_fields) == set(SourceOut.model_fields)
+    assert set(m.SiteReference.model_fields) == set(SiteReference.model_fields)
+
+
+def test_answer_fields_mirror_kinds_of_year() -> None:
+    pytest.importorskip("kinds_of_year")
     from kinds_of_year.aggregate import KindMean
     from kinds_of_year.classify import KindOfYear
 
     from . import plant_answer as m
 
-    def names(cls: type) -> set[str]:
-        return {f.name for f in dataclasses.fields(cls)}
+    soil_loss = set(m.SoilLossOut.model_fields)
+    assert soil_loss == _names(KindMean) | D249_LABELS | {"label"}
+    assert set(m.YearKind.model_fields) == _names(KindOfYear) | {"ag_year"}
 
-    assert set(m.MarginOut.model_fields) == names(MarginResult)
-    assert set(m.SoilLossOut.model_fields) == names(KindMean)
-    assert set(m.LimitCheckOut.model_fields) == names(LimitCheck)
-    assert set(m.LimitAssessmentOut.model_fields) == names(LimitAssessment)
-    assert set(m.LimitCostOut.model_fields) == names(LimitCost)
-    assert set(m.TippingPointOut.model_fields) == names(TippingPoint)
-    assert set(m.TippingPriceOut.model_fields) == names(TippingPrice) - {"decision"}
-    assert set(m.YearKind.model_fields) == names(KindOfYear) | {"ag_year"}
 
-    from api.rain_stress import RainStress, RainStressMissing
-    from api.rotations import SourceOut
+def test_answer_fields_mirror_rain_stress() -> None:
+    rain_stress = pytest.importorskip("api.rain_stress")
 
-    assert set(m.RainStressApplied.model_fields) == names(RainStress)
-    assert set(m.RainStressMissingOut.model_fields) == names(RainStressMissing)
-    assert set(m.SourceOut.model_fields) == set(SourceOut.model_fields)
+    from . import plant_answer as m
 
-    from api.rotations import SiteReference
+    assert set(m.RainStressApplied.model_fields) == _names(rain_stress.RainStress)
+    assert set(m.RainStressMissingOut.model_fields) == _names(
+        rain_stress.RainStressMissing
+    )
 
-    assert set(m.SiteReference.model_fields) == set(SiteReference.model_fields)
+
+def test_the_contract_imports_neither_kinds_of_year_nor_rain_stress() -> None:
+    """#387: the contract imports neither ``kinds_of_year`` nor ``api``."""
+    tree = ast.parse((HERE / "plant_answer.py").read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported |= {alias.name for alias in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.add(node.module)
+    roots = {name.split(".")[0] for name in imported}
+    assert "kinds_of_year" not in roots
+    assert "api" not in roots
+
+
+def test_the_answer_says_what_it_is_and_its_limit() -> None:
+    """D245 and the declared limit, in the example as the screen reads them."""
+    answer = load(ANSWER)
+    assert answer["scope"] == ANSWER_SCOPE
+    assert PHASE_ONE_ONLY in answer["declared_limits"]
+    assert "Plant this rotation" not in json.dumps(answer)
+
+
+def test_every_number_of_the_example_carries_its_labels() -> None:
+    """D249: provenance and range or range_missing on every present number; a
+    margin's source; a tipping distance's own labels; the declared limit with
+    its labels; the price range DECLARED."""
+    answer = load(ANSWER)
+    tipping = answer["tipping_price"]
+    numbers = [answer["limit_cost"], tipping, tipping["up"], tipping["down"]]
+    for option in answer["options"]:
+        numbers += option["margin"].values()
+        numbers += option["soil_loss"].values()
+        numbers.append(option["limit"]["limit"])
+    for item in numbers:
+        value = item.get("value", item.get("price", item.get("today")))
+        if value is None:
+            assert "provenance" not in item
+            continue
+        assert item["provenance"] in ("DECLARED", "DERIVED")
+        assert ("range" in item) != ("range_missing" in item)
+    for point in (tipping["up"], tipping["down"]):
+        if point["distance_percent"] is None:
+            assert "distance_provenance" not in point
+            continue
+        assert point["distance_provenance"] == "DERIVED"
+        assert ("distance_range" in point) != ("distance_range_missing" in point)
+    for option in answer["options"]:
+        assert option["limit"]["limit"]["provenance"] == "DECLARED"
+        for margin in option["margin"].values():
+            if margin["value"] is not None:
+                assert margin["source"] == MARGIN_SOURCE
+    for price_range in (
+        answer["questions"]["soybean_price_range"],
+        tipping["price_range"],
+    ):
+        assert price_range["provenance"] == "DECLARED"
 
 
 def test_retrieved_at_is_written_in_utc_as_api_writes_it() -> None:
@@ -830,7 +1053,7 @@ AGAINST_REQUEST: list[tuple[str, Mutation, str]] = [
     ),
     (
         "answer-not-example-data-to-an-example-request",
-        put(["example_data"], False),
+        both(put(["example_data"], False), label_real_soil_losses),
         "example_data is true when the request's is",
     ),
     (
@@ -842,6 +1065,16 @@ AGAINST_REQUEST: list[tuple[str, Mutation, str]] = [
         "answer-start-month-not-the-rotations",
         put(["kinds_of_year", "start_month"], 8),
         "the rotations' ag_year_start month",
+    ),
+    (
+        "answer-tipping-today-labels-not-the-declared-price",
+        put(["tipping_price", "provenance"], "OBSERVED"),
+        "the provenance and range of the declared soybean price",
+    ),
+    (
+        "answer-limit-labels-not-the-declared-limit",
+        limit_range_missing_not_declared,
+        "judged against the declared limit, with its provenance and range",
     ),
 ]
 
@@ -955,46 +1188,3 @@ def test_f2_a_request_message_never_quotes_a_submitted_id(
     # Fix round 1: a list index (0-based), not the component's position field.
     assert any("list ind" in message for message in messages)
     assert not any("position" in message for message in messages)
-
-
-# --- The answer when the plant layer is not built (S-031), PROPOSED --------------
-# Not cases of the README lists: the not-built body has no example answer to
-# change in memory; its own example sits in examples_not_built/, since
-# examples/ holds exactly the request and the answer.
-
-NOT_BUILT = HERE / "examples_not_built" / "PLACEHOLDER_plant_answer_not_built.json"
-
-
-def test_the_not_built_example_loads_into_its_model() -> None:
-    from .plant_answer import PlantAnswerNotBuilt
-
-    text = NOT_BUILT.read_text(encoding="utf-8")
-    loaded = PlantAnswerNotBuilt.model_validate_json(text)
-    assert loaded.model_dump(mode="json") == json.loads(text)
-    assert NOT_BUILT.name.startswith("PLACEHOLDER_")
-    assert sorted(p.name for p in NOT_BUILT.parent.iterdir()) == [NOT_BUILT.name]
-
-
-@pytest.mark.parametrize(
-    "change",
-    [
-        {"contract": "plant_answer"},
-        {"answer_missing": {"reason": "NO_COVERAGE", "detail": "example detail"}},
-        {"answer_missing": {"reason": "NOT_AVAILABLE"}},
-        {"answer_missing": {"reason": "NOT_AVAILABLE", "detail": ""}},
-        {"example_data": True},
-    ],
-    ids=[
-        "another-contract",
-        "another-reason",
-        "no-detail",
-        "empty-detail",
-        "an-extra-member",
-    ],
-)
-def test_a_not_built_body_that_breaks_a_rule_is_refused(change: dict) -> None:
-    from .plant_answer import PlantAnswerNotBuilt
-
-    data = {**json.loads(NOT_BUILT.read_text(encoding="utf-8")), **change}
-    with pytest.raises(ValidationError):
-        PlantAnswerNotBuilt.model_validate(data)

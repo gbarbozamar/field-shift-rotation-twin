@@ -1,15 +1,25 @@
-"""Acceptance test of the unit l2/kinds-of-year (brief S-012). PROPOSED.
+"""Acceptance test of the unit l2/kinds-of-year (brief S-012; brought to main by
+brief #386 under D240). PROPOSED.
 
-Run with ``uv run pytest kinds_of_year/``. Every threshold and run length used
-here is read from the committed record; the record's own numbers are checked
-against the quoted definition text, so the two cannot drift.
+Run with ``uv run pytest kinds_of_year/``.
+
+EXAMPLE DATA. The ONI record is not in the repository until a person checks
+and signs it (D240 (5), D34, D66). Every record here is written by hand: the
+rule of D240 (1) as the v6 page states it, and, for each season, a file value
+(``anom``) and a printed value (``printed``, D258) that mean nothing, chosen so
+that each case can be read off by hand. None is an ONI value.
 """
 
-import re
+import inspect
+import json
+import subprocess
+import sys
+from pathlib import Path
 from typing import get_args
 
 import pytest
 
+import kinds_of_year
 from contracts.economic_facts import KINDS_OF_YEAR
 from contracts.inputs.common import ReasonCode
 from kinds_of_year import (
@@ -22,27 +32,18 @@ from kinds_of_year import (
 )
 
 EL_NINO, NEUTRAL, LA_NINA = KINDS_OF_YEAR
+ROOT = Path(__file__).resolve().parent.parent
 
-REQUIRED_MEMBERS = (
-    "id",
-    "reference",
-    "url_table_page",
-    "url_data_file",
-    "locator",
-    "date_read",
-    "definition_text",
-    "threshold",
-    "min_consecutive_seasons",
-    "transcribed_by",
-    "checked_by",
-    "data_header_line",
-    "seasons",
-)
+# The rule of D240 (1), as the v6 page states it: a threshold of +/- 0.5 degC
+# met for a minimum of 5 consecutive overlapping seasons. It is written here
+# only to make hand-made records; the code reads it from the record it is given.
+RULE = {"threshold": 0.5, "min_consecutive_seasons": 5}
 
 
 @pytest.fixture(scope="module")
 def record():
-    return load_record()
+    """A hand-made record (example data): the rule, every season of 2010..2014 at 0.0."""
+    return synthetic(RULE, {})
 
 
 @pytest.fixture(scope="module")
@@ -55,65 +56,75 @@ def run_length(record):
     return record["min_consecutive_seasons"]
 
 
-# 1. The record ------------------------------------------------------------
+# 1. The record is read only from the path a caller gives ---------------------
 
 
-def test_record_loads_with_every_member_and_the_unsigned_mark(record):
-    for member in REQUIRED_MEMBERS:
-        assert member in record, member
-        assert record[member] not in (None, "", []), member
-    assert record["checked_by"] == "UNSIGNED_AI_PRECHECK"
-    assert record["date_read"] == "2026-11-15"
-    assert record["data_header_line"].split() == ["SEAS", "YR", "TOTAL", "ANOM"]
+def test_load_record_reads_the_file_it_is_given(tmp_path, record):
+    path = tmp_path / "example_record.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    assert load_record(path) == record
+    assert load_record(str(path)) == record
 
 
-def test_seasons_are_the_twelve_names_in_order_with_no_gap(record):
-    seasons = record["seasons"]
-    years = sorted({item["year"] for item in seasons})
-    assert years[0] == 2000
-    assert years[-1] == 2025
-    expected = [(name, year) for year in years for name in SEASONS]
-    got = [(item["season"], item["year"]) for item in seasons]
-    # Only the last year may stop early (seasons not yet published).
-    assert got == expected[: len(got)]
-    assert len(got) > len(expected) - len(SEASONS)
-    for item in seasons:
-        assert set(item) == {"season", "year", "anom"}
-        assert isinstance(item["anom"], float)
+def test_load_record_has_no_default_record():
+    # The record waits for a person's signature (D34, D66): no path, no record.
+    parameter = inspect.signature(load_record).parameters["path"]
+    assert parameter.default is inspect.Parameter.empty
+    with pytest.raises(TypeError):
+        load_record()
+    assert not hasattr(kinds_of_year, "DEFAULT_RECORD")
 
 
-# 2. The quoted text holds the machine fields --------------------------------
+def test_nothing_is_read_at_import():
+    """Importing the package opens no file of a record (brief #386 (c))."""
+    probe = (
+        "import builtins, io, json\n"
+        "opened = []\n"
+        "real = builtins.open\n"
+        "def watching(file, *args, **kwargs):\n"
+        "    opened.append(str(file))\n"
+        "    return real(file, *args, **kwargs)\n"
+        "builtins.open = io.open = watching\n"
+        "import kinds_of_year\n"
+        "print(json.dumps(opened))\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    opened = json.loads(done.stdout.strip().splitlines()[-1])
+    assert [name for name in opened if name.endswith(".json")] == []
 
 
-def test_definition_text_contains_threshold_and_run_length(record):
-    text = record["definition_text"]
-    threshold_match = re.search(r"threshold of \+/- ([0-9]+(?:\.[0-9]+)?)", text)
-    run_match = re.search(r"minimum of ([0-9]+) consecutive overlapping seasons", text)
-    assert threshold_match is not None
-    assert run_match is not None
-    assert float(threshold_match.group(1)) == record["threshold"]
-    assert int(run_match.group(1)) == record["min_consecutive_seasons"]
-
-
-# 3. Episode logic on SYNTHETIC series (not the real record) ------------------
+# 2. Episode logic on hand-made records -----------------------------------------
 
 SYN_FIRST, SYN_LAST = 2010, 2014
 
 
-def synthetic(record, values):
-    """A synthetic record: every season of 2010..2014 at 0.0 except ``values``.
+def synthetic(rule, values, first=SYN_FIRST, last=SYN_LAST):
+    """A hand-made record: every season of ``first``..``last`` at 0.0 except
+    ``values``, with the threshold and run length of ``rule``.
 
-    The threshold and run length are those of the real record.
+    Each season carries the file value ``anom`` and the printed value
+    ``printed`` (D258). A value of ``values`` is one number, given to both, or
+    a pair (anom, printed); a printed value of ``None`` leaves ``printed`` out
+    of the row, a season whose printed value is missing.
     """
     seasons = []
-    for year in range(SYN_FIRST, SYN_LAST + 1):
+    for year in range(first, last + 1):
         for name in SEASONS:
-            seasons.append(
-                {"season": name, "year": year, "anom": values.get((name, year), 0.0)}
-            )
+            given = values.get((name, year), 0.0)
+            anom, printed = given if isinstance(given, tuple) else (given, given)
+            row = {"season": name, "year": year, "anom": anom}
+            if printed is not None:
+                row["printed"] = printed
+            seasons.append(row)
     return {
-        "threshold": record["threshold"],
-        "min_consecutive_seasons": record["min_consecutive_seasons"],
+        "threshold": rule["threshold"],
+        "min_consecutive_seasons": rule["min_consecutive_seasons"],
         "seasons": seasons,
     }
 
@@ -205,8 +216,8 @@ def test_deciding_season(start_month, expected):
 
 
 def test_classification_records_the_season_used(record):
-    result = classify_agricultural_years(record, 2005, 2005, 1)[2005]
-    assert (result.season, result.season_year) == ("JJA", 2005)
+    result = classify_agricultural_years(record, 2011, 2011, 1)[2011]
+    assert (result.season, result.season_year) == ("JJA", 2011)
 
 
 # 5. Outside the record -------------------------------------------------------
@@ -222,28 +233,142 @@ def test_year_outside_the_record_is_missing(record):
 
 
 def test_count_kinds_is_none_when_a_year_is_missing(record):
-    classified = classify_agricultural_years(record, 2023, 2026, 7)
+    # Agricultural year 2014 is decided by DJF 2015, after the hand-made record.
+    classified = classify_agricultural_years(record, 2012, 2014, 7)
     counts = count_kinds(classified)
     assert set(counts) == set(KINDS_OF_YEAR)
     assert all(value is None for value in counts.values())
 
 
-# 6. The real record, internal consistency only -----------------------------
+# 6. A covered period, internal consistency only -----------------------------
 
 
-def test_real_record_2001_to_2023_july(record):
-    classified = classify_agricultural_years(record, 2001, 2023, 7)
-    assert sorted(classified) == list(range(2001, 2024))
+def test_every_year_of_a_covered_period_has_a_kind(record):
+    # Agricultural years 2010 to 2013, decided by DJF 2011 to DJF 2014, all in
+    # the hand-made record.
+    classified = classify_agricultural_years(record, 2010, 2013, 7)
+    assert sorted(classified) == list(range(2010, 2014))
     for year, result in classified.items():
         assert (result.kind is None) != (result.missing_reason is None), year
-        if result.kind is not None:
-            assert result.kind in KINDS_OF_YEAR
-            assert result.season == "DJF"
-            assert result.season_year == year + 1
+        assert result.kind in KINDS_OF_YEAR
+        assert result.season == "DJF"
+        assert result.season_year == year + 1
     counts = count_kinds(classified)
     assert set(counts) == set(KINDS_OF_YEAR)
     assert all(isinstance(value, int) for value in counts.values())
     assert sum(counts.values()) == len(classified)
+
+
+# 6b. D240 and D258: the threshold reads the value the v6 table prints ---------
+#
+# Every pair below is a hand-made (file value, printed value), EXAMPLE DATA:
+# two decimals as in ``oni.ascii.txt`` next to one decimal as in the v6 table.
+# None is an ONI value; the pairs are chosen so that the two values fall on
+# different sides of the threshold, or so that a printed value is missing.
+
+
+def run_ending_at(season, year, length, value):
+    """``length`` consecutive seasons ending at ``season`` of ``year``."""
+    end = SEASONS.index(season)
+    return {
+        (SEASONS[(end - back) % len(SEASONS)], year + (end - back) // len(SEASONS)): (
+            value
+        )
+        for back in range(length)
+    }
+
+
+@pytest.mark.parametrize(
+    ("anom", "printed", "kind"),
+    [
+        # The printed value meets the threshold, the file value does not.
+        (0.46, 0.5, EL_NINO),
+        (-0.46, -0.5, LA_NINA),
+        # The printed value does not meet it. Half away from zero on the file
+        # value would give -0.5 here: the code must not round.
+        (-0.45, -0.4, NEUTRAL),
+        (0.45, 0.4, NEUTRAL),
+        # Both beyond it; the printed value is what is compared.
+        (-0.55, -0.5, LA_NINA),
+    ],
+)
+def test_the_threshold_reads_the_printed_value(anom, printed, kind):
+    # D258: a run of the rule's length, every season at (anom, printed).
+    rec = synthetic(
+        RULE, run_from_djf(2012, RULE["min_consecutive_seasons"], (anom, printed))
+    )
+    result = classify_2011_july(rec)
+    assert (result.kind, result.missing_reason) == (kind, None)
+
+
+def test_a_season_with_no_printed_value_is_missing():
+    # D258: no printed value is a missing input with its reason; it is never
+    # rounded from the file value, never neutral and never zero.
+    values = run_from_djf(2012, RULE["min_consecutive_seasons"], (-0.66, -0.7))
+    values[("DJF", 2012)] = (-0.66, None)
+    result = classify_2011_july(synthetic(RULE, values))
+    assert result.kind is None
+    assert result.kind != NEUTRAL
+    assert result.missing_reason == "MISSING_INPUT"
+    assert result.missing_reason in get_args(ReasonCode)
+    assert "printed value" in result.detail and "DJF 2012" in result.detail
+    assert count_kinds({2011: result}) == dict.fromkeys(KINDS_OF_YEAR)
+    # A season a run needs, other than the deciding one, has no printed value
+    # either: still missing, naming it.
+    values = run_from_djf(2012, RULE["min_consecutive_seasons"], (-0.66, -0.7))
+    values[("FMA", 2012)] = (-0.66, None)
+    result = classify_2011_july(synthetic(RULE, values))
+    assert (result.kind, result.missing_reason) == (None, "MISSING_INPUT")
+    assert "FMA 2012" in result.detail
+    # A printed value given as null is missing in the same way.
+    rec = synthetic(RULE, {})
+    rec["seasons"][SEASONS.index("DJF") + 12 * (2012 - SYN_FIRST)]["printed"] = None
+    result = classify_2011_july(rec)
+    assert (result.kind, result.missing_reason) == (None, "MISSING_INPUT")
+
+
+# The five seasons D240 names, where the two-decimal and the one-decimal
+# readings part: each with the start month whose deciding season it is (start
+# months 1, 2, 11 and 12, as D240 says), and the sign of its episode as the v6
+# table prints it. The season's hand-made file value is below the threshold
+# and its hand-made printed value is at it; the four seasons before it are
+# beyond it. EXAMPLE DATA: none of these numbers is a value of the record.
+D240_SEASONS = [
+    # (season, year, start month, agricultural year, file value, printed, kind)
+    ("JJA", 2000, 1, 2000, -0.46, -0.5, LA_NINA),
+    ("MJJ", 2002, 12, 2001, 0.47, 0.5, EL_NINO),
+    ("JJA", 2007, 1, 2007, -0.47, -0.5, LA_NINA),
+    ("JAS", 2021, 2, 2021, -0.46, -0.5, LA_NINA),
+    ("AMJ", 2023, 11, 2022, 0.46, 0.5, EL_NINO),
+]
+
+
+@pytest.mark.parametrize(
+    ("season", "year", "start_month", "ag_year", "anom", "printed", "kind"),
+    D240_SEASONS,
+    ids=[f"{season} {year}" for season, year, *_ in D240_SEASONS],
+)
+def test_the_five_seasons_of_d240_are_read_on_the_printed_value(
+    season, year, start_month, ag_year, anom, printed, kind
+):
+    assert deciding_season(ag_year, start_month) == (season, year)
+    threshold = RULE["threshold"]
+    assert abs(anom) < threshold <= abs(printed)  # the readings part here
+    beyond = threshold + 0.2 if printed > 0 else -threshold - 0.2
+    values = run_ending_at(
+        season, year, RULE["min_consecutive_seasons"], (beyond, beyond)
+    )
+    values[(season, year)] = (anom, printed)
+    rec = synthetic(RULE, values, first=year - 1, last=year + 1)
+    result = classify_agricultural_years(rec, ag_year, ag_year, start_month)[ag_year]
+    assert (result.kind, result.season, result.season_year) == (kind, season, year)
+    # A hand-made printed value one tenth short of the threshold breaks the run
+    # at the deciding season, and the year is neutral.
+    short = 0.4 if printed > 0 else -0.4
+    values[(season, year)] = (anom, short)
+    rec = synthetic(RULE, values, first=year - 1, last=year + 1)
+    result = classify_agricultural_years(rec, ag_year, ag_year, start_month)[ag_year]
+    assert result.kind == NEUTRAL
 
 
 # 7. ValueError ------------------------------------------------------------
@@ -353,6 +478,16 @@ def test_row_with_an_anom_that_is_not_a_finite_number_is_rejected(record, bad):
         classify_agricultural_years(rec, 2011, 2011, 7)
 
 
+@pytest.mark.parametrize("bad", [True, "0.5", float("nan"), float("inf")])
+def test_row_with_a_printed_value_that_is_not_a_finite_number_is_rejected(record, bad):
+    # D258: a printed value that is given is a finite number; a missing one is
+    # left out (or null), never a text or a flag.
+    rec = _small_record(record)
+    rec["seasons"][6]["printed"] = bad
+    with pytest.raises(ValueError, match="row 6: field 'printed'"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
 @pytest.mark.parametrize("bad", [True, False, 2011.0, "2011", None])
 def test_years_that_are_not_ints_are_rejected(record, bad):
     with pytest.raises(ValueError, match="first_year"):
@@ -400,9 +535,9 @@ def test_kind_of_year_refuses_a_detail_on_a_present_kind():
 
 
 def test_every_classified_year_satisfies_the_invariant(record):
-    # S-027 R2: the real record over a period that holds present and missing
-    # years builds every KindOfYear without a ValueError.
-    classified = classify_agricultural_years(record, 2020, 2026, 7)
+    # S-027 R2: a hand-made record over a period that holds present and
+    # missing years builds every KindOfYear without a ValueError.
+    classified = classify_agricultural_years(record, 2011, 2015, 7)
     for item in classified.values():
         if item.kind is not None:
             assert item.kind in KINDS_OF_YEAR

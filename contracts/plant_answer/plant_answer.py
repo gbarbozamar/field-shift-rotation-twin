@@ -46,10 +46,12 @@ from contracts.inputs.common import (
     Missing,
     MonthNumber,
     NonEmptyStr,
+    Provenance,
+    Range,
     ReasonCode,
     Value,
 )
-from contracts.results.models import UNIT_SOIL_LOSS_ANNUAL
+from contracts.results.models import PROVENANCE_OF_SOIL_LOSS, UNIT_SOIL_LOSS_ANNUAL
 from contracts.rotation_definition import RotationDefinition
 
 # --- Literals mirrored from economics/ and api/ (the test keeps them equal) ----
@@ -152,16 +154,26 @@ class SiteReference(ContractModel):
 
 
 class PriceRange(ContractModel):
-    """The soybean price range the user declares, ``PriceRange`` of tipping.py."""
+    """The soybean price range the user declares, ``PriceRange`` of tipping.py.
+
+    D249: ``provenance`` labels ``low`` and ``high``, two numbers the user
+    declares, so it is ``DECLARED`` (C4.1), as in ``_declared_value``.
+    """
 
     low: FiniteFloat
     high: FiniteFloat
     unit: NonEmptyStr
+    provenance: Provenance
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
         if self.unit != PRICE_UNIT:
             raise ValueError(f"price range: the unit is {PRICE_UNIT!r} (C1.1)")
+        if self.provenance != DECLARED:
+            raise ValueError(
+                "price range: low and high are declared by the user; the "
+                f"provenance is {DECLARED} (C4.1, D249)"
+            )
         if self.low < 0 or self.high < 0:
             raise ValueError("price range: a price is not negative")
         if not self.low < self.high:
@@ -302,6 +314,80 @@ class PlantRequest(ContractModel):
         return self
 
 
+# --- D249 of #77: what every number of the answer carries -----------------------
+#
+# D249 (R15 of #310): "The number fields carry what C4.1 and C2.2 ask of every
+# value: the provenance label, and the range or the absent range with its
+# reason. A margin carries its source ("computed from the declared economic
+# facts", C4.2)." The items below keep the field names of the dataclasses they
+# mirror and add these labels; ``D249_LABELS`` names the added fields, and the
+# test of the mirror adds them to the names of each dataclass.
+
+# C4.2 for a margin (D249).
+MARGIN_SOURCE = "computed from the declared economic facts"
+# D245 (R11): what the answer is, in the words the screen shows instead of
+# "Plant this rotation". Not admissibility (D89) and not the robust preference
+# of D74.
+ANSWER_SCOPE = (
+    "the most margin within the limit you declared; water and soil carbon are "
+    "not part of this answer"
+)
+# D250 (R16 of #310), point 2: "Only phase 1 enters the answer, and the answer
+# says so as a limit of this release." The answer declares it in
+# ``declared_limits``.
+PHASE_ONE_ONLY = (
+    "phase 1 only: only the first phase of each rotation enters this answer, "
+    "a limit of this release (D250)"
+)
+# D148 of #77: the label of the soil-loss figure, as D148 words it. D250, point
+# 3: "Every real soil-loss value the answer shows carries the label of D148."
+D148_SOIL_LOSS_LABEL = (
+    "based on a Uruguayan no-till measurement; overestimates about 6 times the "
+    "loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)"
+)
+D249_LABELS = frozenset({"provenance", "range", "range_missing"})
+# A tipping point holds two numbers: the labels of its price are D249_LABELS,
+# those of its distance_percent these.
+D249_DISTANCE_LABELS = frozenset(
+    {"distance_provenance", "distance_range", "distance_range_missing"}
+)
+# C4.1: a number the answer computes from other values (the margins, the limit
+# cost, the tipping prices and their distances) is DERIVED; a soil-loss mean by
+# kind of year is DERIVED by C4.6 and D243 (``PROVENANCE_OF_SOIL_LOSS``).
+DERIVED = "DERIVED"
+
+
+def _labels(
+    value: float | None,
+    provenance: str | None,
+    range_: Range | None,
+    range_missing: Missing | None,
+    what: str,
+    computed_as: str | None = None,
+) -> None:
+    """D249: a present number carries its provenance (C4.1) and its range or the
+    absent range with its reason (C2.2); a missing number carries none of them
+    (as ``Value`` of contracts/inputs/common.py). ``computed_as``: the
+    provenance a number the answer computes always has."""
+    if value is None:
+        if provenance is not None or range_ is not None or range_missing is not None:
+            raise ValueError(
+                f"{what}: a missing value carries no provenance and no range (C4.1, C2.2)"
+            )
+        return
+    if provenance is None:
+        raise ValueError(f"{what}: a present value carries its provenance (C4.1, D249)")
+    if computed_as is not None and provenance != computed_as:
+        raise ValueError(f"{what}: the provenance is {computed_as} (C4.1, D249)")
+    if (range_ is None) == (range_missing is None):
+        raise ValueError(
+            f"{what}: a present value carries its range or range_missing with its "
+            "reason, never both (C2.2, D249)"
+        )
+    if range_ is not None and not range_.low <= value <= range_.high:
+        raise ValueError(f"{what}: the value is inside its range (C2.1)")
+
+
 # --- Value-or-missing items of the answer ----------------------------------------
 
 
@@ -320,6 +406,11 @@ class MarginOut(ContractModel):
     unit: NonEmptyStr
     reason: ReasonCode | None
     detail: NonEmptyStr | None
+    # D249
+    provenance: Provenance | None = None
+    range: Range | None = None
+    range_missing: Missing | None = None
+    source: NonEmptyStr | None = None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -330,6 +421,22 @@ class MarginOut(ContractModel):
         _one_of(self.value, self.reason, "margin")
         if self.reason is None and self.detail is not None:
             raise ValueError("margin: a present margin carries no missing detail")
+        return self
+
+    @model_validator(mode="after")
+    def _d249(self) -> Self:
+        _labels(
+            self.value,
+            self.provenance,
+            self.range,
+            self.range_missing,
+            "margin",
+            computed_as=DERIVED,
+        )
+        if self.value is not None and self.source != MARGIN_SOURCE:
+            raise ValueError(f"margin: the source is {MARGIN_SOURCE!r} (C4.2, D249)")
+        if self.value is None and self.source is not None:
+            raise ValueError("margin: a missing margin carries no source")
         return self
 
 
@@ -351,6 +458,13 @@ class SoilLossOut(ContractModel):
     detail: NonEmptyStr | None
     sources: list[NonEmptyStr]
     assumption: bool
+    # D249
+    provenance: Provenance | None = None
+    range: Range | None = None
+    range_missing: Missing | None = None
+    # D148: required on a real value (PlantAnswer checks it when example_data
+    # is false).
+    label: NonEmptyStr | None = None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -373,6 +487,22 @@ class SoilLossOut(ContractModel):
             raise ValueError(
                 "soil loss: a value carries its sources or the assumption mark (C4.2)"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _d249(self) -> Self:
+        _labels(
+            self.value,
+            self.provenance,
+            self.range,
+            self.range_missing,
+            "soil loss",
+            computed_as=PROVENANCE_OF_SOIL_LOSS,
+        )
+        if self.value is None and self.label is not None:
+            raise ValueError("soil loss: a missing value carries no label (D148)")
+        if self.label is not None and self.label != D148_SOIL_LOSS_LABEL:
+            raise ValueError("soil loss: the label is the one D148 words")
         return self
 
 
@@ -419,7 +549,11 @@ def _kinds(kinds: list[str], what: str) -> None:
 class LimitAssessmentOut(ContractModel):
     """``LimitAssessment`` of economics/limit.py."""
 
-    limit: Annotated[FiniteFloat, Field(ge=0)] | None
+    # D249: the declared limit as the whole declared ``Value``, with its
+    # provenance (DECLARED) and its range or range_missing, as
+    # ``RainStressApplied.declared``; not a bare number. Missing: the ``Value``
+    # with its missing part.
+    limit: SoilLossLimit
     unit: NonEmptyStr
     on_average: LimitCheckOut
     every_kind: LimitCheckOut
@@ -457,7 +591,7 @@ class LimitAssessmentOut(ContractModel):
             raise ValueError(
                 "limit: the check of a kind not in the record is not resolved"
             )
-        if self.limit is None and (
+        if self.limit.value is None and (
             self.on_average.verdict != "not_resolved"
             or self.every_kind.verdict != "not_resolved"
             or any(v != "not_resolved" for v in verdict.values())
@@ -487,6 +621,10 @@ class LimitCostOut(ContractModel):
     reason: ReasonCode | None
     detail: NonEmptyStr | None
     unit: NonEmptyStr
+    # D249
+    provenance: Provenance | None = None
+    range: Range | None = None
+    range_missing: Missing | None = None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -514,6 +652,18 @@ class LimitCostOut(ContractModel):
             raise ValueError("limit cost: a missing cost carries a reason and a detail")
         return self
 
+    @model_validator(mode="after")
+    def _d249(self) -> Self:
+        _labels(
+            self.value,
+            self.provenance,
+            self.range,
+            self.range_missing,
+            "limit cost",
+            computed_as=DERIVED,
+        )
+        return self
+
 
 class TippingPointOut(ContractModel):
     """``TippingPoint`` of economics/tipping.py."""
@@ -526,6 +676,14 @@ class TippingPointOut(ContractModel):
     reason: ReasonCode | None
     detail: NonEmptyStr | None
     unit: NonEmptyStr
+    # D249, of the tipping price
+    provenance: Provenance | None = None
+    range: Range | None = None
+    range_missing: Missing | None = None
+    # D249, of distance_percent (D249_DISTANCE_LABELS)
+    distance_provenance: Provenance | None = None
+    distance_range: Range | None = None
+    distance_range_missing: Missing | None = None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -558,6 +716,26 @@ class TippingPointOut(ContractModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _d249(self) -> Self:
+        _labels(
+            self.price,
+            self.provenance,
+            self.range,
+            self.range_missing,
+            "tipping point",
+            computed_as=DERIVED,
+        )
+        _labels(
+            self.distance_percent,
+            self.distance_provenance,
+            self.distance_range,
+            self.distance_range_missing,
+            "tipping distance",
+            computed_as=DERIVED,
+        )
+        return self
+
 
 class TippingPriceOut(ContractModel):
     """``TippingPrice`` of economics/tipping.py, without its nested ``Decision``.
@@ -572,6 +750,10 @@ class TippingPriceOut(ContractModel):
     down: TippingPointOut
     reason: ReasonCode | None
     detail: NonEmptyStr | None
+    # D249, of today's price
+    provenance: Provenance | None = None
+    range: Range | None = None
+    range_missing: Missing | None = None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -618,6 +800,13 @@ class TippingPriceOut(ContractModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _d249(self) -> Self:
+        _labels(
+            self.today, self.provenance, self.range, self.range_missing, "tipping price"
+        )
+        return self
+
 
 class RainStressApplied(ContractModel):
     """``RainStress`` of api/rain_stress.py: a declared factor, applied or not."""
@@ -630,6 +819,8 @@ class RainStressApplied(ContractModel):
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
+        # D249: the factor is the echo of ``declared``, a ``Value`` that carries
+        # its provenance (DECLARED) and its range or range_missing; no copy here.
         if self.label != STRESS_TEST_LABEL:
             raise ValueError(f"rain stress: the label is {STRESS_TEST_LABEL!r}")
         if self.declared.value is None or self.factor != self.declared.value:
@@ -686,12 +877,9 @@ class KindsOfYearRecord(ContractModel):
 
     ``source`` is the id of the record (``oni_v6``); ``start_month`` the start
     month of the agricultural year the years were classified with.
-
-    PROPOSED (S-031): ``source`` is null when no record is configured, and
-    then every year is missing (no year has a kind without a record).
     """
 
-    source: NonEmptyStr | None
+    source: NonEmptyStr
     start_month: MonthNumber
     years: Annotated[list[YearKind], Field(min_length=1)]
     counts: KindCounts
@@ -701,10 +889,6 @@ class KindsOfYearRecord(ContractModel):
         ag_years = [year.ag_year for year in self.years]
         if ag_years != sorted(set(ag_years)):
             raise ValueError("kinds of year: the years are sorted and unique")
-        if self.source is None and any(year.kind is not None for year in self.years):
-            raise ValueError(
-                "kinds of year: a null source only when every year is missing"
-            )
         counts = [getattr(self.counts, kind) for kind in KINDS_OF_YEAR]
         if any(year.kind is None for year in self.years):
             if any(count is not None for count in counts):
@@ -726,10 +910,7 @@ class SourceOut(ContractModel):
     # PROPOSED (fix round 2): the text fields are plain text, as in api/.
     id: str
     contract: str
-    # PROPOSED (S-031): "transcribed", for a record transcribed into the
-    # repository from its published source (the ONI record), in this
-    # contract only; SourceOut of api/rotations.py has the other four.
-    state: Literal["fresh", "cached", "unavailable", "example", "transcribed"]
+    state: Literal["fresh", "cached", "unavailable", "example"]
     # strict=False: a JSON text is read as a date and time.
     retrieved_at: Annotated[dt.datetime, Field(strict=False)] | None
     time_zone: str | None
@@ -790,6 +971,9 @@ class PlantAnswer(ContractModel):
     erosivity: Erosivity
     kinds_of_year: KindsOfYearRecord
     sources: list[SourceOut]
+    # D245 (R11): what the answer is; and its declared limits (D250).
+    scope: NonEmptyStr
+    declared_limits: list[NonEmptyStr]
 
     @model_validator(mode="after")
     def _decision(self) -> Self:
@@ -842,8 +1026,11 @@ class PlantAnswer(ContractModel):
                 "options: the state chosen is on the chosen rotation and on no other"
             )
         strictness = self.questions.strictness
-        limits = {(o.limit.limit, o.limit.unit) for o in self.options}
-        if len(limits) != 1:
+        first = self.options[0].limit
+        if any(
+            (o.limit.limit, o.limit.unit) != (first.limit, first.unit)
+            for o in self.options
+        ):
             raise ValueError("options: every rotation is judged against one limit")
         for option in self.options:
             check = getattr(option.limit, strictness)
@@ -894,30 +1081,26 @@ class PlantAnswer(ContractModel):
             raise ValueError("rain_stress: the echo of the declared factor")
         return self
 
-
-# --- The answer when the plant layer is not built ------------------------------
-
-
-class AnswerMissing(ContractModel):
-    """Why there is no plant answer. PROPOSED (S-031).
-
-    Only "not built" is answered this way, so the reason is ``NOT_AVAILABLE``
-    (C3.2: "The module that would produce the value is not built or not
-    enabled"), with the sentence that names what is absent.
-    """
-
-    reason: Literal["NOT_AVAILABLE"]
-    detail: NonEmptyStr
-
-
-class PlantAnswerNotBuilt(ContractModel):
-    """The ``200`` body of ``POST /api/plant/run`` while the plant layer is not
-    built. PROPOSED (S-031): exactly ``contract`` and ``answer_missing``. The
-    route (``api/plant_layer.py``) writes it as a dict, without importing
-    this model."""
-
-    contract: Literal["plant_answer_not_built"]
-    answer_missing: AnswerMissing
+    @model_validator(mode="after")
+    def _scope_and_labels(self) -> Self:
+        if self.scope != ANSWER_SCOPE:
+            raise ValueError(f"answer: the scope is {ANSWER_SCOPE!r} (D245)")
+        if PHASE_ONE_ONLY not in self.declared_limits:
+            raise ValueError(f"answer: the declared limits include {PHASE_ONE_ONLY!r}")
+        if not self.example_data:
+            for option in self.options:
+                for item in (
+                    option.soil_loss.average,
+                    option.soil_loss.el_nino,
+                    option.soil_loss.neutral,
+                    option.soil_loss.la_nina,
+                ):
+                    if item.value is not None and item.label != D148_SOIL_LOSS_LABEL:
+                        raise ValueError(
+                            f"answer: a real soil-loss value of {option.rotation_id!r} "
+                            "carries the label of D148"
+                        )
+        return self
 
 
 def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> None:
@@ -939,9 +1122,12 @@ def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> 
     given = [option.rotation_id for option in answer.options]
     if given != asked:
         raise ValueError("answer: one option per rotation, in request order")
-    limit = request.soil_loss_limit.value
-    if any(option.limit.limit != limit for option in answer.options):
-        raise ValueError("answer: every option is judged against the declared limit")
+    # D249: the declared limit with its labels, not only its value.
+    if any(option.limit.limit != request.soil_loss_limit for option in answer.options):
+        raise ValueError(
+            "answer: every option is judged against the declared limit, with its "
+            "provenance and range"
+        )
     # PROPOSED (fix round 2): an answer to example data is example data.
     if request.example_data and not answer.example_data:
         raise ValueError("answer: example_data is true when the request's is")
@@ -958,6 +1144,31 @@ def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> 
         raise ValueError(
             "answer: tipping_price.today is the declared soybean price, or null "
             "when it is missing"
+        )
+    # D249: today's price carries the labels of the declared price.
+    declared = next(
+        (
+            crop.price
+            for crop in request.economic_facts.crops
+            if crop.crop_id in request.questions.soybean_crop_ids
+            and isinstance(crop, GrainCrop)
+        ),
+        None,
+    )
+    tipping = answer.tipping_price
+    if (
+        today is not None
+        and declared is not None
+        and (
+            tipping.provenance,
+            tipping.range,
+            tipping.range_missing,
+        )
+        != (declared.provenance, declared.range, declared.range_missing)
+    ):
+        raise ValueError(
+            "answer: tipping_price carries the provenance and range of the declared "
+            "soybean price"
         )
     months = {rotation.ag_year_start.month for rotation in request.rotations}
     if {answer.kinds_of_year.start_month} != months:
