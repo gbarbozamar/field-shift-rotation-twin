@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server'
 import FieldsScreen from './FieldsScreen'
 import { exampleCase } from './exampleCase'
 import { setSelectedFieldId } from './selection'
+import { exampleRotation } from '../rotation/exampleRotation'
 import { strings } from '../strings'
 
 // leaflet needs a real browser window (importing it in node throws
@@ -73,5 +74,29 @@ describe('FieldsScreen', () => {
     expect(html).toContain(strings['example.banner'])
     const lastField = exampleCase.fields[exampleCase.fields.length - 1]
     expect(html.indexOf(strings['site.title'])).toBeGreaterThan(html.indexOf(lastField.field_id))
+  })
+
+  it('shows the rotation ribbon below the field list for the field of the example rotation', () => {
+    setSelectedFieldId(exampleRotation.field_id)
+    const html = renderToString(<FieldsScreen />)
+    expect(html).toContain(strings['ribbon.title'])
+    expect(html.indexOf(strings['ribbon.title'])).toBeGreaterThan(
+      html.lastIndexOf(exampleCase.fields[exampleCase.fields.length - 1].field_id),
+    )
+  })
+
+  it('shows no rotation ribbon when the selected field has no rotation', () => {
+    const withoutRotation = exampleCase.fields.find(
+      (field) => field.field_id !== exampleRotation.field_id,
+    )
+    if (withoutRotation === undefined) throw new Error('fixture: a field without a rotation exists')
+    setSelectedFieldId(withoutRotation.field_id)
+    const html = renderToString(<FieldsScreen />)
+    expect(html).not.toContain(strings['ribbon.title'])
+  })
+
+  it('shows no rotation ribbon when nothing is selected', () => {
+    const html = renderToString(<FieldsScreen />)
+    expect(html).not.toContain(strings['ribbon.title'])
   })
 })
