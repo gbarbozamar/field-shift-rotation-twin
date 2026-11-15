@@ -128,13 +128,15 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "slope length and steepness equations [E3]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
-- Transcribed by: OPEN
-- Checked by: OPEN
-- Status: not defined
+- Decision: [D124 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), fixed before any run (section 10): AH703 Table 4-2, its 91 cells worked in feet with the unit length in feet that D124 names, plus or minus 0.005; and the 19 Moderate values of m of Table 4-5, plus or minus 0.005. The published numbers are not written in this file.
+- Definition (PROPOSED by an AI session, unit l0/validation-h2-e3-ready, issue #225): for each of the 91 cells of Table 4-2, `LS = S * L` computed by `engine/erosion/ls.py` (slope in percent, slope length and unit length in feet) with the coefficients of the parameter catalogue (`params/records/`); for each of the 19 cells of Table 4-5, `m` read back from `L` (`m = log10(L)` at a length ten times the unit length). Each is compared with its expected value.
+- Expected value: the cells of the two tables as D124 names them, in the signed fixture `validation/fixtures/e3_ah703_tables.json` (path PROPOSED; format in `validation/fixtures/README.md`). Not committed yet.
+- Tolerance: plus or minus 0.005 on `LS` and on `m` (D124). The test fails if the fixture states another.
+- Source: named by D124 (AH703 Tables 4-2 and 4-5); the full reference and locators travel in the fixture (`source`, `locator`) and are checked by the person who signs.
+- Transcribed by: the scientific-integration AI session (D34), in the fixture's `transcribed_by`.
+- Checked by: OPEN until the lead developer signs `checked_by` in the fixture and in its unit-length record (D34, D66).
+- Test: `engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values`. **Skip rule:** it skips, naming the file and each missing signature, while the fixture is absent, its `checked_by` is empty, or its unit-length record is absent or unsigned. Once signed, a malformed fixture or a value outside its tolerance fails.
+- Status: written; skipped until the signed fixture is committed.
 
 ### E7
 
@@ -225,13 +227,15 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 1 — one rotation end to end, until CP1"
 - Unit it gates: "reference evapotranspiration against a worked FAO-56 example [H2], in `engine/water/et0/`"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
-- Transcribed by: OPEN
-- Checked by: OPEN
-- Status: not defined
+- Decision: [D124 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), fixed before any run (section 10): the expected reference evapotranspiration is the one of the Eq. 6 line of Example 18; the tolerance is half a unit of the last printed digit of each step, with the soil heat flux G compared exactly. The published numbers are not written in this file.
+- Definition (PROPOSED by an AI session; the test already written, issue #225): `reference_evapotranspiration_day` of `engine/water/et0/` is run on the example's own rows for the actual vapour pressure (Eq. 17), the solar radiation (Eq. 35) and the wind speed at 2 m (Eq. 47), with the constants and the two bounds of D82 given as parameter records; every step the example prints is compared with the engine's step. Whether this is an acceptable definition of [H2] is OPEN in `engine/water/et0/README.md`.
+- Expected value: the printed rows of the example and the reference evapotranspiration of D124, in the signed fixture `validation/fixtures/h2_example18.json` (path PROPOSED; format in `validation/fixtures/README.md`). Not committed yet.
+- Tolerance: per step, half a unit of the last digit the example prints; the soil heat flux exactly (D124). The test recomputes each tolerance from the printed number and fails if the fixture states another.
+- Source: named by D124 (FAO-56, Example 18); the full reference and locators travel in the fixture (`source`, `locator`) and are checked by the person who signs.
+- Transcribed by: the scientific-integration AI session (D34), in the fixture's `transcribed_by`.
+- Checked by: OPEN until the lead developer signs `checked_by` in the fixture and in each of its 31 constant and 2 bound records (D34, D66).
+- Test: `engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56`. **Skip rule:** it skips, naming the file and each missing signature, while the fixture is absent, its `checked_by` is empty, or any constant or bound record is absent or unsigned. Once signed, a malformed fixture, a step the engine does not compute, or a step outside its tolerance fails.
+- Status: written; skipped until the signed fixture is committed.
 
 ### H5
 
