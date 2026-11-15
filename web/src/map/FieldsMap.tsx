@@ -4,15 +4,10 @@ import 'leaflet/dist/leaflet.css'
 import { exampleCase } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
 import { attributionMarkup, fieldPositions, fieldsBounds } from './geometry'
+import { fieldOptions, selectedOptions } from './mapStyles'
 
 // Static example data: the bounds never change, so the map is built once.
 const FIELDS_BOUNDS = fieldsBounds(exampleCase.fields)
-
-/** Path style of a field polygon that is not selected (slate outline). */
-const baseOptions = { color: '#475569', fillColor: '#94a3b8', fillOpacity: 0.25, weight: 2 }
-
-/** Path style of the selected field polygon (emerald, like the list highlight). */
-const selectedOptions = { color: '#059669', fillColor: '#10b981', fillOpacity: 0.45, weight: 3 }
 
 /**
  * Map of the fields of the example case on the OpenStreetMap base layer
@@ -21,7 +16,10 @@ const selectedOptions = { color: '#059669', fillColor: '#10b981', fillOpacity: 0
  * one L.polygon per field, clicking a polygon selects that field in the
  * shared selection store, and the selected polygon is highlighted. The view
  * is the bounding box of the fields, derived from the data alone — no
- * hand-picked center or zoom.
+ * hand-picked center or zoom. Polygon styles and the viewport-based
+ * container follow the design handoff package of 15 Nov 2026
+ * (assets/map-styles.json, SHA256 20ab2acd...0b261d5d, and the handoff
+ * manual section 5.2 for the container).
  */
 export default function FieldsMap() {
   const selectedFieldId = useSelectedFieldId()
@@ -39,7 +37,7 @@ export default function FieldsMap() {
     }).addTo(map)
 
     for (const field of exampleCase.fields) {
-      const polygon = L.polygon(fieldPositions(field), baseOptions).addTo(map)
+      const polygon = L.polygon(fieldPositions(field), fieldOptions).addTo(map)
       polygon.on('click', () => setSelectedFieldId(field.field_id))
       polygonsRef.current.set(field.field_id, polygon)
     }
@@ -54,11 +52,11 @@ export default function FieldsMap() {
     for (const field of exampleCase.fields) {
       const polygon = polygonsRef.current.get(field.field_id)
       if (polygon === undefined) continue
-      polygon.setStyle(field.field_id === selectedFieldId ? selectedOptions : baseOptions)
+      polygon.setStyle(field.field_id === selectedFieldId ? selectedOptions : fieldOptions)
     }
   }, [selectedFieldId])
 
   if (FIELDS_BOUNDS === null) return null
 
-  return <div ref={containerRef} className="h-96 w-full rounded-lg border border-slate-200" />
+  return <div ref={containerRef} className="h-[60dvh] min-h-[24rem] max-h-[80dvh] w-full rounded-lg border border-fs-border" />
 }
