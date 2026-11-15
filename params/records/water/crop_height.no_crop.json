@@ -1,0 +1,18 @@
+{
+  "id": "crop_height",
+  "scope": {
+    "management": "no_crop"
+  },
+  "value": 0,
+  "unit": "m",
+  "range": null,
+  "range_missing_reason": "No range is printed for a surface with no crop.",
+  "citation": {
+    "reference": "Decision D204 of issue #77, gbarbozamar/field-shift-rotation-twin, 15 November 2026, taken by the orchestrating AI session under the delegation of D161",
+    "locator": "Row D204 of the comment of 15 November 2026: «a day with no crop 0 m»",
+    "url": "https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77. UPDATED on 2026-11-15 by an AI session to follow D204 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D204: a day with no crop (fallow, and the tail after maturity of D136) takes 0 m. No source read prints a height for bare soil or for a surface covered with dead residue: the value is a modelling choice, and the citation is the decision. Arithmetic of the form: with h = 0 the climate term of FAO-56 Eq. 72 vanishes and Kc max equals the base (1.2), the value FAO-56 Example 31 uses for bare soil after rain in a sub-humid climate («Kc max = 1.20», chapter 7, https://www.fao.org/4/X0490E/x0490e0c.htm). What the source says about h: chapter 7, symbols of Eq. 72: «h mean maximum plant height during the period of calculation (initial, development, mid-season, or late-season) [m],»; chapter 6, about Eq. 62, not Eq. 72: «For plant heights smaller than 0.1 m, vegetation will behave aerodynamically similar to grass reference and eq. 62 should not be applied.» Option not taken (D204): a height of the residue (no source). The height must not be negative. Scope PROPOSED by unit #217. SIGNED on 2026-11-15: checked_by gbarbozamar, row 30 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

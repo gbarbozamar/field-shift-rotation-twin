@@ -1,0 +1,16 @@
+{
+  "id": "wilting_point_water_content",
+  "scope": {},
+  "value": 0.214,
+  "unit": "m3 m-3",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Capurro, M.C., Beretta, A., García, C., Sawchik, J., Puppo, L. (2017). Rendimiento de la soja en respuesta a distintas dosis y momentos de riego. Agrociencia Uruguay 21(2):65-76.",
+    "locator": "Cuadro 1, «Caracterización del suelo para INIA Las Brujas e INIA La Estanzuela», rows «La Estanzuela», p. 67 (PDF p. 3)",
+    "url": "https://inia.uy/sites/default/files/publications/2024-10/Capurro-Ma.Cet-al2017Agrociencia-v12-65-76.pdf#page=3"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77. Verbatim row to compare: «La Estanzuela 0-20 1,23 37,2 21,4 15,79 31,57» (PMP column, «21,4» % volumen). THIS SESSION DID NOT REOPEN THE PDF: the row is copied from the drafts params_borrador/suelo_agua/field_capacity.0_20cm.json and permanent_wilting_point.0_20cm.json, read in the PDF by another AI session on 2026-11-14. Header of the table as those drafts give it: «Sitio Profundidad D. Ap. CC PMP AD AD horizonte-1» with units «cm», «g cm-3», «% volumen», «mm». DERIVED: percent by volume written as a fraction (divided by 100), because EP3 computes the total evaporable water as unit_factor x (theta_FC - weight x theta_WP) x Ze and the drafted unit_factor is 1000 with Ze in metres (FAO-56 Eq. 73, water contents in m3 m-3). Control: 1000 x (0.372 - 0.5 x 0.214) x 0.10 = 26.5 mm, the value of the drafted record suelo_agua/total_evaporable_water.json. ASSUMPTION a person confirms: the 0-20 cm horizon holds uniformly within the 0.10 m (or 0.15 m) evaporation layer; which layer of the profile of D77 (USER-AE) feeds the surface layer is not decided (EXPOSURE.md OPEN 13). Identifier and scope are the ones engine/water/exposure.py reads (PROPOSED there); the horizon records field_capacity / permanent_wilting_point with the scope key soil are not read by EP3. Methods, p. 67, as those drafts quote it: «PMP se estimó mediante regresión de Silva et al. (1988).» The wilting point is a regression estimate, not a measurement. SIGNED on 2026-11-15: checked_by gbarbozamar, row 4 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

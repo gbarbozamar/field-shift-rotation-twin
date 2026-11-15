@@ -1,0 +1,19 @@
+{
+  "id": "minimum_crop_coefficient",
+  "scope": {},
+  "value": 0.15,
+  "unit": "dimensionless",
+  "range": {
+    "low": 0.15,
+    "high": 0.2,
+    "basis": "Recommended range printed in chapter 7 for Kc min (Eq. 76)"
+  },
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, Eq. 76, list of symbols and text",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «K c min the minimum K c for dry bare soil with no ground cover [ » 0.15 - 0.20]» and «K c min » 0.15 - 0.20 is recommended» No single value is printed; which value inside the recommended range is used is the lead developer's choice. UPDATED on 2026-11-15 by an AI session to follow D200 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D200: 0.15. It is the value of FAO-56 Example 32 («where Kc min = 0.15») and equals the signed Kcb ini of soybean, wheat and maize (0.15), as the text below Eq. 76 says Kc min «ordinarily has the same value as the Kcb ini used for annual crops». The point inside the recommended range is a modelling choice. LIMIT D200 DECLARES: the floor of the same paragraph, «limit the difference Kcb - Kc min to ≥ 0.01 for numerical stability», is not applied by EP3 (a declared difference with no visible effect). With 0.20 every day of the initial stage of the three annual crops would be NOT_COMPUTABLE: EP3 does not clip a negative ratio in the cover fraction. SIGNED on 2026-11-15: checked_by gbarbozamar, row 7 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

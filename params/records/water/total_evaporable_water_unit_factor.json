@@ -1,0 +1,16 @@
+{
+  "id": "total_evaporable_water_unit_factor",
+  "scope": {},
+  "value": 1000.0,
+  "unit": "mm m-1 (theta in m3 m-3, Ze in m, TEW in mm)",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, Eq. 73",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: «TEW = 1000 ( q FC - 0.5 q WP ) Z e (73)» Identifier PROPOSED (the evaporation README calls it unit_factor); EP3 reads TEW directly today (EXPOSURE.md choice 8); USER-AG asks TEW from Ze and the profile. SIGNED on 2026-11-15: checked_by gbarbozamar, row 10 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

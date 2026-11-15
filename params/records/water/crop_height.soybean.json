@@ -1,0 +1,21 @@
+{
+  "id": "crop_height",
+  "scope": {
+    "crop": "soybean"
+  },
+  "value": 1.0,
+  "unit": "m",
+  "range": {
+    "low": 0.5,
+    "high": 1.0,
+    "basis": "Range of the maximum crop height (h) printed in Table 12 for soybeans"
+  },
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 6, Table 12, group «e. Legumes (Leguminosae)», row «Soybeans», column «Maximum Crop Height (h) (m)»",
+    "url": "https://www.fao.org/4/X0490E/x0490e0b.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15. Transcribed by an AI session under D34 of issue #77. Caption: «TABLE 12. Single (time-averaged) crop coefficients, Kc, and mean maximum plant heights for non stressed, well-managed crops in subhumid climates (RHmin » 45%, u2 » 2 m/s) for use with the FAO Penman-Monteith ETo.» (» is the page's rendering of the approximately-equal sign). Column heads as the text search captured them: «Crop | Kc mid | Kc end | Maximum Crop Height (h) (m)» (the head of the Kc ini column was not captured). Verbatim row to compare: «Soybeans | 1.15 | 0.50 | 0.5-1.0» (Kc ini blank in the row). Text of the chapter: «Example values for h are listed in Table 12 for various crops. However, the mean plant height will greatly vary with crop variety and with cultural practices. Therefore, wherever possible, h should be obtained from general field observations.» WHAT EP3 DOES WITH IT: one height per crop, the same on every crop day, in the climate term of Kc max (Eq. 72), whose symbol list reads «h mean maximum plant height during the period of calculation (initial, development, mid-season, or late-season) [m],» (chapter 7, https://www.fao.org/4/X0490E/x0490e0c.htm). A height that changes with the stage is not built (EXPOSURE.md OPEN 4). It must be in the unit of upper_limit_reference_crop_height (drafted 3.0 m). A local height (national cultivar evaluation) is suggested in INVENTARIO_VARIABLES.md and was not looked for. Identifier PROPOSED. UPDATED on 2026-11-15 by an AI session to follow D204 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D204: 1.0 m, the upper end of the printed 0.5-1.0 (a modelling choice inside the range). LIMIT D204 DECLARES: one height per crop for the whole cycle (FAO-56 asks for the height of each period: «h mean maximum plant height during the period of calculation (initial, development, mid-season, or late-season) [m],», chapter 7, symbols of Eq. 72). A height per stage is a lane L1 unit for after the event. SENSITIVITY: a local mean height of soybean at the station, 0.83 m (national cultivar evaluation INIA-INASE, La Estanzuela, computed by an AI session in params_borrador/candidatos/agua/crop_height.soybean.enc_bd_le.json), replaces 1.0 m, with exponent 1.415, when a person has checked that computation; until then it is the sensitivity (D204). SIGNED on 2026-11-15: checked_by gbarbozamar, row 28 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "upper_limit_reference_minimum_relative_humidity",
+  "scope": {},
+  "value": 45.0,
+  "unit": "percent",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, Eq. 72",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image x0490e2q.gif: «Kc max = max({1.2 + [0.04(u2 − 2) − 0.004(RHmin − 45)](h/3)^0.3}, {Kcb + 0.05})» SIGNED on 2026-11-15: checked_by gbarbozamar, row 17 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}
