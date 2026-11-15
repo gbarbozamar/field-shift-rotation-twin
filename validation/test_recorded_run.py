@@ -158,8 +158,9 @@ def test_a_code_without_a_result_is_listed_and_never_counted(store, run_id):
 
 
 def test_no_code_whose_entry_is_not_defined_holds_a_passed_result(store):
+    # Since D252 to D254 no entry of docs/VALIDATION.md has the status
+    # "not defined"; the check stays for any entry that returns to it.
     not_defined = codes_not_defined()
-    assert not_defined, "docs/VALIDATION.md has entries with the status 'not defined'"
     passed = {result["test_code"] for result in store.results.values() if result["outcome"] == "passed"}
     assert passed & not_defined == set()
 

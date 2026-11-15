@@ -25,9 +25,11 @@ A valid request always answers ``200``. ``decision`` is the
 ``DecisionOutput`` of contracts/decision_output/, serialised with every null
 kept (``model_dump(mode="json")``, never ``exclude_none``), or ``null`` with
 ``decision_missing`` and its reason: a rotation without a result, a part
-whose engine is not built, runs that do not hold the same cells, or a
-decision layer that is not built or fails (``_decide``). What an engine
-raises is a defect: ``500`` ``INTERNAL_ERROR``, as on the existing route.
+whose engine is not built, runs that do not hold the same cells, a
+decision layer that is not built, or a typed absence the layer answers
+itself. What an engine or the decision layer raises, and a document that
+fails its check, is a defect: ``500`` ``INTERNAL_ERROR``, as on the existing
+route.
 
 The route depends only on interfaces. It never imports ``engine/`` or
 ``decision/``, never builds a number, and changes nothing it copies.
@@ -79,12 +81,6 @@ NOT_THE_SITE = "not_the_site"
 REPEATED = "repeated"
 NOT_THE_SITE_MESSAGE = "the {field} of this rotation is not the {field} of site"
 REPEATED_MESSAGE = "this rotation_id is the rotation_id of an earlier rotation"
-# PROPOSED: the detail of a decision layer that failed (it names the kind of
-# error only; the error itself goes to the server log, never to the answer).
-LAYER_FAILED = (
-    "the decision layer failed ({kind}), so no decision is given; the failure is "
-    "in the server log"
-)
 
 # --- request ------------------------------------------------------------------
 
@@ -190,27 +186,20 @@ def _missing_out(missing: Missing) -> MissingOut:
 
 
 def _decide(layer: DecisionLayer, table: Any, *, example_data: bool) -> Any:
-    """The decision layer's answer, or a typed absence when it fails. PROPOSED.
+    """The decision layer's answer: a checked document or its typed absence.
 
-    A decision layer that fails to load, raises, or returns a document that
-    does not match its table answers ``200`` with ``decision_missing``
-    ``NOT_AVAILABLE`` (C3.2: the module is not enabled), the kind of error in
-    the detail and the error in the log. The document is checked here
-    (``check_document``) whatever the implementation of ``DecisionLayer``,
-    not only by the default one. The engines are not covered: what they raise
-    is still ``500``, as on the existing route.
+    ``NOT_AVAILABLE`` comes only from the layer itself, when it is not built
+    (``api/decision_layer.py``: the module or the function absent). The
+    document is checked here (``check_document``) whatever the implementation
+    of ``DecisionLayer``, not only by the default one. What the layer raises,
+    a module of it that fails to import, and a document that fails the check
+    are defects: they propagate and the route answers ``500``
+    ``INTERNAL_ERROR``, as for an engine that raises.
     """
-    try:
-        answer = layer.decide(table, example_data=example_data)
-        if isinstance(answer, Missing):
-            return answer
-        return check_document(answer, table, example_data=example_data)
-    except Exception as error:
-        logger.exception("POST /api/decisions/run: the decision layer failed")
-        return Missing(
-            reason="NOT_AVAILABLE",
-            detail=LAYER_FAILED.format(kind=type(error).__name__),
-        )
+    answer = layer.decide(table, example_data=example_data)
+    if isinstance(answer, Missing):
+        return answer
+    return check_document(answer, table, example_data=example_data)
 
 
 def _under_rotation(index: int, problem: ErrorDetail) -> ErrorDetail:

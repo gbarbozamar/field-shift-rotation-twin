@@ -28,9 +28,11 @@ redeploys the service before CI ends). The default implementation,
 ``DiscoveredDecisionLayer``, looks the function up on each request; Python
 keeps a module once it is imported, so the lookup costs nothing after the
 first. Neither ``decision/`` nor ``contracts.decision_output`` is imported at
-module level here. A decision layer that fails to load, raises or returns a
-document that does not match its table never breaks start-up or another
-route: the route answers ``200`` with ``decision_missing`` (``api/decisions.py``).
+module level here, so a decision layer that fails to load never breaks
+start-up or another route. On the decision route it is a defect, as is one
+that raises or returns a document that does not match its table: the route
+answers ``500`` ``INTERNAL_ERROR`` (``api/decisions.py``). Only "not built"
+is ``200`` with ``decision_missing`` ``NOT_AVAILABLE``.
 """
 
 from __future__ import annotations
@@ -169,8 +171,8 @@ class DiscoveredDecisionLayer:
 
     Never at start-up (module docstring). ``discover`` is
     ``discover_decision_function`` unless a test passes another. What the
-    lookup or the function raises propagates to the route, which answers it
-    as a typed absence.
+    lookup or the function raises propagates to the route, which answers
+    ``500``.
     """
 
     def __init__(

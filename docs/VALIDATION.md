@@ -1,6 +1,6 @@
 # Validation protocol
 
-**Skeleton, partly filled. The E and H entries are not defined yet, except [E3] and [H2]: each of the two has the decision D124 of the lead developer, a definition PROPOSED by an AI session, and a test that runs on a signed fixture. The D entries have their logic decided by the lead developer (14 November 2026); their OPEN items and their acceptance by a science reviewer are still pending.**
+**Skeleton, partly filled. [E3] and [H2] each have the decision D124 of the lead developer, a definition PROPOSED by an AI session, and a test that runs on a signed fixture. [E0], [E2] and [H0] have their logic decided under D161 (D211, D225 and D212). [E7] is the plausibility check of EP1, reported as an observation with no pass rule (D252). [H5] is a qualitative contrast with no pass rule, not run in this release (D253). [E1a] and [E1b] are not evaluated in this release (D254). [E8], [E9], [H7] and [H8] have their logic decided under D161 (D226, D227). [H1] has D228 and a test that waits for its signed fixture. [H10] has D229 and its tolerance D230, decided before any run, and waits for its signed fixture. The D entries have their logic decided by the lead developer (14 November 2026); their OPEN items and their acceptance by a science reviewer are still pending.**
 
 This file holds the acceptance tests that `docs/DEVELOPMENT_BLUEPRINT.md` refers to by codes in square brackets. It has one entry per code named in section 8 of the blueprint. No entry has a numeric value, threshold, numeric tolerance, expected value of the science, source or citation yet, with these exceptions: [E3] and [H2] state the tolerance of D124 (and of D138 for two steps of [H2]) and name their source, and their expected values are in the signed fixtures of `validation/fixtures/`, not in this file; and the plot check at the end of this file restates the figures and the source that D148 records.
 
@@ -58,7 +58,7 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - OPEN: several codes share one bracket in the blueprint. What each of those codes covers on its own is for the science reviewers to state; the entries say where this applies. Where the blueprint gives a code its own words inside a longer sentence, the entry quotes those words and gives the sentence as context.
 - OPEN: which values the Status field can take after `not defined`, and who sets each.
 - OPEN: whether an expected value and its citation are written in this file or kept in `validation/` with a pointer from here. The layout of `validation/` is a separate unit.
-- Section 8 is the only source of the codes below. A code that section 8 does not name has no entry. If the protocol has more codes, the science reviewers add them. The one exception is the plot check at the end of this file, which has no code: [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) asks for it to be recorded here.
+- Section 8 is the only source of the codes below. A code that section 8 does not name has no entry. If the protocol has more codes, the science reviewers add them. The plot check near the end of this file, recorded at the request of [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333), carries the code [E7] since D252.
 - OPEN, for the lead developer: **the tolerance of the plot check at the end of this file.** None was fixed before the run, and none is chosen here. For a run that follows, which ratio of the computed soil loss to the measured one counts as plausible? Options: (i) within a factor of 2 of the measured mean of 2017–2019; (ii) within the range of the measured plot-years, 71 to 1,478 kg/ha/yr; (iii) within a factor of 10.
 
 ## Codes in this file
@@ -66,7 +66,7 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - E: E0, E1a, E1b, E2, E3, E7, E8, E9
 - H: H0, H1, H2, H5, H7, H8, H10
 - D: D0, D1, D2, D3, D4, D5, D6, D7, D10, D12
-- Plausibility check without a code in section 8: [EP1: plausibility against the La Estanzuela runoff plots (2017–2019)](#ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019)
+- In the section "Plausibility check without a code in section 8": [EP1: plausibility against the La Estanzuela runoff plots (2017–2019) [E7]](#ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019-e7), which carries the code E7 since [D252 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893897481)
 
 ## E codes
 
@@ -97,13 +97,14 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: OPEN. The blueprint gives no builder unit for this code; it says a person, not a session, runs it
 - Class (blueprint section 3.6): Science — PROPOSED
+- Decision: [D254 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893897481), taken under the delegation of D161 on 15 November 2026: **not evaluated in this release**, and OPEN for after the event. The reason, as D254 states it: E1a "needs a person to run the official program on the two rotations of D128. No person has, and its official soil table has not been read (D213). The EP1 side is already known (D158), so a tolerance would be chosen after seeing one side, and none is fixed now."
 - Definition: OPEN
 - Expected value: OPEN
 - Tolerance: OPEN
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: not evaluated in this release (D254)
 
 ### E1b
 
@@ -112,13 +113,14 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 2 — two clocks and the decision, until CP2"
 - Unit it gates: "plausibility against published plot ratios [E1b]"
 - Class (blueprint section 3.6): Science — PROPOSED
+- Decision: [D254 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893897481), taken under the delegation of D161 on 15 November 2026: **not evaluated in this release**, and OPEN for after the event. The reason, as D254 states it: E1b "has no model ratio to test: with the declared `C`, every rotation gives the same soil loss (D158), so the ratio is 1 by construction, and there is no per-rotation `C` in this release (D213). The only published ratios found (García-Préchac et al. 2004) were seen only in a summary, and are for other systems (tillage against no-till; continuous cropping against crop–pasture), not the rotations of D128." No value of that publication is used.
 - Definition: OPEN
 - Expected value: OPEN
 - Tolerance: OPEN
 - Source: CITATION NEEDED
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: not evaluated in this release (D254)
 
 ### E2
 
@@ -159,18 +161,19 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 ### E7
 
 - What it checks (blueprint wording): "Contrast case from published runoff plots: modelled next to measured [E7, H10]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the soil-loss side of the contrast case ([D252 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893897481), 15 November 2026). The runoff side is [H10] (D229, D230).
 - Lane: L0 Core
 - Block: "Block 3 — the full decision on real data, until CP3"
 - Unit it gates: "Contrast case from published runoff plots: modelled next to measured [E7, H10]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
-- Transcribed by: OPEN
-- Checked by: OPEN
-- Status: not defined
+- Decision: [D252 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893897481), taken under the delegation of D161 on 15 November 2026: E7 is the plausibility check of EP1 against the La Estanzuela runoff plots that [D148](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) ran and recorded, reported as an observation, **with no pass rule**.
+- **D252 gave this code to the check after its result was seen (D148): it is a label change taken after the result, and D252 says so.**
+- Definition, expected value, observed result and status: in the entry [EP1: plausibility against the La Estanzuela runoff plots (2017–2019) [E7]](#ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019-e7) at the end of this file, unchanged.
+- Tolerance: none. The tolerance for later runs stays OPEN, with the three options listed under "Open questions about this file" (D252).
+- Source: the source of that entry
+- Transcribed by: as in that entry
+- Checked by: as in that entry (OPEN)
+- Status: result observed and recorded (D148); code E7 given by D252 after the result; no pass rule; acceptance by a science reviewer pending
 
 ### E8
 
@@ -271,13 +274,15 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - Block: "Block 4 — Sunday until CP4"
 - Unit it gates: "regional soil-moisture contrast with SMAP [H5]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
+- Decision: [D253 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893897481), taken under the delegation of D161 on 15 November 2026, on the definition of [D107](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886058061).
+- Definition (D107, D253): the qualitative contrast of the timing of wetting and drying in the balance of the actual rotation, set next to the root-zone soil wetness `GWETROOT` of NASA POWER: "context and contrast, never as a deciding measure" (D107). `GWETROOT` is never converted to mm, never used as an initial state and never put into the alternative rotations (D107).
+- Source of the data: `GWETROOT` of NASA POWER, MERRA-2 reanalysis, relative saturation of the root zone, 0 to 100 cm ([D114](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886369099)), in place of the SMAP of the blueprint's wording for this release (D107; recorded by D253 as the data-source choice). It is `CQ7` of `contracts/CLIMATE_QUANTITIES.md`.
+- Expected value: none.
+- Tolerance: **no pass rule.** No source or decision gives a metric of timing or a threshold, and none is written here (D253).
+- Not run in this release (D253): `CQ7` is OPEN (the quantity does not come through the adapter), and EP3 gives no real number while the water records are unsigned (D108).
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: DECIDED under D161 (D253); not run
 
 ### H7
 
@@ -553,11 +558,13 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
 
 ## Plausibility check without a code in section 8
 
-This entry has no bracketed code: the blueprint's section 8 does not name it. [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) asks for the check and its result to be recorded in this file. It is a science-class entry (blueprint section 3.6): the numbers below are restated from D148 and from the source, and a science reviewer has not accepted it.
+This entry carries the code [E7] since D252, taken after its result; it had none before. [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) asks for the check and its result to be recorded in this file. It is a science-class entry (blueprint section 3.6): the numbers below are restated from D148 and from the source, and a science reviewer has not accepted it.
 
 The two context blocks of this section (soil loss measured with ¹³⁷Cs, and the carbon inputs of EP4) were added by unit `l0/validation-local-context` (brief #319). They record local measurements a science reviewer needs when judging plausibility. They are not checks, tolerances or expected values, and no value of them enters `params/records/`.
 
-### EP1: plausibility against the La Estanzuela runoff plots (2017–2019)
+<a id="ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019"></a>
+
+### EP1: plausibility against the La Estanzuela runoff plots (2017–2019) [E7]
 
 - What it checks: the annual soil loss that EP1 (`compute_soil_loss`, main route, `docs/METHODS.md` M1.2) gives at the demonstration site, against the soil loss measured on the six Wischmeier runoff plots of La Estanzuela. It is not a check of the code (H2 and E3 cover the equations) and it is not a calibration: no value was fitted, calibrated or changed.
 - Lane: L0 Core (EP1); the check was run by an AI session, read-only.
