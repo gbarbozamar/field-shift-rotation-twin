@@ -1,0 +1,136 @@
+[
+  {
+    "contract": "rotation_definition",
+    "example_data": true,
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "rotation_id": "soybean-winter-fallow",
+    "label": "Soybean with winter fallow (D128), on the calendar of row USER-AP of D72: scenario dates, not observed harvests",
+    "ag_year_start": {
+      "month": 7,
+      "provisional": true,
+      "provenance": "DECLARED",
+      "source": "user"
+    },
+    "repeats": true,
+    "components": [
+      {
+        "component_id": "c1",
+        "position": 1,
+        "crop_id": "soybean",
+        "purpose": "grain",
+        "sowing": {
+          "date": "2027-11-15",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "harvest": {
+          "date": "2028-05-05",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "management": {
+          "residue": "left_on_surface",
+          "grazing": {
+            "missing": { "reason": "NOT_DECLARED" }
+          },
+          "termination": {
+            "missing": { "reason": "NOT_DECLARED" }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "contract": "rotation_definition",
+    "example_data": true,
+    "case_id": "example-case",
+    "field_id": "example-field-1",
+    "rotation_id": "wheat-soybean-maize",
+    "label": "Wheat, second-crop soybean, then maize (D128), on the calendar of row USER-AP of D72: scenario dates, not observed harvests",
+    "ag_year_start": {
+      "month": 7,
+      "provisional": true,
+      "provenance": "DECLARED",
+      "source": "user"
+    },
+    "repeats": true,
+    "components": [
+      {
+        "component_id": "c1",
+        "position": 1,
+        "crop_id": "wheat",
+        "purpose": "grain",
+        "sowing": {
+          "date": "2027-05-25",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "harvest": {
+          "date": "2027-12-05",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "management": {
+          "residue": "left_on_surface",
+          "grazing": {
+            "missing": { "reason": "NOT_DECLARED" }
+          },
+          "termination": {
+            "missing": { "reason": "NOT_DECLARED" }
+          }
+        }
+      },
+      {
+        "component_id": "c2",
+        "position": 2,
+        "crop_id": "soybean",
+        "purpose": "grain",
+        "sowing": {
+          "date": "2027-12-10",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "harvest": {
+          "date": "2028-05-10",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "management": {
+          "residue": "left_on_surface",
+          "grazing": {
+            "missing": { "reason": "NOT_DECLARED" }
+          },
+          "termination": {
+            "missing": { "reason": "NOT_DECLARED" }
+          }
+        }
+      },
+      {
+        "component_id": "c3",
+        "position": 3,
+        "crop_id": "maize",
+        "purpose": "grain",
+        "sowing": {
+          "date": "2028-09-20",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "harvest": {
+          "date": "2029-04-20",
+          "provenance": "DECLARED",
+          "source": "user"
+        },
+        "management": {
+          "residue": "left_on_surface",
+          "grazing": {
+            "missing": { "reason": "NOT_DECLARED" }
+          },
+          "termination": {
+            "missing": { "reason": "NOT_DECLARED" }
+          }
+        }
+      }
+    ]
+  }
+]
