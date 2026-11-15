@@ -64,8 +64,10 @@ from params.catalogue import Missing as CatalogueMissing
 from params.catalogue import identity, read_value
 
 from ._numbers import NumberOrMissing, describe_missing, is_missing
+from .equilibrium import equilibrium_state
 from .modifiers import (
     advance_deficit,
+    bare_soil_deficit,
     clay_partition,
     cover_modifier,
     maximum_tsmd,
@@ -157,6 +159,10 @@ PARAMETERS: dict[str, tuple[str, str]] = {
     "bio_share": ("rothc_bio_share_of_formed", "dimensionless"),
     "iom_coefficient": ("rothc_iom_coefficient", "dimensionless"),
     "iom_exponent": ("rothc_iom_exponent", "dimensionless"),
+    # D223 of issue #77: the divisor of the maximum deficit in a bare month
+    # (BareSMD, p. 10 of the description), scope {}. Read only where a bare
+    # month dries the soil (modifiers.bare_soil_deficit).
+    "bare_tsmd_divisor": ("rothc_bare_tsmd_divisor", "dimensionless"),
 }
 # The composition of the incoming material, one set of records per origin of
 # a carbon input, all dimensionless: the DPM:RPM ratio of plant material, or
@@ -189,6 +195,27 @@ ACTIVE_POOLS = ("dpm", "rpm", "bio", "hum")
 
 NO_RANGE = (
     "run_rothc computes no uncertainty range (Q6 of contracts/ENTRYPOINTS.md, C2.3)"
+)
+# D224 of issue #77: the label of a RothC value, word for word as the decision
+# gives it. The source of every value that holds a number starts with it.
+LABEL = (
+    "RothC-26.3, the 1990 standard formulation (D64); monthly FAO-56 reference "
+    "evapotranspiration as the evaporative demand instead of open-pan "
+    "evaporation × 0.75 (an adaptation, D80); Rothamsted parameters, not "
+    "calibrated for the country of the site; starting pools from an equilibrium "
+    "initialisation convention, with no claim that the soil is at equilibrium "
+    "(D80); inert pool from Falloon et al. (1998), \"a very rough "
+    "approximation\"; surface residue under no-till entered as a soil input."
+)
+EQUILIBRIUM = (
+    "derived by engine.rothc.run_rothc by the inverse mode of D218 of issue #77: "
+    "the inert pool from starting_state 'soil_organic_carbon' by the form of p. "
+    "16 of the model description; the active pools as the state that the "
+    "monthly forcing of this horizon, cycled, returns to (its analytic fixed "
+    "point, D219), with every carbon input scaled once by (SOC - IOM) / "
+    "(SOC_sim - IOM) (GSOCseq Technical Manual eq. 5.1, after Smith et al. "
+    "2005) so that the five pools hold the starting total. An equilibrium "
+    "initialisation convention, not a claim about the soil (D80)"
 )
 NO_CYCLES = (
     "the positions of the whole rotation cycles in the series of stocks: "
@@ -555,6 +582,24 @@ def _pan_values(
     )
 
 
+def _carries(forcing: CarbonForcing, name: str) -> bool:
+    quantity = FORCING_QUANTITIES[name][1]
+    return any(item.quantity == quantity for item in forcing.starting_state)
+
+
+def _inverse_mode(forcing: CarbonForcing) -> bool:
+    """D218: the starting state carries only the total soil organic carbon.
+
+    Then the five pools come from the equilibrium of the cycle. When it
+    carries any pool, the pools are read from it as before (a pool it does
+    not carry is missing and named).
+    """
+    pools = ("dpm_pool", "rpm_pool", "bio_pool", "hum_pool", "iom_pool")
+    return _carries(forcing, "total_carbon") and not any(
+        _carries(forcing, name) for name in pools
+    )
+
+
 def _initial_iom(
     forcing: CarbonForcing, catalogue: _Catalogue
 ) -> tuple[NumberOrMissing, bool]:
@@ -638,6 +683,7 @@ def _month_inputs(
             ),
         )
     maximum_unit = catalogue.read("tsmd_intercept").unit
+    divisor = catalogue.read("bare_tsmd_divisor").value
     # The carbon inputs, once: every series of the forcing, its composition
     # by origin, and its values by month.
     compositions: dict[str, InputSplit | ResultMissing] = {
@@ -677,6 +723,7 @@ def _month_inputs(
             offset_unit=catalogue.read("temperature_offset").unit,
         )
         if not is_missing(deficit):
+            before = deficit
             deficit = advance_deficit(
                 deficit=deficit,
                 maximum=maximum,
@@ -686,6 +733,14 @@ def _month_inputs(
                 pan_evaporation=_at(pan, month, "pan_evaporation"),
                 pan_evaporation_unit=pan_unit,
                 pan_factor=pan_factor.value,
+            )
+            # D223: in a bare month the deficit is held at the bare limit.
+            deficit = bare_soil_deficit(
+                deficit_before=before,
+                advanced=deficit,
+                maximum=maximum,
+                cover_state=_at(cover, month, "soil_cover"),
+                divisor=divisor,
             )
         moisture_factor = moisture_modifier(
             deficit=deficit,
@@ -813,16 +868,29 @@ def run_rothc(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonB
     )
     bio_share = catalogue.read("bio_share").value
     iom, iom_derived = _initial_iom(forcing, catalogue)
-    start = initial_state(
-        dpm=_starting(forcing, "dpm_pool"),
-        rpm=_starting(forcing, "rpm_pool"),
-        bio=_starting(forcing, "bio_pool"),
-        hum=_starting(forcing, "hum_pool"),
-        iom=iom,
-    )
+    month_inputs = _month_inputs(forcing, catalogue, months)
+    inverse = _inverse_mode(forcing)
+    if inverse:
+        # D218: only the total is given; the pools are its equilibrium split.
+        start = equilibrium_state(
+            months=month_inputs,
+            rate_constants=rate_constants,
+            partition_ratio=partition,
+            bio_share=bio_share,
+            total_organic_carbon=_starting(forcing, "total_carbon"),
+            inert_organic_matter=iom,
+        )
+    else:
+        start = initial_state(
+            dpm=_starting(forcing, "dpm_pool"),
+            rpm=_starting(forcing, "rpm_pool"),
+            bio=_starting(forcing, "bio_pool"),
+            hum=_starting(forcing, "hum_pool"),
+            iom=iom,
+        )
     the_run = run(
         initial_state=start,
-        months=_month_inputs(forcing, catalogue, months),
+        months=month_inputs,
         rate_constants=rate_constants,
         partition_ratio=partition,
         bio_share=bio_share,
@@ -849,12 +917,12 @@ def run_rothc(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonB
     )
     records = ", ".join(f"'{pid}'" for pid in catalogue.used)
     simulated = (
-        f"simulated by engine.rothc.run_rothc, variant '{VARIANT}', from the "
+        f"{LABEL} Simulated by engine.rothc.run_rothc, variant '{VARIANT}', from the "
         f"forcing ({quantities}, and every series of carbon_inputs with the "
         f"composition of its origin) and the parameter records {records}"
     )
     derived_iom = (
-        "derived by engine.rothc.run_rothc from starting_state "
+        f"{LABEL} Derived by engine.rothc.run_rothc from starting_state "
         f"'{FORCING_QUANTITIES['total_carbon'][1]}' and the parameter records "
         f"'{PARAMETERS['iom_coefficient'][0]}', '{PARAMETERS['iom_exponent'][0]}' "
         "(the form printed on p. 16 of the model description)"
@@ -883,10 +951,12 @@ def run_rothc(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonB
     def taken(pool: str) -> tuple[str, str]:
         if pool == "iom" and iom_derived:
             return "DERIVED", derived_iom
+        if inverse:
+            return "DERIVED", f"{LABEL} {EQUILIBRIUM}"
         return (
             "DECLARED",
-            f"taken from starting_state '{FORCING_QUANTITIES[f'{pool}_pool'][1]}' "
-            "of the forcing",
+            f"{LABEL} Taken from starting_state "
+            f"'{FORCING_QUANTITIES[f'{pool}_pool'][1]}' of the forcing",
         )
 
     def total(state: PoolState) -> float:
@@ -906,7 +976,7 @@ def run_rothc(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonB
             "total",
             total,
             "DERIVED",
-            "the sum of the five pools of this balance",
+            f"{LABEL} The sum of the five pools of this balance",
         ),
         pools=[
             stock(

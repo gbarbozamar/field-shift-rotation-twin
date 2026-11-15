@@ -74,6 +74,7 @@ from ._numbers import (
 
 __all__ = [
     "advance_deficit",
+    "bare_soil_deficit",
     "clay_partition",
     "cover_modifier",
     "maximum_tsmd",
@@ -475,6 +476,91 @@ def advance_deficit(
     if finite(new_deficit) is None:
         return no_finite_result("advance_deficit", "the new deficit")
     return new_deficit
+
+
+def bare_soil_deficit(
+    *,
+    deficit_before: NumberOrMissing,
+    advanced: NumberOrMissing,
+    maximum: NumberOrMissing,
+    cover_state: NumberOrMissing,
+    divisor: NumberOrMissing,
+) -> float | ResultMissing:
+    """The bare-soil moisture deficit (BareSMD) of D223 of issue #77. PROPOSED form.
+
+    D223: "in a bare month the deficit may not fall below the maximum deficit
+    divided by [the divisor], unless it is already below it" (model
+    description p. 10; users guide p. 11). The divisor is the record
+    ``rothc_bare_tsmd_divisor``; no value of it is written here.
+
+    - ``deficit_before``: the deficit at the start of the month.
+    - ``advanced``: the deficit after the month as ``advance_deficit`` gives
+      it (held at the maximum deficit and at field capacity).
+    - ``maximum``: the maximum deficit, negative, the one ``advance_deficit``
+      was given.
+    - ``cover_state``: one (vegetated) or zero (bare), the encoding of
+      ``cover_modifier``.
+    - ``divisor``: the divisor of the maximum deficit, positive.
+
+    In a vegetated month the result is ``advanced``. In a bare month it is
+    ``advanced``, but never below the bare limit ``maximum / divisor``, or
+    below ``deficit_before`` when that is already below the limit:
+    ``max(advanced, min(maximum / divisor, deficit_before))``. A bare month
+    that does not dry the soil (``advanced`` not below ``deficit_before``)
+    cannot meet the limit, so it gives ``advanced`` without reading the
+    divisor: a missing divisor is then not needed and not named.
+
+    Returns the deficit, or ``MISSING_INPUT`` / ``NOT_COMPUTABLE`` (not
+    finite; a divisor that is not positive; a cover state that is neither of
+    the two).
+
+    Raises ``TypeError`` for an argument of another type.
+    """
+    arguments = {
+        "deficit_before": deficit_before,
+        "advanced": advanced,
+        "maximum": maximum,
+        "cover_state": cover_state,
+        "divisor": divisor,
+    }
+    check_types(arguments)
+    first = numbers_or_missing(
+        {name: arguments[name] for name in ("advanced", "cover_state")}
+    )
+    if isinstance(first, ResultMissing):
+        return first
+    state = first["cover_state"]
+    if state == 1:
+        return first["advanced"]
+    if state != 0:
+        return ResultMissing(
+            reason="NOT_COMPUTABLE",
+            detail=(
+                f"bare_soil_deficit: the cover state {state} is neither of the two "
+                "states of this encoding: zero (bare) or one (vegetated)"
+            ),
+        )
+    before = numbers_or_missing({"deficit_before": deficit_before})
+    if isinstance(before, ResultMissing):
+        return before
+    if not first["advanced"] < before["deficit_before"]:
+        return first["advanced"]
+    values = numbers_or_missing(
+        {name: arguments[name] for name in ("maximum", "divisor")}
+    )
+    if isinstance(values, ResultMissing):
+        return values
+    refused = outside(values, ("divisor",), is_positive, "is not positive")
+    if refused is not None:
+        return refused
+    try:
+        limit = real(values["maximum"] / values["divisor"])
+        result = real(max(first["advanced"], min(limit, before["deficit_before"])))
+    except (ArithmeticError, ValueError, OverflowError):
+        return no_finite_result("bare_soil_deficit", "the deficit")
+    if finite(result) is None:
+        return no_finite_result("bare_soil_deficit", "the deficit")
+    return result
 
 
 def moisture_modifier(
