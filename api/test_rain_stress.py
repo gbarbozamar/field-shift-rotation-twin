@@ -460,3 +460,22 @@ def test_the_factor_is_written_without_float_artefacts():
     for text in (stress.detail, note):
         assert "multiplied by 1.21 " in f"{text} "
         assert repr(number) not in text
+
+
+def test_a_missing_factor_without_its_missing_part_is_refused():
+    # A Value built without validation (model_construct) may break C3.1; the
+    # guard is an explicit check, so it holds also under python -O.
+    broken = Value.model_construct(value=None, unit=DIMENSIONLESS, missing=None)
+    with pytest.raises(ValueError, match="C3.1"):
+        rain_stress(broken)
+
+
+@pytest.mark.parametrize("number", [1.2345678, 1.0000001])
+def test_a_factor_with_many_digits_is_written_exactly(number):
+    # Test data: factors with more than 6 significant digits (invented).
+    stress = rain_stress(declared(number))
+    parameters = catalogue()
+    key, _ = r_key_and_record(parameters)
+    note = scale_erosivity(parameters, stress)[key]["note"]
+    for text in (stress.detail, note):
+        assert f"multiplied by {number!r} " in f"{text} "

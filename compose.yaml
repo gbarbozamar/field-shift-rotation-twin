@@ -55,6 +55,12 @@ services:
         - action: sync
           path: ./decision
           target: /app/decision
+        - action: sync
+          path: ./economics
+          target: /app/economics
+        - action: sync
+          path: ./kinds_of_year
+          target: /app/kinds_of_year
         - action: rebuild
           path: pyproject.toml
         - action: rebuild

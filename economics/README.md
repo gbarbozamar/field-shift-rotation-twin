@@ -70,6 +70,8 @@ def assess_limit(
     limit: Value,
     average: SoilLossLevel,
     by_kind: Mapping[str, SoilLossLevel],
+    *,
+    kinds_in_record: Collection[str] | None = None,
 ) -> LimitAssessment
 ```
 
@@ -77,7 +79,7 @@ def assess_limit(
 - `SoilLossLevel` (a `typing.Protocol`): any object with `value` (float or `None`), `reason` (a `ReasonCode` or `None`) and `detail` (text or `None`), such as the mean by kind of year of `kinds_of_year/aggregate.py` (not imported here). Its unit is the caller's job; an object that has a `unit` attribute must say `"t ha-1 yr-1"`.
 - `by_kind`: one level for each kind of `KINDS_OF_YEAR`.
 - `LimitCheck` (frozen dataclass): `verdict`, `reason`, `detail`; `reason` and `detail` are set exactly when the verdict is `not_resolved`.
-- `LimitAssessment` (frozen dataclass): `limit` (the declared value, or `None` when it is missing, never 0), `unit`, `on_average`, `every_kind`, `by_kind` (a read-only mapping, one `LimitCheck` per kind in `KINDS_OF_YEAR` order), `kinds_not_met` and `kinds_not_resolved` (tuples of kinds, in `KINDS_OF_YEAR` order).
+- `LimitAssessment` (frozen dataclass): `limit` (the declared value, or `None` when it is missing, never 0), `unit`, `on_average`, `every_kind`, `by_kind` (a read-only mapping, one `LimitCheck` per kind in `KINDS_OF_YEAR` order), `kinds_not_met` and `kinds_not_resolved` (tuples of kinds, in `KINDS_OF_YEAR` order), `kinds_not_in_record` (see below, `()` by default).
 
 ## Rules (PROPOSED)
 
@@ -88,6 +90,7 @@ def assess_limit(
 - `every_kind`: `does_not_meet` when any kind does not meet the limit, even if another kind is not resolved (one failing kind is enough); otherwise `not_resolved` when any kind is not resolved, the detail naming those kinds; otherwise `meets`.
 - A kind with no year in the record arrives missing `NO_COVERAGE`: it is `not_resolved` like any missing level (the option easiest to undo).
 - A limit of 0 is a declared limit like any other, not a missing one.
+- Kinds of year with no year in the record (unit `l2/review-whole-2`, PROPOSED): the optional keyword-only `kinds_in_record` (a collection of kinds, a subset of `KINDS_OF_YEAR`, else `ValueError`; one text is refused) names the kinds that have at least one year in the record, for example the kinds with a count above zero in `kinds_of_year.count_kinds`. `None` (the default) keeps every kind in `every_kind`, exactly as before, so a kind missing `NO_COVERAGE` leaves `every_kind` not resolved. When it is given, a kind not in it keeps its `by_kind` check (whatever its level gives), but is left out of `every_kind`, `kinds_not_met` and `kinds_not_resolved`, and is listed in the new field `LimitAssessment.kinds_not_in_record` (in `KINDS_OF_YEAR` order, `()` by default); the detail of `every_kind`, when it has one, ends "left out, no year in the record: <kinds>". When `every_kind` is `meets` or `does_not_meet`, its `LimitCheck` carries no detail even with left-out kinds, so the caller (the route, S-018) must show `kinds_not_in_record` next to `every_kind`. A left-out kind whose level has a value contradicts "no year in the record" and is refused with `ValueError` naming the kind (PROPOSED, code review of S-028; it replaces the earlier rule that kept such a kind left out). An empty `kinds_in_record` makes `every_kind` not resolved with reason `NO_COVERAGE`, detail "no kind of year is in the record, ...". With a missing limit, `kinds_not_resolved` holds only the kinds in the record; the missing limit comes first, so a missing limit with an empty `kinds_in_record` keeps `every_kind` not resolved with reason `MISSING_INPUT` (the limit is not declared), its detail ending with the left-out kinds. Refused with `ValueError`: a `Mapping` passed as `kinds_in_record` (such as the dict of counts `count_kinds` returns, which would otherwise be read as its keys: pass the kinds with at least one year instead), a text or bytes, any object that is not a `Collection` (an integer, a generator, an iterator), and a collection holding an element that cannot be a kind (an unhashable one, such as a list).
 - `ValueError` on structural misuse: `by_kind` without exactly the keys of `KINDS_OF_YEAR`; a negative limit; a limit (present or missing) in another unit; a missing limit without its missing part (only possible for a `Value` built without validation); a level whose `unit` attribute is not `"t ha-1 yr-1"`; a level whose `value` is not `None` and is not a finite real number (a boolean, a text, NaN or infinity), the message naming the level; a level with both a `value` and a `reason` (C3.1). Every check runs before any comparison, so misuse is refused even when the limit is missing.
 - `LimitCheck` refuses a verdict outside `Verdict` and a reason outside `ReasonCode` (C3.2) with `ValueError`.
 - Inputs are not mutated; the results are frozen.

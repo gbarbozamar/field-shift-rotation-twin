@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import math
 import numbers
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Literal, Protocol, get_args
 
@@ -72,6 +72,10 @@ class LimitAssessment:
     """One rotation against the declared soil-loss limit. PROPOSED.
 
     ``by_kind`` is stored as a read-only mapping, in ``KINDS_OF_YEAR`` order.
+    ``kinds_not_in_record`` lists, in ``KINDS_OF_YEAR`` order, the kinds the
+    caller said have no year in the record (``kinds_in_record`` of
+    ``assess_limit``); they are left out of ``every_kind``, ``kinds_not_met``
+    and ``kinds_not_resolved``. Empty by default. PROPOSED.
     """
 
     limit: float | None
@@ -81,6 +85,7 @@ class LimitAssessment:
     by_kind: Mapping[str, LimitCheck]
     kinds_not_met: tuple[str, ...]
     kinds_not_resolved: tuple[str, ...]
+    kinds_not_in_record: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "by_kind", MappingProxyType(dict(self.by_kind)))
@@ -137,6 +142,8 @@ def assess_limit(
     limit: Value,
     average: SoilLossLevel,
     by_kind: Mapping[str, SoilLossLevel],
+    *,
+    kinds_in_record: Collection[str] | None = None,
 ) -> LimitAssessment:
     """Whether one rotation meets the declared soil-loss limit. PROPOSED.
 
@@ -147,6 +154,17 @@ def assess_limit(
     ``KINDS_OF_YEAR``. Raises ``ValueError`` on structural misuse (see
     README.md); a missing input is never an exception but a check that is not
     resolved, with its reason.
+
+    ``kinds_in_record`` (PROPOSED, keyword only): ``None`` keeps every kind in
+    ``every_kind``. Otherwise the kinds of year that have at least one year in
+    the record, a subset of ``KINDS_OF_YEAR`` (else ``ValueError``); a kind not
+    in it keeps its ``by_kind`` check but is left out of ``every_kind``,
+    ``kinds_not_met`` and ``kinds_not_resolved``, and is listed in
+    ``kinds_not_in_record``; a left-out kind whose level has a value is a
+    ``ValueError``. A ``Mapping`` (such as the counts of
+    ``kinds_of_year.count_kinds``), a text, bytes and any object that is not a
+    ``Collection`` (a generator, an iterator) are refused with ``ValueError``.
+    When it is empty, ``every_kind`` is not resolved, reason ``NO_COVERAGE``.
     """
     if limit.unit != UNIT_SOIL_LOSS_ANNUAL:
         raise ValueError(
@@ -162,6 +180,50 @@ def assess_limit(
     _check_shape(average, "average")
     for kind in KINDS_OF_YEAR:
         _check_shape(by_kind[kind], f"by_kind[{kind!r}]")
+    if kinds_in_record is None:
+        in_record = KINDS_OF_YEAR
+    else:
+        # ValueError, not TypeError: one exception type for every misuse.
+        if isinstance(kinds_in_record, Mapping):
+            raise ValueError(
+                "kinds_in_record: not a mapping (such as the counts of "
+                "count_kinds); pass the kinds of year with at least one year "
+                "in the record"
+            )
+        if isinstance(kinds_in_record, (str, bytes, bytearray)):
+            raise ValueError("kinds_in_record: a collection of kinds, not one text")
+        if not isinstance(kinds_in_record, Collection):
+            raise ValueError(
+                "kinds_in_record: a collection of kinds (a set, list or tuple), "
+                "not a generator or an iterator"
+            )
+        try:
+            given = set(kinds_in_record)
+        except TypeError:
+            raise ValueError(
+                "kinds_in_record: a collection of kinds of year (texts)"
+            ) from None
+        unknown = sorted(given - set(KINDS_OF_YEAR), key=repr)
+        if unknown:
+            raise ValueError(
+                f"kinds_in_record: only kinds of KINDS_OF_YEAR {KINDS_OF_YEAR}, "
+                f"got {unknown}"
+            )
+        in_record = tuple(k for k in KINDS_OF_YEAR if k in given)
+    not_in_record = tuple(k for k in KINDS_OF_YEAR if k not in in_record)
+    # PROPOSED (S-028 code review): a kind with no year in the record has no
+    # soil-loss level, so a value there contradicts the caller.
+    with_value = [k for k in not_in_record if by_kind[k].value is not None]
+    if with_value:
+        raise ValueError(
+            f"kinds_in_record: the kind of year {', '.join(with_value)} is left "
+            "out (no year in the record) but its soil-loss level has a value"
+        )
+    left_out = (
+        "; left out, no year in the record: " + ", ".join(not_in_record)
+        if not_in_record
+        else ""
+    )
 
     if limit.value is None:
         # The contract (C3.1) makes a missing value carry its missing part; a
@@ -180,10 +242,15 @@ def assess_limit(
             limit=None,
             unit=UNIT_SOIL_LOSS_ANNUAL,
             on_average=unresolved,
-            every_kind=unresolved,
+            every_kind=(
+                replace(unresolved, detail=unresolved.detail + left_out)
+                if left_out
+                else unresolved
+            ),
             by_kind={kind: unresolved for kind in KINDS_OF_YEAR},
             kinds_not_met=(),
-            kinds_not_resolved=KINDS_OF_YEAR,
+            kinds_not_resolved=in_record,
+            kinds_not_in_record=not_in_record,
         )
 
     declared = limit.value
@@ -192,11 +259,16 @@ def assess_limit(
         kind: _check_level(by_kind[kind], declared, f"in the {kind} kind of year")
         for kind in KINDS_OF_YEAR
     }
-    not_met = tuple(k for k in KINDS_OF_YEAR if checks[k].verdict == "does_not_meet")
-    not_resolved = tuple(
-        k for k in KINDS_OF_YEAR if checks[k].verdict == "not_resolved"
-    )
-    if not_met:
+    not_met = tuple(k for k in in_record if checks[k].verdict == "does_not_meet")
+    not_resolved = tuple(k for k in in_record if checks[k].verdict == "not_resolved")
+    if not in_record:
+        every_kind = LimitCheck(
+            "not_resolved",
+            "NO_COVERAGE",
+            "no kind of year is in the record, so the limit in every kind of "
+            "year is not resolved" + left_out,
+        )
+    elif not_met:
         # PROPOSED: one failing kind is enough, even if another is not resolved.
         every_kind = _DOES_NOT_MEET
     elif not_resolved:
@@ -206,7 +278,8 @@ def assess_limit(
             "the limit is not resolved in the kind of year "
             + ", ".join(not_resolved)
             + ": "
-            + "; ".join(checks[k].detail for k in not_resolved),
+            + "; ".join(checks[k].detail for k in not_resolved)
+            + left_out,
         )
     else:
         every_kind = _MEETS
@@ -218,4 +291,5 @@ def assess_limit(
         by_kind=checks,
         kinds_not_met=not_met,
         kinds_not_resolved=not_resolved,
+        kinds_not_in_record=not_in_record,
     )

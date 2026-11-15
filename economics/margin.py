@@ -74,7 +74,11 @@ def _missing(reason: ReasonCode, detail: str) -> MarginResult:
 def _describe_absent(crop_id: str, member: str, kind: str, value: Value) -> str:
     """The detail of one missing input, naming the crop, member, kind and reason."""
     # The contract (C3.1) guarantees a missing value carries its missing part.
-    assert value.missing is not None
+    if value.missing is None:
+        raise ValueError(
+            f"crop_id {crop_id!r}: {member} in the {kind} kind of year is missing "
+            "without a missing part with its reason (C3.1)"
+        )
     text = (
         f"crop_id {crop_id!r}: {member} in the {kind} kind of year is missing "
         f"{value.missing.reason}"
