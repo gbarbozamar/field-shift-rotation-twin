@@ -2371,6 +2371,62 @@ def test_the_refill_is_the_infiltration_not_the_precipitation(
     assert start.above == pytest.approx(above - expected_refill)
 
 
+def test_a_fallow_day_that_starts_exactly_at_a_total_equal_to_rew_evaporates_nothing(
+    monkeypatch,
+):
+    # D185: "while the depletion is at or above the reduced total, Kr is
+    # zero". A fully covered fallow with a PLACEHOLDER reduction that leaves
+    # the reduced total equal to REW (D110: "REW not above TEW"), and an
+    # initial depletion exactly at that total, with no part above it: the
+    # first day (dry) starts exactly at the total, the stage-1 rule of the step
+    # reports a reduction coefficient of one there, and neither the layer nor
+    # the column evaporates. Runs of this shape differ from the chain before
+    # D185, whose column took the Ke of the step: shown at the end.
+    full = 1.0  # one, structurally: the whole surface is covered
+    reduction = 0.0555  # PLACEHOLDER: a full cover leaves the reduced total at REW
+    assert mulched(full, reduction) == pytest.approx(
+        PLACEHOLDER_SITE["readily_evaporable_water"]
+    )
+    records = {
+        ("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", full),
+        ("mulch_total_evaporable_water_reduction", None): site_record(
+            "mulch_total_evaporable_water_reduction", reduction
+        ),
+    }
+    # The reduced total exactly as the chain computes it, read from its step.
+    given = spy_surface_layer(monkeypatch)
+    chain(parameters=catalogue_with(records))
+    first_day = several_full_years()[0]
+    total = given[first_day][2]["total_evaporable_water"]
+    assert given[first_day][2]["readily_evaporable_water"] == total
+    parameters = catalogue_with(
+        records | {("initial_depletion", None): site_record("initial_depletion", total)}
+    )
+    given.clear()
+    first, *_ = chain(parameters=parameters)
+    assert first.date == first_day and first.precipitation == 0
+    depletion_start, _, constants = given[first_day]
+    assert constants["total_evaporable_water"] == total
+    assert depletion_start == total
+    layer = first.surface_layer
+    assert layer.reduction_coefficient == 1.0
+    assert layer.evaporation_coefficient > 0
+    assert layer.evaporation == 0
+    assert first.balance.evaporation == 0
+    assert first.surface_depletion_carried == total
+    for item in run(parameters=parameters):
+        assert_computed(item)
+    # Before D185 the column took the Ke of the step on that day.
+    monkeypatch.setattr(
+        module,
+        "_column_evaporation_coefficient",
+        lambda surface, start, total, no_crop: surface.evaporation_coefficient,
+    )
+    before, *_ = chain(parameters=parameters)
+    assert before.surface_layer.evaporation == 0
+    assert before.balance.evaporation > 0
+
+
 @pytest.mark.parametrize(
     ("label", "value", "why"),
     [
