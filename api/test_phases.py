@@ -696,10 +696,24 @@ def test_the_engines_of_the_repository_answer_one_scenario_per_phase(kind):
             assert item["result_missing"] is None, item["result_missing"]
             ResultsPerRotation.model_validate(item["result"])
             RotationCalendar.model_validate(item["calendar"])
+        elif _lane_l1_phase_functions():
+            # Lane L1's phase_calendar (#221) flags a crossing component (its
+            # crossing date missing, D133) instead of refusing the phase: the
+            # phase is computed on the flagged calendar, and the runner names
+            # the case as OPEN in the phase's calendar module.
+            RotationCalendar.model_validate(item["calendar"])
+            calendar_module = next(m for m in item["modules"] if m["id"] == "calendar")
+            assert "OPEN" in (calendar_module.get("detail") or "")
         else:
+            # The runner's own transition copy refuses the phase (D133).
             assert item["result"] is None and item["calendar"] is None
             assert item["result_missing"]["reason"] == refused
             assert item["result_missing"]["detail"].startswith("OPEN")
+
+
+def _lane_l1_phase_functions() -> bool:
+    found = discover_engine_functions()
+    return found.phase_calendar is not None and found.list_phases is not None
 
 
 # --- the moved calendar repeated over the record (engine/calendar/repeat.py) --
