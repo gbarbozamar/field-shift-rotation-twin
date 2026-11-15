@@ -35,7 +35,9 @@ What it does, in order:
    the phase-1 result by kind of year (``soil_loss_means``). The record is
    the one ``KINDS_OF_YEAR_RECORD_FILE`` names, read once at start-up
    (``api/config.py``); without it every kind of year is missing
-   ``NOT_AVAILABLE`` (``NO_RECORD``) and its source row is ``unavailable``.
+   ``NOT_AVAILABLE`` (``economics.plant.RECORD_NOT_CONFIGURED``) and its
+   source row is ``unavailable`` with ``NO_RECORD``, which names the
+   variable.
 5. ``answer_plant`` (through ``assemble_answer``) gives the margins, the
    limit checks, the decision and the tipping price from the runs and the
    request, through the pure functions of ``economics/``.
@@ -146,6 +148,10 @@ RECORD_CONTRACT = "kinds_of_year_record"
 RECORD_STATE = "transcribed"
 # PROPOSED (S-031): the id of the record's source row when there is no record
 # id to name (no record configured, or an injected record without ``id``).
+# Fix round 1 (F2): the same text and rule as ``economics.plant.NO_RECORD_ID``
+# and ``economics.plant.record_id`` (the answer's kinds_of_year.source), which
+# this module may not import when it is loaded; api/test_plant_layer.py
+# checks that the two agree.
 NO_RECORD_ID = RECORD_CONTRACT
 # PROPOSED (S-031): why there is no record. It names the variable a person
 # sets to switch the record on (api/config.py), never a submitted value.
@@ -318,8 +324,11 @@ def _record_source(record: Mapping[str, Any] | None) -> dict[str, Any]:
     (S-031, point 7). A record: state ``RECORD_STATE`` (point 8).
     PROPOSED (S-031, F5): ``api/config.py`` refuses a record without ``id``
     or ``date_read`` at start-up; a record injected without them (tests)
-    gives a row whose id is ``NO_RECORD_ID`` and whose detail leaves out what
-    is absent, never "None" and never a ``KeyError``.
+    gives a row whose id is ``NO_RECORD_ID`` and whose detail leaves out the
+    date, never "None" and never a ``KeyError``.
+    PROPOSED (fix round 1, F7): the detail is ``transcribed record {id}``,
+    then ``, read on {date_read}`` when the record has it; no path, since any
+    path can be configured.
     """
     row: dict[str, Any] = {
         "id": NO_RECORD_ID,
@@ -334,18 +343,15 @@ def _record_source(record: Mapping[str, Any] | None) -> dict[str, Any]:
     }
     if record is None:
         return row
-    record_id = record.get("id")
+    value = record.get("id")
+    record_id = NO_RECORD_ID if value is None else str(value)
     date_read = record.get("date_read")
-    detail = (
-        "transcribed record"
-        if record_id is None
-        else f"transcribed record kinds_of_year/records/{record_id}.json"
-    )
+    detail = f"transcribed record {record_id}"
     if date_read is not None:
         detail = f"{detail}, read on {date_read}"
     return {
         **row,
-        "id": NO_RECORD_ID if record_id is None else str(record_id),
+        "id": record_id,
         "state": RECORD_STATE,
         "attribution": record.get("reference"),
         "missing_reason": None,
@@ -499,7 +505,6 @@ def make_plant_router(
                 why=why,
                 reason=reason,
                 record=kinds_of_year_record,
-                record_missing=NO_RECORD if kinds_of_year_record is None else None,
                 rain_stress=run.echo,
                 sources=sources,
                 example_data=example_data,

@@ -309,7 +309,9 @@ In order:
 2. **Sources.** Climate and soil and slope are asked for once for the site,
    as `POST /api/decisions/run` does. `sources` lists them, then the ONI
    record (PROPOSED, S-031: state `transcribed`, a state of the plant
-   contract's `SourceOut` only, OPEN 5 of the contract; with no record
+   contract's `SourceOut` only, OPEN 5 of the contract, detail
+   `transcribed record <id>, read on <date_read>` with no path, the date
+   left out when the record has none, fix round 1 F7; with no record
    configured, state `unavailable`, `NOT_AVAILABLE`, detail `NO_RECORD` of
    `api/plant.py`, which names `KINDS_OF_YEAR_RECORD_FILE`).
 3. **Engines.** Each rotation runs once through the `RotationEngines`, with
@@ -466,7 +468,7 @@ only its path and the reason.
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
-| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on, such as `kinds_of_year/records/oni_v6.json`; read once at start-up with `kinds_of_year.load_record` and passed to `create_app` | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
+| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on, such as `kinds_of_year/records/oni_v6.json`; read once at start-up (parsed with `json.loads`, then classified once by `kinds_of_year.classify_agricultural_years` as a check) and passed to `create_app`. `compose.yaml` sets it to `kinds_of_year/records/oni_v6.json` for the local stack only (PROPOSED, R24; start with `KINDS_OF_YEAR_RECORD_FILE=` to run without it) | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -503,9 +505,13 @@ on `httpx.MockTransport`.
   of the fields the plant layer reads (`id`, `reference`, `date_read`,
   `threshold`, `min_consecutive_seasons`, `seasons`: `RECORD_FIELDS`), has
   `id`, `reference` or `date_read` that is not a non-blank text, or has
-  `seasons` that is not a non-empty list. Checked once, here, never per
-  request (F9 of review-whole-4); the values of the seasons are checked by
-  the classification, as before. PROPOSED.
+  `seasons` that is not a non-empty list, or is refused by
+  `kinds_of_year.classify_agricultural_years` run once over every
+  agricultural year its seasons name (a threshold or run length of the wrong
+  type, a season row that is not a row, an unknown season, a duplicated
+  row; fix round 1, F3), or `kinds_of_year` cannot be imported (F4, the
+  cause chained). Checked once, here, never per request (F9 of
+  review-whole-4). PROPOSED.
 - The parameter catalogue in `params/records/` has any problem of
   `load_folder` or `check_catalogue` (not a variable; see "The parameter
   catalogue" under the engine runner). An empty catalogue starts.
@@ -542,7 +548,7 @@ SOIL_SLOPE_EXAMPLE_FILE=<the soil-and-slope example> \
 uv run uvicorn api.main:app --reload
 ```
 
-**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on.
+**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on, except `KINDS_OF_YEAR_RECORD_FILE`, which the local stack sets to the committed record (PROPOSED, R24; the record still carries `UNSIGNED_AI_PRECHECK`).
 
 ## Interfaces and their implementations
 

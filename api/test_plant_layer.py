@@ -35,12 +35,15 @@ from api.config import (
 )
 from api.main import create_app
 from api.plant import NO_RECORD, RECORD_CONTRACT, RECORD_STATE, _record_source
+from api.plant import NO_RECORD_ID as API_NO_RECORD_ID
 from api.plant_layer import (
     NOT_BUILT_CONTRACT,
     DiscoveredPlantLayer,
 )
 from api.ports import Missing, PlantParts
 from contracts.plant_answer import PlantAnswer, PlantAnswerNotBuilt
+from economics.plant import NO_RECORD_ID as ECONOMICS_NO_RECORD_ID
+from economics.plant import RECORD_NOT_CONFIGURED, answer_plant
 from kinds_of_year import DEFAULT_RECORD, load_record
 
 ROOT = Path(__file__).parent.parent
@@ -242,7 +245,11 @@ def test_a4_without_a_record_a_plant_request_answers_with_every_kind_missing(
     for year in years:
         assert year["kind"] is None
         assert year["missing_reason"] == "NOT_AVAILABLE"
-        assert KINDS_OF_YEAR_RECORD_FILE in year["detail"]
+        # Fix round 1 (F6): the kind of year carries the sentence of
+        # economics/, which never names the variable; the record's source
+        # row (below) still names it.
+        assert year["detail"].startswith(RECORD_NOT_CONFIGURED)
+        assert KINDS_OF_YEAR_RECORD_FILE not in year["detail"]
     assert data["kinds_of_year"]["source"] is None
     assert set(data["kinds_of_year"]["counts"].values()) == {None}
     row = _record_row(data)
@@ -387,3 +394,110 @@ def test_a7_a_layer_that_returns_another_type_is_500():
     )
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+
+
+# --- fix round 1 of the review (PROPOSED) -------------------------------------------
+
+
+def _write_record(tmp_path: Path, record: Any) -> dict[str, str]:
+    path = tmp_path / "record.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    return {KINDS_OF_YEAR_RECORD_FILE: str(path)}
+
+
+def test_f2_an_injected_record_without_id_gives_an_answer_not_a_500():
+    record = load_record()
+    del record["id"]
+    data = plant_tests.answered(
+        plant_tests.client(kinds_of_year_record=record).post(
+            PLANT_ROUTE, json=plant_tests.REQUEST
+        )
+    )
+    plant_tests.checked(plant_tests.REQUEST, data)
+    # One rule for the id in economics/ and in api/: the answer's source and
+    # the record's source row name the record the same way.
+    assert ECONOMICS_NO_RECORD_ID == API_NO_RECORD_ID
+    assert data["kinds_of_year"]["source"] == API_NO_RECORD_ID
+    assert _record_row(data)["id"] == API_NO_RECORD_ID
+
+
+def test_f3_a_threshold_that_is_text_is_refused_at_start_up(tmp_path):
+    record = load_record()
+    record["threshold"] = str(record["threshold"])
+    error = _refused(_write_record(tmp_path, record))
+    assert "threshold" in str(error)
+
+
+def test_f3_season_rows_that_are_not_rows_are_refused_at_start_up(tmp_path):
+    record = load_record()
+    record["seasons"] = [1, 2]
+    _refused(_write_record(tmp_path, record))
+
+
+def test_f3_a_season_row_the_classification_refuses_is_refused_at_start_up(tmp_path):
+    record = load_record()
+    record["seasons"] = [*record["seasons"], dict(record["seasons"][0])]
+    error = _refused(_write_record(tmp_path, record))
+    assert "duplicated" in str(error)
+
+
+@pytest.mark.parametrize("broken", ["absent", "raises"])
+def test_f4_a_kinds_of_year_that_cannot_be_imported_is_a_config_error(
+    monkeypatch, broken
+):
+    for name in list(sys.modules):
+        if name == "kinds_of_year" or name.startswith("kinds_of_year."):
+            monkeypatch.delitem(sys.modules, name)
+    if broken == "absent":
+        # None in sys.modules: the import raises ImportError.
+        monkeypatch.setitem(sys.modules, "kinds_of_year", None)
+    else:
+        import builtins
+
+        real_import = builtins.__import__
+
+        def failing(name, *args, **kwargs):
+            if name == "kinds_of_year" or name.startswith("kinds_of_year."):
+                raise ImportError("PLACEHOLDER broken kinds_of_year")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", failing)
+    with pytest.raises(ConfigError) as caught:
+        load_config({KINDS_OF_YEAR_RECORD_FILE: str(DEFAULT_RECORD)})
+    assert KINDS_OF_YEAR_RECORD_FILE in str(caught.value)
+    assert isinstance(caught.value.__cause__, ImportError)
+
+
+def test_f5_the_file_is_read_once_and_not_through_load_record(monkeypatch):
+    import kinds_of_year
+
+    def never(*args, **kwargs):
+        raise AssertionError("load_record is not called by load_config")
+
+    monkeypatch.setattr(kinds_of_year, "load_record", never)
+    config = load_config({KINDS_OF_YEAR_RECORD_FILE: str(DEFAULT_RECORD)})
+    assert config.kinds_of_year_record == load_record(DEFAULT_RECORD)
+
+
+def test_f5_a_file_that_is_not_utf8_is_refused(tmp_path):
+    path = tmp_path / "record.json"
+    path.write_bytes(b"\xff\xfe\x00")
+    _refused({KINDS_OF_YEAR_RECORD_FILE: str(path)})
+
+
+def test_f6_answer_plant_takes_no_record_missing():
+    import inspect
+
+    assert "record_missing" not in inspect.signature(answer_plant).parameters
+    assert KINDS_OF_YEAR_RECORD_FILE not in RECORD_NOT_CONFIGURED
+
+
+def test_f7_the_record_row_names_the_record_and_its_date_never_a_path():
+    record = load_record()
+    row = _record_source(record)
+    expected = "transcribed record " + record["id"] + ", read on "
+    assert row["detail"] == expected + record["date_read"]
+    assert "/" not in row["detail"]
+    assert ".json" not in row["detail"]
+    del record["date_read"]
+    assert _record_source(record)["detail"] == "transcribed record " + record["id"]

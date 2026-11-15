@@ -28,10 +28,12 @@ empty catalogue is not a problem (Q3, D46, D56 of issue #77).
 S-031) names the ONI record the plant route classifies the kinds of year on,
 such as ``kinds_of_year/records/oni_v6.json``. Unset or blank: no record (the
 plant answer gives every kind of year missing ``NOT_AVAILABLE``), and
-``kinds_of_year`` is not imported. Set: the file is read once, here, with
-``kinds_of_year.load_record``, and the fields the plant layer reads are
-checked (``RECORD_FIELDS``); a file that does not exist, is not JSON, is not
-an object or lacks one of them is a ``ConfigError`` naming the variable.
+``kinds_of_year`` is not imported. Set: the file is read once, here, the
+fields the plant layer reads are checked (``RECORD_FIELDS``) and the record
+is classified once by ``kinds_of_year.classify_agricultural_years``; a file
+that does not exist, is not JSON, is not an object, lacks one of them or is
+refused by the classification, or a ``kinds_of_year`` that cannot be
+imported, is a ``ConfigError`` naming the variable.
 ``build_app`` passes the record to ``create_app``; it is never read again on
 a request.
 
@@ -294,40 +296,80 @@ def _soil_tables(environ: Mapping[str, str]) -> SoilTablesConfig | None:
 
 # PROPOSED (S-031): the fields of the ONI record the plant layer reads (the
 # source row and the kinds of year: ``economics.plant`` and
-# ``kinds_of_year.classify``). kinds_of_year/ has no public check of a whole
-# record, so their presence is checked here; the values of the seasons are
-# checked by the classification on each request, as before.
+# ``kinds_of_year.classify``). Their presence is checked here; then the
+# record is read once the way the classification reads it
+# (``_check_by_classifying``), so a rule or a season row the classification
+# would refuse stops the server here, not on a request (fix round 1, F3).
 RECORD_TEXT_FIELDS = ("id", "reference", "date_read")
 RECORD_FIELDS = (*RECORD_TEXT_FIELDS, "threshold", "min_consecutive_seasons", "seasons")
+# PROPOSED (fix round 1, F3): the start month the start-up check classifies
+# on. Any month reads the same rule and the same season rows; January (C5.1:
+# January = 1) is only the first.
+RECORD_CHECK_START_MONTH = 1
+
+
+def _check_by_classifying(path: Path, record: dict[str, Any]) -> None:
+    """Classify every agricultural year the record's seasons name. PROPOSED (F3).
+
+    ``kinds_of_year.classify_agricultural_years`` checks the threshold, the
+    run length and every season row before it classifies; a ``ValueError``,
+    ``TypeError`` or ``KeyError`` it raises is a ``ConfigError`` naming
+    ``KINDS_OF_YEAR_RECORD_FILE``. ``kinds_of_year`` absent or failing to
+    import is a ``ConfigError`` too (F4), its cause chained.
+    """
+    try:
+        from kinds_of_year import classify_agricultural_years
+    except ImportError as error:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE} is set but the kinds_of_year package "
+            "that reads the record cannot be imported"
+        ) from error
+    years = [
+        row["year"]
+        for row in record["seasons"]
+        if isinstance(row, Mapping)
+        and isinstance(row.get("year"), int)
+        and not isinstance(row.get("year"), bool)
+    ]
+    if not years:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE}: in the record in '{path}', no row of "
+            "seasons has an integer year"
+        )
+    try:
+        classify_agricultural_years(
+            record, min(years), max(years), RECORD_CHECK_START_MONTH
+        )
+    except (ValueError, TypeError, KeyError) as error:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE}: the record in '{path}' is rejected by "
+            f"the classification of the kinds of year: {error}"
+        ) from None
 
 
 def _kinds_of_year_record(environ: Mapping[str, str]) -> Mapping[str, Any] | None:
     """``KINDS_OF_YEAR_RECORD_FILE``: the ONI record, read once. PROPOSED (S-031).
 
     Unset or blank: ``None``, and ``kinds_of_year`` is not imported. Set: the
-    file must exist, ``kinds_of_year.load_record(path)`` must read it as a
-    JSON object, and the fields of ``RECORD_FIELDS`` must be there (the
-    three of ``RECORD_TEXT_FIELDS`` non-blank text, ``seasons`` a non-empty
-    list); otherwise ``ConfigError`` naming the variable, and the server does
-    not start (F9 of review-whole-4: checked here, never per request).
+    file must exist and be read as UTF-8 text holding a JSON object, the
+    fields of ``RECORD_FIELDS`` must be there (the three of
+    ``RECORD_TEXT_FIELDS`` non-blank text, ``seasons`` a non-empty list), and
+    the classification of the kinds of year must accept it
+    (``_check_by_classifying``); otherwise ``ConfigError`` naming the
+    variable, and the server does not start (F9 of review-whole-4: checked
+    here, never per request).
     """
     value = _value(environ, KINDS_OF_YEAR_RECORD_FILE)
     if value is None:
         return None
-    from kinds_of_year import load_record
-
     path = Path(value)
-    _read_file(KINDS_OF_YEAR_RECORD_FILE, path)
+    text = _read_file(KINDS_OF_YEAR_RECORD_FILE, path)
     try:
-        record: Any = load_record(path)
+        record: Any = json.loads(text)
     except json.JSONDecodeError as error:
         raise ConfigError(
             f"{KINDS_OF_YEAR_RECORD_FILE}: the file '{path}' is not valid JSON "
             f"(line {error.lineno}, column {error.colno})"
-        ) from None
-    except (OSError, UnicodeDecodeError):
-        raise ConfigError(
-            f"{KINDS_OF_YEAR_RECORD_FILE}: the file '{path}' cannot be read"
         ) from None
     if not isinstance(record, dict):
         raise ConfigError(
@@ -355,6 +397,7 @@ def _kinds_of_year_record(environ: Mapping[str, str]) -> Mapping[str, Any] | Non
             f"{KINDS_OF_YEAR_RECORD_FILE}: in the record in '{path}', seasons is "
             "not a non-empty list"
         )
+    _check_by_classifying(path, record)
     return record
 
 
