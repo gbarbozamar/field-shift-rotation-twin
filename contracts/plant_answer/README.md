@@ -10,6 +10,7 @@ This folder holds the Pydantic models of the request and of the answer of "What 
 |---|---|---|---|
 | Plant request | Interface (what the user declares) → the route | `plant_answer.PlantRequest` | `examples/PLACEHOLDER_plant_request.json` |
 | Plant answer | The route → the interface | `plant_answer.PlantAnswer` | `examples/PLACEHOLDER_plant_answer.json` |
+| Plant answer not built (PROPOSED, S-031) | The route → the interface | `plant_answer.PlantAnswerNotBuilt` | `examples_not_built/PLACEHOLDER_plant_answer_not_built.json` |
 
 Acceptance test, from the repository root:
 
@@ -73,7 +74,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 | `rain_stress` | applied form, missing form, or null | `RainStress` / `RainStressMissing`; null when no factor was asked |
 | `erosivity` | `"mean_annual"` | Which erosivity the soil-loss run used (S-026 may add `"per_year"`) |
 | `kinds_of_year` | `source`, `start_month`, `years`, `counts` | `KindOfYear` per year and `count_kinds` |
-| `sources` | list | The shape of `SourceOut` of `api/rotations.py` |
+| `sources` | list | The shape of `SourceOut` of `api/rotations.py`, plus the state `"transcribed"` (PROPOSED, S-031) |
 
 `PlantOption`: `rotation_id`; `state` (`"chosen"`, `"meets"`, `"does_not_meet"`, `"not_resolved"`); `margin` (`average`, `el_nino`, `neutral`, `la_nina`, each `value`, `unit` `USD ha-1 yr-1`, `reason`, `detail`: `MarginResult`); `soil_loss` (the same four keys, each `value`, `unit` `t ha-1 yr-1`, `n_years`, `ag_years`, `reason`, `detail`, `sources`, `assumption`: `KindMean`; `average` is `MeansByKind.record`); `limit` (`limit`, `unit`, `on_average`, `every_kind`, `by_kind`, `kinds_not_met`, `kinds_not_resolved`, `kinds_not_in_record`: `LimitAssessment`, each check `verdict`, `reason`, `detail`: `LimitCheck`); `limit_check` (the check of the strictness used).
 
@@ -81,7 +82,7 @@ Tipping point (`up`, `down`): `direction`, `price`, `takes_over`, `answer_after`
 
 Rain stress, applied form: `factor`, `declared` (the declared `Value`, unchanged), `detail`, `label` (`"stress test"`), `applied`. Missing form: `missing`, `detail`, `label`.
 
-Kinds of year: `source` (the record id, `oni_v6`), `start_month`, `years` (each `ag_year`, `kind`, `missing_reason`, `detail`, `season`, `season_year`), `counts` (`el_nino`, `neutral`, `la_nina`: every count, or every count null when a year has no kind).
+Kinds of year: `source` (the record id, `oni_v6`; PROPOSED, S-031: null when no record is configured, allowed only when every year is missing), `start_month`, `years` (each `ag_year`, `kind`, `missing_reason`, `detail`, `season`, `season_year`), `counts` (`el_nino`, `neutral`, `la_nina`: every count, or every count null when a year has no kind).
 
 A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its unit, or null with a reason code; never both, and never a zero standing for missing. Whether a `detail` must come with the reason follows the dataclass mirrored (PROPOSED, fix round 2): a margin (`MarginResult`) and a kind of year (`KindOfYear`) may carry a reason without a detail, and carry no detail when present; `KindMean` sets no rule on its detail; a limit check, a limit cost and a tipping point carry the reason and the detail together, as their dataclasses do. The answer does not reuse `Value` for these items because the dataclasses it mirrors carry no provenance label or range (PROPOSED).
 
@@ -174,6 +175,8 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `answer-limit-kind-not-in-the-record-with-a-resolved-check` | A kind not in the record has a resolved check |
 | `answer-limit-missing-with-a-resolved-check` | The limit is null and checks are resolved |
 | `answer-limit-every-kind-not-the-kinds` | `every_kind` meets while a kind does not meet |
+| `answer-kinds-source-null-with-a-classified-year` | `kinds_of_year.source` is null while a year has a kind (PROPOSED, S-031) |
+| `answer-source-state-not-in-the-list` | A source row has a state outside the list (PROPOSED, S-031) |
 
 ### Rejected: an answer to another request (`check_answer_against_request`)
 
@@ -200,6 +203,8 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `accepted-answer-without-a-rain-stress-test` | No factor asked, no echo |
 | `accepted-answer-rain-stress-factor-missing` | The factor is missing `NOT_DECLARED`, echoed in the missing form |
 | `accepted-answer-not-example-data` | `example_data` is false (a real answer) |
+| `accepted-answer-without-a-record` | No record configured: `kinds_of_year.source` null, every year missing `NOT_AVAILABLE`, every count null, the record's source row `unavailable` (PROPOSED, S-031) |
+| `accepted-answer-record-source-cached` | The record's source row in the state `"cached"` the route wrote before S-031 |
 
 ### Checked without a case of their own
 
@@ -215,6 +220,16 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 2. **Currency.** `USD` only, as in `contracts/economic_facts/` (its OPEN question 2).
 3. **Dry-year label.** No kind of year is named "dry" here; the screen labels kinds.
 4. **Per-year erosivity.** `erosivity` is `"mean_annual"` only; S-026 may add `"per_year"`.
-5. **Source state of a transcribed record.** The ONI record is listed with state `"cached"` (PROPOSED): `SourceOut` has no state for a record read from the repository.
+5. **Source state of a transcribed record.** PROPOSED (S-031): the ONI record is listed with the state `"transcribed"`, a state of this contract's `SourceOut` only (`SourceOut` of `api/rotations.py` keeps `fresh`, `cached`, `unavailable`, `example`); it was `"cached"` before, which says that a first response of a service was kept. With no record configured (`KINDS_OF_YEAR_RECORD_FILE` unset, `api/config.py`) its row is `"unavailable"`, `NOT_AVAILABLE`. Whether `api/rotations.py` should share the state is OPEN.
 6. **One start month.** `kinds_of_year.start_month` is one month for the whole answer; rotations with different start months are not handled yet.
 7. **Rotation years.** How the route turns a `RotationDefinition` into the crops of each agricultural year for `compute_rotation_margin` is the route's (S-018), not this contract's.
+
+## The answer when the plant layer is not built (PROPOSED, S-031)
+
+While the plant layer (`economics.plant.answer_plant` or this contract) is not built, `POST /api/plant/run` answers `200` with exactly two members, written by `api/plant_layer.py` as a dict:
+
+```json
+{"contract": "plant_answer_not_built", "answer_missing": {"reason": "NOT_AVAILABLE", "detail": "<one sentence naming what is absent>"}}
+```
+
+`PlantAnswerNotBuilt` loads it: `contract` is `"plant_answer_not_built"`, `answer_missing.reason` is `NOT_AVAILABLE` only (C3.2: the module that would produce the value is not built or not enabled), `answer_missing.detail` a non-blank text that never repeats a submitted value; no other member. Its example sits in `examples_not_built/`, since the test of this folder checks that `examples/` holds exactly the request and the answer. It carries no `example_data` member: it holds no value.

@@ -306,6 +306,10 @@ export const strings = {
   // read leaves the control without a factor.
   'plant.service.rain_next_answer': 'Applies to the next answer from the service; the saved example answers have no stress test.',
   'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
+  // PROPOSED (S-031): the service answered that its plant layer is not built
+  // (the body plant_answer_not_built); the detail of the service is shown as data.
+  'plant.service.not_built_heading': 'The service has no plant answer yet',
+  'plant.service.not_built_what': 'Answer from the service',
 } as const
 
 /**

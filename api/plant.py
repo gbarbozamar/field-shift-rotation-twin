@@ -6,6 +6,12 @@ decisions). One field, three to five rotations. The body is a
 
 What it does, in order:
 
+0. PROPOSED (unit ``l2/plant-layer-by-name``, S-031, decision R24): the plant
+   layer is found by name (``api/plant_layer.py``, ``DiscoveredPlantLayer``
+   unless ``create_app`` was given another ``PlantLayer``). Not built: ``200``
+   with exactly ``{"contract": "plant_answer_not_built", "answer_missing":
+   {"reason": "NOT_AVAILABLE", "detail": ...}}``, and nothing is called. A
+   plant layer that fails to import is ``500`` ``INTERNAL_ERROR`` here only.
 1. The body is loaded into ``PlantRequest``. A body that fails it is ``422``
    with the one error shape of ``api/errors.py``: ``ROTATION_INVALID`` when
    every problem lies inside one rotation item, ``SITE_INVALID`` when every
@@ -21,23 +27,30 @@ What it does, in order:
    rain-stress factor, the engines are rebuilt on the catalogue whose
    erosivity is scaled (``api/rain_stress.py``), when the app has a way to
    rebuild them.
-4. The kinds of year are the whole agricultural years of the configured
-   period (``api.carbon_forcing.whole_ag_years``, read here from the
-   settings) classified on the ONI record by ``economics.plant.classify_years``.
-   The soil loss per agricultural year of the phase-1 result is averaged by
-   kind of year in ``economics.plant`` (``soil_loss_means``).
-5. ``economics.plant.assemble_answer`` gives the margins, the limit checks,
-   the decision and the tipping price from the runs and the request, through
-   the pure functions of ``economics/``.
+4. The whole agricultural years of the configured period
+   (``api.carbon_forcing.whole_ag_years``, read here from the settings,
+   ``record_years_of``) and the ONI record go to the entry function
+   ``economics.plant.answer_plant`` (S-031), which classifies them
+   (``classify_years``) and averages the soil loss per agricultural year of
+   the phase-1 result by kind of year (``soil_loss_means``). The record is
+   the one ``KINDS_OF_YEAR_RECORD_FILE`` names, read once at start-up
+   (``api/config.py``); without it every kind of year is missing
+   ``NOT_AVAILABLE`` (``NO_RECORD``) and its source row is ``unavailable``.
+5. ``answer_plant`` (through ``assemble_answer``) gives the margins, the
+   limit checks, the decision and the tipping price from the runs and the
+   request, through the pure functions of ``economics/``.
 6. The answer is checked with ``check_answer_against_request`` (inside
-   ``assemble_answer``); a failure is a defect of the route (``500``).
+   ``assemble_answer``), and here to be a ``PlantAnswer``; a failure is a
+   defect (``500``).
 
 The route computes no number itself and decides no rule of which crops and
 years count (S-030, point 2 of the platform review of PR 310): every number of
 the answer comes from a function of ``economics/`` or ``kinds_of_year/``, or
 is copied from an engine result or from the request. The names that moved to
-``economics.plant`` are imported back here, so ``from api.plant import ...``
-keeps working. What an engine raises is a defect: ``500`` ``INTERNAL_ERROR``,
+``economics.plant`` are imported back here on first use (module
+``__getattr__``), so ``from api.plant import ...`` keeps working while this
+module imports nothing of ``economics/``, ``kinds_of_year/`` or
+``contracts.plant_answer`` when it is imported (S-031). What an engine raises is a defect: ``500`` ``INTERNAL_ERROR``,
 as on the other routes.
 """
 
@@ -47,7 +60,7 @@ import dataclasses
 import json
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
@@ -57,8 +70,12 @@ from adapters.ports import ClimateSource
 from api.carbon_forcing import whole_ag_years
 from api.decisions import example_data_of
 from api.errors import ErrorCode, error_response, join_path
+from api.plant_layer import DiscoveredPlantLayer, not_built_body
 from api.ports import (
     ErrorDetail,
+    Missing,
+    PlantLayer,
+    PlantParts,
     RotationEngines,
     RotationValidator,
     RunSettings,
@@ -85,25 +102,33 @@ from api.rotations import (
 from api.rotations import (
     PERIOD_NOT_CONFIGURED_REASON as PERIOD_REASON,
 )
-from contracts.plant_answer import PlantRequest
-from contracts.rotation_definition import RotationDefinition
 
-# Moved to economics.plant (S-030): the names the route uses, and the names
-# imported back so that ``from api.plant import ...`` keeps working.
-from economics.plant import (  # noqa: F401
-    Classified,
-    _todays_price,
-    assemble_answer,
-    cycle_years,
-    plain,
-    soil_loss_means,
+if TYPE_CHECKING:
+    from contracts.plant_answer import PlantRequest
+
+# Moved to economics.plant (S-030). PROPOSED (S-031): imported back lazily,
+# on first use, by ``__getattr__`` below, so ``from api.plant import ...``
+# keeps working while this module imports nothing of economics/ when the app
+# starts (decision R24).
+_FROM_ECONOMICS = frozenset(
+    {
+        "Classified",
+        "_todays_price",
+        "assemble_answer",
+        "cycle_years",
+        "plain",
+        "soil_loss_means",
+    }
 )
 
-# The same style; ruff's import sorting keeps an aliased name in its own
-# statement. The alias frees ``classify_years`` for the wrapper below.
-from economics.plant import (
-    classify_years as classify_record_years,
-)
+
+def __getattr__(name: str) -> Any:
+    if name in _FROM_ECONOMICS:
+        import economics.plant
+
+        return getattr(economics.plant, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +137,22 @@ ROUTE = "/plant/run"
 # Builds the engines for a stressed run from a parameter catalogue. PROPOSED.
 EnginesFactory = Callable[[dict[str, dict]], RotationEngines]
 
-# PROPOSED: the source row of the ONI record (contract, state; OPEN 5 of
-# contracts/plant_answer/README.md: SourceOut has no state for a record read
-# from the repository).
+# PROPOSED: the source row of the ONI record (contract, state). PROPOSED
+# (S-031, point 8 of the brief): the state of a record transcribed into the
+# repository is "transcribed", a state of the plant contract's SourceOut only
+# (contracts/plant_answer/README.md); it was "cached" before, which says that
+# a first response of a service was kept.
 RECORD_CONTRACT = "kinds_of_year_record"
-RECORD_STATE = "cached"
+RECORD_STATE = "transcribed"
+# PROPOSED (S-031): the id of the record's source row when there is no record
+# id to name (no record configured, or an injected record without ``id``).
+NO_RECORD_ID = RECORD_CONTRACT
+# PROPOSED (S-031): why there is no record. It names the variable a person
+# sets to switch the record on (api/config.py), never a submitted value.
+NO_RECORD = (
+    "the kinds-of-year record is not configured (KINDS_OF_YEAR_RECORD_FILE is "
+    "not set), so no agricultural year is classified as a kind of year"
+)
 
 # Shown in place of an error text that repeats a submitted value (as
 # api/rotation_validator.py does for one rotation). PROPOSED.
@@ -192,6 +228,7 @@ def _safe_loc(loc: Sequence[Any], error_type: str) -> tuple[Any, ...]:
 
 def request_problems(
     body: Mapping[str, Any],
+    model: Any = None,
 ) -> tuple[PlantRequest | None, ErrorCode | None, list[ErrorDetail]]:
     """The body loaded into ``PlantRequest``, or the code and details of its errors.
 
@@ -200,15 +237,22 @@ def request_problems(
     ``REDACTED_MESSAGE``; the path and the code still say where and what. A
     key that is not a field name of the model at that point is never written
     in the path (``_safe_loc``).
+
+    PROPOSED (S-031): ``model`` is the request model the plant layer gave
+    (``PlantParts.request_model``); ``None`` imports
+    ``contracts.plant_answer.PlantRequest`` here, on the call, never when
+    this module is imported.
     """
+    if model is None:
+        from contracts.plant_answer import PlantRequest as model
     try:
-        request = PlantRequest.model_validate_json(json.dumps(body))
+        request = model.model_validate_json(json.dumps(body))
     except ValidationError as error:
         errors = error.errors(
             include_url=False, include_context=False, include_input=False
         )
         submitted = submitted_texts(body)
-        known = field_names(PlantRequest)
+        known = field_names(model)
         details = [
             ErrorDetail(
                 path=join_path(_safe_loc(item["loc"], str(item["type"]))),
@@ -235,60 +279,77 @@ def _under_rotation(index: int, problem: ErrorDetail) -> ErrorDetail:
 # --- years of the record -----------------------------------------------------
 
 
-def classify_years(
-    record: Mapping[str, Any],
-    settings: RunSettings,
-    start_month: int,
-    rotations: Sequence[RotationDefinition],
-) -> Classified:
+RecordYears = tuple[tuple[int, int] | None, str, str | None]
+
+
+def record_years_of(settings: RunSettings, start_month: int) -> RecordYears:
     """PROPOSED: the whole agricultural years of the settings period
-    (``api.carbon_forcing.whole_ag_years``), classified on the ONI record.
+    (``api.carbon_forcing.whole_ag_years``), or ``None``, with the text of
+    why they are not known and its reason code (C3.2) when there is one.
 
     Without a period, or with a period that holds no whole agricultural year,
-    the record's years are not known; the answer still lists years (the
-    contract asks for at least one), the agricultural years of every declared
-    date of the rotations, each missing ``NOT_AVAILABLE`` with a detail that
-    says they are not years of the record.
+    the record's years are not known; ``economics.plant.classify_years`` then
+    lists the agricultural years of every declared date of the rotations,
+    each missing ``NOT_AVAILABLE``.
 
     PROPOSED (S-030): this reads the period of the settings and picks the
-    text of why the years are not known; the classification itself is
-    ``economics.plant.classify_years``.
+    text of why the years are not known; the classification itself is in
+    ``economics.plant`` (S-031: called by ``answer_plant``).
 
     PROPOSED (S-034, F3): without a period the reason is the one
     ``api.rotations.get_climate`` gives an absent period (``PERIOD_REASON``),
     so the soil-loss means carry it, not ``NO_COVERAGE``.
     """
-    years = None
-    why = PERIOD_NOT_CONFIGURED
-    reason: str | None = PERIOD_REASON
     if settings.has_period:
         assert settings.start_date is not None and settings.end_date is not None
         years = whole_ag_years(start_month, settings.start_date, settings.end_date)
-        why = NO_WHOLE_YEAR
-        reason = None
-    return classify_record_years(
-        record, years, why, start_month, rotations, reason=reason
-    )
+        return years, NO_WHOLE_YEAR, None
+    return None, PERIOD_NOT_CONFIGURED, PERIOD_REASON
 
 
 # --- the sources and the rain stress ------------------------------------------
 
 
-def _record_source(record: Mapping[str, Any]) -> dict[str, Any]:
-    record_id = record["id"]
-    return {
-        "id": record_id,
+def _record_source(record: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The source row of the ONI record. PROPOSED.
+
+    No record (``None``: ``KINDS_OF_YEAR_RECORD_FILE`` not set): state
+    ``unavailable``, ``NOT_AVAILABLE``, with ``NO_RECORD`` as its detail
+    (S-031, point 7). A record: state ``RECORD_STATE`` (point 8).
+    PROPOSED (S-031, F5): ``api/config.py`` refuses a record without ``id``
+    or ``date_read`` at start-up; a record injected without them (tests)
+    gives a row whose id is ``NO_RECORD_ID`` and whose detail leaves out what
+    is absent, never "None" and never a ``KeyError``.
+    """
+    row: dict[str, Any] = {
+        "id": NO_RECORD_ID,
         "contract": RECORD_CONTRACT,
-        "state": RECORD_STATE,
+        "state": "unavailable",
         "retrieved_at": None,
         "time_zone": None,
         "request": None,
+        "attribution": None,
+        "missing_reason": "NOT_AVAILABLE",
+        "detail": NO_RECORD,
+    }
+    if record is None:
+        return row
+    record_id = record.get("id")
+    date_read = record.get("date_read")
+    detail = (
+        "transcribed record"
+        if record_id is None
+        else f"transcribed record kinds_of_year/records/{record_id}.json"
+    )
+    if date_read is not None:
+        detail = f"{detail}, read on {date_read}"
+    return {
+        **row,
+        "id": NO_RECORD_ID if record_id is None else str(record_id),
+        "state": RECORD_STATE,
         "attribution": record.get("reference"),
         "missing_reason": None,
-        "detail": (
-            f"transcribed record kinds_of_year/records/{record_id}.json, read on "
-            f"{record.get('date_read')}"
-        ),
+        "detail": detail,
     }
 
 
@@ -359,18 +420,36 @@ def make_plant_router(
     engines: RotationEngines,
     rotation_validator: RotationValidator,
     settings: RunSettings,
-    kinds_of_year_record: Mapping[str, Any],
+    kinds_of_year_record: Mapping[str, Any] | None,
     engines_factory: EnginesFactory | None,
     parameters: dict[str, dict] | None,
+    plant_layer: PlantLayer | None = None,
 ) -> APIRouter:
-    """The plant route, bound to the given implementations."""
+    """The plant route, bound to the given implementations.
+
+    PROPOSED (S-031): ``kinds_of_year_record`` ``None`` means no record is
+    configured (never "the committed one"). ``plant_layer`` ``None`` means
+    ``DiscoveredPlantLayer``, which finds the plant layer by name on each
+    request. A plant layer that is not built answers ``200`` with the
+    not-built body (``api.plant_layer.not_built_body``) before the body is
+    read and before any source or engine is called; one that fails to import
+    or raises is ``500`` ``INTERNAL_ERROR``, on this route only.
+    """
     router = APIRouter(prefix="/api")
+    layer: PlantLayer = (
+        plant_layer if plant_layer is not None else DiscoveredPlantLayer()
+    )
 
     @router.post(ROUTE, responses={400: {}, 422: {}, 500: {}})
     def run_plant(body: dict[str, Any] = Body(...)):  # noqa: B008
         """Answer "What should I plant?" for one field and three to five rotations."""
         try:
-            request, code, problems = request_problems(body)
+            parts = layer.parts()
+            if isinstance(parts, Missing):
+                return JSONResponse(content=not_built_body(parts))
+            if not isinstance(parts, PlantParts):
+                raise TypeError("the plant layer gave neither PlantParts nor Missing")
+            request, code, problems = request_problems(body, parts.request_model)
             if request is None:
                 assert code is not None
                 return error_response(code, problems)
@@ -410,21 +489,25 @@ def make_plant_router(
                 or example_data_of(rotations, climate_result, soil_result)
                 or any(info.state == "example" for info in infos)
             )
-            classified = classify_years(
-                kinds_of_year_record,
-                settings,
-                request.rotations[0].ag_year_start.month,
-                request.rotations,
+            record_years, why, reason = record_years_of(
+                settings, request.rotations[0].ag_year_start.month
             )
-            answer = assemble_answer(
+            answer = parts.answer_plant(
                 request,
                 runs,
-                classified=classified,
+                record_years=record_years,
+                why=why,
+                reason=reason,
                 record=kinds_of_year_record,
-                rain_stress=plain(run.echo),
+                record_missing=NO_RECORD if kinds_of_year_record is None else None,
+                rain_stress=run.echo,
                 sources=sources,
                 example_data=example_data,
             )
+            if not isinstance(answer, parts.answer_model):
+                raise TypeError(
+                    "the plant layer returned another type than PlantAnswer"
+                )
             # Never ``exclude_none``: a document written that way does not load back.
             return JSONResponse(content=answer.model_dump(mode="json"))
         except Exception:

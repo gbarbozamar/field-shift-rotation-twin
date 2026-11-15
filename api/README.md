@@ -281,6 +281,20 @@ copied from an engine result or from the request; the route computes none.
 
 In order:
 
+0. **The plant layer, by name** (PROPOSED, unit `l2/plant-layer-by-name`,
+   S-031, decision R24). `api/plant_layer.py` (`DiscoveredPlantLayer`, the
+   default of `create_app(..., plant_layer=None)`) finds `PlantRequest` and
+   `PlantAnswer` of `contracts.plant_answer`, then
+   `economics.plant.answer_plant`, on each request, never at start-up, as
+   `api/decision_layer.py` finds the decision function. Only an absent
+   module (or a package above it) or an absent name is "not built": `200`
+   with exactly `{"contract": "plant_answer_not_built", "answer_missing":
+   {"reason": "NOT_AVAILABLE", "detail": "<what is absent>"}}` (written as a
+   dict; `PlantAnswerNotBuilt` of the contract loads it), and no source or
+   engine is called. Any other import error, or an answer that is not a
+   `PlantAnswer`, is `500` `INTERNAL_ERROR` on this route; `/health` and the
+   other routes are untouched, since `api/app.py` imports nothing of
+   `economics/`, `kinds_of_year/` or `contracts.plant_answer`.
 1. **Request.** The body is loaded into `PlantRequest` (as JSON). A body that
    fails is `422` in the one error shape: `ROTATION_INVALID` when every
    problem lies inside one rotation item (`rotations.<i>.…`), `SITE_INVALID`
@@ -294,7 +308,10 @@ In order:
    text. Nothing is called before that. Malformed JSON is `400`.
 2. **Sources.** Climate and soil and slope are asked for once for the site,
    as `POST /api/decisions/run` does. `sources` lists them, then the ONI
-   record of `kinds_of_year/` (state `cached`, OPEN 5 of the contract).
+   record (PROPOSED, S-031: state `transcribed`, a state of the plant
+   contract's `SourceOut` only, OPEN 5 of the contract; with no record
+   configured, state `unavailable`, `NOT_AVAILABLE`, detail `NO_RECORD` of
+   `api/plant.py`, which names `KINDS_OF_YEAR_RECORD_FILE`).
 3. **Engines.** Each rotation runs once through the `RotationEngines`, with
    its request item unchanged. **Phase 1 is enough for the answer**: the
    top-level result of the run (`EnginesResult.result`) is read, the other
@@ -302,8 +319,15 @@ In order:
 4. **Kinds of year.** The whole agricultural years of the configured climate
    period (`api.carbon_forcing.whole_ag_years`, by the rotations' shared
    start month) are classified with `classify_agricultural_years` on the ONI
-   record, loaded once when the app is built (`create_app` keyword
-   `kinds_of_year_record`; `None` loads the committed record). The years come
+   record, by `economics.plant.answer_plant` (S-031). The record is the one
+   `KINDS_OF_YEAR_RECORD_FILE` names, read and checked once at start-up
+   (`api/config.py`) and passed to `create_app(..., kinds_of_year_record=)`;
+   `None` now means **no record** (PROPOSED, S-031), never the committed one:
+   every year is then missing `NOT_AVAILABLE` with the not-configured detail,
+   `kinds_of_year.source` is null, every count is null, and the means and
+   margins of each kind follow through `economics/` as for any year without
+   a kind (with a period, the years are still those of the period, so the
+   soil-loss mean of the period is kept). The years come
    from the settings period, not from the calendar. Without a period, or with
    a period that holds no whole agricultural year, the record's years are not
    known: the contract still asks for at least one year, so the answer lists
@@ -442,6 +466,7 @@ only its path and the reason.
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
+| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on, such as `kinds_of_year/records/oni_v6.json`; read once at start-up with `kinds_of_year.load_record` and passed to `create_app` | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -473,6 +498,14 @@ on `httpx.MockTransport`.
   path and the position of the problem, never the content); two tables that
   give the same quantity for one soil group. The source still answers
   `unavailable` for a file that breaks after start-up. PROPOSED.
+- `KINDS_OF_YEAR_RECORD_FILE` set and the file does not exist, cannot be
+  read, is not JSON (line and column given), is not a JSON object, lacks one
+  of the fields the plant layer reads (`id`, `reference`, `date_read`,
+  `threshold`, `min_consecutive_seasons`, `seasons`: `RECORD_FIELDS`), has
+  `id`, `reference` or `date_read` that is not a non-blank text, or has
+  `seasons` that is not a non-empty list. Checked once, here, never per
+  request (F9 of review-whole-4); the values of the seasons are checked by
+  the classification, as before. PROPOSED.
 - The parameter catalogue in `params/records/` has any problem of
   `load_folder` or `check_catalogue` (not a variable; see "The parameter
   catalogue" under the engine runner). An empty catalogue starts.
@@ -495,6 +528,7 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
 | `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
+| `KINDS_OF_YEAR_RECORD_FILE` | Unset until the operator switches the record on after signing it; then `kinds_of_year/records/oni_v6.json` | S-031 (PROPOSED) |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
 
@@ -514,7 +548,8 @@ uv run uvicorn api.main:app --reload
 
 The route depends only on these interfaces. `create_app(cors_origins, *,
 climate=None, soil_slope=None, engines=None, rotation_validator=None,
-settings=None, parameters=None, decision_layer=None)` receives the
+settings=None, parameters=None, decision_layer=None, kinds_of_year_record=None,
+engines_factory=None, plant_layer=None)` receives the
 implementations; `None` means the default.
 
 | Interface | Defined in | Default | Default behaviour | Still to come |
@@ -524,6 +559,7 @@ implementations; `None` means the default.
 | `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; a soil-loss or water engine that is not found gives its part in the not-built form (D12) | Nothing in `api/`: each engine is picked up when its lane lands it |
 | `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
 | `DecisionLayer` (PROPOSED) | `api/ports.py` | `DiscoveredDecisionLayer()` (`api/decision_layer.py`) | Looks `decision.output.assemble_decision_output` up on each request, calls it and checks what it returns; when it is absent or fails, a typed absence, `NOT_AVAILABLE` | Built in sub-lane L2b: `decision/output.py` (PROPOSED). Its counts name their carbon model and computation (D169, #331) |
+| `PlantLayer` (PROPOSED, S-031) | `api/ports.py` | `DiscoveredPlantLayer()` (`api/plant_layer.py`) | Finds `contracts.plant_answer` (`PlantRequest`, `PlantAnswer`) and `economics.plant.answer_plant` by name on each request and gives them as `PlantParts`; absent, `Missing` `NOT_AVAILABLE` and the plant route answers the not-built body | Nothing in `api/` |
 
 The engine stand-in `EnginesNotBuilt` and the validator stand-in
 `AcceptAnyRotation` are **removed**: no test needs them. The runner reports an

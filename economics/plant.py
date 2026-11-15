@@ -3,8 +3,10 @@
 Unit ``l2/plant-rules-to-economics`` (brief S-030; point 2 of the platform
 review of PR 310): the rules that decide which crops and years count in each
 margin and mean live here, not in ``api/``. The route ``api/plant.py`` gathers
-the request and the engine runs and hands them to ``assemble_answer``, the one
-entry function of this module.
+the request and the engine runs and hands them to ``answer_plant``, the one
+entry function of this module, which the platform finds by name on each
+request (S-031, ``api/plant_layer.py``): it calls ``classify_years`` and then
+``assemble_answer``.
 
 Steps 4 to 6 of ``api/plant.py`` happen here. ``classify_years`` classifies
 the whole agricultural years of the record (computed by the caller) on the
@@ -525,7 +527,7 @@ def assemble_answer(
     runs: Sequence[EngineRun],
     *,
     classified: Classified,
-    record: Mapping[str, Any],
+    record: Mapping[str, Any] | None,
     rain_stress: Mapping[str, Any] | None,
     sources: list[dict[str, Any]],
     example_data: bool,
@@ -534,7 +536,9 @@ def assemble_answer(
 
     ``runs`` holds one run per rotation of the request, in its order.
     ``record`` is the ONI record ``classified`` was read on (its ``id`` names
-    the source of the kinds of year). ``rain_stress`` is the rain-stress echo
+    the source of the kinds of year). PROPOSED (S-031): ``None`` when no
+    record is configured; the source of the kinds of year is then null, which
+    the contract allows only when every year is missing. ``rain_stress`` is the rain-stress echo
     already as JSON-ready data, or ``None`` when no factor was asked; it is
     copied into the answer unchanged. ``sources`` are the source rows of the
     answer, as JSON-ready data, copied unchanged. A ``classified`` whose
@@ -703,7 +707,7 @@ def assemble_answer(
         "rain_stress": rain_stress,
         "erosivity": EROSIVITY,
         "kinds_of_year": {
-            "source": record["id"],
+            "source": None if record is None else record["id"],
             "start_month": start_month,
             "years": [_year_kind(year, kinds[year]) for year in sorted(kinds)],
             "counts": counts,
@@ -713,3 +717,112 @@ def assemble_answer(
     answer = PlantAnswer.model_validate_json(json.dumps(document))
     check_answer_against_request(request, answer)
     return answer
+
+
+# --- the entry function -------------------------------------------------------
+
+
+def _missing_kind(detail: str) -> KindOfYear:
+    return KindOfYear(
+        kind=None,
+        missing_reason="NOT_AVAILABLE",
+        detail=detail,
+        season=None,
+        season_year=None,
+    )
+
+
+def _without_record(
+    record_years: tuple[int, int] | None,
+    why: str,
+    reason: str | None,
+    start_month: int,
+    rotations: Sequence[RotationDefinition],
+    record_missing: str,
+) -> Classified:
+    """The kinds of year when no record is configured. PROPOSED (S-031).
+
+    Known years (the whole agricultural years of the record period) are still
+    years of the record period (``of_record`` true), each missing
+    ``NOT_AVAILABLE`` with ``record_missing``: the soil-loss mean of the
+    period is kept and each kind of year is missing, through
+    ``mean_by_kind`` and ``count_kinds`` as for any year without a kind.
+    Unknown years are the declared years of ``classify_years`` (which reads
+    no record on that path), with ``record_missing`` first in each detail.
+    """
+    if record_years is not None:
+        if reason is not None:
+            raise ValueError(
+                "answer_plant: a reason is given for record years that are known"
+            )
+        first, last = record_years
+        if first > last:
+            raise ValueError(
+                "record_years: the first agricultural year is after the last"
+            )
+        kinds = {year: _missing_kind(record_missing) for year in range(first, last + 1)}
+        return Classified(kinds, True, start_month)
+    declared = classify_years({}, None, why, start_month, rotations, reason=reason)
+    kinds = {
+        year: _missing_kind(
+            record_missing
+            if kind.detail is None
+            else f"{record_missing}; {kind.detail}"
+        )
+        for year, kind in declared.kinds.items()
+    }
+    return dataclasses.replace(declared, kinds=kinds)
+
+
+def answer_plant(
+    request: PlantRequest,
+    runs: Sequence[EngineRun],
+    *,
+    record_years: tuple[int, int] | None,
+    why: str,
+    reason: str | None,
+    record: Mapping[str, Any] | None,
+    record_missing: str | None,
+    rain_stress: Any,
+    sources: list[dict[str, Any]],
+    example_data: bool,
+) -> PlantAnswer:
+    """The answer to "What should I plant?". PROPOSED (S-031, decision R24).
+
+    The one entry function the platform finds by name
+    (``api/plant_layer.py``). It does what the route did after the engines
+    ran: ``classify_years`` on the given years, then ``assemble_answer``.
+
+    ``record_years``, ``why`` and ``reason`` are what ``classify_years``
+    takes: the whole agricultural years of the record period (first and
+    last), or ``None`` with the text of why they are not known and its reason
+    code (or ``None``). ``record`` is the ONI record, or ``None`` when no
+    record is configured; ``record_missing`` is then the sentence that says
+    so (given exactly when there is no record, ``ValueError`` otherwise), and
+    the kinds of year are those of ``_without_record``. ``rain_stress`` is the
+    rain-stress echo (a dataclass, a mapping or ``None``), written into the
+    answer through ``plain``; ``sources`` and ``example_data`` are copied.
+    """
+    if (record is None) != (record_missing is not None):
+        raise ValueError(
+            "answer_plant: record_missing is given exactly when there is no record"
+        )
+    start_month = request.rotations[0].ag_year_start.month
+    if record is not None:
+        classified = classify_years(
+            record, record_years, why, start_month, request.rotations, reason=reason
+        )
+    else:
+        assert record_missing is not None
+        classified = _without_record(
+            record_years, why, reason, start_month, request.rotations, record_missing
+        )
+    return assemble_answer(
+        request,
+        runs,
+        classified=classified,
+        record=record,
+        rain_stress=plain(rain_stress),
+        sources=sources,
+        example_data=example_data,
+    )
