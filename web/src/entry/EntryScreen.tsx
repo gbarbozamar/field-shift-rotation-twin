@@ -88,7 +88,14 @@ export default function EntryScreen() {
         <p className="mt-6 text-sm text-fs-muted">{strings['identity.empty_list']}</p>
       )}
 
-      <p className="mt-6 text-sm">
+      <p className="mt-6 flex flex-wrap items-center gap-4 text-sm">
+        <a
+          href="#/board"
+          data-testid="entry-plan-link"
+          className="inline-flex min-h-11 items-center rounded-lg bg-fs-primary px-4 font-semibold text-white"
+        >
+          {strings['nav.board']}
+        </a>
         <a
           href="#/fields"
           className="font-medium text-fs-primary underline transition hover:text-fs-primary"
