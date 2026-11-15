@@ -95,7 +95,10 @@ function ItemRow({
   rowTestId: string
 }) {
   return (
-    <li data-testid={rowTestId} className={['flex', 'gap-3'].join(' ')}>
+    <li
+      data-testid={rowTestId}
+      className={['flex', 'gap-3', '[&>div]:min-w-0', '[&>div]:flex-1'].join(' ')}
+    >
       {item.value !== null && (
         <span data-testid="row-label" className={['font-mono', 'text-sm', 'text-slate-500'].join(' ')}>
           {label}
@@ -190,7 +193,7 @@ function CarbonItemRow({
       >
         {formatString(strings['cards.computation_label'], { computation: value.computation })}
       </p>
-      <div className={['flex', 'gap-3'].join(' ')}>
+      <div className={['flex', 'gap-3', '[&>div]:min-w-0', '[&>div]:flex-1'].join(' ')}>
         {value.item.value !== null && (
           <span
             data-testid="row-label"
