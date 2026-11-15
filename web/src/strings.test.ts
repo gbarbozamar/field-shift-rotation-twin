@@ -109,6 +109,7 @@ const WORDING_SHEET: Record<string, string> = {
   'clocks.water': 'The water clock',
   'clocks.years_hint': 'Each column is one agricultural year',
   'clocks.example_note': 'Example data — real years arrive with the seam',
+  'seam.with_real_data': 'Live data — NASA POWER through the platform route',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
   'entry.title': 'Case',
