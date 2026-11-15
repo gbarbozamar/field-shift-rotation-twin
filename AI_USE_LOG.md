@@ -120,6 +120,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-15 | L0 | `l0/erosion-c-main-route` (#218): `engine/erosion/soil_loss.py`, `_parameters.py`, tests, `SOIL_LOSS.md` | Claude Code (Anthropic) | A builder session made EP1 compute C per agricultural year on the main route (M1.5, D129, D47) with the PROPOSED fallback to the declared C; a separate verifier reviewed it | Record ids PROPOSED; no C record on main yet |
 | 2026-11-15 | L0 | `l0/validation-h2-e3-ready` (#225): H2 and E3 tests, `validation/records.py`, fixtures README, `docs/VALIDATION.md` | Claude Code (Anthropic) | A builder session made the H2 and E3 tests read signed fixtures with the D124 tolerances; a separate verifier reviewed it | Tests skip until the signed fixtures are committed |
 | 2026-11-15 | L0 | `l0/source-status-cleanup` (#230): `docs/METHODS.md` sources, `engine/erosion/LS.md` | Claude Code (Anthropic) | A builder session brought the source statuses up to date with links to the signed records and decisions; a separate verifier reviewed it | Documentation only |
+| 2026-11-15 | L0 | `l0/e3-fixture`: `validation/fixtures/e3_ah703_tables.json` | Claude Code (Anthropic) | The scientific-integration session transcribed the E3 values; the lead developer checked them against the pages and signed; the E3 test now runs and passes | Values signed by the lead developer (D34) |
 Rules:
 
 - No generated images, video or voice in the submission.
