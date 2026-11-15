@@ -2,9 +2,14 @@
 
 Signed files that hold the expected values of a check of `docs/VALIDATION.md` together with the inputs and constants the check needs, read by the test of that check. Unit `l0/validation-h2-e3-ready` (issue #225).
 
-> **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), amended for two H2 steps by [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727); this folder holds no value of a source.
+> **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), amended for two H2 steps by [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727). This README holds no value of a source: the values are in the signed files, checked against the source by the person who signs.
 >
-> **This folder holds no fixture yet.** The two signed files arrive in their own commit, after the lead developer signs them (D34, D66). Until then both tests skip.
+> **The two files below are on `main`, signed.** `e3_ah703_tables.json` arrived with #238 and `h2_example18.json` with #239, each with its `checked_by` filled, as is the `checked_by` of every parameter record it carries (D34, D66). Both tests run on them.
+>
+> **Two more fixtures are not in this folder:** the ones of [H1] and [H10] (`docs/VALIDATION.md`). Each waits for a person to transcribe it from its source, check it and sign it in `checked_by` (D34, D66); no fixture enters this folder unsigned. This README gives none of their values. Their paths are PROPOSED in `docs/VALIDATION.md`, and their formats are not described here yet:
+>
+> - `h1_fao56_example37.json`, for [H1]. `engine/water/balance/test_bucket.py::test_h1_public_reference_case` reads it, with the skip rule below: until the signed file is here, that test skips and names the file.
+> - `h10_grahmann2022_runoff.json`, for [H10]. No test reads it yet; the comparator of [H10] (`validation/h10_runoff.py`) is tested on hand-made values only.
 
 | File | Check | Test that reads it |
 |---|---|---|
