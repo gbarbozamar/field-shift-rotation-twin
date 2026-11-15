@@ -1,6 +1,6 @@
 # The AMG soil carbon model: core and entry point EP5
 
-Units `l1/amg-core` (brief in issue #174: the core) and `l1/amg-ep5` (brief in issue #192: the entry point, section [EP5 run_amg](#ep5-run_amg)). Status: `PROPOSED` (blueprint section 3.7): it takes effect only when a person approves the pull request.
+Units `l1/amg-core` (brief in issue #174: the core), `l1/amg-ep5` (brief in issue #192: the entry point, section [EP5 run_amg](#ep5-run_amg)) and `l1/amg-v2-complete-d192` (brief in issue #299: the sixth modifier, the cut of the temperature modifier and the exponential yearly step, by decisions [D192 and D193](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765) and [D199](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890371514) of issue #77). Status: `PROPOSED` (blueprint section 3.7): it takes effect only when a person approves the pull request.
 
 Decision D1 of issue #77 makes AMG one of the two carbon models. Unit `l1/amg-core` built the model core, as pure functions:
 
@@ -13,7 +13,7 @@ Unit `l1/amg-ep5` adds EP5, `run_amg(forcing, *, parameters) -> CarbonBalance` (
 
 ## The forms
 
-Every form is `PROPOSED`. **Its source is to be confirmed by a person.** The session that wrote this unit read no source of AMG (the carbon method is `OPEN` in `docs/METHODS.md`, "Not in this file yet") and wrote no value of the method anywhere: not in the code, a default, a test, a comment or this file.
+Every form is `PROPOSED`. [Decision D192 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765) names the source: **AMGv2 as printed in Clivot et al. (2019)**, *Environmental Modelling & Software* 118:99-113, https://doi.org/10.1016/j.envsoft.2019.04.004: the rate coefficient of equation 5 (p. 101), `k = k0·f(T)·f(H)·f(A)·f(CaCO3)·f(pH)·f(C/N)`, with the modifiers of Appendix A, equations S7 to S13 (pp. 110-111), and the exact exponential solution as the yearly step. **Each form is still to be compared with that source by a person.** No session that wrote this folder read the publication: unit `l1/amg-core` wrote five modifiers as candidates, and unit `l1/amg-v2-complete-d192` wrote the C:N modifier and the cut of the temperature modifier as D192 and [D199](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890371514) state them. No session wrote a value of the method anywhere: not in the code, a default, a test, a comment or this file. `docs/METHODS.md` is not changed by these units.
 
 | Function | Form | Module |
 |---|---|---|
@@ -23,11 +23,12 @@ Every form is `PROPOSED`. **Its source is to be confirmed by a person.** The ses
 | `step`, scheme `"exponential"` | `x = rate_coefficient * duration`; `A' = A * exp(-x) + I * (1 - exp(-x)) / x` (`A' = A + I` when `x` is zero); `M = A + I - A'`; `S' = S` | `pools.py` |
 | `run` | `step` applied to each step input in turn; the end of one step is the start of the next, never reset | `pools.py` |
 | `rate_coefficient` | `k = potential_rate * product of the modifiers` | `modifiers.py` |
-| `temperature_modifier` | `f_T = shape / (1 + (shape - 1) * exp(sensitivity * (reference_temperature - temperature)))` | `modifiers.py` |
+| `temperature_modifier` | `f_T = shape / (1 + (shape - 1) * exp(sensitivity * (reference_temperature - temperature)))` when `temperature` is above zero; `f_T = 0` when it is zero or below (the cut of equation S8; D192) | `modifiers.py` |
 | `moisture_modifier` | `f_W = 1 / (1 + shape * exp(-sensitivity * water_balance))` | `modifiers.py` |
 | `clay_modifier` | `f_A = exp(-sensitivity * clay_content)` | `modifiers.py` |
 | `carbonate_modifier` | `f_CaCO3 = 1 / (1 + sensitivity * carbonate_content)` | `modifiers.py` |
 | `ph_modifier` | `f_pH = exp(-sensitivity * (ph - optimum_ph)^2)` | `modifiers.py` |
+| `cn_ratio_modifier` | `f_CN = minimum + (1 - minimum) * exp(-sensitivity * (cn_ratio - optimum_cn_ratio)^2)` (equation S13 as D192 and D199 state it) | `modifiers.py` |
 | `end_minus_start` | `(stock at the last point - stock at the first) / (last time - first time)` | `trend.py` |
 | `fitted_slope` | slope of the ordinary least-squares line of stock on time, through every point | `trend.py` |
 | `mean_over_cycles` | mean, over the whole cycles given, of `(stock at cycle end - stock at cycle start) / cycle length` | `trend.py` |
@@ -35,7 +36,26 @@ Every form is `PROPOSED`. **Its source is to be confirmed by a person.** The ses
 
 `A` and `S` are the active and the stable pool at the start of a step, `A'` and `S'` at its end, `I` the humified input over the step and `M` the carbon mineralised over the step. Every step keeps the mass balance `(A' + S') - (A + S) = I - M`.
 
-Two schemes of one step are offered because the session does not know which is the form of the source (OPEN 2). Both take any step length, so a monthly step is the same function with a shorter `duration`. Both have the same steady state for constant inputs, `A = I / (rate_coefficient * duration)`. Under uniform forcing the exponential scheme gives the same result for one long step as for that span cut into equal shorter steps; the explicit scheme does not.
+The core offers two schemes of one step. D192 takes the exponential one, the exact solution over the step, for the yearly step of EP5 (OPEN 2); the explicit one stays in the core and the entry point does not use it. Both take any step length, so a monthly step is the same function with a shorter `duration`. Both have the same steady state for constant inputs, `A = I / (rate_coefficient * duration)`. Under uniform forcing the exponential scheme gives the same result for one long step as for that span cut into equal shorter steps; the explicit scheme does not.
+
+### The cut of the temperature modifier (S8, D192)
+
+D192: "f(T) = 0 when the mean annual air temperature is at or below 0 °C (S8)". `temperature_modifier` returns zero when `temperature` is zero or below, and the form of the table above it. The zero is the value of `f_T` in the source, not a fill: the checks of [When a result is not computed](#when-a-result-is-not-computed) come first, so a missing argument, one that is not finite, or unit strings that differ still give a `Missing`. With `f_T` zero the rate coefficient is zero and the step mineralises nothing; the humified input of that year is added to the active pool.
+
+**The cut assumes a Celsius scale.** It is written at zero of the temperature's own unit: nothing is converted and no unit text is read for it. The source gives the mean annual air temperature in degrees Celsius (equation S7), and D195 of issue #77 fixes the unit text `degC` for the temperature record and the climate series. In a scale whose zero is not the freezing point of water, the cut would sit at the wrong temperature (OPEN 16).
+
+### The C:N modifier (S13, D192, D199)
+
+`cn_ratio_modifier` is the sixth modifier of equation 5. Equation S13 prints two numbers beside its two parameters `aCN` and `bCN`: the lower bound of the modifier, and the factor of the exponential, which is one minus that bound. D199 makes the lower bound a constant of its own, read from a record like `aCN` and `bCN`, so that the module writes no number but zero and one: `minimum` is the lower bound and `1 - minimum` the factor. At the optimum C:N ratio the modifier is one, whatever the minimum; far from it the modifier tends to the minimum. A C:N ratio has no unit, so no unit string is compared (as for pH). Refused, `NOT_COMPUTABLE`, named: a negative C:N ratio; a minimum outside zero to one.
+
+## Declared differences from the official code
+
+D192 follows the publication. It names two places where the official AMGv2 code (`inrae/AMG_base`, `scripts/AMG_Script.R`), which the orchestrating session of D192 read and no session of this folder did, does something else. Both are kept as differences, on purpose:
+
+1. **Line 215: the temperature modifier at or below zero.** The official code writes `1e-06` there; the engine writes zero, as equation S8 prints it. With zero, a year at or below zero mineralises nothing; with the code's value it would mineralise a very small amount. D192 says that the case does not arise at the demonstration point.
+2. **Line 239: which year's input meets which year's rate.** The official code pairs the humified input of row `i - 1` with the rate coefficient `k` of row `i`. The engine pairs the humified input and the rate coefficient of the same agricultural year (`entry._step_inputs`: both are read for the year the step starts in).
+
+Neither was checked by running the official code: no session ran it.
 
 ## Signatures
 
@@ -58,6 +78,7 @@ clay_modifier(*, clay_content, clay_content_unit, sensitivity_coefficient,
 carbonate_modifier(*, carbonate_content, carbonate_content_unit, sensitivity_coefficient,
                    sensitivity_coefficient_per_unit) -> float | Missing
 ph_modifier(*, ph, optimum_ph, sensitivity_coefficient) -> float | Missing
+cn_ratio_modifier(*, cn_ratio, optimum_cn_ratio, sensitivity_coefficient, minimum) -> float | Missing
 end_minus_start(*, stocks, times) -> float | Missing
 fitted_slope(*, stocks, times) -> float | Missing
 mean_over_cycles(*, stocks, times, cycle_boundaries) -> float | Missing
@@ -87,6 +108,8 @@ Nothing is converted. Carbon amounts (pools, inputs, mineralised carbon, stocks)
 | `clay_modifier` | `clay_content_unit`, `sensitivity_coefficient_per_unit` |
 | `carbonate_modifier` | `carbonate_content_unit`, `sensitivity_coefficient_per_unit` |
 
+`ph_modifier` and `cn_ratio_modifier` compare no unit string: pH and a ratio have none. The cut of `temperature_modifier` reads no unit either (see [The cut of the temperature modifier](#the-cut-of-the-temperature-modifier-s8-d192)).
+
 When they differ the result is `NOT_COMPUTABLE` and the detail names each string (the reason code of a unit that is not accepted is Q11 of `contracts/ENTRYPOINTS.md`, OPEN; the same choice as `engine/erosion/`).
 
 A trend measure is in the carbon unit per the time unit of `times` (for `trend_measures`, `TrendMeasures.time_unit`). The unit of C1.5, `t C ha-1 yr-1`, is reached only when the stocks are in tonnes of carbon per hectare and the times in years (OPEN 9).
@@ -98,7 +121,7 @@ In this order; the first that applies is returned. Nothing is clipped, filled, n
 1. **`MISSING_INPUT`**: an argument is missing. The detail names every missing argument with its own reason code and detail (C3.3). For `humified_input`, an origin of `carbon_inputs` without a humification coefficient is missing and named. For `rate_coefficient`, a modifier held as a `Missing` (also one a modifier function refused) is named. For `step`, a missing state is named.
 2. **`NOT_COMPUTABLE`**:
    - an argument that is not a finite number ("not a number", an infinity, an integer too large for a float);
-   - then a value outside what the quantity can be: a negative carbon input, pool, total carbon, rate coefficient, potential rate, modifier, step length, clay content or carbonate content; a humification coefficient or a stable fraction outside zero to one;
+   - then a value outside what the quantity can be: a negative carbon input, pool, total carbon, rate coefficient, potential rate, modifier, step length, clay content, carbonate content or C:N ratio; a humification coefficient, a stable fraction or the minimum of the C:N modifier outside zero to one;
    - then unit strings that differ;
    - then, for the explicit scheme, `rate_coefficient * duration` above one: it is the fraction of the active pool mineralised in the step, and above one more carbon would leave the pool than it holds (PROPOSED, OPEN 3);
    - then a form that gives no finite real number, or a modifier that the form makes negative (PROPOSED, OPEN 5);
@@ -106,11 +129,15 @@ In this order; the first that applies is returned. Nothing is clipped, filled, n
 3. **A run**: once a step is missing, every later step is `MISSING_INPUT`, and its detail names the first missing step (counted from zero) with its reason. When the initial state is missing, every step is `MISSING_INPUT` naming it. The total stock and the elapsed time at and after a missing step are missing too.
 4. **A trend measure** needs only the points it uses: `end_minus_start` the first and the last, `fitted_slope` every point, `mean_over_cycles` the points at the cycle boundaries. One of those that is missing gives `MISSING_INPUT` naming it (with the run's detail, so the first missing step is named). `NOT_COMPUTABLE` for: fewer than two points; times at the points used that do not rise strictly; fewer than two cycle boundaries (no whole cycle), a boundary outside the series or not after the one before; a value that is not finite.
 
+A temperature at or below zero is not a refusal: `temperature_modifier` then returns zero, a value (S8, D192), after the checks of items 1 and 2.
+
 A `TypeError` is raised for an argument of another type (`None`, text, a boolean, a list in place of a number; a state that is not a `PoolState`; a step that is not a `StepInput`), so a `None` is never read as a value. A `ValueError` is raised for a scheme that is not one of `SCHEMES`, and when `stocks` and `times` differ in length (OPEN 12).
 
 ## Constants a person has to transcribe
 
 One row per constant. A person fills the parameter catalogue (`params/records/`) from this table and signs `transcribed_by`; a second person checks each value against the source and signs `checked_by` (D34 of issue #77, `params/README.md`). **The column "Value" stays empty: a session writes no value.** The identifiers are `PROPOSED`.
+
+D192 names the source of the constants (Clivot et al. 2019, Appendix A, and the AMGv2 dataset v2.0, https://doi.org/10.57745/MEQQIX), and D195 of issue #77 their unit strings. The twelve rows written by unit `l1/amg-core` still say `OPEN` in the column "Source and equation", because no session read the source; the records, with their locators, are the work of unit `l0/carbon-records-d195-d197`, each signed by a person. The last three rows are the constants of the C:N modifier (unit `l1/amg-v2-complete-d192`).
 
 | Constant | Proposed parameter identifier | What it is | Unit | Source and equation | Value |
 |---|---|---|---|---|---|
@@ -126,6 +153,9 @@ One row per constant. A person fills the parameter catalogue (`params/records/`)
 | `carbonate_modifier.sensitivity_coefficient` | `amg_carbonate_sensitivity` | Multiplies the carbonate content in the carbonate modifier | One over a content, stated as `sensitivity_coefficient_per_unit` | OPEN: the session read no source of AMG | |
 | `ph_modifier.optimum_ph` | `amg_ph_optimum` | The pH at which the pH modifier is one | None (pH) | OPEN: the session read no source of AMG | |
 | `ph_modifier.sensitivity_coefficient` | `amg_ph_sensitivity` | How fast the pH modifier falls away from the optimum | None (one over a squared pH difference) | OPEN: the session read no source of AMG | |
+| `cn_ratio_modifier.sensitivity_coefficient` | `amg_cn_ratio_sensitivity` | How fast the C:N modifier falls away from the optimum: `aCN` of equation S13 | None (one over a squared C:N difference); the record carries `dimensionless` | Named by D192: Clivot et al. (2019), Appendix A, equation S13 (p. 111), with the value from the AMGv2 dataset v2.0. Not read by a session | |
+| `cn_ratio_modifier.optimum_cn_ratio` | `amg_cn_ratio_optimum` | The C:N ratio at which the C:N modifier is one: `bCN` of equation S13 | None (a ratio); the record carries `dimensionless` | Named by D192: the same equation and dataset. Not read by a session | |
+| `cn_ratio_modifier.minimum` | `amg_cn_ratio_minimum` | The lower bound of the C:N modifier, which it tends to far from the optimum | None (a fraction, zero to one); the record carries `dimensionless` | Named by D199: equation S13, and line 220 of the official code (`scripts/AMG_Script.R`). D199: a person compares it with S13 as printed before signing; if S13 does not give it, the record is not signed and D199 is revisited. Not read by a session | |
 
 Not constants of the method, and so not in this table: the step length and its unit, the scheme (OPEN 2), the horizon and the soil depth (C1.6, OPEN for the science reviewers) and the cycle boundaries.
 
@@ -164,16 +194,18 @@ Each case is a test function of `test_amg.py`; a test checks that this list and 
 
 | Case | What it shows |
 |---|---|
-| `test_temperature_modifier_follows_the_proposed_form` | `f_T` equals the form written a second time in the test over a grid of temperatures |
+| `test_temperature_modifier_follows_the_proposed_form` | `f_T` equals the form written a second time in the test over a grid of temperatures above zero (unit `l1/amg-v2-complete-d192` took the two temperatures at and below zero out of this grid: they are the next case) |
+| `test_temperature_modifier_is_zero_at_or_below_zero` | The cut of S8 (D192): `f_T` is zero, a value and not a `Missing`, at zero and below, whatever the constants; just above zero the form applies; a missing or refused argument is still missing; a rate coefficient with it is zero |
 | `test_temperature_modifier_is_one_at_the_reference_temperature` | At the reference temperature `f_T` is one, for any shape and sensitivity |
 | `test_moisture_modifier_follows_the_proposed_form` | `f_W` equals the form written a second time in the test, for a negative, zero and positive water balance |
 | `test_clay_modifier_follows_the_proposed_form` | `f_A` equals the form written a second time in the test; it is one without clay |
 | `test_carbonate_modifier_follows_the_proposed_form` | `f_CaCO3` equals the form written a second time in the test; it is one without carbonate |
 | `test_ph_modifier_follows_the_proposed_form` | `f_pH` equals the form written a second time in the test; it is one at the optimum |
+| `test_cn_ratio_modifier_follows_s13` | `f_CN` equals the form of S13 written a second time in the test over a grid; it is one at the optimum for any minimum; it tends to the minimum far from the optimum; a negative C:N ratio or a minimum outside zero to one, even by a hair, is `NOT_COMPUTABLE`, named; a missing argument is `MISSING_INPUT`, named, both shapes |
 | `test_modifier_negative_content_is_refused` | A negative clay or carbonate content is `NOT_COMPUTABLE` naming it |
-| `test_modifier_that_the_form_makes_negative_or_not_finite_is_not_computed` | Arguments for which a form gives a negative modifier, a division by zero or an overflow: `NOT_COMPUTABLE`, nothing raised |
+| `test_modifier_that_the_form_makes_negative_or_not_finite_is_not_computed` | Arguments for which a form gives a negative modifier, a division by zero or an overflow: `NOT_COMPUTABLE`, nothing raised (the temperature of the first case is now above zero: below it the modifier is zero) |
 | `test_modifier_units_that_differ_are_not_computed` | Each unit string that must agree, changed alone: `NOT_COMPUTABLE` naming it |
-| `test_rate_coefficient_is_the_potential_rate_times_the_modifiers` | `k` is the product; no modifier gives the potential rate; a modifier of zero gives zero; the five modifier functions feed it |
+| `test_rate_coefficient_is_the_potential_rate_times_the_modifiers` | `k` is the product; no modifier gives the potential rate; a modifier of zero gives zero; the six modifier functions feed it, under the names the entry point multiplies |
 | `test_rate_coefficient_missing_or_negative_modifier_is_not_computed` | A missing potential rate or modifier gives `MISSING_INPUT` naming it (both shapes); a negative one `NOT_COMPUTABLE`; a modifier a function refused keeps `k` missing |
 
 ### A run over steps
@@ -234,12 +266,12 @@ Each is **skipped**, and its skip reason says what it waits for: the source of A
 
 ## OPEN
 
-Each item is a question a person has to answer; the role that answers it is named. None is answered by this unit.
+Each item is a question a person has to answer; the role that answers it is named. No session answers one. Items 1, 2 and 4 are answered by [decision D192 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765), which stays open to review by the lead developer or a science reviewer; their first text is kept after the answer.
 
-1. **Which source is AMG here, and are the forms its forms?** The carbon method is `OPEN` in `docs/METHODS.md`. Candidate primary sources, named from the session's memory only, **not read and not checked; to be located and confirmed**: the article that first described AMG (Andriulo, Mary and Guérif, 1999, in *Agronomie*); an article on the stable pool of AMG (Saffih-Hdadi and Mary, 2008, in *Soil Biology and Biochemistry*); the article that described the version of AMG with the soil and climate modifiers (Clivot and others, 2019, in *Environmental Modelling & Software*). Each form above, and the locator of each equation, is to be confirmed against the chosen source. For the science lead.
-2. **Which scheme is the step of the source, yearly and monthly?** The explicit step is the classic discrete form of a two-pool balance; the exponential step is the exact solution over a step with inputs spread evenly. Whether the source steps by year with one or the other, and what its monthly adaptation is (blueprint section 8), is not known. For the science lead.
+1. **Which source is AMG here, and are the forms its forms?** **Answered by [D192](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765):** AMGv2 as printed in Clivot et al. (2019), *Environmental Modelling & Software* 118:99-113, https://doi.org/10.1016/j.envsoft.2019.04.004, equation 5 (p. 101) and Appendix A, equations S7 to S13 (pp. 110-111). Still open: each form here compared with those equations by a person (no session read the publication). *As first written:* The carbon method is `OPEN` in `docs/METHODS.md`. Candidate primary sources, named from the session's memory only, **not read and not checked; to be located and confirmed**: the article that first described AMG (Andriulo, Mary and Guérif, 1999, in *Agronomie*); an article on the stable pool of AMG (Saffih-Hdadi and Mary, 2008, in *Soil Biology and Biochemistry*); the article that described the version of AMG with the soil and climate modifiers (Clivot and others, 2019, in *Environmental Modelling & Software*). Each form above, and the locator of each equation, is to be confirmed against the chosen source. For the science lead.
+2. **Which scheme is the step of the source, yearly and monthly?** **Answered by [D192](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765) for the yearly step:** the exact exponential solution, scheme `exponential`, which D192 finds in the official AMGv2 code (line 239 of `scripts/AMG_Script.R`) and in the closed form of the Andriulo et al. (1999) line of work: "no source read uses an explicit difference step". `entry.SCHEME` is `exponential`. Still open: the monthly adaptation (blueprint section 8). *As first written:* The explicit step is the classic discrete form of a two-pool balance; the exponential step is the exact solution over a step with inputs spread evenly. Whether the source steps by year with one or the other, and what its monthly adaptation is (blueprint section 8), is not known. For the science lead.
 3. **The explicit scheme above one.** `rate_coefficient * duration` above one is refused (PROPOSED: it would mineralise more carbon than the active pool holds). Whether the source bounds it, or whether the inputs of a step are mineralised in the same step, is not known. For the science lead.
-4. **Which modifiers, and which inputs feed them?** Five are proposed: temperature, moisture, clay, carbonate, pH. Whether the source has each, whether it has others (for example one for the carbon to nitrogen ratio of the soil), and which temperature (air or soil, mean over which period) and which water balance (precipitation and irrigation less potential evapotranspiration, or another) feed them, is not known. Which modifiers `rate_coefficient` multiplies is the caller's: an empty mapping gives the potential rate. For the science lead.
+4. **Which modifiers, and which inputs feed them?** **Answered by [D192](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765):** the six of equation 5: temperature, moisture, clay, carbonate, pH and the C:N ratio of the soil; the temperature is the mean annual air temperature (S7; D118), the soil C:N ratio is a quantity of the forcing (D193). The water balance is D119 and D181 of issue #77, outside this folder. *As first written:* Five are proposed: temperature, moisture, clay, carbonate, pH. Whether the source has each, whether it has others (for example one for the carbon to nitrogen ratio of the soil), and which temperature (air or soil, mean over which period) and which water balance (precipitation and irrigation less potential evapotranspiration, or another) feed them, is not known. Which modifiers `rate_coefficient` multiplies is the caller's: an empty mapping gives the potential rate. For the science lead.
 5. **Which values may a constant or a modifier take?** Only what a form cannot carry is refused: a negative modifier (it would make the active pool grow by mineralisation), a negative potential rate, rate or content, a fraction outside zero to one. No bound is put on a sensitivity or a shape coefficient; a bound is a value, so a person supplies it. For the science lead.
 6. **A step without carbon input.** An empty mapping of inputs is refused, so that "no input" is always written as an origin at zero and never arrives by omission. For the lead developer.
 7. **The origins of the carbon inputs and their coefficients.** The vocabulary of origins is OPEN 4 of `contracts/carbon_forcing/README.md`; how a catalogue record names its origin (the scope keys of `params/README.md`) is for the lead developer; whether the humification coefficient depends on the crop, the organ or the product, for the science lead.
@@ -249,14 +281,17 @@ Each item is a question a person has to answer; the role that answers it is name
 11. **Who computes the trend values and builds the indicator values.** Q14 (c) of `contracts/ENTRYPOINTS.md`: each carbon engine or one shared function. These functions sit in `engine/amg/`; if one function is shared with RothC, it may move. Range and provenance of a value (C2.2, C4.3) are for the caller that builds a `SoilCarbonTrend`. For the lead developer and the interface developer.
 12. **Raising for a caller defect.** These functions raise `TypeError` for an argument of another type and `ValueError` for an unknown scheme or series of different lengths, as G5 allows; whether they may is Q7 of `contracts/ENTRYPOINTS.md`. For the platform developer.
 13. **Reason codes.** A unit that is not accepted, a value outside what a quantity can be and a non-finite number are `NOT_COMPUTABLE` (Q11 of `contracts/ENTRYPOINTS.md`). For the lead developer.
-14. **The proposed identifiers.** The table of constants proposes twelve with the prefix `amg_`, and `SCHEMES` proposes `"explicit"` and `"exponential"`. For the lead developer, who owns `params/`.
+14. **The proposed identifiers.** The table of constants proposes fifteen with the prefix `amg_` (the last three, `amg_cn_ratio_sensitivity`, `amg_cn_ratio_optimum` and `amg_cn_ratio_minimum`, by the brief of issue #299 and D199), and `SCHEMES` proposes `"explicit"` and `"exponential"`. For the lead developer, who owns `params/`.
 15. **EP5.** Built by unit `l1/amg-ep5`: see [EP5 run_amg](#ep5-run_amg) and its own OPEN list. `ModelState` still does not exist.
+16. **The unit of the cut of the temperature modifier.** The cut is at zero of the temperature's own unit and reads no unit text, so it is right only on a Celsius scale (S7 gives degrees Celsius; D195 fixes `degC`). The engine does not check that the unit text is `degC`: the core compares unit strings with each other and knows no unit by name, and the brief of issue #299 adds no such rule. Whether the entry point should refuse a temperature whose unit text is not `degC` is for the lead developer.
+17. **The two differences from the official code** ([Declared differences from the official code](#declared-differences-from-the-official-code)): the value at or below zero (line 215) and the year of the input paired with the rate (line 239). D192 keeps both as declared differences; whether the pairing of the same agricultural year is the reading of the publication is for the science lead, with the source in hand.
 
 ## Not verified
 
 - **The forms and every constant against a source of AMG.** The session read none, by rule.
 - **The published worked examples.** The three tests are skipped until a person transcribes them.
-- **The candidate sources of OPEN 1.** Named from memory; their titles, authors, years and journals are not checked.
+- **The candidate sources of OPEN 1.** Named from memory by unit `l1/amg-core`; their titles, authors, years and journals were not checked by a session. D192 now names the source and its equations; the session of unit `l1/amg-v2-complete-d192` repeats what D192 and D199 say and read neither the publication, the dataset nor the official code.
+- **Equation S13 and the cut of S8 against the publication.** Written as D192 and D199 state them.
 - **The names scan of CI.** The list of forbidden names is a secret of the repository.
 - **Lint in CI.** The CI workflow runs ruff on `api/`, `adapters/` and `ci/` only; the session ran ruff on this folder.
 
@@ -280,7 +315,7 @@ Only **AMG-A**, the annual published reference that takes part in the selection 
 
 1. **Steps.** One step per agricultural year of the horizon, from its first month (C5.3), each of length one `yr` (C1.1: one agricultural year). Months after the last whole agricultural year make one more step, which is not computed: its inputs are missing, reason `NOT_COMPUTABLE`, "not a whole agricultural year" (the core then reports the step `MISSING_INPUT` naming them). Why `NOT_COMPUTABLE` and not `NO_COVERAGE` is EP5 OPEN 12.
 2. **Initial state.** `initial_state(total_carbon, stable_fraction)` of the core: the starting soil carbon of the forcing and `amg_stable_fraction`.
-3. **Each step.** `humified_input` of the core, over every series of `annual_carbon_inputs` (keyed by the series' quantity, each with the humification coefficient of its `origin`). `rate_coefficient` of the core: the potential rate times the five modifiers of the core (temperature and moisture of that agricultural year; clay, carbonate and pH of the soil). `run` of the core with scheme `explicit` (EP5 OPEN 3).
+3. **Each step.** `humified_input` of the core, over every series of `annual_carbon_inputs` (keyed by the series' quantity, each with the humification coefficient of its `origin`). `rate_coefficient` of the core: the potential rate times the six modifiers of equation 5 (temperature and moisture of that agricultural year; clay, carbonate, pH and C:N ratio of the soil; D192). In a year whose mean temperature is zero or below, the temperature modifier is zero (S8), so the rate coefficient is zero and nothing is mineralised. `run` of the core with scheme `exponential` (D192; EP5 OPEN 3).
 4. **Trend.** `trend_measures` of the core over the total stocks and elapsed times of the run. `mean_over_cycles` is given no cycle boundaries, because `CarbonForcing` carries no rotation cycle: it is always missing, `MISSING_INPUT`, naming that input, and also the first missing stock when there is one (EP5 OPEN 6).
 5. **The balance.** `total_stock` (`soil_organic_carbon`), `pools` (`amg_active_pool`, `amg_stable_pool`) and `flows` (`amg_humified_input`, `amg_mineralised_carbon`), all in `t C ha-1`, one value per step; the three `SoilCarbonTrend` values in `t C ha-1 yr-1`. The initial stocks carry `DERIVED` (a fixed formula of declared values, C4.3); step values and trend values carry `SIMULATED` (C4.1). Each present value carries a source naming `engine.amg.run_amg`, the variant, the scheme, the forcing quantities and the parameter records read, and `range_missing` with reason `NOT_AVAILABLE` (no range is computed; Q6 of `contracts/ENTRYPOINTS.md`). `horizon`, `soil_depth`, `example_data` and the three identifiers are copied from the forcing.
 
@@ -297,16 +332,17 @@ The identifiers are PROPOSED (`entry.FORCING_QUANTITIES`), for the producer of `
 | `clay_modifier.clay_content` | `soil_properties` | `clay_content` | compared by the core with the unit of `amg_clay_sensitivity` |
 | `carbonate_modifier.carbonate_content` | `soil_properties` | `carbonate_content` | compared by the core with the unit of `amg_carbonate_sensitivity` |
 | `ph_modifier.ph` | `soil_properties` | `ph` | `dimensionless` (C1.1) |
+| `cn_ratio_modifier.cn_ratio` | `soil_properties` | `soil_cn_ratio` (D193) | `dimensionless` (C1.1); another unit is `NOT_COMPUTABLE` |
 
 Not read by AMG-A: `climate`, `carbon_inputs` and `soil_cover` (the monthly series). `soil_depth` is copied unchanged.
 
 ### What it reads from the parameter catalogue
 
-The twelve parameters of the table [Constants a person has to transcribe](#constants-a-person-has-to-transcribe), with those identifiers, each found by its `id` and its `scope`, exactly, as in `engine/water/` (question 5 of `params/README.md`). Every scope is empty except that of `amg_humification_coefficient`: one record per origin, with the origin under the scope key `crop` (EP5 OPEN 4). How the unit of each record is used (`entry.PARAMETERS`; C1.1 writes "per X" as `X-1`):
+The fifteen parameters of the table [Constants a person has to transcribe](#constants-a-person-has-to-transcribe), with those identifiers, each found by its `id` and its `scope`, exactly, as in `engine/water/` (question 5 of `params/README.md`). Every scope is empty except that of `amg_humification_coefficient`: one record per origin, with the origin under the scope key `crop` (EP5 OPEN 4). How the unit of each record is used (`entry.PARAMETERS`; C1.1 writes "per X" as `X-1`):
 
 | Parameters | Unit of the record |
 |---|---|
-| `amg_humification_coefficient`, `amg_stable_fraction`, `amg_temperature_shape`, `amg_moisture_shape`, `amg_ph_optimum`, `amg_ph_sensitivity` | `dimensionless`; another text is `NOT_COMPUTABLE` |
+| `amg_humification_coefficient`, `amg_stable_fraction`, `amg_temperature_shape`, `amg_moisture_shape`, `amg_ph_optimum`, `amg_ph_sensitivity`, `amg_cn_ratio_sensitivity`, `amg_cn_ratio_optimum`, `amg_cn_ratio_minimum` | `dimensionless`; another text is `NOT_COMPUTABLE` |
 | `amg_potential_mineralisation_rate` | `X-1`; `X` goes to the core as the time unit of the rate, which must be `yr` |
 | `amg_temperature_sensitivity`, `amg_moisture_sensitivity`, `amg_clay_sensitivity`, `amg_carbonate_sensitivity` | `X-1`; `X` goes to the core, which compares it with the unit of the input; a unit not written `X-1` is `NOT_COMPUTABLE` |
 | `amg_temperature_reference` | goes to the core as it is |
@@ -345,10 +381,12 @@ Each case is a test function of `test_entry.py`; a test checks that this list an
 | `test_example_forcing_and_empty_catalogue_give_every_value_missing_naming_parameters` | The forcing example and `{}`: a valid `CarbonBalance` in which every value is missing, `MISSING_INPUT`, naming a parameter with "no record in parameters (D56)" |
 | `test_placeholder_catalogue_passes_check_catalogue_and_stocks_are_computed_by_the_core` | A PLACEHOLDER catalogue that passes `check_catalogue`: every stock, pool and flow equals the core's run built a second time by hand |
 | `test_mass_balance_holds_at_every_step` | At every step and over the run, the change of total stock equals humified input minus mineralised carbon; total equals active plus stable; the stable pool does not change |
+| `test_rate_coefficient_multiplies_six_modifiers` | D192: with the three records of the C:N modifier and `soil_cn_ratio` in the forcing, every stock, pool and flow equals the core's run built a second time by hand with six modifiers and scheme `exponential`; the mass balance holds; without the sixth modifier, or with the explicit step, the stocks are other numbers; the source text names the scheme, the quantity and the three records; a C:N ratio in another unit is not computed |
+| `test_a_year_at_or_below_zero_temperature_mineralises_nothing` | The cut of S8 through the entry point: in a year at or below zero the mineralised carbon is zero, a value, and the active pool gains the whole humified input; no later step is missing |
 | `test_trend_values_are_those_of_the_core_and_mean_over_cycles_waits_for_its_input` | `end_minus_start` and `fitted_slope` equal the core functions, with unit, provenance, model and range reason; `mean_over_cycles` missing, naming the cycle input |
 | `test_wrong_types_raise_type_error` | A forcing that is not a `CarbonForcing`, or a `parameters` that is not `dict[str, dict]`, raises `TypeError` |
 | `test_the_runner_finds_run_amg_by_its_module_path_and_name` | `engine.amg` and `run_amg`, the module path and name of EP5, resolve to this function |
-| `test_each_parameter_without_a_record_is_named` | Each of the twelve parameters removed alone: the trend and the last stock are missing, naming it |
+| `test_each_parameter_without_a_record_is_named` | Each of the fifteen parameters removed alone: the trend and the last stock are missing, naming it |
 | `test_a_record_without_a_value_is_named_with_its_reason` | A `null` value: `MISSING_INPUT` naming the parameter and repeating its reason; the initial stock, which does not need it, is computed |
 | `test_a_placeholder_record_is_not_read` | A record that still carries the word PLACEHOLDER is not read, and is named |
 | `test_a_unit_of_a_record_that_is_not_accepted_is_not_computed` | A dimensionless parameter in another unit; a sensitivity not written `X-1`; a rate per another time unit: each not computed, named |
@@ -363,15 +401,26 @@ Each case is a test function of `test_entry.py`; a test checks that this list an
 | `test_entry_holds_no_value_of_the_method` | `entry.py` writes no number but zero and one |
 | `test_readme_lists_the_cases_of_this_file` | This list and `test_entry.py` name the same cases |
 
+## The response of the route: PROPOSED cases
+
+Unit `l1/amg-v2-complete-d192` changes code that runs on every request (the engine, and `SOIL_PROPERTIES` of `api/carbon_forcing.py`) and must change no value the service returns. `test_runner_response.py` goes through `POST /api/rotations/run` with the engines of the repository, the PLACEHOLDER chain examples of `contracts/inputs/` and two catalogues: the empty one and the one the service loads (`params/records/`, which holds no record of AMG). The file is in this folder because the unit owns it and does not own `api/`; its place is PROPOSED.
+
+| Case | What it shows |
+|---|---|
+| `test_the_response_is_the_one_of_the_forms_of_main_but_for_the_amg_reasons` | For the rotation example and a two-year variant of it: the response is the response with the forms of `main` put back in memory (five modifiers, the explicit step, three soil properties), except the reason and the detail of the AMG rows and of the `amg` module; every AMG row is missing with a reason and a detail and holds no number; the `amg` module is `not_available` |
+| `test_the_forcing_the_runner_gives_ep5_carries_the_soil_cn_ratio` | The forcing the runner gives EP5 carries `soil_cn_ratio` among its soil properties, missing `NOT_AVAILABLE` naming D193 (the chain soil file holds no such item); the balance holds no trend value |
+
+The cut of the temperature modifier cannot be put back in memory by the first case; it changes a value only where a rate coefficient is computed, and none is while the rows are missing. Compared outside the repository by the session of the unit: the same four requests on `main` and on the branch give the same response, byte for byte (the detail of each AMG row names the starting carbon and `amg_stable_fraction`, which come before the modifiers).
+
 ## EP5 run_amg: OPEN
 
 Each item is a question a person answers; the role is named. None is answered by this unit.
 
 1. **AMG-M.** The monthly variant (blueprint section 8; experimental under D80, checked against AMG-A under uniform forcing, no carbon vote) is not built. Whether `run_amg` returns it too (a second balance, or a second function), how it is labelled, and which monthly series of the forcing it reads (Q14 (d)). For the lead developer.
-2. **The forcing quantities.** `soil_organic_carbon`, `mean_temperature`, `water_balance`, `clay_content`, `carbonate_content`, `ph` (PROPOSED). Which temperature (air or soil, mean of what) and which water balance feed the modifiers (OPEN 4 of the core), and who makes the annual values from the daily record. For the platform developer, as producer of `CarbonForcing`, and the science reviewers.
-3. **The scheme of the annual step.** `explicit` is used so that AMG-A can run (OPEN 2 of the core). For the science lead.
+2. **The forcing quantities.** `soil_organic_carbon`, `mean_temperature`, `water_balance`, `clay_content`, `carbonate_content`, `ph`, and `soil_cn_ratio` for the soil C:N ratio of D193 (PROPOSED). Which temperature (air or soil, mean of what) and which water balance feed the modifiers (OPEN 4 of the core), and who makes the annual values from the daily record. For the platform developer, as producer of `CarbonForcing`, and the science reviewers.
+3. **The scheme of the annual step.** **Answered by [D192](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765):** `exponential` (OPEN 2 of the core). *As first written:* `explicit` is used so that AMG-A can run. For the science lead.
 4. **The scope of a humification coefficient.** The origin is written under the scope key `crop`; `params/catalogue.py` has no key for an origin, and the vocabulary of origins is OPEN (OPEN 7 of the core; OPEN 4 of `contracts/carbon_forcing/README.md`). For the lead developer.
-5. **Which modifiers.** All five of the core multiply the rate (OPEN 4 of the core). For the science lead.
+5. **Which modifiers.** **Answered by [D192](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765):** the six of equation 5 multiply the rate (OPEN 4 of the core). *As first written:* All five of the core multiply the rate. For the science lead.
 6. **Cycle boundaries.** `mean_over_cycles` needs the whole rotation cycles. `CarbonForcing` carries no cycle length or boundaries, so it is always missing. Either the forcing gains them (a change of `contracts/carbon_forcing/`: the platform developer and the lead developer) or EP5 gains an argument (a change of `contracts/ENTRYPOINTS.md`: lane L0).
 7. **Units.** The stocks and inputs must be in `t C ha-1` and the rate per `yr`; nothing is converted (OPEN 9 of the core). The unit string of a dimensionless record (`dimensionless`, C1.1) is also question 1 of `params/README.md`. For the lead developer.
 8. **The carbon inputs per agricultural year.** An annual carbon input is read as the amount entering over that agricultural year, in `t C ha-1`. For the platform developer and the science reviewers.
@@ -380,9 +429,10 @@ Each item is a question a person answers; the role is named. None is answered by
 11. **The source text of a value** (question 11 of `contracts/results/README.md`). PROPOSED here: it names the engine, the variant, the scheme, the forcing quantities and the parameter records. For the lead developer.
 
 12. **Which reason code for the months after the last whole agricultural year.** PROPOSED: `NOT_COMPUTABLE`, not `NO_COVERAGE`. C5.5 gives `NO_COVERAGE` to an agricultural year that *the data series* does not cover from its first day to its last: it is about the extent of the data (C3.2: "the data source has no data for this place or this period"). Here the months are inside the horizon the run is asked for, and the forcing may hold values for every one of them; what fails is the method, whose annual step (AMG-A, D80) covers whole agricultural years only. That is the case C3.2 and G4 give to `NOT_COMPUTABLE`: "the inputs are present but the method cannot produce a value for this case". A year that the data does not cover arrives in the forcing as a value already missing with `NO_COVERAGE` (C5.5, applied by the producer of `CarbonForcing`), and run_amg passes that reason on unchanged in the step's detail. In practice the case arises only for a forcing without annual series, because `CarbonForcing` requires a horizon of whole agricultural years whenever it carries one. For the lead developer, who may instead make such a horizon an invalid forcing.
+13. **For the platform developer: `soil_cn_ratio` in the producer of the forcing.** `api/carbon_forcing.py` writes the fourth soil property (D193), copied unchanged from the site file when it carries an item with that exact quantity, otherwise missing `NOT_AVAILABLE` naming D193; that one change in `api/` was made by unit `l1/amg-v2-complete-d192` under D159 of issue #77. Left for the platform lane: the row of `soil_cn_ratio` in the table "The producer of CarbonForcing" of `api/README.md`; and the unit text of the missing item, which is `OPEN` like the other three although the unit is decided (`dimensionless`).
 
 ## EP5 run_amg: not verified
 
-- **Any value of AMG.** Every number in the tests is a PLACEHOLDER; `params/records/` is empty (D34).
+- **Any value of AMG.** Every number in the tests is a PLACEHOLDER; `params/records/` holds no record of AMG (D34), so the service returns every AMG row missing.
 - **Use by the runner.** The runner does not call EP5 (see [The runner](#the-runner)).
 - **The names scan of CI** (the list is a secret) and **lint in CI** (ruff runs on `api/`, `adapters/` and `ci/` only; this session ran it on this folder and on `contracts/carbon_balance/`).

@@ -60,7 +60,13 @@ from contracts.results.models import Missing as ResultsMissing
 
 MEAN_TEMPERATURE = "mean_temperature"  # annual_climate
 WATER_BALANCE = "water_balance"  # annual_climate
-SOIL_PROPERTIES: tuple[str, ...] = ("clay_content", "carbonate_content", "ph")
+SOIL_CN_RATIO = "soil_cn_ratio"  # soil_properties (D193 of #77)
+SOIL_PROPERTIES: tuple[str, ...] = (
+    "clay_content",
+    "carbonate_content",
+    "ph",
+    SOIL_CN_RATIO,
+)
 STARTING_CARBON = "soil_organic_carbon"  # starting_state
 
 # --- units ----------------------------------------------------------------------
@@ -92,6 +98,12 @@ SOIL_PROPERTY_OPEN = (
     "not read yet: D120 of #77 takes it from the soil profile of D112, read by "
     "a person with its page (D34); site data: soil and slope carries no item "
     "with this quantity"
+)
+SOIL_CN_RATIO_OPEN = (
+    "not read yet: D193 of #77, which amends D120, takes the soil C:N ratio "
+    "from the organic matter and the total nitrogen of one reference soil "
+    "profile, read by a person with its page (D34); site data: soil and slope "
+    "carries no item soil_cn_ratio"
 )
 STARTING_CARBON_OPEN = (
     "not read yet: D121 of #77 takes it from the soil profile of D112, read by a "
@@ -364,7 +376,10 @@ def _soil_property(soil_slope: SiteSoilSlope, quantity: str) -> SoilProperty:
         quantity=quantity,
         value=None,
         unit=UNIT_OPEN,
-        missing=_missing("NOT_AVAILABLE", SOIL_PROPERTY_OPEN),
+        missing=_missing(
+            "NOT_AVAILABLE",
+            SOIL_CN_RATIO_OPEN if quantity == SOIL_CN_RATIO else SOIL_PROPERTY_OPEN,
+        ),
     )
 
 

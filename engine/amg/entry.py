@@ -14,7 +14,8 @@ What it builds (README.md of this folder, section "EP5 run_amg"):
 - Inputs from the forcing: the starting soil carbon (``starting_state``),
   the annual carbon inputs by origin (``annual_carbon_inputs``), the annual
   temperature and water balance (``annual_climate``) and the clay,
-  carbonate and pH of the soil (``soil_properties``). Their identifiers are
+  carbonate, pH and C:N ratio of the soil (``soil_properties``; the C:N
+  ratio by decision D193 of issue #77). Their identifiers are
   PROPOSED in ``FORCING_QUANTITIES``; the vocabulary of the forcing is OPEN
   (contracts/carbon_forcing/README.md).
 - Every constant is read from ``parameters`` with the pure readers of
@@ -63,6 +64,7 @@ from ._numbers import NumberOrMissing, describe_missing, is_missing
 from .modifiers import (
     carbonate_modifier,
     clay_modifier,
+    cn_ratio_modifier,
     moisture_modifier,
     ph_modifier,
     rate_coefficient,
@@ -88,9 +90,9 @@ __all__ = [
 
 CARBON_MODEL = "amg"  # D1 of issue #77
 VARIANT = "amg_a"  # AMG-A of D80; the vocabulary of ``variant`` is OPEN
-# The scheme of the annual step. OPEN 2 of README.md: the source decides;
-# chosen here only so that AMG-A can run, for the science lead to confirm.
-SCHEME = "explicit"
+# The scheme of the annual step: the exact exponential solution over the year
+# (decision D192 of issue #77; OPEN 2 of README.md).
+SCHEME = "exponential"
 STEP_UNIT = "yr"  # C1.1: one agricultural year; the length of every step is one
 _PER = "-1"  # C1.1 writes "per X" as "X-1", as in "t ha-1 yr-1"
 # The unit of every stock and flow: the unit of C1.5 without "per year", so
@@ -109,6 +111,8 @@ FORCING_QUANTITIES: dict[str, tuple[str, str]] = {
     "clay_content": ("soil_properties", "clay_content"),
     "carbonate_content": ("soil_properties", "carbonate_content"),
     "ph": ("soil_properties", "ph"),
+    # D193 of issue #77: the soil C:N ratio, a quantity of the forcing.
+    "cn_ratio": ("soil_properties", "soil_cn_ratio"),
 }
 
 # The parameters, with the identifiers the core proposes (README.md) and how
@@ -128,13 +132,24 @@ PARAMETERS: dict[str, tuple[str, str]] = {
     "carbonate_sensitivity": ("amg_carbonate_sensitivity", "per"),
     "ph_optimum": ("amg_ph_optimum", "dimensionless"),
     "ph_sensitivity": ("amg_ph_sensitivity", "dimensionless"),
+    # The three constants of the C:N modifier (D192; the minimum, D199).
+    "cn_ratio_sensitivity": ("amg_cn_ratio_sensitivity", "dimensionless"),
+    "cn_ratio_optimum": ("amg_cn_ratio_optimum", "dimensionless"),
+    "cn_ratio_minimum": ("amg_cn_ratio_minimum", "dimensionless"),
 }
 # The humification coefficient has one record per origin of a carbon input;
 # the origin is written under this scope key (OPEN 7 of README.md).
 ORIGIN_SCOPE_KEY = "crop"
-# The modifiers the rate coefficient of AMG-A multiplies: all five of the core
-# (OPEN 4 of README.md).
-MODIFIERS: tuple[str, ...] = ("temperature", "moisture", "clay", "carbonate", "ph")
+# The modifiers the rate coefficient of AMG-A multiplies: the six of the
+# source (decision D192 of issue #77; OPEN 4 of README.md).
+MODIFIERS: tuple[str, ...] = (
+    "temperature",
+    "moisture",
+    "clay",
+    "carbonate",
+    "ph",
+    "cn_ratio",
+)
 
 # The series of the balance.
 POOL_QUANTITIES = {
@@ -369,14 +384,27 @@ def _modifiers(
     clay, clay_unit = _soil(forcing, "clay_content")
     carbonate, carbonate_unit = _soil(forcing, "carbonate_content")
     ph, ph_unit = _soil(forcing, "ph")
+    cn_ratio, cn_ratio_unit = _soil(forcing, "cn_ratio")
     clay_sensitivity = catalogue.read("clay_sensitivity")
     carbonate_sensitivity = catalogue.read("carbonate_sensitivity")
     ph_optimum = catalogue.read("ph_optimum")
     ph_sensitivity = catalogue.read("ph_sensitivity")
+    cn_ratio_optimum = catalogue.read("cn_ratio_optimum")
+    cn_ratio_sensitivity = catalogue.read("cn_ratio_sensitivity")
+    cn_ratio_minimum = catalogue.read("cn_ratio_minimum")
     if not is_missing(ph) and ph_unit != DIMENSIONLESS:
         ph = ResultMissing(
             reason="NOT_COMPUTABLE",
             detail=f"soil property 'ph' is in '{ph_unit}'; expected '{DIMENSIONLESS}' (C1.1)",
+        )
+    if not is_missing(cn_ratio) and cn_ratio_unit != DIMENSIONLESS:
+        quantity = FORCING_QUANTITIES["cn_ratio"][1]
+        cn_ratio = ResultMissing(
+            reason="NOT_COMPUTABLE",
+            detail=(
+                f"soil property '{quantity}' is in '{cn_ratio_unit}'; expected "
+                f"'{DIMENSIONLESS}' (C1.1)"
+            ),
         )
     soil = {
         "clay": clay_modifier(
@@ -395,6 +423,12 @@ def _modifiers(
             ph=ph,
             optimum_ph=ph_optimum.value,
             sensitivity_coefficient=ph_sensitivity.value,
+        ),
+        "cn_ratio": cn_ratio_modifier(
+            cn_ratio=cn_ratio,
+            optimum_cn_ratio=cn_ratio_optimum.value,
+            sensitivity_coefficient=cn_ratio_sensitivity.value,
+            minimum=cn_ratio_minimum.value,
         ),
     }
     temperatures, temperature_unit = _annual_climate(forcing, "temperature")

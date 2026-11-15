@@ -35,6 +35,7 @@ from engine.amg import (
     TrendMeasures,
     carbonate_modifier,
     clay_modifier,
+    cn_ratio_modifier,
     end_minus_start,
     fitted_slope,
     humified_input,
@@ -48,6 +49,7 @@ from engine.amg import (
     temperature_modifier,
     trend_measures,
 )
+from engine.amg.entry import MODIFIERS
 
 HERE = Path(__file__).parent
 README = HERE / "README.md"
@@ -116,6 +118,16 @@ def carbonate(**changes):
 def ph(**changes):
     arguments = dict(ph=6.66, optimum_ph=7.77, sensitivity_coefficient=0.0777)
     return ph_modifier(**{**arguments, **changes})
+
+
+def cn(**changes):
+    arguments = dict(
+        cn_ratio=77.7,
+        optimum_cn_ratio=66.6,
+        sensitivity_coefficient=0.00333,
+        minimum=0.444,
+    )
+    return cn_ratio_modifier(**{**arguments, **changes})
 
 
 def rate(**changes):
@@ -361,9 +373,47 @@ def test_step_unknown_scheme_raises_value_error():
 
 
 def test_temperature_modifier_follows_the_proposed_form():
-    for t in (-11.1, 0.0, 11.1, 22.2, 33.3):
+    # Above a temperature of zero; at or below it the modifier is zero (S8,
+    # D192): test_temperature_modifier_is_zero_at_or_below_zero.
+    for t in (1e-9, 1.11, 11.1, 22.2, 33.3):
         expected = 3.33 / (1 + (3.33 - 1) * math.exp(0.111 * (22.2 - t)))
         assert temperature(temperature=t) == pytest.approx(expected, rel=1e-15)
+
+
+def test_temperature_modifier_is_zero_at_or_below_zero():
+    # The cut of S8 (D192): zero, a value and not a missing, at and below zero.
+    for t in (0.0, -0.0, 0, -1e-9, -11.1, -999.9):
+        result = temperature(temperature=t)
+        assert result == 0 and isinstance(result, float), t
+        # Whatever the constants, also those for which the form above zero
+        # gives a negative number or none.
+        assert temperature(temperature=t, shape_coefficient=0.5) == 0
+        assert temperature(temperature=t, sensitivity_coefficient=1e3) == 0
+        assert temperature(temperature=t, reference_temperature=-22.2) == 0
+    # Just above zero the form applies, and it is not zero.
+    above = temperature(temperature=1e-9)
+    expected = 3.33 / (1 + (3.33 - 1) * math.exp(0.111 * (22.2 - 1e-9)))
+    assert above == pytest.approx(expected, rel=1e-15) and above > 0
+    # The checks come before the cut: a missing or refused argument stays so.
+    for shape in BOTH_SHAPES:
+        assert_missing(
+            temperature(temperature=-11.1, shape_coefficient=shape),
+            "MISSING_INPUT",
+            "shape_coefficient",
+        )
+        assert_missing(temperature(temperature=shape), "MISSING_INPUT", "temperature")
+    assert_missing(
+        temperature(temperature=-11.1, temperature_unit="PLACEHOLDER_other_unit"),
+        "NOT_COMPUTABLE",
+        "PLACEHOLDER_other_unit",
+    )
+    assert_missing(
+        temperature(temperature=-11.1, sensitivity_coefficient=math.nan),
+        "NOT_COMPUTABLE",
+        "sensitivity_coefficient",
+    )
+    # A modifier of zero gives a rate coefficient of zero.
+    assert rate(modifiers={"temperature": temperature(temperature=-11.1)}) == 0
 
 
 def test_temperature_modifier_is_one_at_the_reference_temperature():
@@ -405,6 +455,48 @@ def test_ph_modifier_follows_the_proposed_form():
     assert ph(ph=7.77) == 1.0
 
 
+def test_cn_ratio_modifier_follows_s13():
+    # The form of S13 as D192 and D199 state it, written a second time, over a
+    # grid of PLACEHOLDER ratios, optima, sensitivities and minima.
+    for ratio in (0.0, 33.3, 66.6, 77.7, 99.9):
+        for optimum in (66.6, 44.4):
+            for sensitivity in (0.00333, 0.0555):
+                for minimum in (0.0, 0.444, 0.777, 1.0):
+                    expected = minimum + (1 - minimum) * math.exp(
+                        -sensitivity * (ratio - optimum) ** 2
+                    )
+                    result = cn(
+                        cn_ratio=ratio,
+                        optimum_cn_ratio=optimum,
+                        sensitivity_coefficient=sensitivity,
+                        minimum=minimum,
+                    )
+                    assert result == pytest.approx(expected, rel=1e-15)
+                    assert minimum <= result <= 1
+    # One at the optimum, for any minimum.
+    for minimum in (0.0, 0.111, 0.444, 0.777, 0.999, 1.0):
+        assert cn(cn_ratio=66.6, minimum=minimum) == pytest.approx(1.0, rel=1e-15)
+    # Far from the optimum it tends to the minimum, from above.
+    near, far, farther = (
+        cn(cn_ratio=ratio, sensitivity_coefficient=0.0555)
+        for ratio in (67.7, 77.7, 999.9)
+    )
+    assert near > far > farther >= 0.444
+    assert farther == pytest.approx(0.444, rel=1e-12)
+    # With a minimum of one the modifier is one everywhere.
+    assert cn(cn_ratio=999.9, minimum=1.0) == 1.0
+    # A negative ratio, or a minimum outside zero to one even by a hair.
+    assert_missing(cn(cn_ratio=-77.7), "NOT_COMPUTABLE", "cn_ratio", "negative")
+    for minimum in (-0.444, -1e-12, 1.0 + 1e-12, 4.44):
+        result = cn(minimum=minimum)
+        assert_missing(result, "NOT_COMPUTABLE", "minimum", "outside zero to one")
+        assert "cn_ratio" not in result.detail
+    # A missing argument, both shapes, named with its reason.
+    for name in ("cn_ratio", "optimum_cn_ratio", "sensitivity_coefficient", "minimum"):
+        for shape in BOTH_SHAPES:
+            assert_missing(cn(**{name: shape}), "MISSING_INPUT", name, shape.reason)
+
+
 def test_modifier_negative_content_is_refused():
     assert_missing(
         clay(clay_content=-222.0), "NOT_COMPUTABLE", "clay_content", "negative"
@@ -414,12 +506,14 @@ def test_modifier_negative_content_is_refused():
 
 def test_modifier_that_the_form_makes_negative_or_not_finite_is_not_computed():
     # A shape below one makes the denominator negative far below the reference.
-    assert_missing(temperature(shape_coefficient=0.5, temperature=-111.0), "NOT_COMPUTABLE", "temperature_modifier")  # fmt: skip
+    # (Above zero: at or below it the modifier is zero, S8.)
+    assert_missing(temperature(shape_coefficient=0.5, temperature=1.11), "NOT_COMPUTABLE", "temperature_modifier")  # fmt: skip
     # A negative sensitivity that cancels the denominator, or overflows the exponential.
     assert_missing(carbonate(sensitivity_coefficient=-1.0, carbonate_content=1.0), "NOT_COMPUTABLE", "carbonate_modifier")  # fmt: skip
     assert_missing(carbonate(sensitivity_coefficient=-1.0, carbonate_content=2.0), "NOT_COMPUTABLE", "negative")  # fmt: skip
     assert_missing(clay(sensitivity_coefficient=-1e3, clay_content=1e3), "NOT_COMPUTABLE", "clay_modifier")  # fmt: skip
     assert_missing(moisture(sensitivity_coefficient=1e3, water_balance=-1e3), "NOT_COMPUTABLE", "moisture_modifier")  # fmt: skip
+    assert_missing(cn(sensitivity_coefficient=-1e3, cn_ratio=999.9), "NOT_COMPUTABLE", "cn_ratio_modifier")  # fmt: skip
 
 
 @pytest.mark.parametrize(
@@ -446,7 +540,8 @@ def test_rate_coefficient_is_the_potential_rate_times_the_modifiers():
     assert rate(modifiers={}) == 0.444
     assert rate(modifiers={"a": 0.0}) == 0.0
     # Each modifier function feeds it.
-    modifiers = {"temperature": temperature(), "moisture": moisture(), "clay": clay(), "carbonate": carbonate(), "ph": ph()}  # fmt: skip
+    modifiers = {"temperature": temperature(), "moisture": moisture(), "clay": clay(), "carbonate": carbonate(), "ph": ph(), "cn_ratio": cn()}  # fmt: skip
+    assert tuple(modifiers) == MODIFIERS  # the six the entry point multiplies
     expected = 0.444 * math.prod(modifiers.values())
     assert rate(modifiers=modifiers) == pytest.approx(expected, rel=1e-14)
 
@@ -727,6 +822,10 @@ NUMBER_ARGUMENTS = [
     (ph, "ph"),
     (ph, "optimum_ph"),
     (ph, "sensitivity_coefficient"),
+    (cn, "cn_ratio"),
+    (cn, "optimum_cn_ratio"),
+    (cn, "sensitivity_coefficient"),
+    (cn, "minimum"),
     (rate, "potential_rate"),
     (initial, "total_carbon"),
     (initial, "stable_fraction"),
@@ -809,6 +908,7 @@ PUBLIC_FUNCTIONS = [
     clay_modifier,
     carbonate_modifier,
     ph_modifier,
+    cn_ratio_modifier,
     rate_coefficient,
     humified_input,
     initial_state,
@@ -871,6 +971,9 @@ CONSTANTS = {
     "carbonate_modifier.sensitivity_coefficient",
     "ph_modifier.optimum_ph",
     "ph_modifier.sensitivity_coefficient",
+    "cn_ratio_modifier.sensitivity_coefficient",
+    "cn_ratio_modifier.optimum_cn_ratio",
+    "cn_ratio_modifier.minimum",
 }
 
 

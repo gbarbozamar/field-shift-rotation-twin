@@ -200,6 +200,7 @@ def test_every_value_but_mean_temperature_is_missing_with_its_reason():
         "clay_content",
         "carbonate_content",
         "ph",
+        "soil_cn_ratio",
     ]
     # Monthly parts: run_amg reads annual series only.
     assert (forcing.climate, forcing.carbon_inputs, forcing.soil_cover) == ([], [], [])
@@ -228,7 +229,7 @@ def test_a_soil_property_with_the_exact_quantity_is_copied_unchanged():
     soil = chain_soil_slope([present, near])
     forcing = chain_forcing(soil_slope=soil)
     by_quantity = {item.quantity: item for item in forcing.soil_properties}
-    assert set(by_quantity) == {"clay_content", "carbonate_content", "ph"}
+    assert set(by_quantity) == set(producer.SOIL_PROPERTIES)
     assert by_quantity["clay_content"] == soil.soil_properties[0]
     assert by_quantity["carbonate_content"].value is None
     assert by_quantity["ph"].missing.reason == "NOT_AVAILABLE"
@@ -262,8 +263,43 @@ def test_the_identifiers_and_units_are_those_run_amg_reads():
         reads["clay_content"],
         reads["carbonate_content"],
         reads["ph"],
+        reads["cn_ratio"],
     ]
+    # Every soil property run_amg reads is one the producer writes, and no other.
+    assert {q for part, q in reads.values() if part == "soil_properties"} == set(
+        producer.SOIL_PROPERTIES
+    )
+    assert reads["cn_ratio"] == ("soil_properties", producer.SOIL_CN_RATIO)
     assert STOCK_UNIT == entry.STOCK_UNIT
+
+
+def test_d193_the_soil_cn_ratio_is_copied_unchanged_or_missing_naming_d193():
+    # A site file without soil_cn_ratio: missing, NOT_AVAILABLE, naming D193.
+    by_quantity = {item.quantity: item for item in chain_forcing().soil_properties}
+    absent = by_quantity["soil_cn_ratio"]
+    assert absent.value is None
+    assert absent.unit == UNIT_OPEN
+    assert absent.missing.reason == "NOT_AVAILABLE"
+    assert "D193" in absent.missing.detail
+    assert "soil_cn_ratio" in absent.missing.detail
+    # The other three keep the text of D120, which does not name D193.
+    for quantity in ("clay_content", "carbonate_content", "ph"):
+        assert "D193" not in by_quantity[quantity].missing.detail
+    # With the exact quantity it is copied unchanged, like the other three
+    # (the number is the example's, a PLACEHOLDER); a near name is not read.
+    present = {
+        **SOIL_SLOPE["soil_properties"][0],
+        "quantity": "soil_cn_ratio",
+        "unit": "dimensionless",
+    }
+    near = {**SOIL_SLOPE["soil_properties"][0], "quantity": "cn_ratio"}
+    soil = chain_soil_slope([near, present])
+    by_quantity = {
+        item.quantity: item for item in chain_forcing(soil_slope=soil).soil_properties
+    }
+    assert set(by_quantity) == set(producer.SOIL_PROPERTIES)
+    assert by_quantity["soil_cn_ratio"] == soil.soil_properties[1]
+    assert by_quantity["clay_content"].value is None
 
 
 # --- 2. the horizon: edge cases ---------------------------------------------------
