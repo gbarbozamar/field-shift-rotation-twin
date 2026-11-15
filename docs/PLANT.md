@@ -62,7 +62,7 @@ These files are example data; no number in them comes from a source, and none ma
 - `contracts/economic_facts/examples/PLACEHOLDER_economic_facts.json` (`"example_data": true`, every `crop_id` carries PLACEHOLDER; `contracts/economic_facts/README.md`).
 - `contracts/plant_answer/examples/PLACEHOLDER_plant_request.json` and `PLACEHOLDER_plant_answer.json` (`contracts/plant_answer/README.md` lists which of their parts are example inputs and which were computed by the real functions on them).
 - `web/src/data/PLACEHOLDER_plant_request.json`: the request the screen starts from and sends, with the user's choices of strictness, kind of year and heavier rain (`plantRequestFor` in `web/src/plant/plantRoute.ts`). The screen has no editor for its facts, its limit or its prices.
-- `web/src/data/PLACEHOLDER_plant_answers.json`: the example answers that `web/src/plant/plantData.ts` imports (`plantExamples`). Under D251 they are not shown on the screen; they stay test fixtures (`PlantNoServiceView` and `PlantScreenView` in `PlantScreen.tsx`).
+- `web/src/data/PLACEHOLDER_plant_answers.json`: the example answers that `web/src/plant/plantData.ts` imports (`plantExamples`). Under D251 no value of them is shown; the screen reads them only for its first state (`initialPlantState`, `onExample` in `PlantScreen.tsx`, through `selectQuestions`), and the tests use them as fixtures.
 - `web/src/data/PLACEHOLDER_plant_answer.json`: a copy of the contract example answer, which a test keeps equal to `contracts/plant_answer/examples/PLACEHOLDER_plant_answer.json` (module text of `plantData.ts`); `plantData.ts` does not import it.
 - `contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json`: the soil and slope that `compose.yaml` serves through `SOIL_SLOPE_EXAMPLE_FILE`.
 
