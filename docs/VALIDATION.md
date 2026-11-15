@@ -50,13 +50,15 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 - OPEN: several codes share one bracket in the blueprint. What each of those codes covers on its own is for the science reviewers to state; the entries say where this applies. Where the blueprint gives a code its own words inside a longer sentence, the entry quotes those words and gives the sentence as context.
 - OPEN: which values the Status field can take after `not defined`, and who sets each.
 - OPEN: whether an expected value and its citation are written in this file or kept in `validation/` with a pointer from here. The layout of `validation/` is a separate unit.
-- Section 8 is the only source of the codes below. A code that section 8 does not name has no entry. If the protocol has more codes, the science reviewers add them.
+- Section 8 is the only source of the codes below. A code that section 8 does not name has no entry. If the protocol has more codes, the science reviewers add them. The one exception is the plot check at the end of this file, which has no code: [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) asks for it to be recorded here.
+- OPEN, for the lead developer: **the tolerance of the plot check at the end of this file.** None was fixed before the run, and none is chosen here. For a run that follows, which ratio of the computed soil loss to the measured one counts as plausible? Options: (i) within a factor of 2 of the measured mean of 2017–2019; (ii) within the range of the measured plot-years, 71 to 1,478 kg/ha/yr; (iii) within a factor of 10.
 
 ## Codes in this file
 
 - E: E0, E1a, E1b, E2, E3, E7, E8, E9
 - H: H0, H1, H2, H5, H7, H8, H10
 - D: D0, D1, D2, D3, D4, D5, D6, D7, D10, D12
+- Plausibility check without a code in section 8: [EP1: plausibility against the La Estanzuela runoff plots (2017–2019)](#ep1-plausibility-against-the-la-estanzuela-runoff-plots-20172019)
 
 ## E codes
 
@@ -500,3 +502,32 @@ Section 3.6 of the blueprint lists "decision" among its examples of the class "L
 - Transcribed by: OPEN
 - Checked by: OPEN
 - Status: logic DECIDED (lead developer, 14 November 2026); the OPEN items in the definition are for the science reviewers; acceptance by a science reviewer pending
+
+## Plausibility check without a code in section 8
+
+This entry has no bracketed code: the blueprint's section 8 does not name it. [D148 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333) asks for the check and its result to be recorded in this file. It is a science-class entry (blueprint section 3.6): the numbers below are restated from D148 and from the source, and a science reviewer has not accepted it.
+
+### EP1: plausibility against the La Estanzuela runoff plots (2017–2019)
+
+- What it checks: the annual soil loss that EP1 (`compute_soil_loss`, main route, `docs/METHODS.md` M1.2) gives at the demonstration site, against the soil loss measured on the six Wischmeier runoff plots of La Estanzuela. It is not a check of the code (H2 and E3 cover the equations) and it is not a calibration: no value was fitted, calibrated or changed.
+- Lane: L0 Core (EP1); the check was run by an AI session, read-only.
+- Class (blueprint section 3.6): Science — PROPOSED
+- Source: Grahmann, K., Rubio, V., Perez-Bidegain, M., Quincke, J.A. (2022). *Soil Use Legacy as Driving Factor for Soil Erosion under Conservation Agriculture*. Frontiers in Environmental Science 10:822967, https://doi.org/10.3389/fenvs.2022.822967, CC BY 4.0 (the plots of D100):
+  - the yearly average soil losses of the six plots are 233, 805 and 139 kg/ha for 2017, 2018 and 2019 (pp. 1 and 8); their mean is the 0.392 t ha-1 yr-1 of D148;
+  - the measured yearly rates of single plots range from 71 to 1,478 kg/ha/yr (p. 12; Figure 4, p. 10);
+  - the crop sequence and its dates are in Table 1 (p. 4) and on p. 3, which says that all six plots were managed uniformly since 2015.
+- Soil: the plots are a Vertic Argiudoll with K = 0.023 (pp. 1, 3 and 7). That is not the soil of the demonstration, the Brunosol éutrico típico of [D112](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886174765) (class "T Brunosol" of D100). The runoff experiment stays separate from the demonstration (D71), and D112 already says that the soil-loss number does not reproduce the plots.
+- Definition: EP1 is run on the climate record of the site and on the rotation the plots had in 2017–2019, once with the declared `C` of D125 (the 26 records of #203) and once with the computed `C` of D129 and D142 to D145 (the records of #237). Its annual values are compared with the measured ones. The inputs of each run (the calendar dates the paper does not print, the cover crops that have no records, the commit of EP1 and the catalogues) are in the write-up of the check, which is not in this repository.
+- **Tolerance: none was fixed before the run.** The result is therefore reported as an observation. No pass rule was chosen after the result was seen, and none is chosen in this file. Choosing a tolerance for the runs that follow is listed under OPEN above.
+- Observed result, as D148 records it:
+  - **Declared `C` (D125):** 2.365 t ha-1 yr-1 against 0.392 measured, a ratio of 6.0 (2.9 to 17.0 by year, which is 2.365 divided by each of the three printed yearly averages). That is above all 18 measured plot-years. D148 calls it the same order of magnitude, and close to the paper's own RUSLE estimate.
+  - **Computed `C` (D129, D142 to D145):** about 24.4 t ha-1 yr-1 on average, a ratio of about 62 (18 to 180 by year in D148; the write-up's own table gives 176 for the highest year).
+  - **Order of the years:** the computed `C` reverses it. Measured: 2018 > 2017 > 2019. Computed: 2017 > 2019 > 2018 (n = 3).
+  - **Soil:** using the plot's K instead of the demonstration's explains at most a factor of 1.3.
+  - **Ranking of treatments:** it cannot be tested with this experiment, because all six plots had the same rotation since 2015.
+- Status, per D148: **not passed** for the computed `C`; a known overestimate of the same order of magnitude for the declared `C`. Since no tolerance was fixed, "not passed" is the wording of D148 and rests on the observed ratios above, not on a pass rule written in this file. This is not a validation of the model.
+- Consequence ([D148](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333), which amends D145 and D146): the computed `C` is withdrawn from the demonstration; its per-rotation values are not shown, as absolute values or as a comparison. Its code (#229) and its signed records (#237) stay in the repository as a documented capability that is not validated. The headline soil loss is the declared-`C` figure of D125 (2.365 t ha-1 yr-1 at La Estanzuela), shown with the label D148 words: "based on a Uruguayan no-till measurement; overestimates about 6 times the loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)". EP1 was not calibrated or tuned before the deadline.
+- After the event, per D148: temperature and moisture modifiers of residue decay, consolidated no-till subfactors, cover crops, and this same check kept as a regression test.
+- Transcribed by: the AI session that ran the check (D34). The numbers of the source are restated here from D148 and from the pages cited above.
+- Checked by: OPEN. D148 records the lead developer's acceptance of the recommendation, not a check of the numbers against the pages of the paper.
+- Status: result observed and recorded (15 November 2026); no test is written; acceptance by a science reviewer pending.

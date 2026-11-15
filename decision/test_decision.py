@@ -1,27 +1,30 @@
 """Acceptance test of the decision functions (units l2/decision-functions
-#163 and l2/decision-separation #202).
+#163, l2/decision-separation #202 and l2/tipping-priority-input #223).
 
-The table below is the one supplied by a person and verified by the lead
-developer on #96 (decisions D59 to D61 of #77); every expected value in
-this file is that supplied one, or follows from the decisions D74 and
-D85 to D99 of #77 as the person-approved expectations of #202 state
-them, and none is invented here. The logic each group of tests follows
-is the D entry of ``docs/VALIDATION.md`` named in its title, as decided
-by the lead developer on 14 November 2026.
+The first table below is the one supplied by a person and verified by the
+lead developer on #96 (decisions D59 to D61 of #77); every expected value
+on it is that supplied one, or follows from the decisions D74 and D85 to
+D99 of #77 as the person-approved expectations of #202 state them. The
+second case is the v2.1 tables of #223 (issue #177, comment of 14
+November 2026), approved by Martín as table designer and confirmed by
+the lead developer in review (D103 confirmed the design readings, D97
+and D98 re-derived the rows the case carries): every value, range,
+bracket, rank, state and refusal on it is that approved one, and none is
+invented here. The logic each group of tests follows is the D entry of
+``docs/VALIDATION.md`` named in its title, as decided by the lead
+developer on 14 November 2026.
 
-The table is labelled example data throughout; the results contract has
-no field for that label (``ResultsTable`` holds only ``case_id``,
+Both tables are labelled example data throughout; the results contract
+has no field for that label (``ResultsTable`` holds only ``case_id``,
 ``field_id`` and ``rows``), so the label lives in this docstring, and
 the sources of the numbers carry their PLACEHOLDER markers.
 
-The supplied table carries no range on any value (``range_missing``
-NOT_AVAILABLE everywhere), so under D92 no difference of any pair has a
-range: the branches of D92, D93 and D98 that need a range (a computed
-difference range, the classes of a ranged cell, the states "Robust
-preference" and "Not separated: within uncertainty") are implemented in
-``decision/functions.py`` and are not exercised numerically here,
-because no person-supplied table carries ranges and this file invents
-no value, threshold or range (CLAUDE.md, "Rules a session must follow").
+The first table carries no range on any value (``range_missing``
+NOT_AVAILABLE everywhere), so on it the branches of D92, D93 and D98
+that need a range are not exercised numerically; the v2.1 table of #223
+carries a range on every value (one kind, PLACEHOLDER_kind, so D92
+applies), and the tests on it exercise those branches and the entries
+D3, D4, D10 and D12 built on them.
 
 Run from the repository root: ``python -m pytest decision/``.
 """
@@ -31,21 +34,35 @@ from __future__ import annotations
 import pytest
 
 from contracts.results import models
-from contracts.results.models import Missing, ResultsTable, ResultsTableRow
+from contracts.results.models import (
+    Missing,
+    Range,
+    ResultsTable,
+    ResultsTableRow,
+)
 from decision.functions import (
     IDENTICAL,
+    NOT_ROBUST_ACROSS_SCENARIOS,
     NOT_SEPARATED_UNCERTAINTY_MISSING,
+    NOT_SEPARATED_WITHIN_UNCERTAINTY,
+    ROBUST_PREFERENCE,
     DeclaredLimit,
+    Measurement,
     PairCounts,
     PointSignCounts,
     RangeClassCounts,
+    UncertainInput,
     indicator_ranking,
     limit_counts,
+    measurement_consistency,
+    measurement_priority,
     never_preferred_less,
     paired_difference,
     paired_differences,
     pair_counts,
     pair_state,
+    recompute_with_measurement,
+    tipping_point,
 )
 
 # The numerical tolerance of the paired differences (D2) and of the
@@ -571,3 +588,409 @@ def test_d91_the_coverage_names_the_cells_compared_out_of_the_cells_of_the_pair(
     assert counts_of_b_c[("s1", "soil_loss")].cells_of_the_pair == 4
     # No minimum coverage is set (D91): a missing side lowers the coverage
     # and blocks nothing.
+
+
+# --- the v2.1 case of #223: every value below is the person-approved one -------
+
+
+# The kind label of every range of the case: one label on all, so the two
+# ranges of a pair share their kind and D92 applies (the closed list of
+# kinds is OPEN, C2.3).
+V21_RANGE_KIND = "PLACEHOLDER_kind"
+
+# The fixed cells of the case, as (value, low, high): A2020, A2021 at the
+# reference of u2 and B2020 at the reference of u3.
+A_2020 = (8.2, 7.8, 8.6)
+A_2021 = (7.4, 7.0, 7.8)
+B_2020 = (6.1, 5.8, 6.5)
+
+
+def v21_soil_row(
+    rotation_id: str, scenario_id: str, ag_year: int, entry: tuple[float, float, float]
+) -> ResultsTableRow:
+    """One soil-loss row of the v2.1 case: the value with its range, both
+    person-approved, one kind on every value."""
+    value, low, high = entry
+    return ResultsTableRow(
+        rotation_id=rotation_id,
+        scenario_id=scenario_id,
+        time_basis="ag_year",
+        ag_year=ag_year,
+        indicator="soil_loss",
+        direction="lower_is_better",
+        value=value,
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        range=Range(low=low, high=high, kind=V21_RANGE_KIND),
+        provenance="DERIVED",
+        source=SOIL_SOURCE,
+    )
+
+
+def sweep_table(
+    u1_values: tuple[tuple[str, tuple[float, float, float]], ...],
+) -> ResultsTable:
+    """A one-input table of the case: one scenario per admitted value of u1
+    (D103: each value of the uncertain input is one admitted scenario),
+    holding the three fixed cells and B2021 at that scenario's value."""
+    rows = []
+    for scenario_id, u1 in u1_values:
+        rows.append(v21_soil_row("A", scenario_id, 2020, A_2020))
+        rows.append(v21_soil_row("A", scenario_id, 2021, A_2021))
+        rows.append(v21_soil_row("B", scenario_id, 2020, B_2020))
+        rows.append(v21_soil_row("B", scenario_id, 2021, u1))
+    return ResultsTable(case_id=CASE_ID, field_id=FIELD_ID, rows=rows)
+
+
+# T1: u1 = B2021, every value with the range the person derived for it.
+T1_VALUES = (
+    ("u1=4.0", (4.0, 3.8, 4.2)),
+    ("u1=5.5", (5.5, 5.3, 5.7)),
+    ("u1=6.9", (6.9, 6.7, 7.1)),
+    ("u1=8.0", (8.0, 7.8, 8.2)),
+    ("u1=9.0", (9.0, 8.8, 9.2)),
+)
+U1 = UncertainInput(
+    name="u1",
+    unit=models.UNIT_SOIL_LOSS_ANNUAL,
+    cell=("B", "soil_loss", "ag_year", 2021, None, None),
+    values=(
+        (4.0, "u1=4.0"),
+        (5.5, "u1=5.5"),
+        (6.9, "u1=6.9"),
+        (8.0, "u1=8.0"),
+        (9.0, "u1=9.0"),
+    ),
+)
+
+
+def v21_difference(
+    table: ResultsTable, scenario_id: str, ag_year: int
+) -> object:
+    """The paired difference of one agricultural year of one scenario of the
+    v2.1 case (second rotation minus first, D2)."""
+    scenario = ResultsTable(
+        case_id=table.case_id,
+        field_id=table.field_id,
+        rows=[row for row in table.rows if row.scenario_id == scenario_id],
+    )
+    return next(
+        difference
+        for difference in paired_differences(scenario, "A", "B")
+        if difference.ag_year == ag_year
+    )
+
+
+# --- D3 (T1): the bracket where the robust preference ends ----------------------
+
+
+def test_t1_the_state_of_the_pair_at_each_value_of_the_input():
+    """Person-approved expectations of #223: at 4.0 and 5.5 both cells are
+    strict improvements; at 6.9 the 2021 difference range crosses zero and
+    at 8.0 it touches it, and a cell whose range touches or crosses zero
+    blocks a robust preference (D98) under the name D97 gives it; at 9.0
+    the range lies wholly on the worse side (deterioration)."""
+    table = sweep_table(T1_VALUES)
+    point = tipping_point(table, "A", "B", U1)
+    assert point.states == (
+        (4.0, ROBUST_PREFERENCE),
+        (5.5, ROBUST_PREFERENCE),
+        (6.9, NOT_SEPARATED_WITHIN_UNCERTAINTY),
+        (8.0, NOT_SEPARATED_WITHIN_UNCERTAINTY),
+        (9.0, NOT_ROBUST_ACROSS_SCENARIOS),
+    )
+    # The difference ranges the person derived (D92, worst case): 2020 is
+    # [−2.8, −1.3] at every value of u1, and 2021 moves with it.
+    fixed = v21_difference(table, "u1=4.0", 2020)
+    assert fixed.range.low == pytest.approx(-2.8, abs=TOLERANCE)
+    assert fixed.range.high == pytest.approx(-1.3, abs=TOLERANCE)
+    for scenario_id, low, high in (
+        ("u1=4.0", -4.0, -2.8),
+        ("u1=5.5", -2.5, -1.3),
+        ("u1=6.9", -1.1, 0.1),
+        ("u1=8.0", 0.0, 1.2),
+        ("u1=9.0", 1.0, 2.2),
+    ):
+        difference = v21_difference(table, scenario_id, 2021)
+        assert difference.range.low == pytest.approx(low, abs=TOLERANCE)
+        assert difference.range.high == pytest.approx(high, abs=TOLERANCE)
+    # At 8.0 the range touches zero exactly (7.8 − 7.8): it is read as
+    # touching, and it blocks.
+    assert v21_difference(table, "u1=8.0", 2021).range.low == 0.0
+
+
+def test_t1_the_tipping_point_is_the_bracket_between_two_adjacent_values():
+    point = tipping_point(sweep_table(T1_VALUES), "A", "B", U1)
+    assert point.bracket == (5.5, 6.9)
+    assert point.input_name == "u1"
+    assert point.unit == "t ha-1 yr-1"
+    assert point.reason is None
+    # No interpolation inside (D3): the bracket is the pair of adjacent
+    # values, nothing between them. The change of reason at 9.0 ("Not
+    # separated: within uncertainty" into "Not robust across scenarios")
+    # is no change of the tipping point: the state is robust preference
+    # against not.
+
+
+# --- D3 (T0): no tipping point ---------------------------------------------------
+
+
+def test_t0_no_tipping_point_when_the_state_never_changes():
+    """Person-approved expectation of #223: u1 in {4.0, 5.0, 6.0} keeps both
+    cells strict improvements (6.0 gives [−2.0, −0.8]), so no tipping point
+    is reported, with that reason."""
+    values = (
+        ("u1=4.0", (4.0, 3.8, 4.2)),
+        ("u1=5.0", (5.0, 4.8, 5.2)),
+        ("u1=6.0", (6.0, 5.8, 6.2)),
+    )
+    u1 = UncertainInput(
+        name="u1",
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        cell=("B", "soil_loss", "ag_year", 2021, None, None),
+        values=((4.0, "u1=4.0"), (5.0, "u1=5.0"), (6.0, "u1=6.0")),
+    )
+    point = tipping_point(sweep_table(values), "A", "B", u1)
+    assert point.states == (
+        (4.0, ROBUST_PREFERENCE),
+        (5.0, ROBUST_PREFERENCE),
+        (6.0, ROBUST_PREFERENCE),
+    )
+    assert point.bracket is None
+    assert point.reason is not None
+    assert "Robust preference" in point.reason
+    assert "u1" in point.reason
+
+
+# --- D4 (T2): what to measure first ----------------------------------------------
+
+
+def t2_scenario(u1: float, u2: float, u3: float) -> str:
+    return f"u1={u1},u2={u2},u3={u3}"
+
+
+# The admitted values of the three inputs, each with the person-derived
+# range: u1 drives B2021 (width ±0.2), u2 drives A2021 (its reference 7.4
+# carries the fixed cell's range), u3 drives B2020 (same at 6.1).
+T2_U1 = ((5.5, 5.3, 5.7), (9.0, 8.8, 9.2))
+T2_U2 = ((7.4, 7.0, 7.8), (5.0, 4.8, 5.2))
+T2_U3 = ((6.1, 5.8, 6.5), (5.0, 4.8, 5.2))
+
+
+def t2_table() -> ResultsTable:
+    """The whole admitted set of T2: one scenario per combination of the
+    values of the three uncertain inputs."""
+    rows = []
+    for u1 in T2_U1:
+        for u2 in T2_U2:
+            for u3 in T2_U3:
+                scenario_id = t2_scenario(u1[0], u2[0], u3[0])
+                rows.append(v21_soil_row("A", scenario_id, 2020, A_2020))
+                rows.append(v21_soil_row("A", scenario_id, 2021, u2))
+                rows.append(v21_soil_row("B", scenario_id, 2020, u3))
+                rows.append(v21_soil_row("B", scenario_id, 2021, u1))
+    return ResultsTable(case_id=CASE_ID, field_id=FIELD_ID, rows=rows)
+
+
+T2_INPUTS = (
+    UncertainInput(
+        name="u1",
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        cell=("B", "soil_loss", "ag_year", 2021, None, None),
+        values=(
+            (5.5, t2_scenario(5.5, 7.4, 6.1)),
+            (9.0, t2_scenario(9.0, 7.4, 6.1)),
+        ),
+    ),
+    UncertainInput(
+        name="u2",
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        cell=("A", "soil_loss", "ag_year", 2021, None, None),
+        values=(
+            (7.4, t2_scenario(5.5, 7.4, 6.1)),
+            (5.0, t2_scenario(5.5, 5.0, 6.1)),
+        ),
+    ),
+    UncertainInput(
+        name="u3",
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        cell=("B", "soil_loss", "ag_year", 2020, None, None),
+        values=(
+            (6.1, t2_scenario(5.5, 7.4, 6.1)),
+            (5.0, t2_scenario(5.5, 7.4, 5.0)),
+        ),
+    ),
+)
+
+
+def test_t2_the_base_state_over_the_whole_admitted_set_is_not_robust():
+    # The set contains u1 = 9.0 (a deterioration), so the pair over the
+    # whole set is "Not robust across scenarios" (D103: the set-level
+    # state) and the priority list exists.
+    priority = measurement_priority(t2_table(), "A", "B", T2_INPUTS)
+    assert priority.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert priority.items != ()
+
+
+def test_t2_rank_one_is_shared_by_the_inputs_that_change_the_state():
+    priority = measurement_priority(t2_table(), "A", "B", T2_INPUTS)
+    u1, u2, u3 = priority.items
+    # The ordering measure among state-changers is OPEN (D4): u1 and u2
+    # tie at rank 1; u3, whose values never change the state, ranks below.
+    assert (u1.rank, u1.input_name) == (1, "u1")
+    assert (u2.rank, u2.input_name) == (1, "u2")
+    assert (u3.rank, u3.input_name) == (2, "u3")
+    assert u1.unit == u2.unit == u3.unit == "t ha-1 yr-1"
+    assert u1.cell == ("B", "soil_loss", "ag_year", 2021, None, None)
+    assert u2.cell == ("A", "soil_loss", "ag_year", 2021, None, None)
+    assert u3.cell == ("B", "soil_loss", "ag_year", 2020, None, None)
+    # u1 at 9.0 deteriorates; u2 at 5.0, with u1 at its reference, gives
+    # [5.3−5.2, 5.7−4.8] wholly worse; u3 never (at 5.0 the 2020 range is
+    # [−3.8, −2.6] and 2021 still strictly improves: robust either way).
+    assert u1.states == ((5.5, ROBUST_PREFERENCE), (9.0, NOT_ROBUST_ACROSS_SCENARIOS))
+    assert u2.states == ((7.4, ROBUST_PREFERENCE), (5.0, NOT_ROBUST_ACROSS_SCENARIOS))
+    assert u3.states == ((6.1, ROBUST_PREFERENCE), (5.0, ROBUST_PREFERENCE))
+    # Each item is qualitative (D4): rank, what to measure, why.
+    for item in (u1, u2, u3):
+        assert item.input_name in item.why
+
+
+def test_d4_a_set_that_is_robust_in_every_scenario_gives_no_priority_list():
+    """The empty-list case of the approved unit: a set whose only uncertain
+    input is u3 (values 6.1 and 5.0) is robust in every scenario, so the
+    base state is a robust preference and the priority list is empty."""
+    rows = []
+    for scenario_id, b2020 in (("u3=6.1", T2_U3[0]), ("u3=5.0", T2_U3[1])):
+        rows.append(v21_soil_row("A", scenario_id, 2020, A_2020))
+        rows.append(v21_soil_row("A", scenario_id, 2021, A_2021))
+        rows.append(v21_soil_row("B", scenario_id, 2020, b2020))
+        rows.append(v21_soil_row("B", scenario_id, 2021, T2_U1[0]))
+    only_u3 = UncertainInput(
+        name="u3",
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        cell=("B", "soil_loss", "ag_year", 2020, None, None),
+        values=((6.1, "u3=6.1"), (5.0, "u3=5.0")),
+    )
+    only_u3_table = ResultsTable(case_id=CASE_ID, field_id=FIELD_ID, rows=rows)
+    priority = measurement_priority(only_u3_table, "A", "B", (only_u3,))
+    assert priority.base_state == ROBUST_PREFERENCE
+    assert priority.items == ()
+
+
+# --- D10 (T3): a measured value for one input of the list ------------------------
+
+
+def measured_u1(
+    value: float | None,
+    low: float,
+    high: float,
+    unit: str = models.UNIT_SOIL_LOSS_ANNUAL,
+) -> Measurement:
+    return Measurement(
+        input_name="u1",
+        value=value,
+        unit=unit,
+        provenance="OBSERVED",
+        range=Range(low=low, high=high, kind=V21_RANGE_KIND),
+    )
+
+
+def test_t3_a_measured_value_recomputes_the_decision_to_robust():
+    table = sweep_table(T1_VALUES)
+    measurement = measured_u1(5.5, 5.3, 5.7)
+    assert measurement.provenance == "OBSERVED"  # it enters with the label (C4.1)
+    recomputed = recompute_with_measurement(table, U1, measurement)
+    # 2021 becomes [5.3−7.8, 5.7−7.0] = [−2.5, −1.3], wholly better; 2020
+    # is unchanged: the recomputed pair is a robust preference.
+    assert pair_state(recomputed, "A", "B").state == ROBUST_PREFERENCE
+    # The scenario's cells the input drives change, nothing else: every
+    # other row is carried into the new table unchanged, and each driven
+    # row holds the measured value and range, keeping its identifier, its
+    # unit and the label the contract fixes for its indicator (C4.6).
+    assert len(recomputed.rows) == len(table.rows)
+    for before, after in zip(table.rows, recomputed.rows):
+        if before.rotation_id == "B" and before.ag_year == 2021:
+            assert after.value == 5.5
+            assert (after.range.low, after.range.high, after.range.kind) == (
+                5.3,
+                5.7,
+                V21_RANGE_KIND,
+            )
+            assert after.range_missing is None
+            assert after.missing is None
+            assert after.provenance == "DERIVED"
+            assert (after.rotation_id, after.scenario_id, after.ag_year) == (
+                before.rotation_id,
+                before.scenario_id,
+                before.ag_year,
+            )
+        else:
+            assert after == before
+
+
+def test_t3_a_blank_value_is_refused_and_never_taken_as_zero():
+    blank = measured_u1(None, 5.3, 5.7)
+    with pytest.raises(ValueError, match="never taken as zero"):
+        recompute_with_measurement(sweep_table(T1_VALUES), U1, blank)
+
+
+def test_t3_a_value_in_another_unit_is_refused():
+    wrong_unit = measured_u1(5.5, 5.3, 5.7, unit="t/ha")
+    with pytest.raises(ValueError, match="refused"):
+        recompute_with_measurement(sweep_table(T1_VALUES), U1, wrong_unit)
+
+
+def test_d10_a_measurement_carries_its_range_or_its_range_missing():
+    without_either = Measurement(
+        input_name="u1",
+        value=5.5,
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        provenance="OBSERVED",
+    )
+    with pytest.raises(ValueError, match="C2.2"):
+        recompute_with_measurement(sweep_table(T1_VALUES), U1, without_either)
+
+
+# --- D12 (T4): a measured value on one side of the bracket -----------------------
+
+
+def test_t4_a_value_below_the_bracket_gives_the_state_of_that_side():
+    # Measured 5.0 [4.8, 5.2] lies below the bracket (5.5, 6.9): 2021
+    # becomes [−3.0, −1.8], wholly better — the robust side — and a state
+    # that has become a robust preference empties the priority list (D12).
+    consistency = measurement_consistency(
+        sweep_table(T1_VALUES),
+        "A",
+        "B",
+        U1,
+        measured_u1(5.0, 4.8, 5.2),
+        (5.5, 6.9),
+        (U1,),
+    )
+    assert consistency.measured_value == 5.0
+    assert consistency.side == "below the bracket"
+    assert consistency.state_after_measurement == ROBUST_PREFERENCE
+    assert consistency.priority.items == ()
+
+
+def test_t4_a_value_above_the_bracket_gives_the_state_of_that_side():
+    # Measured 8.5 [8.3, 8.7] lies above the bracket: 2021 becomes
+    # [+0.5, +1.7], wholly worse — not robust — and the priority list
+    # follows D4 over the recomputed set.
+    consistency = measurement_consistency(
+        sweep_table(T1_VALUES),
+        "A",
+        "B",
+        U1,
+        measured_u1(8.5, 8.3, 8.7),
+        (5.5, 6.9),
+        (U1,),
+    )
+    assert consistency.side == "above the bracket"
+    assert consistency.state_after_measurement == NOT_ROBUST_ACROSS_SCENARIOS
+    assert consistency.priority.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert consistency.priority.items != ()
+    # The list is the one D4 builds over the same recomputed set.
+    recomputed = recompute_with_measurement(
+        sweep_table(T1_VALUES), U1, measured_u1(8.5, 8.3, 8.7)
+    )
+    assert consistency.priority == measurement_priority(recomputed, "A", "B", (U1,))
