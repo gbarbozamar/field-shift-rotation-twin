@@ -16,7 +16,12 @@ of the rotation and per agricultural year (C5.3):
 - ``annual_carbon_inputs``: per crop, purpose and part, one series with one
   value per agricultural year, in the shape of
   ``contracts.carbon_forcing.AnnualCarbonInputSeries``, so the platform copies
-  it without arithmetic of its own.
+  it without arithmetic of its own;
+- ``monthly_carbon_inputs``: per origin of D194, one series with one value
+  per calendar month of the agricultural years of the ledger, in the shape of
+  ``contracts.carbon_forcing.CarbonInputSeries``, for the monthly carbon
+  inputs of RothC (D221 of #77): the carbon of a component enters in the
+  calendar month of its harvest, and every other month is an explicit zero.
 
 Every value can be missing with its reason (C3.1). This module fixes structure
 only: it names no value, no record and no unit; the units each producer
@@ -25,8 +30,8 @@ and ``carbon_input_unit`` (the series, which may be in another unit than the
 components: for EP4, D147 of #77).
 
 The shared parts are imported, never copied: ``Value`` and ``Missing`` of
-``contracts.inputs.common``, ``AnnualCarbonInputSeries`` of
-``contracts.carbon_forcing`` and the closed lists ``Purpose`` and ``Residue``
+``contracts.inputs.common``, ``AnnualCarbonInputSeries`` and
+``CarbonInputSeries`` of ``contracts.carbon_forcing`` and the closed lists ``Purpose`` and ``Residue``
 of ``contracts.rotation_definition``.
 
 Models and pure validation only. No network calls, no parameter values.
@@ -39,7 +44,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from contracts.carbon_forcing.models import AnnualCarbonInputSeries
+from contracts.carbon_forcing.models import AnnualCarbonInputSeries, CarbonInputSeries
 from contracts.inputs.common import (
     ContractModel,
     DateValue,
@@ -81,6 +86,19 @@ ORIGIN_GROUP_OF_PART = {
 def series_origin(crop_id: str, part: str) -> str:
     """The origin of the series of ``part`` for ``crop_id`` (D194 of #77)."""
     return f"{crop_id}_{ORIGIN_GROUP_OF_PART[part]}"
+
+
+# D221 of #77: the monthly series of ``monthly_carbon_inputs`` are one per
+# origin of D194; their quantity identifier is the origin with this suffix
+# (PROPOSED), so that each is unique in ``CarbonForcing.carbon_inputs``.
+MONTHLY_QUANTITY_SUFFIX = "_carbon_input"
+ORIGIN_GROUPS = tuple(dict.fromkeys(ORIGIN_GROUP_OF_PART.values()))
+MONTHS_IN_A_YEAR = 12  # C5.3: an agricultural year is twelve calendar months
+
+
+def monthly_quantity(origin: str) -> str:
+    """The quantity of the monthly series of ``origin`` (D221 of #77; PROPOSED)."""
+    return f"{origin}{MONTHLY_QUANTITY_SUFFIX}"
 
 
 class NotGiven(ContractModel):
@@ -153,12 +171,15 @@ class ResidueLedger(ContractModel):
     )
     components: list[LedgerComponent]
     annual_carbon_inputs: list[AnnualCarbonInputSeries]
+    # D221 of #77: one monthly series per origin of D194, for RothC.
+    monthly_carbon_inputs: list[CarbonInputSeries]
 
     @model_validator(mode="after")
     def _consistent(self) -> ResidueLedger:
         self._check_years()
         self._check_components()
         self._check_series()
+        self._check_monthly_series()
         return self
 
     def _check_years(self) -> None:
@@ -179,7 +200,7 @@ class ResidueLedger(ContractModel):
                 "years: a ledger without agricultural years carries the reason "
                 "in years_missing (C3.1)"
             )
-        if self.components or self.annual_carbon_inputs:
+        if self.components or self.annual_carbon_inputs or self.monthly_carbon_inputs:
             raise ValueError(
                 "years: a ledger without agricultural years lists no component "
                 "and no series"
@@ -246,4 +267,48 @@ class ResidueLedger(ContractModel):
                     f"its quantity takes the origin group {group!r} (D194 of #77: "
                     "'<crop>_aboveground' for aboveground_carbon_retained, "
                     "'<crop>_belowground' for root_carbon and rhizodeposit_carbon)"
+                )
+
+    def _check_monthly_series(self) -> None:
+        """D221 of #77: one series per origin of D194, over every month of the
+        agricultural years of the ledger, in ``carbon_input_unit``."""
+        origins = Counter(series.origin for series in self.monthly_carbon_inputs)
+        repeated = sorted(o for o, count in origins.items() if count > 1)
+        if repeated:
+            raise ValueError(
+                f"monthly_carbon_inputs: the origin {repeated[0]!r} has more than "
+                "one series (D221 of #77: one series per origin)"
+            )
+        crops = {item.crop_id for item in self.components}
+        allowed = {f"{crop}_{group}" for crop in crops for group in ORIGIN_GROUPS}
+        starts = {(s.start.year, s.start.month) for s in self.monthly_carbon_inputs}
+        if len(starts) > 1:
+            raise ValueError(
+                "monthly_carbon_inputs: every series starts in the same month"
+            )
+        for series in self.monthly_carbon_inputs:
+            what = f"monthly_carbon_inputs {series.quantity!r}"
+            if series.origin not in allowed:
+                raise ValueError(
+                    f"{what}: its origin is not '<crop>_aboveground' or "
+                    "'<crop>_belowground' for a crop of a component of the ledger "
+                    "(D194 and D221 of #77)"
+                )
+            if series.quantity != monthly_quantity(series.origin):
+                raise ValueError(
+                    f"{what}: its quantity is not its origin followed by "
+                    f"{MONTHLY_QUANTITY_SUFFIX!r} (D221 of #77)"
+                )
+            if series.unit != self.carbon_input_unit:
+                raise ValueError(
+                    f"{what}: is not in the carbon_input_unit of the ledger"
+                )
+            years = self.last_ag_year - self.first_ag_year + 1  # type: ignore[operator]
+            if (
+                series.start.year != self.first_ag_year
+                or len(series.months) != years * MONTHS_IN_A_YEAR
+            ):
+                raise ValueError(
+                    f"{what}: it runs over every month of the agricultural years "
+                    "of the ledger, from the start month of first_ag_year (C5.3)"
                 )
