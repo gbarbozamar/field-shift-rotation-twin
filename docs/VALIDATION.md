@@ -682,3 +682,15 @@ The two context blocks of this section (soil loss measured with ¹³⁷Cs, and t
 - Transcribed by: an AI session (D34), on 15 November 2026. The numbers are restated from D234, not read again from the file or the article.
 - Checked by: OPEN.
 - Status: DECIDED under D161 (D234); results seen before the decision. No test, code or fixture is written. Open to review: the lead developer or a science reviewer may change it or remove the entry.
+
+### EP3 phase-1 hydrological mass-closure audit and FAO-56 Example 35 reference transcription
+
+- **Phase-1 EP3 numerical mass-closure audit (`closure_review`):**
+  - Reviewed by: `gbarbozamar` (`2026-11-15T15:19:20Z`).
+  - Scope: strictly limited to phase-1 demonstration scenarios using existing signed `params/records/` without new parameter signatures (`new_parameter_signature_needed: false`), and without claiming local physical field validation.
+  - `soybean-winter-fallow` phase 1 (`8,766` days across `2001-01-01`..`2024-12-31`): daily soil-water mass balance closes numerically across the 24-year window under cached daily forcing shape (verified deterministically with synthetic `PLACEHOLDER` daily forcing in `engine/water/test_phase1_hydrological_closure.py`).
+  - `wheat-soybean-maize` phase 1: remains `not evaluated` because the 10 unsigned wheat/maize water parameters (`#433`) block computation with `MISSING_INPUT`.
+- **FAO-56 Example 35 corrected Feb 2006 reference transcription (`e35_transcription` / `e35_method_decision`):**
+  - Reference transcription checked by: `gbarbozamar` (`2026-11-15T15:19:20Z`), SHA-256 `01c981837ecd0f04fd95602610ebaff7d0add59fe880067502ff5bea59f31803`.
+  - Stored outside `params/records/` as reference only — **not** a test fixture or tolerance approval. No Example 35 printed table numbers are written here.
+  - Method decisions (`use_corrected_reference: PENDING`, `full_precision_interpolation: PENDING`, `half_last_digit_comparison: PROPOSAL_ONLY`, `results_seen_before_human_approval: true`) and wetting-order difference remain `PENDING` with the lead developer and science review.
