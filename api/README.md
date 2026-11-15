@@ -282,9 +282,11 @@ In order:
    fails is `422` in the one error shape: `ROTATION_INVALID` when every
    problem lies inside one rotation item (`rotations.<i>.…`), `SITE_INVALID`
    when every problem lies inside `site`, `INVALID_REQUEST` otherwise (a wrong
-   number of rotations, a rule of the whole request). Then each rotation goes
-   through the `RotationValidator`; a problem is `ROTATION_INVALID` under
-   `rotations.<i>`. A message that repeats a submitted text (three characters
+   number of rotations, a rule of the whole request, problems in several
+   rotation items; PROPOSED). Then each rotation goes through the
+   `RotationValidator`; its problems are written under `rotations.<i>`,
+   `ROTATION_INVALID` when they lie in one item and `INVALID_REQUEST` when
+   they lie in several (PROPOSED). A message that repeats a submitted text (three characters
    or more, as `api/rotation_validator.py` looks for) is replaced by a fixed
    text. Nothing is called before that. Malformed JSON is `400`.
 2. **Sources.** Climate and soil and slope are asked for once for the site,
@@ -310,7 +312,12 @@ In order:
    (`kinds_of_year.series_from_results`) are averaged with `mean_by_kind`;
    `average` is the record mean. No result (no period, an input absent,
    calendar not built) or a soil-loss part not built gives every mean missing
-   with the engine's reason and detail, never zero.
+   with the engine's reason and detail, never zero. PROPOSED: only the years
+   of the classified list are read, and only when they are years of the
+   record; a year of the result outside them is ignored and named in a note
+   added to the detail of every mean. No year left (the period holds no whole
+   agricultural year, or no year of the result is in the list) gives every
+   mean missing `NO_COVERAGE`.
 6. **Limit.** `assess_limit(limit, average, by_kind, kinds_in_record=...)`:
    the kinds with at least one year in the record when every year is
    classified (R13); `None` (every kind kept) when a year has no kind or the
@@ -320,7 +327,14 @@ In order:
    `year_counts` from `count_kinds`. `years` is read from the
    `RotationDefinition` (PROPOSED, not the calendar): each component counts in
    the agricultural year of its sowing date, in position order, from the first
-   such year to the last. A missing sowing date (`MISSING_INPUT`), a year of
+   such year to the last. A declared-margin crop (margin per hectare and
+   agricultural year) with a harvest date in a later agricultural year counts
+   in each year from its sowing through its harvest, such as a pasture kept
+   several years (PROPOSED). A grain or cover crop counts only in its sowing
+   year (its yield and cost are of one season), and so does a declared-margin
+   crop with no harvest date: the limit is that a pasture kept several years
+   needs its harvest (end) date declared, or the years after the first have
+   no crop and the margins are `NOT_COMPUTABLE`. A missing sowing date (`MISSING_INPUT`), a year of
    the cycle without a crop, or a declared-margin crop sharing its year
    (both `NOT_COMPUTABLE`) give that rotation's margins missing with the
    reason. The margin the ranking reads is `questions.margin_of`.
@@ -336,7 +350,10 @@ In order:
    `create_app` keyword used only by this route; with the default engines it
    defaults to `EntryPointEngines` on the same engine functions. With
    `engines` given and no factory, the run is not stressed and the echo says
-   `applied: false` with the reason in its detail; never a silent run.
+   `applied: false` with the reason in its detail; never a silent run. With
+   `engines` and a factory both given, the catalogue of the injected engines
+   is not known: the factory is not called and the echo says `applied: false`
+   with that reason (PROPOSED).
 10. `erosivity` is `"mean_annual"` (S-026 may add `"per_year"`).
 11. `example_data` is true when the request says so, when a rotation, the
     climate or the soil and slope carries the mark

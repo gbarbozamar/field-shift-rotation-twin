@@ -16,6 +16,7 @@ from the example answer file, never typed here.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import datetime as dt
 import json
 from pathlib import Path
@@ -612,6 +613,178 @@ def test_a_rotation_without_years_gives_its_own_reason_to_the_tipping_price(day)
     for side in ("up", "down"):
         assert tipping[side]["price"] is None
         assert tipping[side]["reason"] == "NOT_COMPUTABLE"
+
+
+# --- code review fixes (PROPOSED) --------------------------------------------------------
+
+
+def test_a_rotation_with_every_date_missing_is_422_before_any_call():
+    """Finding 1: D21 refuses it, so the years of classify_years are never empty."""
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    request = copy.deepcopy(REQUEST)
+    for component in request["rotations"][0]["components"]:
+        for key in ("sowing", "harvest"):
+            component[key] = {"date": None, "missing": {"reason": "NOT_DECLARED"}}
+    response = client(
+        climate=climate, soil_slope=soil, engines=engines, settings=RunSettings()
+    ).post(ROUTE, json=request)
+    error = _error(response, 422, "ROTATION_INVALID")
+    assert all(d["path"].startswith("rotations.0") for d in error["details"])
+    _nothing_called(climate, soil, engines)
+
+
+def test_problems_in_two_rotation_items_are_invalid_request():
+    """Finding 7: ROTATION_INVALID only when every problem is in one item."""
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    request = copy.deepcopy(REQUEST)
+    del request["rotations"][0]["components"]
+    del request["rotations"][1]["components"]
+    response = client(climate=climate, soil_slope=soil, engines=engines).post(
+        ROUTE, json=request
+    )
+    error = _error(response, 422, "INVALID_REQUEST")
+    heads = {".".join(d["path"].split(".")[:2]) for d in error["details"]}
+    assert heads == {"rotations.0", "rotations.1"}
+    _nothing_called(climate, soil, engines)
+
+
+def test_injected_validator_problems_in_two_items_are_invalid_request():
+    class TwoProblems:
+        def validate(self, rotation):
+            if rotation["rotation_id"] == SOYBEAN:
+                return []
+            return [ErrorDetail(path="components.0", code="PLACEHOLDER", message="m")]
+
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    response = client(
+        climate=climate,
+        soil_slope=soil,
+        engines=engines,
+        rotation_validator=TwoProblems(),
+    ).post(ROUTE, json=REQUEST)
+    error = _error(response, 422, "INVALID_REQUEST")
+    assert [d["path"] for d in error["details"]] == [
+        "rotations.1.components.0",
+        "rotations.2.components.0",
+    ]
+    _nothing_called(climate, soil, engines)
+
+
+def _all_soil_means(data: dict[str, Any]):
+    return [mean for o in data["options"] for mean in o["soil_loss"].values()]
+
+
+def test_a_period_without_a_whole_year_reads_no_soil_loss_year():
+    """Findings 2 and 4: the engines ran, but no year of the result is a whole
+    agricultural year of the record, so every mean is NO_COVERAGE, never 0."""
+    short = RunSettings(
+        start_date=PERIOD.start_date,
+        end_date=PERIOD.start_date + dt.timedelta(days=30),
+    )
+    data = answered(client(settings=short).post(ROUTE, json=REQUEST))
+    checked(REQUEST, data)
+    for mean in _all_soil_means(data):
+        assert mean["value"] is None
+        assert mean["reason"] == "NO_COVERAGE"
+        assert "are ignored" in mean["detail"]
+    assert 0 not in list(_numbers(data))
+
+
+def test_years_of_the_result_outside_the_record_period_are_ignored_with_a_note():
+    """Finding 4: a year of the result that is not classified is not averaged."""
+    later = RunSettings(
+        start_date=dt.date(FIRST_YEAR + 1, START_MONTH, 1), end_date=PERIOD.end_date
+    )
+    data = answered(client(settings=later).post(ROUTE, json=REQUEST))
+    checked(REQUEST, data)
+    note = f"agricultural year(s) {FIRST_YEAR} of the soil-loss result"
+    for mean in _all_soil_means(data):
+        assert FIRST_YEAR not in mean["ag_years"]
+        assert note in mean["detail"]
+    assert FIRST_YEAR not in {y["ag_year"] for y in data["kinds_of_year"]["years"]}
+
+
+def test_an_empty_annual_list_gives_soil_loss_missing_not_a_500():
+    """Finding 2: the contract refuses an empty list (min_length=1); built
+    around it, the means are still missing with a reason."""
+    from api.plant import Classified, soil_loss_means
+    from contracts.results.models import SoilLossResults
+
+    run = result_of(SOYBEAN)
+    hollow = run.result.model_copy(
+        update={"soil_loss": SoilLossResults.model_construct(annual=[], monthly=[])}
+    )
+    record, by_kind = soil_loss_means(
+        dataclasses.replace(run, result=hollow), Classified({}, True)
+    )
+    for mean in (record, *by_kind.values()):
+        assert mean.value is None
+        assert mean.reason == "NO_COVERAGE"
+        assert mean.detail
+
+
+def test_a_pasture_kept_several_years_counts_in_each_year_until_its_harvest():
+    """Finding 3: a declared-margin crop from its sowing through its harvest."""
+    from api.plant import cycle_years
+    from contracts.rotation_definition import RotationDefinition
+    from economics.margin import compute_rotation_margin
+
+    request = copy.deepcopy(REQUEST)
+    (pasture,) = [r for r in request["rotations"] if r["rotation_id"] == PASTURE]
+    last = pasture["components"][-1]
+    sown = dt.date.fromisoformat(last["sowing"]["date"])
+    last["harvest"] = {
+        "date": sown.replace(year=sown.year + 2).isoformat(),
+        "provenance": "DECLARED",
+        "source": "user",
+    }
+    plant_request = PlantRequest.model_validate_json(json.dumps(request))
+    crops = {c.crop_id: c for c in plant_request.economic_facts.crops}
+    cycle = cycle_years(RotationDefinition.model_validate(pasture), crops)
+    assert cycle.years is not None
+    pasture_id = last["crop_id"]
+    assert cycle.years[-3:] == [[pasture_id]] * 3
+    data = answered(client().post(ROUTE, json=request))
+    checked(request, data)
+    (option,) = [o for o in data["options"] if o["rotation_id"] == PASTURE]
+    expected = compute_rotation_margin(
+        cycle.years,
+        plant_request.economic_facts,
+        {k: v for k, v in data["kinds_of_year"]["counts"].items()},
+    )
+    assert option["margin"]["average"] == json.loads(
+        json.dumps(dataclasses.asdict(expected.average))
+    )
+
+
+def test_a_grain_crop_harvested_in_a_later_year_counts_only_once():
+    from api.plant import cycle_years
+    from contracts.rotation_definition import RotationDefinition
+
+    request = copy.deepcopy(REQUEST)
+    soybean = request["rotations"][0]
+    first = soybean["components"][0]
+    sown = dt.date.fromisoformat(first["sowing"]["date"])
+    first["harvest"]["date"] = sown.replace(year=sown.year + 2).isoformat()
+    plant_request = PlantRequest.model_validate_json(json.dumps(request))
+    crops = {c.crop_id: c for c in plant_request.economic_facts.crops}
+    cycle = cycle_years(RotationDefinition.model_validate(soybean), crops)
+    assert cycle.years == [[first["crop_id"]]]
+
+
+def test_a_factory_with_injected_engines_is_not_called_and_not_applied():
+    """Finding 5: the catalogue of injected engines is not known."""
+    from api.plant import NO_CATALOGUE
+
+    engines, factory = FakeEngines(), Factory()
+    data = answered(
+        client(engines=engines, engines_factory=factory).post(ROUTE, json=REQUEST)
+    )
+    checked(REQUEST, data)
+    assert factory.catalogues == []
+    assert data["rain_stress"]["applied"] is False
+    assert NO_CATALOGUE in data["rain_stress"]["detail"]
+    assert len(engines.calls) == 3
 
 
 # --- defects: 500 -----------------------------------------------------------------------

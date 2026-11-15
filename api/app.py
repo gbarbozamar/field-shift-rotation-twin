@@ -88,7 +88,9 @@ def create_app(
     ``api.rain_stress.scale_erosivity``). ``None`` means: with the default
     engines, ``EntryPointEngines`` on the same engine functions; with
     ``engines`` given, no factory, and the answer says the factor was not
-    applied, and why.
+    applied, and why. With ``engines`` and a factory both given, the
+    catalogue of the injected engines is not known, so the factory is not
+    called and the answer says the factor was not applied, and why.
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -109,6 +111,11 @@ def create_app(
         """Liveness: the process is up and answering. Checks nothing else."""
         return Health(status="ok")
 
+    # PROPOSED (code review): the catalogue the plant route scales for a
+    # rain-stress run is the one the default engines use (``parameters``, or
+    # ``{}`` for None, as EntryPointEngines reads it); with ``engines`` given
+    # it is not known (None), and a factory is then not called.
+    plant_catalogue = None if engines is not None else (parameters or {})
     if engines is None:
         functions = discover_engine_functions()
 
@@ -153,7 +160,7 @@ def create_app(
                 else load_record()
             ),
             engines_factory=engines_factory,
-            parameters=parameters if parameters is not None else {},
+            parameters=plant_catalogue,
         )
     )
 

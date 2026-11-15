@@ -9,8 +9,9 @@ What it does, in order:
 1. The body is loaded into ``PlantRequest``. A body that fails it is ``422``
    with the one error shape of ``api/errors.py``: ``ROTATION_INVALID`` when
    every problem lies inside one rotation item, ``SITE_INVALID`` when every
-   problem lies inside ``site``, ``INVALID_REQUEST`` otherwise. Then each
-   rotation goes through the ``RotationValidator``, as on the other routes.
+   problem lies inside ``site``, ``INVALID_REQUEST`` otherwise (problems in
+   several rotation items included). Then each rotation goes through the
+   ``RotationValidator``, as on the other routes, with the same rule.
    A message that repeats a submitted value is replaced by a fixed text.
    Nothing is called before that.
 2. The climate and the soil and slope are asked for once, for the site, as
@@ -127,6 +128,10 @@ NO_FACTORY = (
     "the engines were given to the app without a way to rebuild them on a "
     "parameter catalogue with the erosivity scaled"
 )
+NO_CATALOGUE = (
+    "the engines were given to the app without the parameter catalogue they "
+    "use, so there is no erosivity to scale"
+)
 NO_WHOLE_YEAR = (
     "the climate record period holds no whole agricultural year for the start "
     "month of the rotations"
@@ -137,28 +142,41 @@ YEAR_NOT_OF_THE_RECORD = (
     "the record, and it is not classified"
 )
 NO_SOIL_LOSS = "the soil loss of this rotation is not available ({why})"
+IGNORED_YEARS = (
+    "agricultural year(s) {years} of the soil-loss result are not whole "
+    "agricultural years of the record period and are ignored"
+)
+NO_YEAR_READ = (
+    "the soil-loss result holds no whole agricultural year of the record period"
+)
 
 
 # --- the request --------------------------------------------------------------
 
 
 def _owner(loc: Sequence[Any], error_type: str) -> str:
-    """Which part of the request an error lies in. PROPOSED, as api/errors.py."""
+    """Which part of the request an error lies in. PROPOSED, as api/errors.py.
+
+    A rotation item is owned by its index (``rotations.<i>``), so errors in two
+    items have two owners.
+    """
     if not loc:
         return "envelope"
     if loc[0] == "site" and (len(loc) > 1 or error_type != "missing"):
         return "site"
     # Inside one rotation item; a wrong number of rotations is the envelope's.
     if loc[0] == "rotations" and len(loc) > 1 and isinstance(loc[1], int):
-        return "rotations"
+        return f"rotations.{loc[1]}"
     return "envelope"
 
 
 def _code_of(errors: Sequence[Mapping[str, Any]]) -> ErrorCode:
+    """PROPOSED: ``ROTATION_INVALID`` only when every error lies inside one and
+    the same rotation item; errors in several items are ``INVALID_REQUEST``."""
     owners = {_owner(tuple(e.get("loc", ())), str(e.get("type", ""))) for e in errors}
     if owners == {"site"}:
         return ErrorCode.SITE_INVALID
-    if owners == {"rotations"}:
+    if len(owners) == 1 and next(iter(owners)).startswith("rotations."):
         return ErrorCode.ROTATION_INVALID
     return ErrorCode.INVALID_REQUEST
 
@@ -277,6 +295,8 @@ def classify_years(
             if day is not None
         }
     )
+    # Never empty: D21 of issue #77 (RotationDefinition) refuses a rotation
+    # without any sowing or harvest date, so PlantRequest is 422 before this.
     detail = YEAR_NOT_OF_THE_RECORD.format(why=why)
     return Classified(
         {
@@ -302,16 +322,23 @@ class CycleYears:
     detail: str | None = None
 
 
-def cycle_years(rotation: RotationDefinition) -> CycleYears:
-    """PROPOSED: the crop_ids sown in each agricultural year of one cycle.
+def cycle_years(rotation: RotationDefinition, crops: Mapping[str, Any]) -> CycleYears:
+    """PROPOSED: the crop_ids of each agricultural year of one cycle.
 
     Read from the ``RotationDefinition``: each component counts in the
     agricultural year of its sowing date (by ``ag_year_start.month``), in
-    position order, from the first such year to the last. A missing sowing
-    date (``MISSING_INPUT``), a year of the cycle with no crop sown, or a
-    declared-margin crop sharing its year with another crop (both
-    ``NOT_COMPUTABLE``: ``compute_rotation_margin`` takes neither) gives no
-    years, with the reason.
+    position order, from the first such year to the last. PROPOSED (code
+    review): a declared-margin crop of ``crops`` (its margin is per hectare
+    and agricultural year, contracts/economic_facts) with a harvest date in a
+    later agricultural year counts in each agricultural year from its sowing
+    through its harvest, such as a pasture kept several years. A grain or
+    cover crop counts only in the year of its sowing (its yield and cost are
+    of one season; counting it twice would count them twice), and so does a
+    declared-margin crop whose harvest date is missing (how long it is kept
+    is not known). A missing sowing date (``MISSING_INPUT``), a year of the
+    cycle with no crop, or a declared-margin crop sharing its year with
+    another crop (both ``NOT_COMPUTABLE``: ``compute_rotation_margin`` takes
+    neither) gives no years, with the reason.
     """
     month = rotation.ag_year_start.month
     by_year: dict[int, list[str]] = {}
@@ -324,7 +351,14 @@ def cycle_years(rotation: RotationDefinition) -> CycleYears:
                 f"the sowing date of component {component.component_id!r} is "
                 "missing, so the crops of each agricultural year are not known",
             )
-        by_year.setdefault(_ag_year_of(day, month), []).append(component.crop_id)
+        first = last = _ag_year_of(day, month)
+        harvest = component.harvest.date
+        if harvest is not None and isinstance(
+            crops.get(component.crop_id), DeclaredMarginCrop
+        ):
+            last = _ag_year_of(harvest, month)
+        for year in range(first, last + 1):
+            by_year.setdefault(year, []).append(component.crop_id)
     first, last = min(by_year), max(by_year)
     empty = [year for year in range(first, last + 1) if year not in by_year]
     if empty:
@@ -364,13 +398,26 @@ def _why(reason: str, detail: str | None) -> str:
     return reason if detail is None else f"{reason}: {detail}"
 
 
+def _with_note(mean: KindMean, note: str) -> KindMean:
+    detail = note if mean.detail is None else f"{mean.detail}; {note}"
+    return dataclasses.replace(mean, detail=detail)
+
+
 def soil_loss_means(
-    run: EnginesResult, kinds: Mapping[int, KindOfYear]
+    run: EnginesResult, classified: Classified
 ) -> tuple[KindMean, dict[str, KindMean]]:
     """The soil loss on the record and in each kind of year, or missing.
 
     From the annual values of the phase-1 result. No result, or the soil-loss
     part not built, gives every mean missing with the engine's reason.
+
+    PROPOSED (code review): only the agricultural years of the classified
+    list are read, and only when they are years of the record. A year of the
+    result outside them is ignored, and a note naming the ignored years is
+    added to the detail of every mean. No year left (an empty annual list, or
+    no year of the result in the list, as when the period holds no whole
+    agricultural year) gives every mean missing ``NO_COVERAGE`` (C3.2: no data
+    for this period), never a zero.
     """
     if run.result is None:
         missing = run.result_missing
@@ -381,13 +428,29 @@ def soil_loss_means(
         detail = run.result.soil_loss.missing.detail
     else:
         assert isinstance(run.result.soil_loss, SoilLossResults)
-        means = mean_by_kind(
-            INDICATOR,
-            UNIT_SOIL_LOSS_ANNUAL,
-            series_from_results(run.result.soil_loss.annual),
-            kinds,
+        annual = run.result.soil_loss.annual
+        read = set(classified.kinds) if classified.of_record else set()
+        kept = [item for item in annual if item.ag_year in read]
+        ignored = sorted({item.ag_year for item in annual} - read)
+        note = (
+            None
+            if not ignored
+            else IGNORED_YEARS.format(years=", ".join(str(y) for y in ignored))
         )
-        return means.record, dict(means.by_kind)
+        if kept:
+            means = mean_by_kind(
+                INDICATOR,
+                UNIT_SOIL_LOSS_ANNUAL,
+                series_from_results(kept),
+                classified.kinds,
+            )
+            if note is None:
+                return means.record, dict(means.by_kind)
+            return _with_note(means.record, note), {
+                kind: _with_note(mean, note) for kind, mean in means.by_kind.items()
+            }
+        reason = "NO_COVERAGE"
+        detail = NO_YEAR_READ if note is None else f"{NO_YEAR_READ}; {note}"
     mean = _missing_mean(reason, NO_SOIL_LOSS.format(why=_why(reason, detail)))
     return mean, {kind: mean for kind in KINDS_OF_YEAR}
 
@@ -465,7 +528,15 @@ def _shared_tipping(
 
 
 def _todays_price(request: PlantRequest) -> float | None:
-    """As ``check_answer_against_request`` reads it: null when one is missing."""
+    """As ``check_answer_against_request`` reads it: null when one is missing.
+
+    Mirrors the rule "tipping_price.today is the declared soybean price, or
+    null when it is missing" of ``check_answer_against_request``
+    (contracts/plant_answer/plant_answer.py, PROPOSED fix round 2), which
+    exposes no public helper for it. That rule also keeps only ``GrainCrop``
+    items; ``PlantRequest`` already refuses a soybean crop_id that is not a
+    grain crop, so the two read the same prices. Keep them in step.
+    """
     prices = [
         crop.price.value
         for crop in request.economic_facts.crops
@@ -484,15 +555,17 @@ def stressed_run(
     request: PlantRequest,
     engines: RotationEngines,
     factory: EnginesFactory | None,
-    catalogue: dict[str, dict],
+    catalogue: dict[str, dict] | None,
 ) -> StressedRun:
     """The engines for this request and the rain-stress echo. PROPOSED (R10).
 
     No factor: the engines unchanged, no echo. A missing factor: the engines
     unchanged, the missing echo. A factor and a factory: the engines rebuilt on
     ``scale_erosivity(catalogue, stress)``, the echo of ``applied_echo``. A
-    factor and no factory: the engines unchanged and the echo ``applied``
-    false, with the reason in its detail; never a silent run.
+    factor and no factory, or a factory but no catalogue (``None``: the
+    engines were injected, so the catalogue they use is not known): the
+    engines unchanged and the echo ``applied`` false, with the reason in its
+    detail; never a silent run.
     """
     factor = request.questions.rain_stress_factor
     if factor is None:
@@ -500,13 +573,14 @@ def stressed_run(
     stress = rain_stress(factor)
     if isinstance(stress, RainStressMissing):
         return StressedRun(engines, stress)
-    if factory is None:
+    if factory is None or catalogue is None:
+        why = NO_FACTORY if factory is None else NO_CATALOGUE
         return StressedRun(
             engines,
             dataclasses.replace(
                 stress,
                 applied=False,
-                detail=_not_applied_detail(stress.factor, NO_FACTORY),
+                detail=_not_applied_detail(stress.factor, why),
             ),
         )
     return StressedRun(
@@ -555,7 +629,7 @@ def build_answer(
     for definition, run in zip(request.rotations, runs, strict=True):
         if run.result is not None and run.result.rotation_id != definition.rotation_id:
             raise ValueError("the engines answered for another rotation")
-        record_mean, by_kind = soil_loss_means(run, kinds)
+        record_mean, by_kind = soil_loss_means(run, classified)
         soil.append((record_mean, by_kind))
         limits.append(
             assess_limit(
@@ -565,7 +639,7 @@ def build_answer(
                 kinds_in_record=kinds_in_record,
             )
         )
-        cycle = cycle_years(definition)
+        cycle = cycle_years(definition, crops)
         if cycle.years is not None and _shares_a_declared_margin_year(
             cycle.years, crops
         ):
@@ -705,7 +779,7 @@ def make_plant_router(
     settings: RunSettings,
     kinds_of_year_record: Mapping[str, Any],
     engines_factory: EnginesFactory | None,
-    parameters: dict[str, dict],
+    parameters: dict[str, dict] | None,
 ) -> APIRouter:
     """The plant route, bound to the given implementations."""
     router = APIRouter(prefix="/api")
@@ -719,13 +793,21 @@ def make_plant_router(
                 assert code is not None
                 return error_response(code, problems)
             rotations = body["rotations"]
-            problems = [
-                _under_rotation(index, problem)
-                for index, rotation in enumerate(rotations)
-                for problem in rotation_validator.validate(rotation)
-            ]
+            problems = []
+            items = set()
+            for index, rotation in enumerate(rotations):
+                for problem in rotation_validator.validate(rotation):
+                    problems.append(_under_rotation(index, problem))
+                    items.add(index)
             if problems:
-                return error_response(ErrorCode.ROTATION_INVALID, problems)
+                # PROPOSED: one item is ROTATION_INVALID, several are
+                # INVALID_REQUEST, as for the errors of PlantRequest (_code_of).
+                return error_response(
+                    ErrorCode.ROTATION_INVALID
+                    if len(items) == 1
+                    else ErrorCode.INVALID_REQUEST,
+                    problems,
+                )
 
             climate_result = _get_climate(climate, request.site, settings)
             soil_result = soil_slope.get_soil_slope(
