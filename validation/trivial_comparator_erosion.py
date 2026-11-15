@@ -19,19 +19,29 @@ What is called, not re-implemented:
   ``months_of_ag_year`` and ``ag_year_of`` of the same package (C5.3);
 - the order of the full ``soil_loss`` values by their mean over agricultural
   years, read in the direction of the row (C1.1), ignoring ranges: the reading
-  of entry D0, ``trivial_orders`` of ``validation/trivial_comparator.py``.
+  of entry D0, ``trivial_orders`` of ``validation/trivial_comparator.py``;
+- the daily living-crop flags from a ``RotationCalendar`` and parameter
+  catalogue (PROPOSED bridge): ``live_crop_by_day`` of
+  ``engine/water/living_crop.py`` (unit ``l1/live-crop-by-day``, issue #399;
+  D135, D136, D137), called directly by ``living_crop_flags_from_calendar``
+  and ``flags_by_rotation_from_calendars`` with no re-implementation of
+  calendar repetition or stage logic.
 
 What is taken as an input (OPEN 1): which days carry a living crop. EP3 decides
 it inside its chain for the window of D157 (a component of the repeated
 calendar on the day, and not a day of the tail after maturity, D105, D106,
-D136); the stage lengths it needs come from the catalogue, and no public
-function of ``engine/`` returns the flags. So this module reads, for each
-rotation and scenario, a flag per day: ``True`` when a living crop is on the
-field, ``False`` when none is, or a ``Missing`` with its reason (the
-``Missing`` of the results contract or of the inputs contract, as the engine
-accepts either). It decides no day itself. Any other flag (``None``, the
-integers 0 and 1, text) is a defect of the caller and raises ``TypeError``:
-it is never counted as a day with or without a crop.
+D136); since unit ``l1/live-crop-by-day`` (issue #399),
+``engine.water.living_crop.live_crop_by_day`` returns those daily flags for a
+``RotationCalendar`` and parameter catalogue. For backward compatibility,
+``year_shares``, ``erosion_orders`` and ``compare_with_soil_loss`` continue
+to read, for each rotation and scenario, a flag per day: ``True`` when a
+living crop is on the field, ``False`` when none is, or a ``Missing`` with its
+reason (the ``Missing`` of the results contract or of the inputs contract, as
+the engine accepts either). They decide no day themselves, and callers can
+build those flags from calendars via ``living_crop_flags_from_calendar`` or
+``flags_by_rotation_from_calendars``. Any other flag (``None``, the integers 0
+and 1, text) is a defect of the caller and raises ``TypeError``: it is never
+counted as a day with or without a crop.
 
 Rules of the order, as entry D0 has them (D211: "A tie, a missing year and a
 single rotation give no order, with the reason; nothing is filled and nothing
@@ -45,13 +55,20 @@ values (OPEN 7 of the D0 comparator applies here too).
 
 Pure functions: no file, no clock, no network. The module holds no value of
 the method and no threshold: the fractions come from the erosivity the caller
-passes, the flags from the caller, and the soil loss from the caller's table.
+passes, the flags from the caller (or via the bridge to ``live_crop_by_day``),
+and the soil loss from the caller's table.
 
 OPEN, for the lead developer:
 
-1. The daily flags of a living crop are an input (above). Options: (a) as
-   built, flags passed by the caller; (b) a public function in ``engine/``
-   that gives the flags of D157 for a calendar and a catalogue, called here.
+1. The daily flags of a living crop are an input to ``year_shares``,
+   ``erosion_orders`` and ``compare_with_soil_loss`` (above). Unit
+   ``l1/live-crop-by-day`` (issue #399) exposed
+   ``engine.water.living_crop.live_crop_by_day``, and this module now provides
+   the PROPOSED bridge helpers ``living_crop_flags_from_calendar`` and
+   ``flags_by_rotation_from_calendars`` that delegate directly to it. Options:
+   (a) as built on the comparator entry points, flags passed by the caller;
+   (b) use the bridge to ``live_crop_by_day`` directly from calendars and
+   a catalogue.
 2. The agricultural years read are those the flags touch, for every rotation
    of the scenario; a year that one rotation lacks or does not cover whole is
    a missing year, so the edge years of a record give no order. Options: (a)
@@ -79,9 +96,11 @@ from fractions import Fraction
 from typing import Literal
 
 from contracts.inputs.common import Missing as InputMissing
+from contracts.inputs.rotation_calendar import RotationCalendar
 from contracts.results.models import Missing, ResultsTable
 from engine.erosion.r_factor import climatological_monthly_fractions
 from engine.erosion.r_factor._checks import ag_year_of, months_of_ag_year
+from engine.water.living_crop import live_crop_by_day
 from validation.trivial_comparator import TrivialOrder, trivial_orders
 
 SOIL_LOSS = "soil_loss"
@@ -444,3 +463,148 @@ def compare_with_soil_loss(
             )
         )
     return tuple(items)
+
+
+def _check_date(name: str, value: object) -> dt.date:
+    """``TypeError`` unless ``value`` is a ``datetime.date`` and not a ``datetime`` (G5)."""
+    if isinstance(value, dt.datetime) or not isinstance(value, dt.date):
+        raise TypeError(
+            f"{name}: expected datetime.date, got {type(value).__name__} (G5)"
+        )
+    return value
+
+
+def _check_parameters(parameters: object) -> None:
+    """``TypeError`` unless ``parameters`` is a ``dict[str, dict]`` (G3, G5)."""
+    if not isinstance(parameters, dict):
+        raise TypeError(
+            "parameters: expected dict[str, dict] (the catalogue as loaded), "
+            f"got {type(parameters).__name__} (G5)"
+        )
+    for key, record in parameters.items():
+        if not isinstance(key, str) or not isinstance(record, dict):
+            raise TypeError(
+                "parameters: expected dict[str, dict] (the catalogue as loaded): "
+                "every key is the path of a record file and every value a record (G5)"
+            )
+
+
+def _check_bridge_window_and_parameters(
+    start_date: object, end_date: object, parameters: object
+) -> tuple[dt.date, dt.date]:
+    start = _check_date("start_date", start_date)
+    end = _check_date("end_date", end_date)
+    if end < start:
+        raise ValueError(
+            f"end_date ({end.isoformat()}) comes before "
+            f"start_date ({start.isoformat()}) (G5)"
+        )
+    _check_parameters(parameters)
+    return start, end
+
+
+def _checked_live_flag(day: dt.date, flag: object) -> Flag:
+    if isinstance(flag, bool) or isinstance(flag, MISSING_FLAGS):
+        return flag
+    raise TypeError(
+        f"live_crop_by_day returned {type(flag).__name__} on {day}: "
+        "expected True, False or a Missing"
+    )
+
+
+def living_crop_flags_from_calendar(
+    calendar: RotationCalendar,
+    *,
+    start_date: dt.date,
+    end_date: dt.date,
+    parameters: dict[str, dict],
+) -> dict[dt.date, Flag]:
+    """PROPOSED bridge from a ``RotationCalendar`` to daily living-crop flags.
+
+    Delegates directly to ``engine.water.living_crop.live_crop_by_day`` (unit
+    #399): every day from ``start_date`` to ``end_date`` (inclusive) maps
+    ``True`` when a live crop stands (D135), ``False`` on a fallow day or a
+    day of the tail after maturity (D136), or a ``Missing`` with its reason.
+    No calendar repetition or stage logic is re-implemented here.
+
+    Pure function (G1): reads no file, clock or network and changes no
+    argument. Raises ``TypeError`` when ``calendar`` is not a
+    ``RotationCalendar``, ``start_date`` or ``end_date`` is not a
+    ``datetime.date`` (or is a ``datetime``), or ``parameters`` is not a
+    ``dict[str, dict]``; raises ``ValueError`` when ``end_date`` comes before
+    ``start_date`` or calendar repetition fails (G5).
+    """
+    if not isinstance(calendar, RotationCalendar):
+        raise TypeError(
+            f"calendar: expected RotationCalendar, got {type(calendar).__name__} (G5)"
+        )
+    start, end = _check_bridge_window_and_parameters(start_date, end_date, parameters)
+    raw = live_crop_by_day(calendar, start, end, parameters=parameters)
+    return {day: _checked_live_flag(day, flag) for day, flag in raw.items()}
+
+
+def _check_calendars(
+    calendars: object,
+) -> list[tuple[tuple[str, str], RotationCalendar]]:
+    if not isinstance(calendars, Mapping):
+        raise TypeError(
+            "calendars: expected Mapping[tuple[str, str], RotationCalendar], "
+            f"got {type(calendars).__name__} (G5)"
+        )
+    entries: list[tuple[tuple[str, str], RotationCalendar]] = []
+    for key, calendar in calendars.items():
+        if not isinstance(key, tuple) or len(key) != 2:
+            raise TypeError(
+                "calendars: every key must be a (rotation_id, scenario_id) pair, "
+                f"got {key!r} (G5)"
+            )
+        rotation_id, scenario_id = key
+        if not isinstance(rotation_id, str) or not isinstance(scenario_id, str):
+            raise TypeError(
+                "calendars: rotation_id and scenario_id must be text, "
+                f"got ({type(rotation_id).__name__}, {type(scenario_id).__name__}) (G5)"
+            )
+        if not rotation_id.strip() or not scenario_id.strip():
+            raise ValueError(
+                "calendars: rotation_id and scenario_id must be non-empty text (G5)"
+            )
+        if not isinstance(calendar, RotationCalendar):
+            raise TypeError(
+                f"calendars[{key!r}]: expected RotationCalendar, "
+                f"got {type(calendar).__name__} (G5)"
+            )
+        entries.append(((rotation_id, scenario_id), calendar))
+    return entries
+
+
+def flags_by_rotation_from_calendars(
+    calendars: Mapping[tuple[str, str], RotationCalendar],
+    *,
+    start_date: dt.date,
+    end_date: dt.date,
+    parameters: dict[str, dict],
+) -> dict[tuple[str, str], dict[dt.date, Flag]]:
+    """PROPOSED bridge for scenario tables: daily living-crop flags for each
+    ``(rotation_id, scenario_id)`` calendar in ``calendars``.
+
+    Produces the ``(rotation_id, scenario_id) -> dict[dt.date, Flag]`` mapping
+    consumed by ``year_shares``, ``erosion_orders`` and
+    ``compare_with_soil_loss`` by calling ``living_crop_flags_from_calendar``
+    for each entry.
+
+    Pure function (G1). Raises ``TypeError`` for malformed ``calendars``
+    entries or invalid window/catalogue arguments, and ``ValueError`` for
+    blank ``rotation_id`` / ``scenario_id``, ``end_date < start_date``, or
+    repetition failure (G5).
+    """
+    start, end = _check_bridge_window_and_parameters(start_date, end_date, parameters)
+    entries = _check_calendars(calendars)
+    return {
+        key: living_crop_flags_from_calendar(
+            calendar,
+            start_date=start,
+            end_date=end,
+            parameters=parameters,
+        )
+        for key, calendar in entries
+    }

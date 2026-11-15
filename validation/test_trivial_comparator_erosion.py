@@ -14,17 +14,32 @@ Run from the repository root: ``python -m pytest validation/test_trivial_compara
 from __future__ import annotations
 
 import ast
+import copy
 import datetime as dt
+import json
 from pathlib import Path
 
 import pytest
 
 from contracts.inputs.common import Missing as InputMissing
+from contracts.inputs.rotation_calendar import (
+    AgYearStart,
+    Feasibility,
+    RotationCalendar,
+    RuleViolation,
+)
 from contracts.results.models import Missing, ResultsTable, ResultsTableRow
+from contracts.rotation_definition import RotationDefinition
+from engine.calendar import build_rotation_calendar
+from engine.calendar.repeat import list_phases, phase_calendar
+from engine.water import living_crop as water_living_crop
+from params.catalogue import check_catalogue, load_folder
 from validation import trivial_comparator_erosion
 from validation.trivial_comparator_erosion import (
     compare_with_soil_loss,
     erosion_orders,
+    flags_by_rotation_from_calendars,
+    living_crop_flags_from_calendar,
     year_shares,
 )
 
@@ -497,3 +512,502 @@ def test_the_module_reads_no_file_clock_or_network_and_holds_no_number():
         if isinstance(node, ast.Constant) and type(node.value) in (int, float)
     }
     assert numbers <= {0, 1, 2}  # counting only: no threshold, no value of the method
+
+
+# --- bridge from RotationCalendar to live_crop_by_day (unit #399) ---------------
+
+_ROOT = Path(__file__).resolve().parent.parent
+_DEMO_ROTATIONS_PATH = _ROOT / "web" / "src" / "data" / "demo_rotations_d128.json"
+_RECORDS_DIR = _ROOT / "params" / "records"
+
+_BRIDGE_MARK = "PLACEHOLDER"
+_BRIDGE_UNMARKED = "UNMARKED_TEST_ONLY"
+
+# PLACEHOLDER stage lengths for synthetic tests and Rotation B's unsigned
+# crops (wheat, maize). Distinct repeated digits, plainly not real FAO-56
+# values, unmarked in memory only when fed into the catalogue lookup.
+_PLACEHOLDER_ROTATION_B_STAGE_LENGTHS = {
+    "wheat": {
+        "fao56_stage_length_initial": 11,
+        "fao56_stage_length_development": 22,
+        "fao56_stage_length_mid": 33,
+        "fao56_stage_length_late": 44,
+    },
+    "maize": {
+        "fao56_stage_length_initial": 15,
+        "fao56_stage_length_development": 25,
+        "fao56_stage_length_mid": 35,
+        "fao56_stage_length_late": 15,
+    },
+}
+
+
+def _stage_length_record(
+    *, param_id: str, crop: str, value: float | int
+) -> dict[str, object]:
+    raw = json.dumps(
+        {
+            "id": param_id,
+            "scope": {"crop": crop},
+            "value": value,
+            "unit": "day",
+            "range": None,
+            "range_missing_reason": f"{_BRIDGE_MARK} test record without range.",
+            "citation": {
+                "reference": f"{_BRIDGE_MARK} test-only parameter record for {param_id}",
+                "locator": f"{_BRIDGE_MARK} unit test",
+            },
+            "transcribed_by": f"{_BRIDGE_MARK} test author",
+            "checked_by": f"{_BRIDGE_MARK} test reviewer",
+            "note": f"{_BRIDGE_MARK} in-memory record for E0 bridge test.",
+        }
+    ).replace(_BRIDGE_MARK, _BRIDGE_UNMARKED)
+    return json.loads(raw)
+
+
+def _placeholder_stage_catalogue(
+    lengths_by_crop: dict[str, dict[str, float | int]],
+) -> dict[str, dict]:
+    records: dict[str, dict] = {}
+    for crop, stages in lengths_by_crop.items():
+        for param_id, value in stages.items():
+            records[f"placeholder.{param_id}.{crop}"] = _stage_length_record(
+                param_id=param_id, crop=crop, value=value
+            )
+    return records
+
+
+def _placeholder_rotation_definition(
+    rotation_id: str,
+    crop_id: str,
+    sowing: str,
+    harvest: str,
+    *,
+    start_month: int = 7,
+) -> RotationDefinition:
+    return RotationDefinition.model_validate(
+        {
+            "contract": "rotation_definition",
+            "example_data": True,
+            "case_id": CASE_ID,
+            "field_id": FIELD_ID,
+            "rotation_id": rotation_id,
+            "label": f"{SOURCE} {rotation_id}",
+            "ag_year_start": {
+                "month": start_month,
+                "provisional": True,
+                "provenance": "DECLARED",
+                "source": SOURCE,
+            },
+            "repeats": True,
+            "components": [
+                {
+                    "component_id": "c1",
+                    "position": 1,
+                    "crop_id": crop_id,
+                    "purpose": "grain",
+                    "sowing": {
+                        "date": sowing,
+                        "provenance": "DECLARED",
+                        "source": SOURCE,
+                    },
+                    "harvest": {
+                        "date": harvest,
+                        "provenance": "DECLARED",
+                        "source": SOURCE,
+                    },
+                    "management": {
+                        "residue": "left_on_surface",
+                        "grazing": {"missing": {"reason": "NOT_DECLARED"}},
+                        "termination": {"missing": {"reason": "NOT_DECLARED"}},
+                    },
+                }
+            ],
+        }
+    )
+
+
+def test_living_crop_flags_from_calendar_delegates_to_live_crop_by_day(monkeypatch):
+    cal = build_rotation_calendar(
+        _placeholder_rotation_definition("rot-a", "crop-a", "2020-10-01", "2020-12-31")
+    )
+    params = _placeholder_stage_catalogue(
+        {
+            "crop-a": {
+                "fao56_stage_length_initial": 11,
+                "fao56_stage_length_development": 11,
+                "fao56_stage_length_mid": 11,
+                "fao56_stage_length_late": 11,
+            }
+        }
+    )
+    d1, d2, d3 = dt.date(2020, 7, 1), dt.date(2020, 7, 2), dt.date(2020, 7, 3)
+    sentinel_missing = Missing(reason="MISSING_INPUT", detail="PLACEHOLDER delegated")
+    recorded_calls = []
+
+    def fake_live_crop_by_day(calendar, record_start, record_end, *, parameters):
+        recorded_calls.append((calendar, record_start, record_end, parameters))
+        return {d1: True, d2: False, d3: sentinel_missing}
+
+    monkeypatch.setattr(
+        trivial_comparator_erosion, "live_crop_by_day", fake_live_crop_by_day
+    )
+    flags = living_crop_flags_from_calendar(
+        cal, start_date=d1, end_date=d3, parameters=params
+    )
+    assert recorded_calls == [(cal, d1, d3, params)]
+    assert flags == {d1: True, d2: False, d3: sentinel_missing}
+    assert flags[d1] is True
+    assert flags[d2] is False
+
+
+def test_living_crop_flags_from_calendar_matches_live_crop_by_day_and_is_pure():
+    cal = build_rotation_calendar(
+        _placeholder_rotation_definition("rot-a", "crop-a", "2020-10-01", "2020-11-30")
+    )
+    params = _placeholder_stage_catalogue(
+        {
+            "crop-a": {
+                "fao56_stage_length_initial": 11,
+                "fao56_stage_length_development": 11,
+                "fao56_stage_length_mid": 11,
+                "fao56_stage_length_late": 11,
+            }
+        }
+    )
+    cal_before = cal.model_copy(deep=True)
+    params_before = copy.deepcopy(params)
+    start, end = dt.date(2020, 7, 1), dt.date(2021, 6, 30)
+
+    flags = living_crop_flags_from_calendar(
+        cal, start_date=start, end_date=end, parameters=params
+    )
+    direct = water_living_crop.live_crop_by_day(
+        cal, start, end, parameters=params
+    )
+    assert flags == direct
+    # 44 live days from Oct 1 -> Oct 1..Nov 13 are True; Nov 14..30 is tail (False).
+    assert flags[dt.date(2020, 9, 30)] is False
+    assert flags[dt.date(2020, 10, 1)] is True
+    assert flags[dt.date(2020, 11, 13)] is True
+    assert flags[dt.date(2020, 11, 14)] is False
+    assert flags[dt.date(2020, 11, 30)] is False
+    # G1 purity: arguments untouched, second call equal.
+    assert cal == cal_before
+    assert params == params_before
+    assert (
+        living_crop_flags_from_calendar(
+            cal, start_date=start, end_date=end, parameters=params
+        )
+        == flags
+    )
+
+    # Single-day window is accepted.
+    single = living_crop_flags_from_calendar(
+        cal, start_date=dt.date(2020, 10, 1), end_date=dt.date(2020, 10, 1), parameters=params
+    )
+    assert single == {dt.date(2020, 10, 1): True}
+
+
+def test_living_crop_flags_from_calendar_keeps_missing_for_infeasible_or_missing_start_month():
+    cal_base = build_rotation_calendar(
+        _placeholder_rotation_definition("bad", "crop-a", "2020-10-01", "2020-11-30")
+    )
+    cal_no_start = cal_base.model_copy(
+        update={
+            "ag_year_start": AgYearStart(
+                month=None,
+                missing=InputMissing(reason="NOT_DECLARED"),
+            )
+        }
+    )
+    cal_infeasible = cal_base.model_copy(
+        update={
+            "feasibility": Feasibility(
+                feasible=False,
+                violations=[
+                    RuleViolation(
+                        rule="overlap",
+                        component_ids=["c1"],
+                        detail="PLACEHOLDER infeasible calendar",
+                    )
+                ],
+            )
+        }
+    )
+    start, end = dt.date(2020, 7, 1), dt.date(2020, 7, 3)
+
+    flags_no_start = living_crop_flags_from_calendar(
+        cal_no_start, start_date=start, end_date=end, parameters={}
+    )
+    assert all(
+        isinstance(flag, Missing) and flag.reason == "MISSING_INPUT"
+        for flag in flags_no_start.values()
+    )
+
+    flags_infeasible = living_crop_flags_from_calendar(
+        cal_infeasible, start_date=start, end_date=end, parameters={}
+    )
+    assert all(
+        isinstance(flag, Missing) and flag.reason == "NOT_COMPUTABLE"
+        for flag in flags_infeasible.values()
+    )
+
+
+def test_bridge_validates_arguments_per_g5():
+    cal = build_rotation_calendar(
+        _placeholder_rotation_definition("rot-a", "crop-a", "2020-10-01", "2020-11-30")
+    )
+    start, end = dt.date(2020, 7, 1), dt.date(2021, 6, 30)
+
+    with pytest.raises(TypeError, match="RotationCalendar"):
+        living_crop_flags_from_calendar(
+            cal.model_dump(), start_date=start, end_date=end, parameters={}
+        )
+    for bad_date in ("2020-07-01", None, dt.datetime(2020, 7, 1, 0, 0)):
+        with pytest.raises(TypeError, match="datetime.date"):
+            living_crop_flags_from_calendar(
+                cal, start_date=bad_date, end_date=end, parameters={}
+            )
+        with pytest.raises(TypeError, match="datetime.date"):
+            living_crop_flags_from_calendar(
+                cal, start_date=start, end_date=bad_date, parameters={}
+            )
+    with pytest.raises(ValueError, match="before start_date"):
+        living_crop_flags_from_calendar(
+            cal, start_date=end, end_date=start, parameters={}
+        )
+    for bad_params in (None, [], {1: {}}, {"k": "not-a-dict"}):
+        with pytest.raises(TypeError, match="parameters"):
+            living_crop_flags_from_calendar(
+                cal, start_date=start, end_date=end, parameters=bad_params
+            )
+
+    # flags_by_rotation_from_calendars validation
+    assert flags_by_rotation_from_calendars(
+        {}, start_date=start, end_date=end, parameters={}
+    ) == {}
+    with pytest.raises(ValueError, match="before start_date"):
+        flags_by_rotation_from_calendars(
+            {}, start_date=end, end_date=start, parameters={}
+        )
+    with pytest.raises(TypeError, match="calendars"):
+        flags_by_rotation_from_calendars(
+            [("A", "p1", cal)], start_date=start, end_date=end, parameters={}
+        )
+    for bad_key in ("A", ("A",), ("A", "p1", "extra"), (1, "p1"), ("A", 2)):
+        with pytest.raises(TypeError, match="calendars"):
+            flags_by_rotation_from_calendars(
+                {bad_key: cal}, start_date=start, end_date=end, parameters={}
+            )
+    for blank_key in (("", "p1"), ("A", "   ")):
+        with pytest.raises(ValueError, match="non-empty"):
+            flags_by_rotation_from_calendars(
+                {blank_key: cal}, start_date=start, end_date=end, parameters={}
+            )
+    with pytest.raises(TypeError, match="RotationCalendar"):
+        flags_by_rotation_from_calendars(
+            {("A", "p1"): "not-a-calendar"},
+            start_date=start,
+            end_date=end,
+            parameters={},
+        )
+
+
+def test_flags_by_rotation_from_calendars_feeds_comparator_end_to_end():
+    cal_a = build_rotation_calendar(
+        _placeholder_rotation_definition("A", "crop-a", "2020-12-01", "2021-03-31")
+    )
+    cal_b = build_rotation_calendar(
+        _placeholder_rotation_definition("B", "crop-b", "2020-07-01", "2020-11-30")
+    )
+    # 44 live days for A (in high-erosivity Dec-Jan); 44 live days for B (in low-erosivity Jul-Aug).
+    params = _placeholder_stage_catalogue(
+        {
+            crop: {
+                "fao56_stage_length_initial": 11,
+                "fao56_stage_length_development": 11,
+                "fao56_stage_length_mid": 11,
+                "fao56_stage_length_late": 11,
+            }
+            for crop in ("crop-a", "crop-b")
+        }
+    )
+    living_map = flags_by_rotation_from_calendars(
+        {("A", SCENARIO): cal_a, ("B", SCENARIO): cal_b},
+        start_date=FIRST_DAY,
+        end_date=LAST_DAY,
+        parameters=params,
+    )
+    assert set(living_map) == {("A", SCENARIO), ("B", SCENARIO)}
+    (order,) = erosion_orders(
+        living_map, MONTHLY_EROSIVITY, start_month=START_MONTH
+    )
+    # A has live crop in Jan (erosivity 0.30) and Dec (0.03), so lower bare share than B.
+    assert order.order == ("A", "B")
+    assert order.reason is None
+
+
+@pytest.fixture(scope="module")
+def _d128_calendars_and_catalogue():
+    records, load_errors = load_folder(_RECORDS_DIR)
+    assert load_errors == []
+    assert check_catalogue(records) == []
+    raw_rotations = json.loads(_DEMO_ROTATIONS_PATH.read_text(encoding="utf-8"))
+    calendars = {}
+    for entry in raw_rotations:
+        rotation = RotationDefinition.model_validate(entry)
+        calendars[rotation.rotation_id] = build_rotation_calendar(rotation)
+    return calendars, records
+
+
+def test_d128_rotation_a_with_shipped_catalogue_computes_live_flags_and_year_shares(
+    _d128_calendars_and_catalogue,
+):
+    calendars, shipped = _d128_calendars_and_catalogue
+    cal_a = calendars["soybean-winter-fallow"]
+    start, end = dt.date(2020, 7, 1), dt.date(2023, 6, 30)
+
+    flags_a = living_crop_flags_from_calendar(
+        cal_a, start_date=start, end_date=end, parameters=shipped
+    )
+    assert len(flags_a) == (end - start).days + 1
+    assert all(isinstance(flag, bool) for flag in flags_a.values())
+    assert any(flag is True for flag in flags_a.values())
+    assert any(flag is False for flag in flags_a.values())
+    assert flags_a == water_living_crop.live_crop_by_day(
+        cal_a, start, end, parameters=shipped
+    )
+
+    shares = year_shares(
+        {("soybean-winter-fallow", "phase_0"): flags_a},
+        MONTHLY_EROSIVITY,
+        start_month=cal_a.ag_year_start.month,
+    )
+    assert [item.ag_year for item in shares] == [2020, 2021, 2022]
+    assert all(item.missing is None and 0.0 < item.share < 1.0 for item in shares)
+
+    # Partial boundary years behave per E0 / NO_COVERAGE when the window starts mid-year.
+    boundary_flags = living_crop_flags_from_calendar(
+        cal_a,
+        start_date=dt.date(2020, 1, 1),
+        end_date=dt.date(2022, 12, 31),
+        parameters=shipped,
+    )
+    boundary_shares = {
+        item.ag_year: item
+        for item in year_shares(
+            {("soybean-winter-fallow", "phase_0"): boundary_flags},
+            MONTHLY_EROSIVITY,
+            start_month=cal_a.ag_year_start.month,
+        )
+    }
+    assert boundary_shares[2019].missing.reason == "NO_COVERAGE"
+    assert boundary_shares[2022].missing.reason == "NO_COVERAGE"
+    assert boundary_shares[2020].missing is None and boundary_shares[2021].missing is None
+
+
+def test_d128_rotation_b_shipped_catalogue_preserves_missing_input_without_filling(
+    _d128_calendars_and_catalogue,
+):
+    calendars, shipped = _d128_calendars_and_catalogue
+    cal_a = calendars["soybean-winter-fallow"]
+    cal_b = calendars["wheat-soybean-maize"]
+    start, end = dt.date(2020, 7, 1), dt.date(2023, 6, 30)
+
+    living_map = flags_by_rotation_from_calendars(
+        {
+            ("soybean-winter-fallow", "phase_0"): cal_a,
+            ("wheat-soybean-maize", "phase_0"): cal_b,
+        },
+        start_date=start,
+        end_date=end,
+        parameters=shipped,
+    )
+    flags_b = living_map[("wheat-soybean-maize", "phase_0")]
+    assert any(
+        isinstance(flag, Missing) and flag.reason == "MISSING_INPUT"
+        for flag in flags_b.values()
+    )
+    # Soybean and fallow days remain resolved booleans even though wheat/maize are missing.
+    assert any(flag is True for flag in flags_b.values())
+    assert any(flag is False for flag in flags_b.values())
+
+    (order,) = erosion_orders(
+        living_map, MONTHLY_EROSIVITY, start_month=cal_a.ag_year_start.month
+    )
+    assert order.order is None
+    assert order.means is None
+    assert "'wheat-soybean-maize'" in order.reason
+    assert "MISSING_INPUT" in order.reason
+
+
+def test_d128_rotation_a_shipped_and_rotation_b_placeholder_compare_across_phases(
+    _d128_calendars_and_catalogue,
+):
+    calendars, shipped = _d128_calendars_and_catalogue
+    cal_a = calendars["soybean-winter-fallow"]
+    cal_b = calendars["wheat-soybean-maize"]
+
+    augmented = copy.deepcopy(shipped)
+    augmented.update(_placeholder_stage_catalogue(_PLACEHOLDER_ROTATION_B_STAGE_LENGTHS))
+    assert check_catalogue(augmented) == []
+
+    start, end = dt.date(2020, 7, 1), dt.date(2023, 6, 30)
+    phases_b = list_phases(cal_b)
+    assert len(phases_b) >= 2
+
+    calendar_map = {}
+    for phase in phases_b[:2]:
+        scenario_id = f"phase_{phase}"
+        calendar_map[("soybean-winter-fallow", scenario_id)] = cal_a
+        calendar_map[("wheat-soybean-maize", scenario_id)] = phase_calendar(cal_b, phase)
+
+    living_map = flags_by_rotation_from_calendars(
+        calendar_map, start_date=start, end_date=end, parameters=augmented
+    )
+    assert all(
+        isinstance(flag, bool)
+        for flags in living_map.values()
+        for flag in flags.values()
+    )
+
+    orders = erosion_orders(
+        living_map, MONTHLY_EROSIVITY, start_month=cal_a.ag_year_start.month
+    )
+    assert [item.scenario_id for item in orders] == ["phase_0", "phase_1"]
+    assert all(item.order is not None and item.reason is None for item in orders)
+
+    # Compare against a PLACEHOLDER ResultsTable with equal (D158-style) soil_loss.
+    tied_rows = [
+        ResultsTableRow(
+            rotation_id=rot_id,
+            scenario_id=scenario_id,
+            time_basis="ag_year",
+            ag_year=ag_year,
+            indicator="soil_loss",
+            direction="lower_is_better",
+            value=2.0,
+            unit="t ha-1 yr-1",
+            range_missing=Missing(reason="NOT_AVAILABLE", detail=SOURCE),
+            provenance="DERIVED",
+            source=SOURCE,
+        )
+        for scenario_id in ("phase_0", "phase_1")
+        for rot_id in ("soybean-winter-fallow", "wheat-soybean-maize")
+        for ag_year in (2020, 2021, 2022)
+    ]
+    report = compare_with_soil_loss(
+        living_map,
+        MONTHLY_EROSIVITY,
+        ResultsTable(case_id=CASE_ID, field_id=FIELD_ID, rows=tied_rows),
+        start_month=cal_a.ag_year_start.month,
+    )
+    assert [item.outcome for item in report] == [
+        "no order from the full method",
+        "no order from the full method",
+    ]
+    assert all(
+        (item.trivial_rotations_ordered, item.full_rotations_ordered) == (2, 0)
+        for item in report
+    )
