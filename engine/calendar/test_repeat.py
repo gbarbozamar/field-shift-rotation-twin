@@ -1079,6 +1079,26 @@ def test_first_cycle_that_starts_on_the_first_day_is_unchanged(record):
         assert all(c.cycle >= 0 for c in laid.components)
 
 
+@BOTH_RECORDS
+def test_first_cycle_that_starts_on_the_second_day_gets_a_lead_in(record):
+    # The boundary of point 6 (verifier of #403): the first cycle starts on
+    # the second day of the record's years, so the cycle before it is laid
+    # out and holds that first day alone; its crop ends before that day, so
+    # the day is a day with no crop, not a day the calendar does not describe.
+    calendar = build(
+        "2027-07-02",
+        "2028-06-30",
+        [component("c1", CROP_A, "2027-09-01", "2028-03-31")],
+    )
+    laid = described_to_the_end_of_the_first_cycle(calendar, 0, record)
+    lead, first = laid.cycles[:2]
+    assert (lead.index, first.index) == (repeat.LEAD_IN, 0)
+    assert first.start == laid.first_day + dt.timedelta(days=1)
+    assert lead.last_day == laid.first_day
+    assert lead.components_not_laid_out == ("c1",)
+    assert laid.described_from == lead.start < laid.first_day
+
+
 def soybean_winter_fallow() -> RotationCalendar:
     """A PLACEHOLDER one-year rotation shaped as the D128 rotation soybean -
     winter fallow: a soybean sown after the July start month and harvested

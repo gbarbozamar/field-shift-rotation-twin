@@ -27,7 +27,7 @@ import pytest
 
 from contracts.carbon_forcing import CarbonForcing
 from contracts.inputs.rotation_calendar import RotationCalendar
-from contracts.inputs.site_climate import SiteClimate
+from contracts.inputs.site_climate import SiteClimate, YearMonth
 from contracts.residue_ledger import CARBON_FIELDS, MASS_FIELDS, ResidueLedger
 from contracts.rotation_definition import RotationDefinition
 from engine.residues import build_residue_ledger
@@ -40,6 +40,7 @@ from engine.residues._parameters import (
     RECORDS,
 )
 from engine.amg.entry import STOCK_UNIT as AMG_INPUT_UNIT
+from engine.residues import ledger as residue_ledger
 from engine.residues.ledger import PARTS
 from params.catalogue import check_catalogue
 
@@ -906,29 +907,45 @@ def test_missing_component_gives_missing_months_never_zero():
     )
 
 
-def test_months_before_a_late_first_cycle_are_missing_never_zero():
-    """The lead-in rule of the months (``_month_value``): the first cycle is
-    laid out from a day after the start of the first agricultural year, so a
-    harvest in the months before that day, or in its own month before it, is
-    not known. Those months are missing, never zero; the months after are
-    computed. Without the rule they would read as months without a harvest."""
-    for first_day, unknown in (
-        ("2001-09-20", [(2001, 7), (2001, 8), (2001, 9)]),
-        ("2001-09-01", [(2001, 7), (2001, 8)]),  # the month of a first day is known
-    ):
+def test_months_before_a_late_first_cycle_are_described_by_the_cycle_before():
+    """D188 (2) with D221: the first cycle is laid out from a day after the
+    start of the first agricultural year, so the cycle before it is laid out
+    too (points 6 and 13 of engine/calendar/repeat.py) and every day of the
+    record's years is described. The harvests of that cycle fall before the
+    record, so July and August, and September before the first cycle, are
+    months with no harvest: an explicit zero, as every month without one
+    (D221). Every month is computed.
+
+    The rule of ``_month_value`` for a month before the first described day
+    (missing, never zero) stays: since D188 (2) no month of the record's
+    years comes before that day through the entry point, so the rule is
+    checked on the function, with a first described day after the start of
+    the year."""
+    for first_day in ("2001-09-20", "2001-09-01"):
         late = calendar_data(start_date=first_day, end_date="2002-09-19")
         late["components"][0]["start"] = date_value("2001-09-25")
         ledger = run(calendar=late)
         assert ledger.first_ag_year == YEARS[0]
         for found in ledger.monthly_carbon_inputs:
             for item in found.months:
-                if (item.year, item.month) in unknown:
-                    assert item.value is None, (found.origin, item)
-                    assert item.missing.reason == "MISSING_INPUT"
-                    assert f"before {first_day}" in item.missing.detail
-                    assert "before the first cycle" in item.missing.detail
-                else:
-                    assert item.value is not None, (found.origin, item)
+                assert item.value is not None, (found.origin, item)
+                if (item.year, item.month) in ((2001, 7), (2001, 8), (2001, 9)):
+                    assert item.value == 0, (found.origin, item)
+    for described_from, unknown in (
+        (dt.date(2001, 9, 20), [(2001, 7), (2001, 8), (2001, 9)]),
+        (dt.date(2001, 9, 1), [(2001, 7), (2001, 8)]),  # its own month is known
+    ):
+        for year, month in ((2001, 7), (2001, 8), (2001, 9), (2001, 10)):
+            item = residue_ledger._month_value(
+                YearMonth(year=year, month=month), PARTS, [], [], None, described_from
+            )
+            if (year, month) in unknown:
+                assert item.value is None, (described_from, item)
+                assert item.missing.reason == "MISSING_INPUT"
+                assert f"before {described_from.isoformat()}" in item.missing.detail
+                assert "before the first cycle" in item.missing.detail
+            else:
+                assert item.value == 0, (described_from, item)
 
 
 def test_monthly_sum_equals_the_annual_series():
