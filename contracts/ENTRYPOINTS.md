@@ -32,7 +32,7 @@ Every type in a signature is one of the rows below. Nothing else is used.
 | `"Rotation definition"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
 | `"ResidueLedger"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
 | `"CarbonForcing"` | PROPOSED model: file `contracts/carbon_forcing/models.py`, class `CarbonForcing` (#155, accepted into `contracts/` by D62 of #77). It also carries the monthly soil-cover series (`soil_cover`) and the starting state of the soil carbon (`starting_state`): both travel inside the forcing, not as separate arguments (D65 of #77). Its values (quantities, units, depth, horizon, aggregation, cover, starting pools) are `OPEN` in `contracts/carbon_forcing/README.md` |
-| `"CarbonBalance"` | Contract of blueprint section 5 that does not exist yet. `OPEN` |
+| `CarbonBalance` | PROPOSED model: file `contracts/carbon_balance/models.py`, class `CarbonBalance` (#199, #205). What one carbon model returns for one rotation of one field: the stocks, the flows of each step and the three values of `soil_carbon_trend`, all inside it. Its pools, flows, identifiers and units are `OPEN` in `contracts/carbon_balance/README.md` |
 
 A name in double quotes is the blueprint name of a contract, not a class: its model, its file and its example are a separate unit. The models of `contracts/inputs/` and `contracts/results/` are themselves proposals; a signature follows them as they are in `main` and changes when they change.
 
@@ -104,7 +104,7 @@ The summary repeats the entries below; the status of an entry is the one on its 
 | EP2 | `engine/calendar/` | L1 Engines | `build_rotation_calendar` | PROPOSED |
 | EP3 | `engine/water/` | L1 Engines | `compute_water_deficit_exposure` | PROPOSED |
 | EP4 | `engine/residues/` | L1 Engines | `build_residue_ledger` | OPEN |
-| EP5 | `engine/amg/` | L1 Engines | `run_amg` | OPEN |
+| EP5 | `engine/amg/` | L1 Engines | `run_amg` | PROPOSED |
 | EP6 | `engine/rothc/` | L2b Platform: decision and carbon | `run_rothc` | OPEN |
 
 Module paths are written from the repository root. Whether that is the import path is Q1.
@@ -247,29 +247,34 @@ When it cannot compute: it returns a `"ResidueLedger"` in which every value that
 
 ### EP5 `engine/amg/`
 
-Status: OPEN
+Status: PROPOSED
 
-| Aspect | Candidate |
+| Aspect | Entry |
 |---|---|
 | Lane | L1 Engines (lead developer) |
-| Module path | `engine.amg` (file `engine/amg/__init__.py`) |
+| Module path | `engine.amg` (file `engine/amg/__init__.py`; the function is in `engine/amg/entry.py` and is exported from the package) |
 | Function name | `run_amg` |
 | Argument `forcing` | `"CarbonForcing"`: contract of blueprint section 5, producer Platform (L2a); PROPOSED model `contracts/carbon_forcing/models.py`, class `CarbonForcing` (#155, D62). The same object for EP5 and EP6. It carries the monthly soil-cover series and the starting state of the soil carbon (D65) |
-| Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner, passed by keyword like the other arguments (Q3, D46, D56; given to this entry by D65). PROPOSED |
-| Return type | `"CarbonBalance"`: contract of blueprint section 5, producers Engines and Platform (L2b). It does not exist yet: `OPEN` |
+| Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner, passed by keyword (Q3, D46, D56; given to this entry by D65). In `run_amg` it is keyword-only. PROPOSED |
+| Return type | `CarbonBalance` (`contracts/carbon_balance/models.py`, PROPOSED, #199 and #205). The same type for EP5 and EP6 |
 
 ```text
 run_amg(
     forcing: "CarbonForcing",
+    *,
     parameters: dict[str, dict],
-) -> "CarbonBalance"
+) -> CarbonBalance
 ```
+
+**Status of the function.** `engine.amg.run_amg` exists (#199, #205; `engine/amg/README.md`, section "EP5 run_amg"). It runs **AMG-A only**, the annual reference that takes part in the selection (D80 of issue #77), with `carbon_model` `amg` (D1) and `variant` `amg_a` (the label is PROPOSED: `contracts/carbon_balance/README.md`, OPEN 2). AMG-M, the monthly variant, is experimental under D80 and is not built. The runner in `api/engines.py` does not call EP5 yet: that is a change of lane L2a (Q15).
 
 **Arguments decided** (decided by the lead developer on 14 November 2026, issue #77, D65): EP5 and EP6 keep the same arguments, and both take `parameters`, as EP1 and EP3 do (D46, D56). The monthly soil-cover series and the starting state travel inside `"CarbonForcing"`, not as separate arguments. G1, G3 and the two rows of G4 for a parameter apply to `parameters` here as they do for EP1 and EP3. The fields that carry the two inputs are PROPOSED in `contracts/carbon_forcing/` (`soil_cover`, `starting_state`); which quantities, pools and units they hold stays `OPEN` there.
 
-Why it is still `OPEN`: the return type is a contract that does not exist, and the candidate holds only what the table of blueprint section 5 states: `"CarbonForcing"` goes to both carbon models with the same inputs, climate and horizon, and each model produces a `"CarbonBalance"`. Still not placed: whether the state at the end is returned (the rest of Q14 (a)), the residue ledger (Q14 (b)), and the values of the indicator `soil_carbon_trend` (Q14 (c)). Blueprint section 8 also gives this engine two variants, an annual reference and a monthly adaptation (Q14 (d)).
+What it returns: a `CarbonBalance`: the total soil carbon, the pools and the flows of each step, and the three values of `soil_carbon_trend` for this model, all inside it (PROPOSED: the state at the end of the horizon is the last step of each stock series, and no separate state is returned). Its horizon, soil depth, `example_data` and identifiers are those of the forcing.
 
-When it cannot compute: it returns a `"CarbonBalance"` in which every value that is not computed is missing with its reason (G4); blueprint section 5 asks that contract for typed absences. Wherever the values of `soil_carbon_trend` travel (Q14), each of the three computations of C1.6 is present for this model, and one that is not computed is missing with its reason. Values of the two carbon models are never merged (C1.5).
+Why it is `PROPOSED` and no longer `OPEN`: the return type now exists as a PROPOSED model, so the signature is a proposal that a person accepts or corrects in the pull request. What stays `OPEN` is under Q14: whether the residue ledger is an argument (Q14 (b)), and the second variant (Q14 (d)). The acceptance of the shape of `CarbonBalance` is OPEN 1 of `contracts/carbon_balance/README.md`.
+
+When it cannot compute: it returns a `CarbonBalance` in which every value that is not computed is missing with its reason (G4), and each of the three computations of C1.6 is present for this model, one that is not computed being missing with its reason. Values of the two carbon models are never merged (C1.5). `run_amg` raises only `TypeError`, when `forcing` is not a `CarbonForcing` or `parameters` is not a `dict[str, dict]` (G5); no `ValueError` of G5 arises, because the one argument that carries identifiers is `forcing`.
 
 ### EP6 `engine/rothc/`
 
@@ -282,18 +287,20 @@ Status: OPEN
 | Function name | `run_rothc` |
 | Argument `forcing` | `"CarbonForcing"`: contract of blueprint section 5, producer Platform (L2a); PROPOSED model `contracts/carbon_forcing/models.py`, class `CarbonForcing` (#155, D62). The same object for EP5 and EP6. It carries the monthly soil-cover series and the starting state of the soil carbon (D65) |
 | Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner, passed by keyword like the other arguments (Q3, D46, D56; given to this entry by D65). PROPOSED |
-| Return type | `"CarbonBalance"`: contract of blueprint section 5, producers Engines and Platform (L2b). It does not exist yet: `OPEN` |
+| Return type | `CarbonBalance` (`contracts/carbon_balance/models.py`, PROPOSED, #199 and #205). The same type for EP5 and EP6, with `carbon_model` `rothc` (D1) |
 
 ```text
 run_rothc(
     forcing: "CarbonForcing",
     parameters: dict[str, dict],
-) -> "CarbonBalance"
+) -> CarbonBalance
 ```
 
 **Arguments decided** (issue #77, D65), as for EP5: EP5 and EP6 have the same arguments, so that both carbon models receive the same inputs (blueprint section 5) and the route calls them in the same way. The soil-cover series and the starting state that the RothC brief (#176) proposed as two further arguments of this entry travel inside `"CarbonForcing"` instead.
 
-Why it is still `OPEN`: for the same reasons as EP5. One point is proposed whatever the answers to Q14: EP5 and EP6 also have the same return type.
+Return type, PROPOSED: `CarbonBalance`, the same as EP5, so that the runner reads both in the same way (`contracts/carbon_balance/README.md`). A model of RothC steps by month; the contract takes a step list that may be annual or monthly, and `test_monthly_steps_load_for_the_other_carbon_model` in `contracts/carbon_balance/` shows that shape loading.
+
+Why it is still `OPEN`: `engine.rothc.run_rothc` does not exist, and its pools, flows, identifiers, units and the label of its `variant` (for example standard RothC, the reference of D80) are not proposed (`contracts/carbon_balance/README.md`, OPEN 2 and 3). The return type and the signature are a candidate, for the interface developer, who owns this folder, to accept or correct together with OPEN 1 of that file.
 
 When it cannot compute: as EP5.
 
@@ -306,10 +313,23 @@ The route itself is not defined here. This section only says which entry point g
 | `case_id`, `field_id`, `rotation_id` | The `RotationCalendar` returned by EP2 carries the same three |
 | `soil_loss` | EP1, unchanged when it returns a `SoilLossResults`. For the other case see Q4, now answered: that case no longer reaches an engine. While EP1 is not built: the part is wholly missing, reason `NOT_AVAILABLE` only (D12; the form is PROPOSED, `PartNotBuilt` in `contracts/results/models.py`, question 21 of `contracts/results/README.md`) |
 | `water_deficit_exposure` | EP3, unchanged. While EP3 is not built: the part is wholly missing, reason `NOT_AVAILABLE` only (D12; the form is PROPOSED, as for `soil_loss`) |
-| `soil_carbon_trend` | No entry point, as the candidates of EP5 and EP6 stand: Q14, Q15 |
+| `soil_carbon_trend` | EP5 and EP6, PROPOSED: the list `soil_carbon_trend` of the `CarbonBalance` each returns, copied unchanged, one balance after the other (see the mapping below). While no carbon engine is built: the part is wholly missing, reason `NOT_AVAILABLE` only (D12; the form is PROPOSED, `SoilCarbonTrendNotBuilt` in `contracts/results/models.py`). Today the runner writes it as the three computations of each configured carbon model, missing `NOT_AVAILABLE`, and calls neither entry point (Q15) |
 
 - EP2 is called first. EP1, EP3 and EP4 take its result, also when the calendar is infeasible: the engine, not its caller, writes the missing values and their reason.
 - No entry point returns a `ResultsTable` or a whole `ResultsPerRotation`: Q15.
+
+### Mapping of `soil_carbon_trend`, PROPOSED
+
+Restates what `contracts/carbon_balance/README.md` (OPEN 5) and `contracts/results/models.py` already say, for the platform developer to accept or correct. It adds no rule to either.
+
+1. **Where the values come from.** Each carbon entry point returns the three values of `soil_carbon_trend` for its own model inside its `CarbonBalance` (`end_minus_start`, `fitted_slope` and `mean_over_cycles`, each naming `carbon_model`; C1.5, C1.6). The balance already checks that it carries the three once each and that all name its model.
+2. **How they reach the response.** The part `soil_carbon_trend` of `ResultsPerRotation` is the list of the balance of EP5 (`carbon_model` `amg`) followed by the list of the balance of EP6 (`carbon_model` `rothc`). Each item is copied as it is: its value, unit, direction, provenance, source or assumption mark, range or reason, and its missing part. Nothing is added, summed, averaged, converted or reordered inside a list, and the items of the two models are never merged (C1.5). `ResultsPerRotation` already checks that each model present carries the three computations once.
+3. **A balance with missing values.** A balance whose values are not computed still carries the three items, each missing with its reason (G4). They are copied like any other item. The part is then present, not wholly missing: the wholly missing form is only for an engine that is not built (D12).
+4. **A carbon engine that is not built.** Today the runner writes, for each carbon model it is configured with, the three computations missing with `NOT_AVAILABLE` (`api/engines.py`). PROPOSED: when EP5 is built and EP6 is not, the part keeps the three items of `amg` from its balance and the three items of `rothc` missing `NOT_AVAILABLE`, as today. A model is never left out of the list without a typed absence (G4). When neither is built the part is as today, or the wholly missing form of D12; which of the two is item 4 of "Still `OPEN` for the mapping" in Q15.
+5. **Who does it.** The runner, a function of lane L2a that is not one of the engines (Q15 (a)); no engine, and no model of `contracts/`, changes for it.
+6. **Identifiers.** `amg` and `rothc` are the two values of `CarbonModel` in `contracts/results/models.py` (D1), and each balance names its own in `carbon_model`; the identifiers the runner is configured with are those of question 7 of `contracts/results/README.md`.
+
+What this mapping needs before the runner can use it is listed as items 1 to 4 under "Still `OPEN` for the mapping" in Q15.
 
 ## OPEN
 
@@ -378,17 +398,27 @@ Each item is a question a person can answer. The role that answers it is named a
 
 **Q13. What is the residue ledger computed from, and what is its contract?** EP4 is `OPEN` until the `ResidueLedger` contract exists and a person says which inputs the ledger needs: what the user declares, the calendar, site data, the result of another engine, parameters. The contract has to let every value be missing with its reason. For the lead developer, as owner of lane L1; the science reviewers for what the ledger is computed from.
 
-**Q14. What do the two carbon entry points receive and return?** EP5 and EP6 are `OPEN` until the `ModelState` and `CarbonBalance` contracts exist; `CarbonForcing` is PROPOSED in `contracts/carbon_forcing/` (#155, D62). Four parts. (a) `ModelState`: is it an argument (the starting state, the same for both models), part of what is returned, or both? (b) The residue ledger: does a carbon engine take `ResidueLedger` as an argument, or does `CarbonForcing` already hold what comes from it? `CarbonForcing` has `carbon_inputs` and `annual_carbon_inputs`, each series with an `origin` whose vocabulary is `OPEN` (`contracts/carbon_forcing/README.md`, OPEN 4). (c) The indicator: who computes the three values of `soil_carbon_trend` per model (C1.6): each carbon engine, which then returns `list[SoilCarbonTrend]` (`contracts/results/models.py`) next to the balance, or one function shared by both models, and in which folder does it live? (d) The two variants of AMG in blueprint section 8: does the one function return both, and how is each labelled? `CarbonForcing` now carries both monthly series and annual series (`annual_climate`, `annual_carbon_inputs`), at the lead developer's request on #155; which one each variant reads stays part of this question (`contracts/carbon_forcing/README.md`, OPEN 4). For the lead developer (EP5), the interface developer (EP6) and the platform developer, as producer of `CarbonForcing`.
+**Q14. What do the two carbon entry points receive and return?** EP5 and EP6 were `OPEN` until the `ModelState` and `CarbonBalance` contracts existed. `CarbonForcing` is PROPOSED in `contracts/carbon_forcing/` (#155, D62) and `CarbonBalance` in `contracts/carbon_balance/` (#199, #205); EP5 is `PROPOSED` and `run_amg` exists, EP6 stays `OPEN` because `run_rothc` does not exist. Four parts. (a) `ModelState`: is it an argument (the starting state, the same for both models), part of what is returned, or both? (b) The residue ledger: does a carbon engine take `ResidueLedger` as an argument, or does `CarbonForcing` already hold what comes from it? `CarbonForcing` has `carbon_inputs` and `annual_carbon_inputs`, each series with an `origin` whose vocabulary is `OPEN` (`contracts/carbon_forcing/README.md`, OPEN 4). (c) The indicator: who computes the three values of `soil_carbon_trend` per model (C1.6): each carbon engine, which then returns `list[SoilCarbonTrend]` (`contracts/results/models.py`) next to the balance, or one function shared by both models, and in which folder does it live? (d) The two variants of AMG in blueprint section 8: does the one function return both, and how is each labelled? `CarbonForcing` now carries both monthly series and annual series (`annual_climate`, `annual_carbon_inputs`), at the lead developer's request on #155; which one each variant reads stays part of this question (`contracts/carbon_forcing/README.md`, OPEN 4). For the lead developer (EP5), the interface developer (EP6) and the platform developer, as producer of `CarbonForcing`.
 
 - `DECIDED` for the starting state in part (a) (decided by the lead developer on 14 November 2026, issue #77, D65): **the starting state is not an argument of its own; it travels inside `CarbonForcing`**, the same object for both models. D65 also gives EP5 and EP6 the argument `parameters` and places the monthly soil-cover series (`contracts/carbon_forcing/README.md`, OPEN 8) inside `CarbonForcing`. The fields are PROPOSED: `starting_state` and `soil_cover` of `contracts/carbon_forcing/models.py`.
 - Still `OPEN` in part (a): whether the state at the end of the horizon is also returned, inside `"CarbonBalance"`; which pools the starting state holds, with which identifiers and units, and how it is obtained (`contracts/carbon_forcing/README.md`, OPEN 9); and whether the `ModelState` contract of blueprint section 5 later takes over the shape of `starting_state`. For the same roles as before; the science reviewers for the pools and units.
-- Parts (b), (c) and (d) are not answered by D65.
+- `PROPOSED` for part (a), second half (#199, #205; `contracts/carbon_balance/README.md`, OPEN 4): the state at the end of the horizon is the last step of each stock series of `CarbonBalance`, and no separate `ModelState` is returned. Not decided by a person: whether the `ModelState` contract of blueprint section 5 takes this over.
+- `PROPOSED` for part (c) (`contracts/carbon_balance/README.md`, OPEN 5; `engine/amg/README.md`): each carbon engine computes the three values of `soil_carbon_trend` for its own model and returns them inside its `CarbonBalance`, in the field `soil_carbon_trend` (a list of `SoilCarbonTrend`), so no function shared by the two models is needed. EP5 does it (`engine.amg.trend`). The runner copying them into `ResultsPerRotation` is the mapping in [From the entry points to one response](#from-the-entry-points-to-one-response). Not decided by a person.
+- `PROPOSED` for part (d) as far as AMG goes: `run_amg` returns AMG-A only, as a `CarbonBalance` with `variant` `amg_a`; AMG-M is experimental and casts no carbon vote (D80) and is not built. Still `OPEN`: whether AMG-M is later a second `CarbonBalance` with another variant or a second function, the vocabulary of `variant`, what RothC writes, and which monthly or annual series of `CarbonForcing` each variant reads (`contracts/carbon_balance/README.md`, OPEN 2).
+- Still `OPEN` in part (b), not answered by D65 or by #199: whether `ResidueLedger` is an argument of a carbon engine. `run_amg` takes none; it reads the annual carbon inputs of `CarbonForcing` (`annual_carbon_inputs`), by origin, whose vocabulary is `OPEN` (`contracts/carbon_forcing/README.md`, OPEN 4).
+- Still `OPEN`: the pools, flows, identifiers and units of `CarbonBalance` (`contracts/carbon_balance/README.md`, OPEN 3), and its acceptance by the platform developer and the interface developer (OPEN 1).
 
 **Q15. Who builds what no entry point returns?** Three parts. (a) `ResultsPerRotation` is put together from the results of EP1 and EP3 and the carbon values: by the route, or by a function that is not one of the six engines? (b) `ResultsTable`: which code builds it from several calls, and in which folder? (c) While an engine is not built, who writes its values as missing with reason `NOT_AVAILABLE` (C3.2)? For `soil_carbon_trend` that also needs the identifiers of the carbon models, which are question 7 of `contracts/results/README.md`. For the platform developer and the lead developer.
 
 - `DECIDED` for the form of part (c) (decided by the lead developer on 14 November 2026, decision D12, recorded in [issue #18](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/18#issuecomment-6881785241) and [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6881787420)): while an engine is not built, its whole part of `ResultsPerRotation` (`soil_loss`, `water_deficit_exposure` or `soil_carbon_trend`) may be wholly missing, **only with reason `NOT_AVAILABLE`**. A built engine keeps the present form and G4.
 - PROPOSED, not decided: the shape of a wholly missing part (`PartNotBuilt` in `contracts/results/models.py`; question 21 of `contracts/results/README.md`), for the platform developer and the interface developer to accept or rename.
 - Not answered by D12: which code writes the wholly missing part (today the runner in `api/engines.py`, lane L2a, writes the carbon rows as missing values, and answers `result: null` when EP1 or EP3 is not built), and parts (a) and (b).
+- What #180, #199 and #205 change for part (a): the carbon values now have a producer and a place. Each carbon engine returns them inside its `CarbonBalance` (Q14 (c)), so the code that puts `ResultsPerRotation` together has them in hand, and no function other than the six engines has to compute them. The mapping from the balances to the part `soil_carbon_trend` is `PROPOSED` in [From the entry points to one response](#from-the-entry-points-to-one-response). Who puts the part together stays the runner, as today: not decided for the carbon part by a person. Part (b) is not changed by them.
+- Still `OPEN` for the mapping, each for the platform developer unless said otherwise:
+  1. Who builds `CarbonForcing` for a request. The adapters and the runner contain no producer of it (blueprint section 5 names Platform, L2a, as producer), so the runner cannot call EP5 or EP6 until one exists and the runner has a place to call it.
+  2. How the runner checks that the forcing and the calendar describe the same rotation of the same field (`case_id`, `field_id`, `rotation_id`). G5 cannot do it: a carbon entry point has one argument that carries them, so it has nothing to compare.
+  3. What the part holds when EP5 is built and EP6 is not (or the reverse): the proposal is the three items of the built model from its balance and the three items of the other missing `NOT_AVAILABLE`, as the runner writes them today. For the platform developer and the lead developer.
+  4. What the part is when neither carbon engine is built: the items missing `NOT_AVAILABLE` of each configured model, as today, or the wholly missing form of D12 (`SoilCarbonTrendNotBuilt`, question 21 of `contracts/results/README.md`). For the platform developer and the interface developer.
 
 **Q16. Where does a result say that it was computed from example data?** The three input models carry `example_data`. `ResultsPerRotation` and `ResultsTable` do not, so an engine cannot pass the mark on. Blueprint section 7 lets soil and slope come from the accepted example at the first checkpoint, shown as example data. Either the results models gain the mark, or the route carries it next to the result. For the lead developer and the platform developer.
 
