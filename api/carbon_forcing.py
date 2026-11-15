@@ -5,11 +5,13 @@ of one rotation from what the runner already holds: the ``RotationCalendar``
 of EP2, the ``SiteClimate`` and the ``SiteSoilSlope``. The runner gives it to
 EP5 ``engine.amg.run_amg`` (and, once it exists, to EP6).
 
-It computes nothing scientific. It aggregates no series, converts no unit,
-fills no gap and never writes a number of its own: the only numbers it can
-carry are soil properties copied unchanged from ``SiteSoilSlope``. Every
-quantity whose definition, aggregation or source is not decided is written
-missing with its reason, never zero (C3.1). The identifiers of the quantities
+It converts no unit and fills no gap. The one value it computes is the one
+a decision fixes: the yearly ``mean_temperature`` of D118 of #77, the
+arithmetic mean over each agricultural year of the daily mean of D30 (from
+the daily maximum and minimum). Soil properties and the starting carbon are
+copied unchanged from ``SiteSoilSlope`` when present (D120, D121). Every
+quantity whose definition, aggregation or source is not decided, or not yet
+usable, is written missing with its reason, never zero (C3.1). The identifiers of the quantities
 are those ``engine/amg/entry.py`` reads (``FORCING_QUANTITIES``, PROPOSED
 there); they are written here as text, because this module never imports
 ``engine/``. ``api/test_carbon_forcing.py`` checks them against the engine
@@ -30,6 +32,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import statistics
 
 from contracts.carbon_forcing import (
     AnnualCarbonInputSeries,
@@ -70,23 +73,32 @@ SOIL_DEPTH_OPEN = (
     "the soil depth and its unit are OPEN (C1.6 of contracts/CONVENTIONS.md, "
     "for the science reviewers)"
 )
-MEAN_TEMPERATURE_OPEN = (
-    "the yearly aggregation of the daily mean air temperature (derived by the "
-    "engine from the daily maximum and minimum, D30 of #77) is not decided "
-    "(contracts/carbon_forcing/README.md, OPEN 7)"
-)
 WATER_BALANCE_OPEN = (
-    "the quantity water_balance is not defined (asked on #18; "
-    "engine/amg/README.md OPEN 4)"
+    "water_balance (D119 of #77: precipitation minus the FAO-56 reference "
+    "evapotranspiration, each summed over the agricultural year) is not written: "
+    "D119 waits for a science reviewer to check it against the AMG description, "
+    "and no reference evapotranspiration series reaches the producer"
 )
-CARBON_INPUTS_OPEN = "the residue ledger (EP4, engine/residues/) is not built"
+CARBON_INPUTS_OPEN = (
+    "the residue ledger (EP4, engine/residues/) is not built (D122 of #77)"
+)
 SOIL_PROPERTY_OPEN = (
-    "no source of this soil property is decided (asked on #18): site data: "
-    "soil and slope carries no item with this quantity"
+    "not read yet: D120 of #77 takes it from the soil profile of D112, read by "
+    "a person with its page (D34); site data: soil and slope carries no item "
+    "with this quantity"
 )
 STARTING_CARBON_OPEN = (
-    "no value or source of the starting soil organic carbon is decided (asked on #18)"
+    "not read yet: D121 of #77 takes it from the soil profile of D112, read by a "
+    "person with its page (D34); site data: soil and slope carries no item "
+    "soil_organic_carbon"
 )
+
+# --- D118: the yearly mean of the daily mean temperature of D30 ------------------
+
+# The two daily series D30 derives the daily mean from, by their identifiers in
+# contracts/CLIMATE_QUANTITIES.md (CQ2, CQ3), never by position.
+TEMPERATURE_MAX = "air_temperature_max_2m"
+TEMPERATURE_MIN = "air_temperature_min_2m"
 
 # The pattern of ``QuantityId`` of contracts/inputs/common.py, which ``origin``
 # and ``quantity`` of a carbon-input series must follow.
@@ -196,6 +208,148 @@ def crops_left_out(calendar: RotationCalendar) -> list[str]:
     return left_out
 
 
+def daily_mean_temperature(temperature_max: float, temperature_min: float) -> float:
+    """D30: "mean from the daily maximum and minimum": the arithmetic mean of the two.
+
+    The same form as ``mean_temperature`` of engine/water/et0/equations.py
+    (PROPOSED there); written here because this module never imports ``engine/``.
+    """
+    return statistics.fmean([temperature_max, temperature_min])
+
+
+def _annual_mean_temperature(
+    climate: SiteClimate, start_month: int, years: tuple[int, int]
+) -> AnnualSeries:
+    """D118: the arithmetic mean over each agricultural year of the daily means of D30.
+
+    A year with any day missing in either input series is missing with its
+    reason (C3.3), never filled or partially averaged (C3.4). Two input
+    units that differ: every year missing, nothing converted.
+    """
+    found = {series.quantity: series for series in climate.daily_series}
+    absent = [q for q in (TEMPERATURE_MAX, TEMPERATURE_MIN) if q not in found]
+    if absent:
+        missing = _missing(
+            "MISSING_INPUT",
+            "mean_temperature (D118, D30) needs the daily series "
+            + " and ".join(repr(q) for q in absent)
+            + " of site data: climate, which it does not carry",
+        )
+        return AnnualSeries(**_all_missing(MEAN_TEMPERATURE, UNIT_OPEN, years, missing))
+    high, low = found[TEMPERATURE_MAX], found[TEMPERATURE_MIN]
+    if high.unit != low.unit:
+        missing = _missing(
+            "NOT_COMPUTABLE",
+            f"mean_temperature (D118, D30): the daily series {TEMPERATURE_MAX!r} "
+            f"and {TEMPERATURE_MIN!r} are in different units; nothing is converted",
+        )
+        return AnnualSeries(**_all_missing(MEAN_TEMPERATURE, UNIT_OPEN, years, missing))
+
+    by_day = {
+        name: {day.date: day for day in series.days}
+        for name, series in ((TEMPERATURE_MAX, high), (TEMPERATURE_MIN, low))
+    }
+    items: list[AnnualValue] = []
+    for year in range(years[0], years[1] + 1):
+        first = dt.date(year, start_month, 1)
+        after = dt.date(year + 1, start_month, 1)
+        means: list[float] = []
+        gap: InputMissing | None = None
+        day = first
+        while day < after and gap is None:
+            pair = []
+            for name in (TEMPERATURE_MAX, TEMPERATURE_MIN):
+                item = by_day[name].get(day)
+                if item is None:
+                    gap = _missing(
+                        "NO_COVERAGE",
+                        f"mean_temperature (D118): {name!r} has no item for "
+                        f"{day.isoformat()}",
+                    )
+                    break
+                if item.value is None:
+                    assert item.missing is not None
+                    gap = _missing(
+                        "MISSING_INPUT",
+                        f"mean_temperature (D118): {name!r} is missing on "
+                        f"{day.isoformat()}, reason {item.missing.reason}"
+                        + (f" ({item.missing.detail})" if item.missing.detail else "")
+                        + "; a year with a missing day is not filled (C3.3, C3.4)",
+                    )
+                    break
+                pair.append(item.value)
+            else:
+                means.append(daily_mean_temperature(*pair))
+            day += dt.timedelta(days=1)
+        if gap is not None:
+            items.append(AnnualValue(ag_year=year, value=None, missing=gap))
+        else:
+            items.append(AnnualValue(ag_year=year, value=statistics.fmean(means)))
+
+    header: dict = {"quantity": MEAN_TEMPERATURE, "unit": high.unit}
+    if any(item.value is not None for item in items):
+        sources = "; ".join(
+            f"{series.quantity}: {series.source}"
+            for series in (high, low)
+            if series.source is not None
+        )
+        reasons = {
+            series.range_missing.reason
+            for series in (high, low)
+            if series.range_missing is not None
+        }
+        header.update(
+            provenance="DERIVED",  # C4.3: a fixed formula of observed values
+            source=(
+                "derived by api.carbon_forcing: arithmetic mean over the "
+                "agricultural year (D118 of #77) of the daily mean of "
+                f"{TEMPERATURE_MAX} and {TEMPERATURE_MIN} (D30 of #77)"
+                + (f"; input series: {sources}" if sources else "")
+            ),
+            assumption=high.assumption or low.assumption,
+            range_missing=_missing(
+                reasons.pop() if len(reasons) == 1 else "NOT_AVAILABLE",
+                "the input series carry no range, and none is derived (C2.2)",
+            ),
+        )
+    return AnnualSeries(
+        **header,
+        first_ag_year=years[0],
+        last_ag_year=years[1],
+        years=items,
+    )
+
+
+def _starting_carbon(soil_slope: SiteSoilSlope) -> StartingStateValue:
+    """D121 (PROPOSED source): the soil item ``soil_organic_carbon`` in the stock unit.
+
+    Copied unchanged only when its unit is the unit ``run_amg`` requires; a
+    concentration, or any other unit, is never converted.
+    """
+    for item in soil_slope.soil_properties:
+        if item.quantity != STARTING_CARBON:
+            continue
+        if item.unit == STOCK_UNIT:
+            return StartingStateValue.model_validate(item.model_dump())
+        return StartingStateValue(
+            quantity=STARTING_CARBON,
+            value=None,
+            unit=STOCK_UNIT,
+            missing=_missing(
+                "NOT_COMPUTABLE",
+                f"site data: soil and slope carries {STARTING_CARBON} in a unit "
+                f"other than {STOCK_UNIT!r}; D121 of #77 converts nothing (a "
+                "concentration would need a bulk density and a depth)",
+            ),
+        )
+    return StartingStateValue(
+        quantity=STARTING_CARBON,
+        value=None,
+        unit=STOCK_UNIT,
+        missing=_missing("NOT_AVAILABLE", STARTING_CARBON_OPEN),
+    )
+
+
 def _soil_property(soil_slope: SiteSoilSlope, quantity: str) -> SoilProperty:
     for item in soil_slope.soil_properties:
         if item.quantity == quantity:
@@ -275,14 +429,7 @@ def build_carbon_forcing(
         climate=[],
         carbon_inputs=[],
         annual_climate=[
-            AnnualSeries(
-                **_all_missing(
-                    MEAN_TEMPERATURE,
-                    UNIT_OPEN,
-                    years,
-                    _missing("NOT_AVAILABLE", MEAN_TEMPERATURE_OPEN),
-                )
-            ),
+            _annual_mean_temperature(climate, start.month, years),
             AnnualSeries(
                 **_all_missing(
                     WATER_BALANCE,
@@ -303,12 +450,5 @@ def build_carbon_forcing(
             _soil_property(soil_slope, quantity) for quantity in SOIL_PROPERTIES
         ],
         soil_cover=[],
-        starting_state=[
-            StartingStateValue(
-                quantity=STARTING_CARBON,
-                value=None,
-                unit=STOCK_UNIT,
-                missing=_missing("NOT_AVAILABLE", STARTING_CARBON_OPEN),
-            )
-        ],
+        starting_state=[_starting_carbon(soil_slope)],
     )

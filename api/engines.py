@@ -19,7 +19,8 @@ assembles one ``ResultsPerRotation`` (decision Q15 a, issue 18):
    out, EP5 is not called and its rows are missing with that reason;
 4. ``ResultsPerRotation`` from the identifiers of the calendar, the two engine
    results unchanged, and ``soil_carbon_trend``: the three rows of the
-   ``CarbonBalance`` of EP5 unchanged for ``amg`` (PROPOSED mapping), and
+   ``CarbonBalance`` of EP5 unchanged for ``amg`` (the mapping of
+   contracts/ENTRYPOINTS.md), and
    missing rows for every model whose engine is not built or was not called
    (decision Q15 c). A part whose engine is
    not built is written in the not-built form of the contract (decision D12
@@ -731,9 +732,10 @@ def _dependent(
 def carbon_trend(
     carbon_models: Sequence[str], amg_rows: Sequence[SoilCarbonTrend] | None
 ) -> list[SoilCarbonTrend]:
-    """``soil_carbon_trend`` of the result, model by model, in the configured order.
+    """``soil_carbon_trend`` of the result: the rows of EP5, then those of EP6.
 
-    PROPOSED mapping of a ``CarbonBalance`` into ``ResultsPerRotation``: for
+    The mapping of "From the entry points to one response" of
+    contracts/ENTRYPOINTS.md (PROPOSED there, #210): for
     ``amg``, the rows of EP5 (the three of its balance, unchanged, or the
     three missing with the reason EP5 was not called). For every other model,
     its three rows missing ``NOT_AVAILABLE``, the detail naming its engine
@@ -743,7 +745,9 @@ def carbon_trend(
     if amg_rows is None:
         return missing_carbon_trend(carbon_models)
     rows: list[SoilCarbonTrend] = []
-    for carbon_model in carbon_models:
+    # The list of EP5, then the list of EP6 ("From the entry points to one
+    # response" of contracts/ENTRYPOINTS.md), for the configured models only.
+    for carbon_model in [m for m in CARBON_ENTRY_POINTS if m in carbon_models]:
         if carbon_model == AMG_CARBON_MODEL:
             rows.extend(amg_rows)
             continue

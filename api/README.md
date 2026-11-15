@@ -446,10 +446,11 @@ is missing. So in the default app (nothing built) every module is
 
 `build_carbon_forcing(calendar, climate, soil_slope) -> CarbonForcing | Missing`
 builds the one forcing of one rotation (L2a is the producer of the contract,
-#155, D62) from what the runner already holds. It computes nothing
-scientific: no aggregation, no unit conversion, no gap filling, no number of
-its own. Every quantity whose definition, aggregation or source is not
-decided is missing with its reason, never zero. It reads no file, calls no
+#155, D62) from what the runner already holds. It converts no unit, fills
+no gap and computes only what a decision of #77 fixes: the yearly
+`mean_temperature` of D118 from the daily mean of D30. Every quantity whose
+definition, aggregation or source is not decided, or not yet usable, is
+missing with its reason, never zero. It reads no file, calls no
 network and never imports `engine/`; the identifiers below are those
 `engine/amg/entry.py` reads (`FORCING_QUANTITIES`), and
 `api/test_carbon_forcing.py` checks them against the engine when it is
@@ -461,10 +462,11 @@ importable. Every row is PROPOSED (platform developer, issue #18).
 | `case_id`, `field_id`, `rotation_id` | From the calendar (the runner has already compared climate and soil with it, D14) |
 | `horizon` | The whole agricultural years of the climate record (D47, D29), cut by the calendar's start month (`ag_year_start`): from the first month of the first whole agricultural year to the last month of the last one (C5.3, C5.5). The record's period is read from the document: the days every daily series covers (latest `start_date`, earliest `end_date`); monthly series are not read |
 | `soil_depth` | Missing `NOT_AVAILABLE`, unit `OPEN`, detail naming C1.6 (depth OPEN) |
-| `annual_climate` | `mean_temperature` and `water_balance`, one item per agricultural year of the horizon, every year missing `NOT_AVAILABLE`: the yearly aggregation of the daily mean temperature (D30) is not decided (contracts/carbon_forcing/README.md OPEN 7); `water_balance` is not defined (asked on #18). Unit `OPEN`: `engine/amg/entry.py` states none for either (it compares them with the units of its parameter records) |
-| `annual_carbon_inputs` | One series per crop of the calendar, once each in order of first appearance, `origin` and `quantity` both the `crop_id` (`run_amg` looks the humification coefficient up under scope key `crop` = `origin`, `ORIGIN_SCOPE_KEY`). Every year missing `NOT_AVAILABLE`: the residue ledger (EP4) is not built. Unit `t C ha-1`, the unit `run_amg` requires (`STOCK_UNIT`, derived from C1.5 as the engine derives it). A `crop_id` that is not a quantity identifier (`^[a-z][a-z0-9_]*$`) cannot be a series and is left out, never renamed; `CarbonForcing` has no field to say so, so the runner adds to the detail of the `amg` module "N crop(s) of the calendar could not be written as carbon-input series of the forcing: their crop_id is not a quantity identifier" (their number only, never the identifiers; `crops_left_out`). Why series and not an empty list: with no series `run_amg` answers `NOT_COMPUTABLE` ("no origin") for the humified input; with all-missing series it answers `MISSING_INPUT` naming the reason, the residue ledger |
-| `soil_properties` | `clay_content`, `carbonate_content`, `ph`: copied from `SiteSoilSlope.soil_properties` only if an item with exactly that `quantity` is there (never converted, never renamed); otherwise missing `NOT_AVAILABLE`, unit `OPEN`, detail: no source decided (asked on #18) |
-| `starting_state` | `soil_organic_carbon`, missing `NOT_AVAILABLE`, unit `t C ha-1`, detail: no value or source decided (asked on #18) |
+| `annual_climate` `mean_temperature` (D118) | One item per agricultural year of the horizon: the arithmetic mean over the year of the daily mean temperatures of D30. D30 reads "Derived by the engine (mean from the daily maximum and minimum; pressure from elevation), not requested as series"; the daily mean is the arithmetic mean of `air_temperature_max_2m` and `air_temperature_min_2m` (CQ2, CQ3 of `contracts/CLIMATE_QUANTITIES.md`, found by quantity, never by position), the same form as `mean_temperature` of `engine/water/et0/equations.py`. A year with a day missing in either series is missing `MISSING_INPUT` naming the series, the day and its reason (never filled or partially averaged, C3.3, C3.4); a day absent from a series, `NO_COVERAGE`. An absent input series: every year `MISSING_INPUT`. Input units that differ: every year `NOT_COMPUTABLE`, unit `OPEN`, nothing converted. Otherwise the unit of the inputs; provenance `DERIVED` (C4.3); source naming D118, D30 and the source of each input series; `range_missing` with the reason the inputs carry (or `NOT_AVAILABLE` if they differ): no range is derived (C2.2) |
+| `annual_climate` `water_balance` (D119) | Every year missing `NOT_AVAILABLE`, unit `OPEN`: D119 (precipitation minus FAO-56 ET0, each summed over the agricultural year, in mm) is conditional on a science reviewer's check against the AMG description, and no ET0 series reaches the producer (FAO-56 ET0 is computed inside the water engine). The detail says both |
+| `annual_carbon_inputs` | One series per crop of the calendar, once each in order of first appearance, `origin` and `quantity` both the `crop_id` (`run_amg` looks the humification coefficient up under scope key `crop` = `origin`, `ORIGIN_SCOPE_KEY`). Every year missing `NOT_AVAILABLE`: the residue ledger (EP4) is not built (D122). Unit `t C ha-1`, the unit `run_amg` requires (`STOCK_UNIT`, derived from C1.5 as the engine derives it). A `crop_id` that is not a quantity identifier (`^[a-z][a-z0-9_]*$`) cannot be a series and is left out, never renamed; `CarbonForcing` has no field to say so, so the runner adds to the detail of the `amg` module "N crop(s) of the calendar could not be written as carbon-input series of the forcing: their crop_id is not a quantity identifier" (their number only, never the identifiers; `crops_left_out`). Why series and not an empty list: with no series `run_amg` answers `NOT_COMPUTABLE` ("no origin") for the humified input; with all-missing series it answers `MISSING_INPUT` naming the reason, the residue ledger |
+| `soil_properties` (D120) | `clay_content`, `carbonate_content`, `ph`: copied from `SiteSoilSlope.soil_properties` only if an item with exactly that `quantity` is there (never converted, never renamed); otherwise missing `NOT_AVAILABLE`, unit `OPEN`, detail naming D120 (a person reads them from the D112 profile, under D34). Why `NOT_AVAILABLE` and not `NOT_DECLARED`: D120 keeps `NOT_DECLARED` for a property the profile does not print, which only the person reading it can know; until a person has read it, the platform only knows that no value has reached it, the meaning of `NOT_AVAILABLE` closest in C3.2. When the reading says "not printed", the soil file carries the item missing `NOT_DECLARED` and it is copied as it is |
+| `starting_state` (D121) | `soil_organic_carbon` (PROPOSED source): the `SiteSoilSlope.soil_properties` item with exactly that quantity, copied unchanged only if its unit is `t C ha-1`, the stock unit `run_amg` requires. Another unit (for example a concentration) is never converted: missing `NOT_COMPUTABLE`, detail naming D121. Absent: missing `NOT_AVAILABLE`, detail naming D121 (a person reads it from the D112 profile, under D34) |
 | `climate`, `carbon_inputs`, `soil_cover` | Empty lists: `run_amg` (AMG-A, D80) reads annual series only |
 | Series headers | All-missing series carry no `provenance`, `source` or `range_missing` (the contract's rule) |
 
@@ -473,17 +475,18 @@ month (`MISSING_INPUT`, naming `ag_year_start` and its reason), when the
 climate document has no daily series (`MISSING_INPUT`), or when the record
 covers no whole agricultural year (`NO_COVERAGE`, C5.5).
 
-### From a `CarbonBalance` to `soil_carbon_trend` (PROPOSED)
+### From a `CarbonBalance` to `soil_carbon_trend`
 
-`carbon_trend(carbon_models, amg_rows)`: model by model, in the configured
-order, three rows each. For `amg`, the three `soil_carbon_trend` items of the
-balance EP5 returned, unchanged (or the three missing rows when EP5 was not
-called). For `rothc`, three missing rows `NOT_AVAILABLE`, detail "the module
-is not built yet: engine.rothc.run_rothc". Values of the two models are
-never merged (C1.5). The balance itself (stocks and flows by year) is not in
-the response (OPEN below). Issue #208 (lane L0) proposes the mapping in
-`contracts/ENTRYPOINTS.md`; no pull request of it existed when this was
-written, so this mapping is the platform lane's proposal for it.
+`carbon_trend(carbon_models, amg_rows)` follows "From the entry points to one
+response" of `contracts/ENTRYPOINTS.md` (#210; PROPOSED there, not ours): the
+list of the balance of EP5 (`amg`), copied unchanged (or its three rows
+missing when EP5 was not called), then the three `rothc` rows missing
+`NOT_AVAILABLE`, detail "the module is not built yet:
+engine.rothc.run_rothc". That order holds whatever the order of
+`carbon_models`; a model that is not configured has no rows. Values of the
+two models are never merged (C1.5). With EP5 not built the six rows are as
+before, in the configured order. The balance itself (stocks and flows by
+year) is not in the response (OPEN below).
 
 ### Module states (PROPOSED)
 
@@ -567,6 +570,10 @@ result and not both zero with one (checked at construction).
   `end_date`). A consequence: a daily series that is shorter than the others
   shortens the horizon, even when it is a quantity AMG does not read (today
   the forcing reads no climate value at all).
+- Unit `l2/runner-amg` after D118 to D122: the source of the starting carbon
+  (a soil item `soil_organic_carbon` in `t C ha-1`, D121), the reasons and
+  details of the table above, the `range_missing` and source of
+  `mean_temperature`.
 - Unit `l2/runner-amg`: `carbon_models` checked against `CarbonModel`; EP5
   called only when `amg` is configured; the note on crops left out in the
   `amg` detail; EP5 in discovery and in the call order; the producer
@@ -612,18 +619,17 @@ here.
 
 ## OPEN
 
-- **The inputs of AMG (asked on #18).** Until they are answered, AMG runs and
-  its values are missing with their reason:
-  - the definition of `water_balance` (which water balance, which unit);
-  - the source of `clay_content`, `carbonate_content` and `ph`, and their units;
-  - the value or source of the starting soil organic carbon (`starting_state`);
-  - the residue ledger (EP4, `engine/residues/`), which the carbon inputs
-    come from, and the vocabulary of `origin` and of the carbon-input
-    quantities (Q14 (b));
-  - the yearly aggregation of the daily mean air temperature (D30; OPEN 7 of
-    `contracts/carbon_forcing/README.md`), and what a year with missing days
-    becomes.
-  For the lead developer and the science reviewers.
+- **The inputs of AMG after D118 to D122.** Answered: `mean_temperature`
+  (D118, built). Still missing with their reason:
+  - `water_balance` (D119): **how ET0 reaches the producer once the science
+    reviewer's check passes**: an ET0 function of `engine/water/` discovered
+    by name, or a series in the climate contract. For the lead developer;
+  - `clay_content`, `carbonate_content`, `ph` (D120) and the starting soil
+    organic carbon (D121): read by a person from the D112 profile (D34) into
+    the soil file; whether the profile gives organic carbon as a stock in
+    `t C ha-1` (D121) is for that person;
+  - the carbon inputs (D122): the residue ledger (EP4), and the vocabulary of
+    `origin` and of the carbon-input quantities (Q14 (b)).
 - **The soil depth and its unit** (C1.6), for the science reviewers.
 - **Whether the forcing horizon must equal the agricultural years of the
   record** (OPEN 3 of `contracts/carbon_forcing/README.md`); proposed here:

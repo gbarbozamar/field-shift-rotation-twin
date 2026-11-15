@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -157,9 +158,12 @@ def test_the_horizon_is_the_whole_agricultural_years_of_the_record():
         assert (series.first_ag_year, series.last_ag_year) == years
 
 
-def test_every_value_is_missing_with_its_reason_and_nothing_is_zero():
+def test_every_value_but_mean_temperature_is_missing_with_its_reason():
     forcing = chain_forcing()
     dumped = forcing.model_dump(mode="json")
+    dumped["annual_climate"] = [
+        s for s in dumped["annual_climate"] if s["quantity"] != "mean_temperature"
+    ]
     assert values_in(dumped) == []  # no number at all, zero included
     assert forcing.soil_depth.value is None
     assert forcing.soil_depth.missing.reason == "NOT_AVAILABLE"
@@ -167,9 +171,10 @@ def test_every_value_is_missing_with_its_reason_and_nothing_is_zero():
     assert forcing.soil_depth.unit == UNIT_OPEN
     climate = {series.quantity: series for series in forcing.annual_climate}
     assert set(climate) == {producer.MEAN_TEMPERATURE, producer.WATER_BALANCE}
-    assert "D30" in climate["mean_temperature"].years[0].missing.detail
-    assert "not defined" in climate["water_balance"].years[0].missing.detail
-    for series in [*forcing.annual_climate, *forcing.annual_carbon_inputs]:
+    assert "D119" in climate["water_balance"].years[0].missing.detail
+    assert "evapotranspiration" in climate["water_balance"].years[0].missing.detail
+    assert "D122" in forcing.annual_carbon_inputs[0].years[0].missing.detail
+    for series in [climate["water_balance"], *forcing.annual_carbon_inputs]:
         assert series.years
         assert all(item.value is None for item in series.years)
         assert all(item.missing.reason == "NOT_AVAILABLE" for item in series.years)
@@ -181,10 +186,14 @@ def test_every_value_is_missing_with_its_reason_and_nothing_is_zero():
             None,
         )
         assert series.assumption is False
-    for item in [*forcing.soil_properties, *forcing.starting_state]:
+    for item in forcing.soil_properties:
         assert item.value is None
         assert item.missing.reason == "NOT_AVAILABLE"
-        assert item.missing.detail
+        assert "D120" in item.missing.detail
+    for item in forcing.starting_state:
+        assert item.value is None
+        assert item.missing.reason == "NOT_AVAILABLE"
+        assert "D121" in item.missing.detail
     assert [item.quantity for item in forcing.starting_state] == ["soil_organic_carbon"]
     assert forcing.starting_state[0].unit == STOCK_UNIT
     assert [item.quantity for item in forcing.soil_properties] == [
@@ -366,3 +375,133 @@ def test_crops_left_out_are_the_crops_that_are_not_identifiers():
     calendar = chain_calendar(crops=False)
     expected = list(dict.fromkeys(c.crop_id for c in calendar.components))
     assert producer.crops_left_out(calendar) == expected
+
+
+# --- 3. D118: mean_temperature from the daily mean of D30 -------------------------
+
+# Plainly unreal placeholder temperatures, for the synthetic record only.
+HIGH, LOW = 1234.5, 1000.25
+
+
+def temperature_climate(
+    *, years: int = 2, gap: tuple[str, int] | None = None, low_unit: str | None = None
+) -> SiteClimate:
+    """The chain climate with two temperature series of ``years`` agricultural years."""
+    climate = json.loads(json.dumps(CHAIN_CLIMATE))
+    first_day, _ = the_period()
+    after = dt.date(first_day.year + years, first_day.month, first_day.day)
+    count = (after - first_day).days
+    kept = []
+    for series in climate["daily_series"]:
+        if series["quantity"] not in (
+            producer.TEMPERATURE_MAX,
+            producer.TEMPERATURE_MIN,
+        ):
+            continue
+        value = HIGH if series["quantity"] == producer.TEMPERATURE_MAX else LOW
+        series["days"] = [
+            {"date": (first_day + dt.timedelta(days=i)).isoformat(), "value": value}
+            for i in range(count)
+        ]
+        series["start_date"] = series["days"][0]["date"]
+        series["end_date"] = series["days"][-1]["date"]
+        if gap is not None and gap[0] == series["quantity"]:
+            series["days"][gap[1]] = {
+                "date": series["days"][gap[1]]["date"],
+                "value": None,
+                "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+            }
+        if low_unit is not None and series["quantity"] == producer.TEMPERATURE_MIN:
+            series["unit"] = low_unit
+        kept.append(series)
+    climate["daily_series"] = list(reversed(kept))  # read by quantity, not position
+    return SiteClimate.model_validate(climate)
+
+
+def mean_temperature(forcing: CarbonForcing):
+    (series,) = [s for s in forcing.annual_climate if s.quantity == "mean_temperature"]
+    return series
+
+
+def test_d118_is_the_yearly_mean_of_the_daily_mean_of_d30():
+    climate = temperature_climate()
+    series = mean_temperature(chain_forcing(climate=climate))
+    expected = statistics.fmean([(HIGH + LOW) / 2])  # every day the same
+    assert [item.value for item in series.years] == [expected, expected]
+    assert series.unit == climate.daily_series[0].unit
+    assert series.provenance == "DERIVED"
+    assert "D118" in series.source and "D30" in series.source
+    assert climate.daily_series[0].source in series.source
+    assert series.range_missing is not None
+
+
+def test_d118_on_the_chain_example_uses_every_day_of_the_year():
+    climate = chain_climate()
+    series = {s.quantity: s for s in climate.daily_series}
+    high = [d.value for d in series[producer.TEMPERATURE_MAX].days]
+    low = [d.value for d in series[producer.TEMPERATURE_MIN].days]
+    expected = statistics.fmean([(h + lo) / 2 for h, lo in zip(high, low, strict=True)])
+    (item,) = mean_temperature(chain_forcing()).years
+    assert item.value == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("which", ["air_temperature_max_2m", "air_temperature_min_2m"])
+def test_d118_a_year_with_one_missing_day_is_missing_and_not_filled(which):
+    climate = temperature_climate(gap=(which, 3))
+    first, second = mean_temperature(chain_forcing(climate=climate)).years
+    assert first.value is None
+    assert first.missing.reason == "MISSING_INPUT"
+    assert which in first.missing.detail
+    assert second.value is not None  # the other year is whole
+
+
+def test_d118_inputs_in_different_units_give_every_year_missing():
+    climate = temperature_climate(low_unit="PLACEHOLDER_other_unit")
+    series = mean_temperature(chain_forcing(climate=climate))
+    assert all(item.value is None for item in series.years)
+    assert all(item.missing.reason == "NOT_COMPUTABLE" for item in series.years)
+    assert series.provenance is None
+
+
+def test_d118_an_absent_input_series_gives_every_year_missing():
+    climate = json.loads(json.dumps(CHAIN_CLIMATE))
+    climate["daily_series"] = [
+        s for s in climate["daily_series"] if s["quantity"] != producer.TEMPERATURE_MIN
+    ]
+    series = mean_temperature(
+        chain_forcing(climate=SiteClimate.model_validate(climate))
+    )
+    assert all(item.missing.reason == "MISSING_INPUT" for item in series.years)
+    assert producer.TEMPERATURE_MIN in series.years[0].missing.detail
+
+
+def test_daily_mean_temperature_is_the_mean_of_maximum_and_minimum():
+    assert producer.daily_mean_temperature(HIGH, LOW) == (HIGH + LOW) / 2
+
+
+# --- 4. D121: the starting soil organic carbon ----------------------------------
+
+
+def soil_item(quantity: str, unit: str) -> dict[str, Any]:
+    return {**SOIL_SLOPE["soil_properties"][0], "quantity": quantity, "unit": unit}
+
+
+def test_d121_copied_unchanged_in_the_stock_unit():
+    soil = chain_soil_slope([soil_item("soil_organic_carbon", STOCK_UNIT)])
+    (state,) = chain_forcing(soil_slope=soil).starting_state
+    assert state.model_dump() == soil.soil_properties[0].model_dump()
+
+
+def test_d121_another_unit_is_never_converted():
+    soil = chain_soil_slope([soil_item("soil_organic_carbon", "PLACEHOLDER_percent")])
+    (state,) = chain_forcing(soil_slope=soil).starting_state
+    assert state.value is None
+    assert state.unit == STOCK_UNIT
+    assert state.missing.reason == "NOT_COMPUTABLE"
+    assert "D121" in state.missing.detail
+
+
+def test_d121_absent_is_missing_naming_d121():
+    (state,) = chain_forcing().starting_state
+    assert state.missing.reason == "NOT_AVAILABLE"
+    assert "D121" in state.missing.detail

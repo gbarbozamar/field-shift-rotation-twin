@@ -1836,13 +1836,14 @@ def test_ep5_not_called_when_amg_is_not_configured_and_an_input_is_absent():
     assert dict_of_modules(result)["amg"].detail == runner.AMG_NOT_CONFIGURED
 
 
-def test_the_rows_follow_the_configured_order_of_the_models():
+def test_the_rows_are_those_of_ep5_then_ep6_whatever_the_configured_order():
+    # contracts/ENTRYPOINTS.md, "From the entry points to one response".
     amg = Fake(balance())
     result = run_with_models(amg, ("rothc", "amg"))
     assert len(amg.calls) == 1
     rows = result.result.soil_carbon_trend
-    assert [r.carbon_model for r in rows] == ["rothc"] * 3 + ["amg"] * 3
-    assert rows[3:] == amg.answer.soil_carbon_trend
+    assert [r.carbon_model for r in rows] == ["amg"] * 3 + ["rothc"] * 3
+    assert rows[:3] == amg.answer.soil_carbon_trend
 
 
 @pytest.mark.parametrize(
