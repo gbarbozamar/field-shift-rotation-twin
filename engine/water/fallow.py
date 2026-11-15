@@ -20,8 +20,9 @@ that follows it: the cover of D115 is the cover at the sowing of that crop.
 Unit ``l1/water-ep3-repeat-d47`` (issue #253): ``following_crop`` takes the
 sowings of the repeated rotation instead of a calendar, so the fallow after
 the last component of a cycle is followed by the first sowing of the next
-cycle. The repetition itself is ``engine.calendar.repeat_over_record``; this
-module holds no rule of it and is given plain dates.
+cycle, when that sowing is laid out inside the record. The repetition itself
+is ``engine.calendar.repeat_over_record``; this module holds no rule of it
+and is given plain dates.
 
 This module holds the three pure steps of that day; ``exposure.py`` reads the
 records and chains them. Status: PROPOSED (blueprint section 3.7); see
@@ -54,12 +55,13 @@ Number = float | Missing
 # --- detail texts: PROPOSED, English for developers -------------------------
 
 NO_FOLLOWING_CROP = (
-    "the fallow of the day has no crop that follows it in the rotation repeated "
-    "over the years of the climate record (decision D47 of issue #77): no "
-    "component of the calendar has a start date, so the record of its surface "
-    "residue cover cannot be named: the cover of a fallow is read by the crop "
-    "sown after it (decisions D110 and D115 of issue #77, scope PROPOSED, OPEN "
-    "31 of engine/water/EXPOSURE.md)"
+    "the fallow of the day has no crop that follows it in the rotation laid out "
+    "over the years of the climate record (decisions D47 and D109 of issue "
+    "#77): no sowing is laid out after the day, and nothing is laid out past "
+    "the record, so the record of its surface residue cover cannot be named: "
+    "the cover of a fallow is read by the crop sown after it (decisions D110 "
+    "and D115 of issue #77, scope PROPOSED, OPEN 31 and OPEN 41 of "
+    "engine/water/EXPOSURE.md)"
 )
 SOWING_NOT_KNOWN = (
     "the crop that follows the fallow of the day is not known: a component of "

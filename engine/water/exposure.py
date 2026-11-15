@@ -80,7 +80,6 @@ from engine.calendar.repeat import (
     RepeatedComponent,
     RepeatedRotation,
     repeat_over_record,
-    shifted_date,
 )
 from engine.water import balance, evaporation, fallow
 from engine.water._parameters import Catalogue, Scope, check_parameters
@@ -519,21 +518,16 @@ def _unit_problems(
 # --- the rotation over the record, and the crop of each day ---------------------
 
 
-def _over_record(
-    calendar: RotationCalendar, record: DailySeries
-) -> tuple[RepeatedRotation, RepeatedRotation]:
-    """The calendar repeated over the record, and the same one cycle past it.
+def _over_record(calendar: RotationCalendar, record: DailySeries) -> RepeatedRotation:
+    """The calendar repeated over the agricultural years of the record.
 
     The repetition is ``engine.calendar.repeat_over_record`` (D47, D109), on
     the dates of the ``precipitation`` series, the series that marks the
-    record for EP1 too; no rule of it is written here. A calendar moved by
-    ``phase_calendar`` (D132) is repeated like any other.
-
-    The second repetition is the first laid out up to one cycle after the
-    last day of the record. PROPOSED: it is read only to name the crop sown
-    after a fallow (``_following_crop``): the sowing that follows a fallow at
-    the end of the record lies after the record, where the first repetition
-    lays out no component. No day after the record is computed.
+    record for EP1 too; no rule of it is written here, and it is called once,
+    with the record as it is. A calendar moved by ``phase_calendar`` (D132)
+    is repeated like any other. Nothing is laid out past the record: a cycle
+    that does not fit whole is cut at its end (D109), so a component sown
+    after the last day of the record's years is not known here.
 
     Raises ``ValueError``, as EP1 does, if the helper does not lay out the
     agricultural years this entry point lists from the same record and start
@@ -549,11 +543,7 @@ def _over_record(
     )
     if repeated.ag_years != tuple(years):
         raise ValueError(REPETITION_OTHER_YEARS)
-    one_cycle_later, _ = shifted_date(record.end_date, repeated.cycle_length)
-    beyond = repeat_over_record(calendar, record.start_date, one_cycle_later)
-    if not isinstance(beyond, RepeatedRotation):
-        raise ValueError(REPETITION_NOT_LAID_OUT)
-    return repeated, beyond
+    return repeated
 
 
 def _earliest(component: RepeatedComponent) -> dt.date:
@@ -648,24 +638,29 @@ def _component_of_day(
     return component_of
 
 
-def _following_crop(beyond: RepeatedRotation) -> Callable[[dt.date], str | Missing]:
+def _following_crop(
+    repeated: RepeatedRotation,
+) -> Callable[[dt.date], str | Missing]:
     """The crop sown after a fallow day (``fallow.following_crop``), read from
-    the rotation laid out one cycle past the record (``_over_record``).
+    the rotation repeated over the record (``_over_record``).
 
     A component with a start date is a sowing. One without a start date can
     be sown from the start of its cycle to its last possible day (point 7 of
     engine/calendar/repeat.py); ``fallow.following_crop`` answers a fallow it
-    could follow as not known.
+    could follow as not known. Only the components the helper lays out are
+    read: the fallow after the last sowing laid out, whose next sowing lies
+    after the record, has no following crop (``MISSING_INPUT``, OPEN 41 of
+    EXPOSURE.md). No component is placed here.
     """
     return fallow.following_crop(
         [
             (component.start, component.crop_id)
-            for component in beyond.components
+            for component in repeated.components
             if component.start is not None
         ],
         [
             (component.calendar_start, _latest(component), component.component_id)
-            for component in beyond.components
+            for component in repeated.components
             if component.start is None
         ],
     )
@@ -1024,10 +1019,10 @@ def _run_chain(
     precipitation_values = _series_values(precipitation_series)
     wind_values = _series_values(by_quantity.get(WIND_SPEED_2M))
     # The rotation over the years of the record (D47, D109, D132, D141).
-    repeated, beyond = _over_record(calendar, by_quantity[PRECIPITATION])
+    repeated = _over_record(calendar, by_quantity[PRECIPITATION])
     component_of = _component_of_day(calendar, repeated)
     growth_of = _growth_of_day(catalogue)
-    following_of = _following_crop(beyond)
+    following_of = _following_crop(repeated)
 
     chain: list[ChainDay] = []
     for day in days:
