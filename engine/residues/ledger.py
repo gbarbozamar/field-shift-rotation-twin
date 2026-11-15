@@ -28,7 +28,9 @@ What it does, in order:
 4. Per crop, purpose and part that enters the soil (retained aboveground
    carbon, root carbon, rhizodeposit carbon), one annual series: the sum over
    the components of that crop and purpose harvested in that agricultural
-   year; a year in which none is harvested is zero.
+   year; a year in which none is harvested is zero. The entries are in
+   ``kg C ha-1``; each sum is divided by ``KG_PER_TONNE`` so the series are in
+   ``t C ha-1``, the unit AMG requires (D147 of #77).
 
 An infeasible calendar makes every value ``NOT_COMPUTABLE`` (G4). A pure
 function (G1): no file, no network, no clock, and its arguments are not changed.
@@ -53,7 +55,13 @@ from contracts.rotation_definition import (
 )
 from engine.calendar.repeat import RepeatedComponent, repeat_over_record
 
-from ._parameters import CARBON_UNIT, MASS_UNIT, Catalogue
+from ._parameters import (
+    CARBON_INPUT_UNIT,
+    CARBON_UNIT,
+    KG_PER_TONNE,
+    MASS_UNIT,
+    Catalogue,
+)
 
 __all__ = ["PARTS", "build_residue_ledger"]
 
@@ -434,7 +442,9 @@ def _year_value(
                 + "; ".join(problems),
             ),
         )
-    return AnnualValue(ag_year=year, value=total)
+    # D147: the sum is in CARBON_UNIT (kg C ha-1); the series is in
+    # CARBON_INPUT_UNIT (t C ha-1), by the SI definition 1 t = 1000 kg.
+    return AnnualValue(ag_year=year, value=total / KG_PER_TONNE)
 
 
 def _series(
@@ -473,14 +483,16 @@ def _series(
                         f"{FUNCTION}: sum of {part} over the components of crop "
                         f"{crop!r} with purpose {purpose!r} harvested in the "
                         "agricultural year; a year without such a harvest is zero "
-                        "(PROPOSED; brief #220)"
+                        "(PROPOSED; brief #220); converted from "
+                        f"{CARBON_UNIT!r} to {CARBON_INPUT_UNIT!r} by "
+                        f"1 t = {KG_PER_TONNE} kg (D147)"
                     ),
                     "range_missing": NO_RANGE,
                 }
             result.append(
                 AnnualCarbonInputSeries(
                     quantity=f"{crop}_{purpose}_{part}",
-                    unit=CARBON_UNIT,
+                    unit=CARBON_INPUT_UNIT,
                     origin=crop,
                     first_ag_year=years[0],
                     last_ag_year=years[1],
@@ -535,6 +547,7 @@ def _ledger(
         rotation_id=calendar.rotation_id,
         mass_unit=MASS_UNIT,
         carbon_unit=CARBON_UNIT,
+        carbon_input_unit=CARBON_INPUT_UNIT,
         **parts,  # type: ignore[arg-type]
     )
 

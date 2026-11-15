@@ -37,10 +37,11 @@ from params.catalogue import Missing as CatalogueMissing
 from params.catalogue import identity, read_value
 
 __all__ = [
-    "AMG_INPUT_UNIT",
+    "CARBON_INPUT_UNIT",
     "CARBON_UNIT",
     "CROP_SCOPE_KEY",
     "DIMENSIONLESS",
+    "KG_PER_TONNE",
     "MASS_UNIT",
     "RECORDS",
     "Catalogue",
@@ -48,19 +49,25 @@ __all__ = [
     "named",
 ]
 
-# The units of the ledger, as the orchestrating session of #220 set them: SI,
-# kilograms of dry matter per hectare and kilograms of carbon per hectare, the
-# unit the yield records arrive in, so nothing is converted. Written in the
-# manner of C1.1 ("ha" the hectare, "C" for carbon, "dimensionless" for a value
-# without a unit); C1.1 itself lists "t", not "kg" (OPEN 3 of README.md). A
-# record in any other unit is not converted.
+# The units of the ledger's entries, as the orchestrating session of #220 set
+# them: SI, kilograms of dry matter per hectare and kilograms of carbon per
+# hectare, the unit the yield records arrive in, so no record is converted.
+# Written in the manner of C1.1 ("ha" the hectare, "C" for carbon,
+# "dimensionless" for a value without a unit); C1.1 itself lists "t", not "kg"
+# (OPEN 3 of README.md). A record in any other unit is not converted.
 DIMENSIONLESS = "dimensionless"
 MASS_UNIT = "kg ha-1"  # of dry matter
 CARBON_UNIT = "kg C ha-1"
-# The unit engine/amg/entry.py requires for an annual carbon input (its
-# ``STOCK_UNIT``): the unit of C1.5 without "per year". The ledger is not in it
-# (OPEN 3 of README.md); kept here so the test can show the difference.
-AMG_INPUT_UNIT = UNIT_SOIL_CARBON_TREND.removesuffix(" yr-1")
+
+# D147 of #77: the annual carbon-input series EP4 writes for
+# ``CarbonForcing.annual_carbon_inputs`` are in the unit AMG requires for a
+# carbon input (``STOCK_UNIT`` of engine/amg/entry.py and api/carbon_forcing.py:
+# the unit of C1.5 without "per year"), so the runner and AMG convert nothing.
+CARBON_INPUT_UNIT = UNIT_SOIL_CARBON_TREND.removesuffix(" yr-1")
+# D147: kilograms in one tonne, by the SI definition of the prefixes
+# (1 t = 1000 kg). A definition, not a value of the method, so no record. It
+# turns a sum in CARBON_UNIT (kg C ha-1) into CARBON_INPUT_UNIT (t C ha-1).
+KG_PER_TONNE = 1000
 
 # Every record of this engine is read by crop, under this scope key of
 # params/README.md, with the ``crop_id`` of the calendar component.

@@ -256,7 +256,7 @@ What it returns: a `ResidueLedger` with one entry per component of the calendar 
 - the roots = `root_mass_at_harvest` with `root_carbon_fraction`;
 - the rhizodeposits = `rhizodeposit_carbon`.
 
-Every record is read by crop. The ledger also holds, per crop, purpose and part that enters the soil, one `AnnualCarbonInputSeries` over the whole agricultural years of the record. These are the series the platform copies unchanged into `CarbonForcing.annual_carbon_inputs`.
+Every record is read by crop. The ledger also holds, per crop, purpose and part that enters the soil, one `AnnualCarbonInputSeries` over the whole agricultural years of the record. These are the series the platform copies unchanged into `CarbonForcing.annual_carbon_inputs`. Under D147 of #77 they are in `t C ha-1`, the unit AMG requires: EP4 converts its sums from the ledger's `kg C ha-1` by the SI definition 1 t = 1000 kg, a definition that needs no record. The components of the ledger stay in `kg ha-1` and `kg C ha-1`.
 
 When it cannot compute (G4):
 
@@ -269,13 +269,13 @@ It raises only `TypeError` for an argument that is not of its type, and `ValueEr
 
 Still `OPEN` (`engine/residues/README.md`, OPEN; `contracts/residue_ledger/README.md`, OPEN):
 
-- the units: the ledger is in `kg ha-1` (dry matter) and `kg C ha-1`, while AMG requires `t C ha-1` for a carbon input and converts nothing, so who converts is open; also the dry-matter basis of the yield;
+- the dry-matter basis of the yield, and the `kg` unit strings, which C1.1 does not list;
 - how roots, rhizodeposits, cover crops and pastures are computed;
 - when a residue enters the soil;
 - the acceptance of the contract's shape;
 - whether a carbon engine takes the ledger itself (Q14 (b)).
 
-The runner does not call EP4 yet: that is a change of lane L2a.
+The runner calls EP4 and copies its series into `CarbonForcing` (lane L2a, #242).
 
 ### EP5 `engine/amg/`
 
@@ -443,7 +443,7 @@ Each item is a question a person can answer. The role that answers it is named a
 
   No site datum other than the period of the record and no result of another engine is read. EP4 takes `parameters`, which answers for EP4 the last bullet of Q3 ("whether they gain it").
 - Still `OPEN`:
-  - the units of the ledger (`kg ha-1`, `kg C ha-1`) against the `t C ha-1` of AMG (OPEN 3), the dry-matter basis of the yield, and whether the ratio is mass per mass (OPEN 2; CITATION NEEDED);
+  - the dry-matter basis of the yield and whether the ratio is mass per mass (OPEN 2; CITATION NEEDED); who converts to the `t C ha-1` of AMG is decided by D147 (EP4 does);
   - how roots and rhizodeposits are computed, and any partition form, which would be a record with a cited source (OPEN 4; CITATION NEEDED);
   - a method for cover crops and pastures (OPEN 5);
   - when a residue enters the soil, and the zero of a year without a harvest (OPEN 6);

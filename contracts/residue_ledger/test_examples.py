@@ -40,6 +40,7 @@ def rejected(data: dict[str, Any], words: str) -> None:
 
 def test_example_loads():
     ledger = ResidueLedger.model_validate(load())
+    assert ledger.carbon_input_unit != ledger.carbon_unit  # the series' own unit
     assert ledger.example_data is True
     assert (ledger.first_ag_year, ledger.last_ag_year) == (2001, 2002)
     assert [item.purpose for item in ledger.components] == ["grain", "cover", "grain"]
@@ -162,7 +163,10 @@ def test_series_rules_are_checked():
     rejected(data, "are those of the ledger")
     data = load()
     data["annual_carbon_inputs"][0]["unit"] = "PLACEHOLDER_other_unit"
-    rejected(data, "is not in the carbon_unit")
+    rejected(data, "is not in the carbon_input_unit")
+    data = load()
+    data["annual_carbon_inputs"][0]["unit"] = data["carbon_unit"]
+    rejected(data, "is not in the carbon_input_unit")
     data = load()
     data["annual_carbon_inputs"][0]["origin"] = "placeholder_unknown_crop"
     rejected(data, "not the crop of any component")

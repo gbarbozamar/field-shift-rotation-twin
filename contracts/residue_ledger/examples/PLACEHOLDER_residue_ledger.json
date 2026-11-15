@@ -8,6 +8,7 @@
   "last_ag_year": 2002,
   "mass_unit": "PLACEHOLDER_mass_unit",
   "carbon_unit": "PLACEHOLDER_carbon_unit",
+  "carbon_input_unit": "PLACEHOLDER_carbon_input_unit",
   "components": [
     {
       "component_id": "c1",
@@ -307,7 +308,7 @@
   "annual_carbon_inputs": [
     {
       "quantity": "placeholder_crop_a_grain_aboveground_carbon_retained",
-      "unit": "PLACEHOLDER_carbon_unit",
+      "unit": "PLACEHOLDER_carbon_input_unit",
       "origin": "placeholder_crop_a",
       "provenance": "DERIVED",
       "source": "PLACEHOLDER: example data, no real source",
@@ -330,7 +331,7 @@
     },
     {
       "quantity": "placeholder_crop_a_grain_root_carbon",
-      "unit": "PLACEHOLDER_carbon_unit",
+      "unit": "PLACEHOLDER_carbon_input_unit",
       "origin": "placeholder_crop_a",
       "provenance": "DERIVED",
       "source": "PLACEHOLDER: example data, no real source",
@@ -357,7 +358,7 @@
     },
     {
       "quantity": "placeholder_crop_a_grain_rhizodeposit_carbon",
-      "unit": "PLACEHOLDER_carbon_unit",
+      "unit": "PLACEHOLDER_carbon_input_unit",
       "origin": "placeholder_crop_a",
       "provenance": "DERIVED",
       "source": "PLACEHOLDER: example data, no real source",
@@ -380,7 +381,7 @@
     },
     {
       "quantity": "placeholder_crop_b_cover_aboveground_carbon_retained",
-      "unit": "PLACEHOLDER_carbon_unit",
+      "unit": "PLACEHOLDER_carbon_input_unit",
       "origin": "placeholder_crop_b",
       "first_ag_year": 2001,
       "last_ag_year": 2002,

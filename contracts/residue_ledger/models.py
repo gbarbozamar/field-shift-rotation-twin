@@ -20,7 +20,9 @@ of the rotation and per agricultural year (C5.3):
 
 Every value can be missing with its reason (C3.1). This module fixes structure
 only: it names no value, no record and no unit; the units each producer
-writes are stated once in ``mass_unit`` and ``carbon_unit``.
+writes are stated once in ``mass_unit`` and ``carbon_unit`` (the components)
+and ``carbon_input_unit`` (the series, which may be in another unit than the
+components: for EP4, D147 of #77).
 
 The shared parts are imported, never copied: ``Value`` and ``Missing`` of
 ``contracts.inputs.common``, ``AnnualCarbonInputSeries`` of
@@ -122,7 +124,10 @@ class ResidueLedger(ContractModel):
     last_ag_year: int | None  # inclusive
     years_missing: Missing | None = None  # why no agricultural year is laid out
     mass_unit: NonEmptyStr  # every mass value of the ledger is in this unit
-    carbon_unit: NonEmptyStr  # every carbon value and series is in this unit
+    carbon_unit: NonEmptyStr  # every carbon value of the components is in this unit
+    carbon_input_unit: (
+        NonEmptyStr  # every series of annual_carbon_inputs is in this unit
+    )
     components: list[LedgerComponent]
     annual_carbon_inputs: list[AnnualCarbonInputSeries]
 
@@ -195,8 +200,10 @@ class ResidueLedger(ContractModel):
                 raise ValueError(
                     f"{what}: first_ag_year and last_ag_year are those of the ledger"
                 )
-            if series.unit != self.carbon_unit:
-                raise ValueError(f"{what}: is not in the carbon_unit of the ledger")
+            if series.unit != self.carbon_input_unit:
+                raise ValueError(
+                    f"{what}: is not in the carbon_input_unit of the ledger"
+                )
             if series.origin not in crops:
                 raise ValueError(
                     f"{what}: its origin is not the crop of any component of the ledger"

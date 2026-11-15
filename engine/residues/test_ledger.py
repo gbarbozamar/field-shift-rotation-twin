@@ -32,12 +32,14 @@ from contracts.residue_ledger import CARBON_FIELDS, MASS_FIELDS, ResidueLedger
 from contracts.rotation_definition import RotationDefinition
 from engine.residues import build_residue_ledger
 from engine.residues._parameters import (
-    AMG_INPUT_UNIT,
+    CARBON_INPUT_UNIT,
     CARBON_UNIT,
+    KG_PER_TONNE,
     DIMENSIONLESS,
     MASS_UNIT,
     RECORDS,
 )
+from engine.amg.entry import STOCK_UNIT as AMG_INPUT_UNIT
 from engine.residues.ledger import PARTS
 from params.catalogue import check_catalogue
 
@@ -298,7 +300,10 @@ def test_two_crop_calendar_gives_ledger_with_carbon_recomputed():
         )
         assert entry.aboveground_mass_produced.provenance == "DERIVED"
         assert entry.ag_year == entry.cycle + YEARS[0]
-    # The annual series: one harvest of each crop per year, recomputed.
+    # The annual series: one harvest of each crop per year, recomputed, then
+    # from kg C ha-1 to t C ha-1 by the SI definition 1 t = 1000 kg (D147),
+    # written here a second time and not taken from the engine.
+    kg_per_tonne = 1000
     for crop in (CROP_A, CROP_B):
         n = {name: by_crop[crop] for name, by_crop in NUMBERS.items()}
         share = n["residue_removed_fraction"] if removed[crop] else 0.0
@@ -312,10 +317,10 @@ def test_two_crop_calendar_gives_ledger_with_carbon_recomputed():
         }
         for part in PARTS:
             found = series(ledger, f"{crop}_grain_{part}")
-            assert found.origin == crop and found.unit == CARBON_UNIT
+            assert found.origin == crop and found.unit == CARBON_INPUT_UNIT
             assert [item.ag_year for item in found.years] == list(YEARS)
             for item in found.years:
-                assert item.value == pytest.approx(expected[part])
+                assert item.value == pytest.approx(expected[part] / kg_per_tonne)
 
 
 def test_mass_and_carbon_close_retained_plus_exported_equals_produced():
@@ -513,7 +518,7 @@ def test_year_without_a_harvest_of_a_crop_is_zero():
         i.value for i in series(ledger, f"{CROP_B}_grain_rhizodeposit_carbon").years
     ]
     assert values[0] == 0.0 and values[1] == pytest.approx(
-        NUMBERS["rhizodeposit_carbon"][CROP_B]
+        NUMBERS["rhizodeposit_carbon"][CROP_B] / 1000  # kg to t (D147)
     )
 
 
@@ -557,9 +562,30 @@ def test_series_load_into_carbon_forcing_unchanged():
         }
     )
     assert len(forcing.annual_carbon_inputs) == len(ledger.annual_carbon_inputs)
-    # The ledger's unit is not the one AMG requires (OPEN 3 of README.md).
-    assert {s.unit for s in forcing.annual_carbon_inputs} == {CARBON_UNIT}
-    assert CARBON_UNIT != AMG_INPUT_UNIT
+    # D147: the series are in the unit AMG requires, so nothing is converted
+    # after EP4; the entries of the ledger stay in kg.
+    assert {s.unit for s in forcing.annual_carbon_inputs} == {AMG_INPUT_UNIT}
+    assert ledger.carbon_input_unit == AMG_INPUT_UNIT
+    assert ledger.carbon_unit == CARBON_UNIT != AMG_INPUT_UNIT
+
+
+def test_series_are_in_tonnes_hand_checked():
+    """D147, checked by hand on one PLACEHOLDER number.
+
+    The rhizodeposit carbon of crop A is the record, 3.33 kg C ha-1, one
+    harvest a year, so each year of its series is 3.33 / 1000 = 0.00333 t C ha-1.
+    """
+    assert (CARBON_UNIT, CARBON_INPUT_UNIT) == ("kg C ha-1", "t C ha-1")
+    assert KG_PER_TONNE == 1000
+    assert NUMBERS["rhizodeposit_carbon"][CROP_A] == 3.33
+    ledger = run()
+    for entry in entries(ledger, "c1"):
+        assert entry.rhizodeposit_carbon.value == 3.33  # the ledger stays in kg
+        assert entry.rhizodeposit_carbon.unit == "kg C ha-1"
+    found = series(ledger, f"{CROP_A}_grain_rhizodeposit_carbon")
+    assert found.unit == "t C ha-1"
+    assert [item.value for item in found.years] == pytest.approx([0.00333] * 3)
+    assert "D147" in found.source
 
 
 def test_ledger_round_trips_and_arguments_are_not_changed():
