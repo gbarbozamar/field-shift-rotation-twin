@@ -198,7 +198,8 @@ def test_a8_example_files_are_well_formed_placeholders():
 
 
 def test_a9_the_catalogue_in_this_repository_passes():
-    """Checks the whole params/ folder, the records of records/ included."""
+    """Checks the whole params/ folder: the records of records/ and, apart
+    from them, the records of withdrawn/."""
     assert catalogue.check_layout(HERE) == []
 
 
@@ -782,6 +783,76 @@ def test_f5c_params_folder_without_records_is_a_problem(tmp_path):
     problems = catalogue.check_layout(tmp_path)
     assert len(problems) == 1
     assert "does not exist" in problems[0]
+
+
+# --- W: withdrawn records (PROPOSED) ----------------------------------------
+
+
+def test_w1_withdrawn_record_is_checked_and_is_not_in_the_catalogue(tmp_path):
+    (tmp_path / "records").mkdir()
+    assert catalogue.check_layout(tmp_path) == []  # withdrawn/ may be absent
+
+    write_record(tmp_path / "withdrawn" / "group" / "kept.json", placeholder_record())
+    (tmp_path / "withdrawn" / "README.md").write_text("PLACEHOLDER", encoding="utf-8")
+    # Not part of the catalogue: the folder a service loads does not hold it.
+    assert load_folder(tmp_path / "records") == ({}, [])
+    # Not a stray file, and still checked as a record: the one problem is the
+    # one any record with the word has, named from params/.
+    assert catalogue.check_layout(tmp_path) == [
+        f"withdrawn/group/kept.json: contains the word {WORD}, so it is not a parameter"
+    ]
+
+
+def test_w2_withdrawn_folder_is_checked_like_a_catalogue_of_its_own(tmp_path):
+    (tmp_path / "records").mkdir()
+    withdrawn = tmp_path / "withdrawn"
+    withdrawn.mkdir()
+    (withdrawn / "broken.json").write_text("{", encoding="utf-8")
+    (withdrawn / "notes.txt").write_text("PLACEHOLDER", encoding="utf-8")
+    (withdrawn / "group").mkdir()
+    (withdrawn / "group" / "README.md").write_text("PLACEHOLDER", encoding="utf-8")
+    write_record(
+        withdrawn / "group" / "no_citation.json", without(placeholder_record(), "citation")
+    )
+    write_record(withdrawn / "first.json", placeholder_record(scope={}))
+    write_record(withdrawn / "second.json", placeholder_record(scope={}, value=3.0))
+
+    problems = catalogue.check_layout(tmp_path)
+    assert problems and all("withdrawn/" in p for p in problems)
+    assert not any("a record file outside" in p for p in problems)
+    assert any(
+        p.startswith("withdrawn/broken.json: not a readable record file") for p in problems
+    )
+    assert "withdrawn/notes.txt: not a .json record file" in problems
+    assert "withdrawn/group/README.md: not a .json record file" in problems
+    assert any(
+        p.startswith("withdrawn/group/no_citation.json:") and "'citation' is absent" in p
+        for p in problems
+    )
+    assert "same 'id' and 'scope' in: withdrawn/first.json, withdrawn/second.json" in problems
+
+
+def test_w2_withdrawn_and_loaded_records_are_two_sets(tmp_path):
+    """The same identifier and scope in records/ and in withdrawn/ is not a
+    duplicate: the withdrawn record is not in the catalogue."""
+    write_record(tmp_path / "records" / "one.json", placeholder_record())
+    write_record(tmp_path / "withdrawn" / "one.json", placeholder_record(value=3.0))
+
+    assert list(load_folder(tmp_path / "records")[0]) == ["one.json"]
+    problems = catalogue.check_layout(tmp_path)
+    assert len(problems) == 2  # the word, once per folder
+    assert not any("same 'id' and 'scope'" in p for p in problems)
+
+
+def test_w3_withdrawn_records_of_this_repository_are_checked_and_not_loaded():
+    loaded, problems = load_folder(HERE / catalogue.RECORDS_FOLDER)
+    assert problems == [] and check_catalogue(loaded) == []
+    withdrawn, problems = load_folder(HERE / catalogue.WITHDRAWN_FOLDER)
+    assert problems == [] and check_catalogue(withdrawn) == []
+    assert withdrawn
+    loaded_identities = {catalogue.identity(record) for record in loaded.values()}
+    for name, record in withdrawn.items():
+        assert catalogue.identity(record) not in loaded_identities, name
 
 
 PUBLIC_FUNCTIONS = [
