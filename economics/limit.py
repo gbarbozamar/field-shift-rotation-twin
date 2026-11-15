@@ -182,7 +182,13 @@ def assess_limit(
     else:
         if isinstance(kinds_in_record, str):
             raise ValueError("kinds_in_record: a collection of kinds, not one text")
-        given = set(kinds_in_record)
+        # ValueError, not TypeError: one exception type for every misuse.
+        try:
+            given = set(kinds_in_record)
+        except TypeError:
+            raise ValueError(
+                "kinds_in_record: a collection of kinds of year (texts)"
+            ) from None
         unknown = sorted(given - set(KINDS_OF_YEAR), key=repr)
         if unknown:
             raise ValueError(

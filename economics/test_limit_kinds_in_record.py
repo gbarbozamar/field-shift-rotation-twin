@@ -172,3 +172,23 @@ def test_the_field_defaults_to_empty_and_keeps_kinds_of_year_order():
         _limit(TEST_LIMIT), Level(2.0), by_kind, kinds_in_record=["neutral"]
     )
     assert result.kinds_not_in_record == ("el_nino", "la_nina")
+
+
+@pytest.mark.parametrize("bad", [3, [["neutral"]], [{"neutral"}]])
+def test_a_non_collection_or_an_unhashable_element_is_a_value_error(bad):
+    by_kind = _kinds(Level(1.0), Level(2.0), Level(3.0))
+    with pytest.raises(ValueError, match="kinds_in_record"):
+        assess_limit(_limit(TEST_LIMIT), Level(2.0), by_kind, kinds_in_record=bad)
+
+
+def test_a_missing_limit_comes_before_an_empty_kinds_in_record():
+    by_kind = _kinds(_absent(), _absent(), _absent())
+    result = assess_limit(_limit(None), Level(2.0), by_kind, kinds_in_record=())
+    assert result.every_kind.verdict == "not_resolved"
+    assert result.every_kind.reason == "MISSING_INPUT"
+    detail = result.every_kind.detail
+    assert "the soil-loss limit of the field is not declared" in detail
+    assert "left out, no year in the record: el_nino, neutral, la_nina" in detail
+    assert result.kinds_not_in_record == KINDS_OF_YEAR
+    assert result.kinds_not_resolved == ()
+    assert result.kinds_not_met == ()

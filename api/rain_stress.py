@@ -40,6 +40,10 @@ The factor's own range is not carried into R: R's range is multiplied by the
 factor's number only. How the uncertainty of the factor combines with the
 uncertainty of R is a science choice, OPEN.
 
+The factor is written in the detail and the note with 15 significant digits
+(``_factor_text``, PROPOSED, S-028): exactly as declared up to 15 digits,
+without binary float artefacts.
+
 This module holds no factor: "as today, heavier, much heavier" are screen
 choices whose numbers the user declares (or example data in ``demo/``,
 labelled as such). Pure functions: no file, no network, no clock.
@@ -84,8 +88,15 @@ NOTE_SEPARATOR = "; "
 
 
 def _factor_text(factor: float) -> str:
-    """The factor as a person reads it, without floating-point artefacts."""
-    return f"{factor:g}"
+    """The factor as a person reads it, without floating-point artefacts.
+
+    PROPOSED (S-028): 15 significant digits, the most a binary float (double)
+    always carries without an artefact of its binary form, so a factor
+    declared with up to 15 significant digits is written exactly as declared
+    (1.2345678 stays 1.2345678) and a product such as 1.1 * 1.1 is written
+    1.21. The ``g`` default of 6 digits rounded longer factors.
+    """
+    return f"{factor:.15g}"
 
 
 def _applied_detail(factor: float) -> str:
