@@ -8,25 +8,46 @@ a server runs. Both names are re-exported by ``api/main.py``.
 
 from __future__ import annotations
 
-from typing import Literal
+import logging
+from collections.abc import Callable, Mapping
+from typing import Any, Literal
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from adapters.ports import ClimateSource
-from api.decision_layer import DecisionLayer, DiscoveredDecisionLayer
+from api.decision_layer import DecisionLayer, DiscoveredDecisionLayer, import_named
 from api.decisions import make_decision_router
 from api.engines import (
     DEFAULT_CARBON_MODELS,
     EntryPointEngines,
     discover_engine_functions,
 )
-from api.errors import install_error_handlers
+from api.errors import ErrorCode, error_response, install_error_handlers
 from api.ports import RotationEngines, RotationValidator, RunSettings, SoilSlopeSource
 from api.rotation_validator import RotationDefinitionValidator
 from api.rotations import make_router
 from api.standins import ClimateUnavailable, SoilSlopeNotLoaded
+
+logger = logging.getLogger(__name__)
+
+# PROPOSED (review of #310, point 2): the plant layer is found by name on each
+# request, as the decision layer is (api/decision_layer.py), never imported
+# when the app is built: a plant layer that fails to load never stops
+# ``/health`` or another route. Not there: ``200`` with the answer ``null``
+# and its reason ``NOT_AVAILABLE``.
+PLANT_ROUTE = "/api/plant/run"
+PLANT_MODULE = "api.plant"
+PLANT_FUNCTION = "run_plant"
+PLANT_NOT_BUILT = f"the plant layer is not built yet: {PLANT_MODULE}.{PLANT_FUNCTION}"
+
+# Builds the engines of a rain-stress run from a parameter catalogue (the same
+# type as ``api.plant.EnginesFactory``, written here so nothing of the plant
+# layer is imported when the app is built).
+EnginesFactory = Callable[[dict[str, dict]], RotationEngines]
+PlantLayer = Callable[..., Any]
 
 
 class Health(BaseModel):
@@ -52,6 +73,10 @@ def create_app(
     settings: RunSettings | None = None,
     parameters: dict[str, dict] | None = None,
     decision_layer: DecisionLayer | None = None,
+    kinds_of_year_record: Mapping[str, Any] | None = None,
+    engines_factory: EnginesFactory | None = None,
+    plant_layer: PlantLayer | None = None,
+    rain_stress_switched_on: bool = False,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -71,8 +96,30 @@ def create_app(
     ``POST /api/decisions/run``; ``None`` means ``DiscoveredDecisionLayer``,
     which looks the function of ``decision/`` up by name on each request,
     never when the app is built (``api/decision_layer.py``), and answers "not
-    built" when it is not there. Both routes share the same sources, engines,
-    validator and settings.
+    built" when it is not there. The three routes share the same sources,
+    engines, validator and settings.
+
+    PROPOSED (unit ``l2/plant-route``, review of #310), for
+    ``POST /api/plant/run`` only: ``plant_layer`` answers the route; ``None``
+    means ``api.plant.run_plant`` found by name on each request
+    (``PLANT_MODULE``, ``PLANT_FUNCTION``), never when the app is built.
+    ``kinds_of_year_record`` is the ONI record the kinds of year are
+    classified on, already read by the caller; ``None`` means no record is
+    configured, and the answer gives every kind of year missing with its
+    reason. No record is read here. ``engines_factory`` builds the engines of
+    a rain-stress run from the catalogue whose erosivity is scaled; ``None``
+    means, with the default engines, ``EntryPointEngines`` on the same engine
+    functions, and with ``engines`` given, no factory (the answer says the
+    factor was not applied, and why).
+
+    PROPOSED (S-032, decision R25, re-implemented from ``l2/rain-stress-switch``):
+    ``rain_stress_switched_on`` false (the default) means the plant route
+    applies no rain-stress factor: a declared one is echoed not applied with
+    the reason ``api.plant.NOT_SWITCHED_ON`` and ``engines_factory`` (given or
+    the default) is never called. How rain enters erosion and how its
+    uncertainty scales is a science choice, to be proposed to the erosion lane
+    as an option of EP1; until then a person switches it on
+    (``RAIN_STRESS_TEST=on``, read by ``api.config``).
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -93,18 +140,27 @@ def create_app(
         """Liveness: the process is up and answering. Checks nothing else."""
         return Health(status="ok")
 
+    # The catalogue the plant route scales for a rain-stress run is the one the
+    # default engines use (``parameters``, or ``{}`` for None); with
+    # ``engines`` given it is not known (None), and a factory is not called.
+    plant_catalogue = None if engines is not None else (parameters or {})
+    if engines is None:
+        functions = discover_engine_functions()
+
+        def default_factory(catalogue: dict[str, dict]) -> RotationEngines:
+            return EntryPointEngines(
+                functions, carbon_models=DEFAULT_CARBON_MODELS, parameters=catalogue
+            )
+
+        engines = EntryPointEngines(
+            functions, carbon_models=DEFAULT_CARBON_MODELS, parameters=parameters
+        )
+        if engines_factory is None:
+            engines_factory = default_factory
     shared = {
         "climate": climate if climate is not None else ClimateUnavailable(),
         "soil_slope": soil_slope if soil_slope is not None else SoilSlopeNotLoaded(),
-        "engines": (
-            engines
-            if engines is not None
-            else EntryPointEngines(
-                discover_engine_functions(),
-                carbon_models=DEFAULT_CARBON_MODELS,
-                parameters=parameters,
-            )
-        ),
+        "engines": engines,
         "rotation_validator": (
             rotation_validator
             if rotation_validator is not None
@@ -123,5 +179,36 @@ def create_app(
             ),
         )
     )
+
+    @app.post(PLANT_ROUTE, responses={400: {}, 422: {}, 500: {}})
+    def run_plant(body: dict[str, Any] = Body(...)):  # noqa: B008
+        """Answer "What should I plant?" for one field and three to five rotations."""
+        try:
+            layer = (
+                plant_layer
+                if plant_layer is not None
+                else import_named(PLANT_MODULE, PLANT_FUNCTION)
+            )
+        except Exception:
+            logger.exception("POST %s: the plant layer failed to load", PLANT_ROUTE)
+            return error_response(ErrorCode.INTERNAL_ERROR)
+        if layer is None:
+            return JSONResponse(
+                content={
+                    "answer": None,
+                    "answer_missing": {
+                        "reason": "NOT_AVAILABLE",
+                        "detail": PLANT_NOT_BUILT,
+                    },
+                }
+            )
+        return layer(
+            body,
+            **shared,
+            kinds_of_year_record=kinds_of_year_record,
+            engines_factory=engines_factory,
+            parameters=plant_catalogue,
+            rain_stress_switched_on=rain_stress_switched_on,
+        )
 
     return app

@@ -24,6 +24,12 @@ it once with ``params.catalogue.load_folder`` and checks it with
 ``ConfigError`` naming the folder and listing the problems, one per line. An
 empty catalogue is not a problem (Q3, D46, D56 of issue #77).
 
+``RAIN_STRESS_TEST`` (PROPOSED, S-032, decision R25) switches the heavier-rain
+stress test of the plant route on. Unset or blank: off (a declared factor is
+echoed not applied, with its reason). The only accepted value is exactly
+``on`` (after stripping spaces); any other value is a ``ConfigError`` naming
+the variable, never repeating the value.
+
 Status: PROPOSED (blueprint section 3.7), including the variable names, the
 rules above and the message texts.
 """
@@ -69,6 +75,13 @@ CLIMATE_END_DATE = "CLIMATE_END_DATE"
 SOIL_SLOPE_EXAMPLE_FILE = "SOIL_SLOPE_EXAMPLE_FILE"
 SOIL_TABLE_FILES = "SOIL_TABLE_FILES"
 SOIL_GROUPS_FILE = "SOIL_GROUPS_FILE"
+# PROPOSED (review of #310, point 1): the ONI record of the plant route. No
+# default: the record waits for a person's signature (D34, D66).
+KINDS_OF_YEAR_RECORD_FILE = "KINDS_OF_YEAR_RECORD_FILE"
+# PROPOSED (S-032, R25; review of #427): the heavier-rain stress test of the
+# plant route. No default: off unless a person sets it to SWITCHED_ON.
+RAIN_STRESS_TEST = "RAIN_STRESS_TEST"
+SWITCHED_ON = "on"
 
 VARIABLES: tuple[str, ...] = (
     CORS_ORIGINS,
@@ -79,6 +92,8 @@ VARIABLES: tuple[str, ...] = (
     SOIL_SLOPE_EXAMPLE_FILE,
     SOIL_TABLE_FILES,
     SOIL_GROUPS_FILE,
+    KINDS_OF_YEAR_RECORD_FILE,
+    RAIN_STRESS_TEST,
 )
 
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -121,6 +136,10 @@ class AppConfig:
     soil_tables: SoilTablesConfig | None = None
     # The parameter catalogue as loaded and checked; ``{}`` when it is empty.
     parameters: dict[str, dict] = field(default_factory=dict)
+    # The ONI record of the plant route, as read; ``None``: not configured.
+    kinds_of_year_record: dict[str, Any] | None = None
+    # RAIN_STRESS_TEST=on; off when the variable is not set.
+    rain_stress_switched_on: bool = False
 
 
 # --- reading the variables ----------------------------------------------------
@@ -224,6 +243,50 @@ def _soil_slope_example(environ: Mapping[str, str]) -> Path | None:
     return path
 
 
+def _kinds_of_year_record(environ: Mapping[str, str]) -> dict[str, Any] | None:
+    """The ONI record ``KINDS_OF_YEAR_RECORD_FILE`` names, read once here.
+
+    Unset: ``None``, and the plant route gives every kind of year missing
+    with its reason. Set but not a JSON object with an ``id`` and ``seasons``:
+    a ``ConfigError`` naming the variable. Only the shape is checked here; the
+    classification is ``kinds_of_year``'s, on each request.
+    """
+    value = _value(environ, KINDS_OF_YEAR_RECORD_FILE)
+    if value is None:
+        return None
+    path = Path(value)
+    text = _read_file(KINDS_OF_YEAR_RECORD_FILE, path)
+    try:
+        data = json.loads(text)
+    except ValueError:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE}: the file '{path}' is not JSON"
+        ) from None
+    if not isinstance(data, dict) or "id" not in data or "seasons" not in data:
+        raise ConfigError(
+            f"{KINDS_OF_YEAR_RECORD_FILE}: the file '{path}' is not an ONI record "
+            "(a JSON object with an id and seasons)"
+        )
+    return data
+
+
+def _rain_stress_switched_on(environ: Mapping[str, str]) -> bool:
+    """``RAIN_STRESS_TEST``: exactly ``on``, or unset. PROPOSED (S-032, R25).
+
+    The message of a wrong value names the variable, never the value.
+    """
+    value = _value(environ, RAIN_STRESS_TEST)
+    if value is None:
+        return False
+    if value != SWITCHED_ON:
+        raise ConfigError(
+            f"{RAIN_STRESS_TEST} has a value other than '{SWITCHED_ON}': set it "
+            f"to '{SWITCHED_ON}' to switch the heavier-rain stress test on, or "
+            "leave it unset"
+        )
+    return True
+
+
 def _soil_tables(environ: Mapping[str, str]) -> SoilTablesConfig | None:
     """``SOIL_TABLE_FILES`` and ``SOIL_GROUPS_FILE``: both or neither. PROPOSED.
 
@@ -312,6 +375,8 @@ def load_config(
         soil_slope_example_file=_soil_slope_example(environ),
         soil_tables=_soil_tables(environ),
         parameters=load_parameters(parameters_folder),
+        kinds_of_year_record=_kinds_of_year_record(environ),
+        rain_stress_switched_on=_rain_stress_switched_on(environ),
     )
 
 
@@ -373,6 +438,8 @@ def build_app(
         soil_slope=soil_slope,
         settings=config.run_settings,
         parameters=config.parameters,
+        kinds_of_year_record=config.kinds_of_year_record,
+        rain_stress_switched_on=config.rain_stress_switched_on,
     )
     if client is not None:
         _close_on_shutdown(app, client)
