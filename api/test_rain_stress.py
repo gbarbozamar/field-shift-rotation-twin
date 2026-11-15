@@ -34,6 +34,7 @@ import api.rain_stress as rain_stress_module
 from api.config import PARAMETERS_FOLDER, load_parameters
 from api.rain_stress import (
     DIMENSIONLESS,
+    EP1_SCOPE,
     R_ID,
     STRESS_TEST_LABEL,
     RainStress,
@@ -48,6 +49,7 @@ from contracts.inputs.site_climate import SiteClimate
 from contracts.inputs.site_soil_slope import SiteSoilSlope
 from engine.erosion import compute_soil_loss
 from engine.erosion import soil_loss as erosion
+from engine.erosion._parameters import read_parameter
 from params.catalogue import check_catalogue
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -121,6 +123,7 @@ def r_keys(parameters: dict[str, dict]) -> list[str]:
 
 def test_identifiers_are_those_of_ep1():
     assert R_ID == erosion.R_ID
+    assert EP1_SCOPE == erosion.SCOPE
     assert DIMENSIONLESS == erosion.DIMENSIONLESS
     assert STRESS_TEST_LABEL == "stress test"
     assert r_keys(catalogue()), "the catalogue holds the R record"
@@ -322,3 +325,138 @@ def test_the_module_holds_no_factor_number():
         ):
             value = node.value.value
             assert isinstance(value, str), ast.dump(node)
+
+
+# --- fix round 1: the record EP1 reads, EP1's semantics, provenance, text ------------
+
+
+def r_key_and_record(parameters: dict[str, dict]) -> tuple[str, dict]:
+    (key,) = r_keys(parameters)
+    return key, parameters[key]
+
+
+def test_a_record_of_r_with_another_scope_is_unchanged_and_not_noted():
+    parameters = catalogue()
+    key, record = r_key_and_record(parameters)
+    other = copy.deepcopy(record)
+    # Test data: a scope word EP1 does not read.
+    other["scope"] = {"region": "test_data_region"}
+    parameters["test_data_other_scope.json"] = other
+    assert check_catalogue(parameters) == []
+    scaled = scale_erosivity(parameters, rain_stress(declared(TEST_FACTOR)))
+    assert scaled["test_data_other_scope.json"] == other
+    assert scaled[key]["value"] != record["value"]
+
+
+def test_a_null_r_value_is_not_scaled_nor_noted():
+    parameters = catalogue()
+    key, record = r_key_and_record(parameters)
+    null = copy.deepcopy(record)
+    null["value"] = None
+    null["value_missing_reason"] = "test data: no value"
+    parameters[key] = null
+    assert check_catalogue(parameters) == []
+    stress = rain_stress(declared(TEST_FACTOR))
+    assert scale_erosivity(parameters, stress)[key] == null
+    echo = applied_echo(parameters, stress)
+    assert echo.applied is False and "has no value" in echo.detail
+
+
+def test_a_numeric_value_with_a_bound_that_is_not_a_number_is_a_value_error():
+    parameters = catalogue()
+    key, record = r_key_and_record(parameters)
+    broken = copy.deepcopy(record)
+    broken.pop("range_missing_reason")
+    broken["range"] = {"low": "test data", "high": record["value"], "basis": "test"}
+    parameters[key] = broken
+    with pytest.raises(ValueError):
+        scale_erosivity(parameters, rain_stress(declared(TEST_FACTOR)))
+
+
+def duplicate(parameters: dict[str, dict]) -> None:
+    _, record = r_key_and_record(parameters)
+    parameters["test_data_duplicate.json"] = copy.deepcopy(record)
+
+
+def placeholder(parameters: dict[str, dict]) -> None:
+    key, record = r_key_and_record(parameters)
+    parameters[key] = {**record, "note": f"{record['note']} PLACEHOLDER"}
+
+
+def null_value(parameters: dict[str, dict]) -> None:
+    key, record = r_key_and_record(parameters)
+    parameters[key] = {**record, "value": None, "value_missing_reason": "test data"}
+
+
+def malformed_elsewhere(parameters: dict[str, dict]) -> None:
+    parameters["test_data_malformed.json"] = {"id": "_not_an_id", "scope": {}}
+
+
+def no_record(parameters: dict[str, dict]) -> None:
+    key, _ = r_key_and_record(parameters)
+    del parameters[key]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [duplicate, placeholder, null_value, malformed_elsewhere, no_record],
+    ids=["duplicate", "placeholder", "null_value", "malformed", "no_record"],
+)
+def test_applied_echo_follows_ep1_reader(change):
+    parameters = catalogue()
+    stress = rain_stress(declared(TEST_FACTOR))
+    assert isinstance(read_parameter(parameters, R_ID, EP1_SCOPE).value, float)
+    assert applied_echo(parameters, stress) == stress
+    change(parameters)
+    read = read_parameter(parameters, R_ID, EP1_SCOPE)
+    assert not isinstance(read.value, float)
+    echo = applied_echo(parameters, stress)
+    assert isinstance(echo, RainStress) and echo.applied is False
+    assert echo.factor == stress.factor and echo.declared == stress.declared
+    assert "not applied" in echo.detail and "not a forecast" in echo.detail
+
+
+def test_a_placeholder_r_record_is_not_scaled():
+    parameters = catalogue()
+    placeholder(parameters)
+    key, record = r_key_and_record(parameters)
+    scaled = scale_erosivity(parameters, rain_stress(declared(TEST_FACTOR)))
+    assert scaled[key] == record
+
+
+def test_the_declared_factor_travels_with_the_stress():
+    factor = declared(TEST_FACTOR)
+    stress = rain_stress(factor)
+    assert isinstance(stress, RainStress)
+    assert stress.declared == factor
+    assert stress.declared.provenance == "DECLARED"
+    assert stress.declared.source == factor.source
+
+
+def test_the_scaled_record_keeps_its_citation_and_signatures():
+    parameters = catalogue()
+    key, record = r_key_and_record(parameters)
+    after = scale_erosivity(parameters, rain_stress(declared(TEST_FACTOR)))[key]
+    for name in ("citation", "transcribed_by", "checked_by"):
+        assert after[name] == record[name]
+
+
+def test_applied_echo_checks_its_arguments():
+    stress = rain_stress(declared(TEST_FACTOR))
+    with pytest.raises(TypeError, match="parameters"):
+        applied_echo([], stress)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="stress"):
+        applied_echo(catalogue(), TEST_FACTOR)  # type: ignore[arg-type]
+
+
+def test_the_factor_is_written_without_float_artefacts():
+    # Test data: a product whose float repr carries an artefact.
+    number = 1.1 * 1.1
+    assert repr(number) != "1.21"
+    stress = rain_stress(declared(number))
+    parameters = catalogue()
+    key, _ = r_key_and_record(parameters)
+    note = scale_erosivity(parameters, stress)[key]["note"]
+    for text in (stress.detail, note):
+        assert "multiplied by 1.21 " in f"{text} "
+        assert repr(number) not in text
