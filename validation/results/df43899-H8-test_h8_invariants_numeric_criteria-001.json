@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "df43899-H8-test_h8_invariants_numeric_criteria-001",
+  "run_id": "run-20261115T170110Z-df43899",
+  "test_code": "H8",
+  "expected": {
+    "missing_reason": "the entry H8 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "not_evaluated",
+  "observed": {
+    "missing_reason": "pytest skipped engine/water/balance/test_bucket.py::test_h8_invariants_numeric_criteria, so nothing was obtained"
+  },
+  "reason": "[H8] is defined by D227 of issue #77 (docs/VALIDATION.md H8) as a list of invariants that the tests named in that entry check one by one. This test has no criterion of its own: asserting the list again here would need series and cases D227 does not give. Whether to remove it is for the lead developer",
+  "notes": "Test engine/water/balance/test_bucket.py::test_h8_invariants_numeric_criteria. Placed under H8: it names [H8] in its skip reason, as in the first and second runs; the 'Test' line of entry H8 leaves to the lead developer whether a run record reads it."
+}

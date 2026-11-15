@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "df43899-E8-test_eq6e_a_zero_factor_does_not_turn_a_unit_mismatch_into_zero-017",
+  "run_id": "run-20261115T170110Z-df43899",
+  "test_code": "E8",
+  "expected": {
+    "missing_reason": "the entry E8 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_equation.py::test_eq6e_a_zero_factor_does_not_turn_a_unit_mismatch_into_zero[pair16]"
+  },
+  "notes": "Test engine/erosion/test_equation.py::test_eq6e_a_zero_factor_does_not_turn_a_unit_mismatch_into_zero[pair16]. Placed under E8: listed by name on the 'Test' line of entry E8 of docs/VALIDATION.md."
+}
