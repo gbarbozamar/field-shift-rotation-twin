@@ -171,7 +171,8 @@ def crop_origins(calendar: RotationCalendar) -> list[str]:
     """The crops of the calendar, once each, in the order they first appear.
 
     Only a ``crop_id`` that is a quantity identifier (``QuantityId``) can be an
-    ``origin``; one that is not is left out, never renamed (PROPOSED).
+    ``origin``; one that is not is left out, never renamed, and counted by
+    ``crops_left_out`` (PROPOSED).
     """
     origins: list[str] = []
     for component in calendar.components:
@@ -179,6 +180,20 @@ def crop_origins(calendar: RotationCalendar) -> list[str]:
         if _IDENTIFIER.match(crop) and crop not in origins:
             origins.append(crop)
     return origins
+
+
+def crops_left_out(calendar: RotationCalendar) -> list[str]:
+    """The crops of the calendar that cannot be an ``origin``, once each.
+
+    ``CarbonForcing`` has no field that could say so, so the runner notes their
+    number in the detail of the ``amg`` module (PROPOSED).
+    """
+    left_out: list[str] = []
+    for component in calendar.components:
+        crop = component.crop_id
+        if not _IDENTIFIER.match(crop) and crop not in left_out:
+            left_out.append(crop)
+    return left_out
 
 
 def _soil_property(soil_slope: SiteSoilSlope, quantity: str) -> SoilProperty:

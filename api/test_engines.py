@@ -18,7 +18,7 @@ import json
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 from fastapi.testclient import TestClient
@@ -49,6 +49,7 @@ from contracts.results.models import (
     DIRECTION_OF,
     TREND_COMPUTATIONS,
     UNITS_OF,
+    CarbonModel,
     Missing,
     PartNotBuilt,
     ResultsPerRotation,
@@ -1797,3 +1798,81 @@ def test_the_real_run_amg_with_an_empty_catalogue_answers_200_and_writes_no_numb
     modules = {m["id"]: m for m in body["modules"]}
     assert modules["amg"]["state"] == "not_available"
     assert modules["amg"]["reason"] == rows[0].missing.reason
+
+
+# --- 16. remarks of the review of l2/runner-amg ---------------------------------
+
+
+def test_an_unknown_carbon_model_is_a_value_error_at_construction():
+    with pytest.raises(ValueError, match="carbon models"):
+        EntryPointEngines(EngineFunctions(), carbon_models=("amg", "PLACEHOLDER"))
+    # The closed list comes from the results contract, not from a literal here.
+    assert set(runner.CARBON_MODEL_IDS) == set(get_args(CarbonModel))
+
+
+def run_with_models(amg: Fake, carbon_models: tuple[str, ...]):
+    engines = EntryPointEngines(with_amg(amg), carbon_models=carbon_models)
+    return engines.run(ROTATION, climate_result(chain_climate()), soil_result())
+
+
+def test_ep5_not_called_when_amg_is_not_a_configured_model():
+    amg = Fake(balance())
+    result = run_with_models(amg, ("rothc",))
+    assert amg.calls == []
+    assert {r.carbon_model for r in result.result.soil_carbon_trend} == {"rothc"}
+    modules = dict_of_modules(result)
+    assert (modules["amg"].state, modules["amg"].reason) == (
+        "not_available",
+        "NOT_AVAILABLE",
+    )
+    assert modules["amg"].detail == runner.AMG_NOT_CONFIGURED
+
+
+def test_ep5_not_called_when_amg_is_not_configured_and_an_input_is_absent():
+    amg = Fake(balance())
+    engines = EntryPointEngines(with_amg(amg), carbon_models=("rothc",))
+    result = engines.run(ROTATION, climate_result(None), soil_result())
+    assert amg.calls == []
+    assert dict_of_modules(result)["amg"].detail == runner.AMG_NOT_CONFIGURED
+
+
+def test_the_rows_follow_the_configured_order_of_the_models():
+    amg = Fake(balance())
+    result = run_with_models(amg, ("rothc", "amg"))
+    assert len(amg.calls) == 1
+    rows = result.result.soil_carbon_trend
+    assert [r.carbon_model for r in rows] == ["rothc"] * 3 + ["amg"] * 3
+    assert rows[3:] == amg.answer.soil_carbon_trend
+
+
+@pytest.mark.parametrize(
+    "point", [runner.RESIDUES, runner.ROTHC], ids=lambda p: p.entry
+)
+def test_the_carbon_engines_written_not_built_do_not_exist_yet(point):
+    # The runner names these not built without looking. When one lands, this
+    # fails: the runner must then discover and call it (a unit of lane L2a).
+    assert runner._import_function(point) is None, (
+        f"{runner._name(point)} now exists: add it to DISCOVERED"
+    )
+
+
+def test_crops_that_are_not_identifiers_are_counted_in_the_amg_detail():
+    amg = Fake(balance())
+    result = run(with_amg(amg), climate=climate_result(chain_climate()))
+    (forcing,) = amg.calls[0][0]
+    assert forcing.annual_carbon_inputs == []  # the example's crops are not ids
+    crops = {c["crop_id"] for c in CALENDAR_DOCUMENT["components"]}
+    detail = dict_of_modules(result)["amg"].detail
+    assert runner.crops_left_out_detail(len(crops)) in detail
+    assert not any(crop in detail for crop in crops)  # counted, never repeated
+
+
+def test_a_soil_property_of_the_site_data_reaches_ep5_unchanged():
+    soil_document = example("inputs", "PLACEHOLDER_site_soil_slope.json")
+    soil_document["soil_properties"][0]["quantity"] = "clay_content"
+    soil = SiteSoilSlope.model_validate(soil_document)
+    amg = Fake(balance())
+    run(with_amg(amg), climate=climate_result(chain_climate()), soil=soil_result(soil))
+    (forcing,) = amg.calls[0][0]
+    (clay,) = [p for p in forcing.soil_properties if p.quantity == "clay_content"]
+    assert clay == soil.soil_properties[0]

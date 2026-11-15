@@ -54,7 +54,7 @@ from dataclasses import dataclass
 from typing import Any, get_args
 
 from adapters.ports import ClimateResult, SoilSlopeResult
-from api.carbon_forcing import build_carbon_forcing
+from api.carbon_forcing import build_carbon_forcing, crops_left_out
 from api.ports import EnginesResult, Missing, ModuleStatus, ReasonCode
 from api.rotation_validator import load_rotation_definition
 from contracts.carbon_balance import CarbonBalance
@@ -66,6 +66,7 @@ from contracts.results.models import (
     TREND_COMPUTATIONS,
     UNIT_SOIL_CARBON_TREND,
     UNITS_OF,
+    CarbonModel,
     IndicatorValue,
     PartNotBuilt,
     ResultsPerRotation,
@@ -115,11 +116,17 @@ MODULE_IDS: tuple[str, ...] = (
 # contracts/results/README.md). The default of the app built by
 # ``api.main.create_app``; ``EntryPointEngines`` itself takes them as an argument.
 DEFAULT_CARBON_MODELS: tuple[str, ...] = ("amg", "rothc")
+# The closed list of carbon models of the results contract (``CarbonModel``).
+CARBON_MODEL_IDS: tuple[str, ...] = get_args(CarbonModel)
 # The carbon model of EP5 (D1 of #77) and the entry point of each carbon model.
 AMG_CARBON_MODEL = "amg"
 CARBON_ENTRY_POINTS: dict[str, EntryPoint] = {AMG_CARBON_MODEL: AMG, "rothc": ROTHC}
 
 # PROPOSED detail texts: English for developers, never shown to users.
+AMG_NOT_CONFIGURED = (
+    "the carbon model 'amg' is not among the configured carbon models, "
+    "so engine.amg.run_amg is not called"
+)
 NOT_BUILT = "the module is not built yet"
 CARBON_NOT_BUILT = "no carbon engine is built yet"
 CARBON_MODELS_NOT_CONFIGURED = (
@@ -364,13 +371,35 @@ def _carbon_modules(amg: ModuleStatus | None = None) -> tuple[ModuleStatus, ...]
     return (_not_built(RESIDUES), amg, _not_built(ROTHC))
 
 
+def _amg_not_configured() -> ModuleStatus:
+    return _status(AMG.module_id, "not_available", "NOT_AVAILABLE", AMG_NOT_CONFIGURED)
+
+
 def _carbon_dependent(
-    amg_function: Callable[..., Any] | None, missing_input: str
+    amg_function: Callable[..., Any] | None, amg_configured: bool, missing_input: str
 ) -> tuple[ModuleStatus, ...]:
     """The carbon modules when EP5 was not called because an input is missing."""
     if amg_function is None:
         return _carbon_modules()
+    if not amg_configured:
+        return _carbon_modules(_amg_not_configured())
     return _carbon_modules(_missing_input(AMG.module_id, missing_input))
+
+
+def crops_left_out_detail(count: int) -> str:
+    """The note on crops that could not be carbon-input series (PROPOSED text).
+
+    Gives their number only, never their identifiers (submitted values).
+    """
+    return (
+        f"{count} crop(s) of the calendar could not be written as carbon-input "
+        "series of the forcing: their crop_id is not a quantity identifier"
+    )
+
+
+def _with_note(status: ModuleStatus, note: str) -> ModuleStatus:
+    detail = note if status.detail is None else f"{status.detail}; {note}"
+    return _status(status.id, status.state, status.reason, detail)
 
 
 def check_balance(balance: object, forcing: CarbonForcing) -> CarbonBalance:
@@ -440,6 +469,12 @@ class EntryPointEngines:
             raise ValueError("carbon_models holds non-empty identifiers")
         if len(set(models)) != len(models):
             raise ValueError("carbon_models names one model twice")
+        unknown = [m for m in models if m not in CARBON_MODEL_IDS]
+        if unknown:
+            raise ValueError(
+                "carbon_models names a model that is not one of the carbon models "
+                f"of contracts/results/models.py ({', '.join(CARBON_MODEL_IDS)})"
+            )
         if parameters is None:
             parameters = {}
         if not isinstance(parameters, dict):
@@ -465,6 +500,7 @@ class EntryPointEngines:
         soil_loss_function = functions.compute_soil_loss
         water_function = functions.compute_water_deficit_exposure
         amg_function = functions.run_amg
+        amg_configured = AMG_CARBON_MODEL in self._carbon_models
 
         # 1. EP2 first.
         if build_calendar is None:
@@ -480,7 +516,7 @@ class EntryPointEngines:
                     _not_built(CALENDAR),
                     _dependent(EROSION, soil_loss_function, calendar_input),
                     _dependent(WATER, water_function, calendar_input),
-                    *_carbon_dependent(amg_function, calendar_input),
+                    *_carbon_dependent(amg_function, amg_configured, calendar_input),
                 ),
             )
         calendar = build_calendar(self._load_rotation(rotation))
@@ -511,7 +547,7 @@ class EntryPointEngines:
                     calendar_module,
                     _dependent(EROSION, soil_loss_function, detail),
                     _dependent(WATER, water_function, detail),
-                    *_carbon_dependent(amg_function, detail),
+                    *_carbon_dependent(amg_function, amg_configured, detail),
                 ),
             )
 
@@ -537,7 +573,7 @@ class EntryPointEngines:
                     calendar_module,
                     _dependent(EROSION, soil_loss_function, detail),
                     _dependent(WATER, water_function, detail),
-                    *_carbon_dependent(amg_function, detail),
+                    *_carbon_dependent(amg_function, amg_configured, detail),
                 ),
             )
 
@@ -587,10 +623,14 @@ class EntryPointEngines:
 
         # 5. EP5 on the forcing built from the same inputs (PROPOSED), with the
         # catalogue by keyword (D65). Not called when the forcing cannot be
-        # laid out: its three rows are missing with that reason.
+        # laid out: its three rows are missing with that reason. Not called
+        # either when ``amg`` is not a configured carbon model: no amg rows.
         amg_rows: list[SoilCarbonTrend] | None = None
         amg_module: ModuleStatus | None = None
-        if amg_function is not None:
+        if amg_function is not None and not amg_configured:
+            amg_rows = []
+            amg_module = _amg_not_configured()
+        elif amg_function is not None:
             forcing = build_carbon_forcing(calendar, climate.data, soil_slope.data)
             if isinstance(forcing, ResultsMissing):
                 amg_rows = missing_carbon_trend((AMG_CARBON_MODEL,), forcing)
@@ -603,6 +643,11 @@ class EntryPointEngines:
                 )
                 amg_rows = list(balance.soil_carbon_trend)
                 amg_module = module_status_of(AMG.module_id, count_values(amg_rows))
+            left_out = crops_left_out(calendar)
+            if left_out:
+                amg_module = _with_note(
+                    amg_module, crops_left_out_detail(len(left_out))
+                )
 
         modules = (
             calendar_module,

@@ -342,3 +342,27 @@ def test_the_record_period_is_the_days_every_daily_series_covers():
     )
     assert record_period(chain_climate()) == the_period()
     assert record_period(chain_climate(daily_series=[])) is None
+
+
+@pytest.mark.parametrize("marked", [(), (0,), (1,), (2,), (0, 1, 2)])
+def test_example_data_is_true_when_any_input_says_so(marked):
+    documents = [
+        chain_calendar().model_dump(mode="json"),
+        chain_climate().model_dump(mode="json"),
+        chain_soil_slope().model_dump(mode="json"),
+    ]
+    for index, item in enumerate(documents):
+        item["example_data"] = index in marked
+    forcing = chain_forcing(
+        calendar=RotationCalendar.model_validate_json(json.dumps(documents[0])),
+        climate=SiteClimate.model_validate_json(json.dumps(documents[1])),
+        soil_slope=SiteSoilSlope.model_validate_json(json.dumps(documents[2])),
+    )
+    assert forcing.example_data is bool(marked)
+
+
+def test_crops_left_out_are_the_crops_that_are_not_identifiers():
+    assert producer.crops_left_out(chain_calendar()) == []
+    calendar = chain_calendar(crops=False)
+    expected = list(dict.fromkeys(c.crop_id for c in calendar.components))
+    assert producer.crops_left_out(calendar) == expected
