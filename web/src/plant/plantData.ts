@@ -131,8 +131,13 @@ export interface PlantAnswer {
   sources: PlantSource[]
 }
 
-export type SourceState = 'fresh' | 'cached' | 'unavailable' | 'example'
-const SOURCE_STATES: readonly SourceState[] = ['fresh', 'cached', 'unavailable', 'example']
+/**
+ * PROPOSED (S-031): 'transcribed' is the state of a record transcribed into
+ * the repository from its published source (the ONI record), a state of the
+ * plant contract's SourceOut only.
+ */
+export type SourceState = 'fresh' | 'cached' | 'unavailable' | 'example' | 'transcribed'
+const SOURCE_STATES: readonly SourceState[] = ['fresh', 'cached', 'unavailable', 'example', 'transcribed']
 
 /** One source of the answer, the parts of SourceOut the screen renders. */
 export interface PlantSource {

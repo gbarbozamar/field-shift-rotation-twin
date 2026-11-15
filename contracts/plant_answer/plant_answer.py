@@ -686,9 +686,12 @@ class KindsOfYearRecord(ContractModel):
 
     ``source`` is the id of the record (``oni_v6``); ``start_month`` the start
     month of the agricultural year the years were classified with.
+
+    PROPOSED (S-031): ``source`` is null when no record is configured, and
+    then every year is missing (no year has a kind without a record).
     """
 
-    source: NonEmptyStr
+    source: NonEmptyStr | None
     start_month: MonthNumber
     years: Annotated[list[YearKind], Field(min_length=1)]
     counts: KindCounts
@@ -698,6 +701,10 @@ class KindsOfYearRecord(ContractModel):
         ag_years = [year.ag_year for year in self.years]
         if ag_years != sorted(set(ag_years)):
             raise ValueError("kinds of year: the years are sorted and unique")
+        if self.source is None and any(year.kind is not None for year in self.years):
+            raise ValueError(
+                "kinds of year: a null source only when every year is missing"
+            )
         counts = [getattr(self.counts, kind) for kind in KINDS_OF_YEAR]
         if any(year.kind is None for year in self.years):
             if any(count is not None for count in counts):
@@ -719,7 +726,10 @@ class SourceOut(ContractModel):
     # PROPOSED (fix round 2): the text fields are plain text, as in api/.
     id: str
     contract: str
-    state: Literal["fresh", "cached", "unavailable", "example"]
+    # PROPOSED (S-031): "transcribed", for a record transcribed into the
+    # repository from its published source (the ONI record), in this
+    # contract only; SourceOut of api/rotations.py has the other four.
+    state: Literal["fresh", "cached", "unavailable", "example", "transcribed"]
     # strict=False: a JSON text is read as a date and time.
     retrieved_at: Annotated[dt.datetime, Field(strict=False)] | None
     time_zone: str | None
@@ -883,6 +893,31 @@ class PlantAnswer(ContractModel):
         elif not isinstance(stress, RainStressApplied) or stress.declared != factor:
             raise ValueError("rain_stress: the echo of the declared factor")
         return self
+
+
+# --- The answer when the plant layer is not built ------------------------------
+
+
+class AnswerMissing(ContractModel):
+    """Why there is no plant answer. PROPOSED (S-031).
+
+    Only "not built" is answered this way, so the reason is ``NOT_AVAILABLE``
+    (C3.2: "The module that would produce the value is not built or not
+    enabled"), with the sentence that names what is absent.
+    """
+
+    reason: Literal["NOT_AVAILABLE"]
+    detail: NonEmptyStr
+
+
+class PlantAnswerNotBuilt(ContractModel):
+    """The ``200`` body of ``POST /api/plant/run`` while the plant layer is not
+    built. PROPOSED (S-031): exactly ``contract`` and ``answer_missing``. The
+    route (``api/plant_layer.py``) writes it as a dict, without importing
+    this model."""
+
+    contract: Literal["plant_answer_not_built"]
+    answer_missing: AnswerMissing
 
 
 def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> None:

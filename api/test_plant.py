@@ -38,6 +38,7 @@ from contracts.plant_answer import (
     check_answer_against_request,
 )
 from contracts.results.models import ResultsPerRotation
+from kinds_of_year import load_record
 
 ROOT = Path(__file__).parent.parent
 EXAMPLES = ROOT / "contracts" / "plant_answer" / "examples"
@@ -222,6 +223,9 @@ def client(**kwargs: Any) -> TestClient:
     kwargs.setdefault("settings", PERIOD)
     kwargs.setdefault("climate", FakeClimate())
     kwargs.setdefault("soil_slope", FakeSoilSlope())
+    # S-031: create_app no longer loads the committed ONI record; the tests
+    # that relied on it inject it here.
+    kwargs.setdefault("kinds_of_year_record", load_record())
     if "engines" not in kwargs:
         kwargs.setdefault("parameters", CATALOGUE)
         kwargs.setdefault("engines_factory", Factory())

@@ -463,7 +463,40 @@ INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
         put([*NOT_MET, "limit", "kinds_not_met"], ["dry"]),
         "only kinds of KINDS_OF_YEAR",
     ),
+    # PROPOSED (S-031): a null record source only when every year is missing.
+    (
+        "answer-kinds-source-null-with-a-classified-year",
+        put(["kinds_of_year", "source"], None),
+        "a null source only when every year is missing",
+    ),
+    (
+        "answer-source-state-not-in-the-list",
+        put(["sources", 1, "state"], "stored"),
+        "state",
+    ),
 ]
+
+
+def _no_record(data: dict[str, Any]) -> None:
+    """PROPOSED (S-031): the kinds of year when no record is configured."""
+    kinds = data["kinds_of_year"]
+    kinds["source"] = None
+    for year in kinds["years"]:
+        year.update(
+            kind=None,
+            missing_reason="NOT_AVAILABLE",
+            detail="example detail: the kinds-of-year record is not configured",
+            season=None,
+            season_year=None,
+        )
+    kinds["counts"] = {"el_nino": None, "neutral": None, "la_nina": None}
+    data["sources"][1].update(
+        state="unavailable",
+        attribution=None,
+        missing_reason="NOT_AVAILABLE",
+        detail="example detail: the kinds-of-year record is not configured",
+    )
+
 
 VALID_ANSWER: list[tuple[str, Mutation]] = [
     (
@@ -534,6 +567,11 @@ VALID_ANSWER: list[tuple[str, Mutation]] = [
     (
         "accepted-answer-not-example-data",
         put(["example_data"], False),
+    ),
+    ("accepted-answer-without-a-record", _no_record),
+    (
+        "accepted-answer-record-source-cached",
+        put(["sources", 1, "state"], "cached"),
     ),
 ]
 
@@ -917,3 +955,46 @@ def test_f2_a_request_message_never_quotes_a_submitted_id(
     # Fix round 1: a list index (0-based), not the component's position field.
     assert any("list ind" in message for message in messages)
     assert not any("position" in message for message in messages)
+
+
+# --- The answer when the plant layer is not built (S-031), PROPOSED --------------
+# Not cases of the README lists: the not-built body has no example answer to
+# change in memory; its own example sits in examples_not_built/, since
+# examples/ holds exactly the request and the answer.
+
+NOT_BUILT = HERE / "examples_not_built" / "PLACEHOLDER_plant_answer_not_built.json"
+
+
+def test_the_not_built_example_loads_into_its_model() -> None:
+    from .plant_answer import PlantAnswerNotBuilt
+
+    text = NOT_BUILT.read_text(encoding="utf-8")
+    loaded = PlantAnswerNotBuilt.model_validate_json(text)
+    assert loaded.model_dump(mode="json") == json.loads(text)
+    assert NOT_BUILT.name.startswith("PLACEHOLDER_")
+    assert sorted(p.name for p in NOT_BUILT.parent.iterdir()) == [NOT_BUILT.name]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"contract": "plant_answer"},
+        {"answer_missing": {"reason": "NO_COVERAGE", "detail": "example detail"}},
+        {"answer_missing": {"reason": "NOT_AVAILABLE"}},
+        {"answer_missing": {"reason": "NOT_AVAILABLE", "detail": ""}},
+        {"example_data": True},
+    ],
+    ids=[
+        "another-contract",
+        "another-reason",
+        "no-detail",
+        "empty-detail",
+        "an-extra-member",
+    ],
+)
+def test_a_not_built_body_that_breaks_a_rule_is_refused(change: dict) -> None:
+    from .plant_answer import PlantAnswerNotBuilt
+
+    data = {**json.loads(NOT_BUILT.read_text(encoding="utf-8")), **change}
+    with pytest.raises(ValidationError):
+        PlantAnswerNotBuilt.model_validate(data)

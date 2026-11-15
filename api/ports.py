@@ -49,6 +49,8 @@ __all__ = [
     "ModuleState",
     "ModuleStatus",
     "PhaseResult",
+    "PlantLayer",
+    "PlantParts",
     "ReasonCode",
     "ResultsPayload",
     "RotationEngines",
@@ -265,3 +267,36 @@ class DecisionLayer(Protocol):
     def decide(
         self, table: ResultsTable, *, example_data: bool
     ) -> DecisionOutput | Missing: ...
+
+
+# --- plant layer --------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PlantParts:
+    """What the plant route needs of the plant layer. PROPOSED (S-031, R24).
+
+    ``request_model`` is ``contracts.plant_answer.PlantRequest`` (the body is
+    loaded into it), ``answer_model`` is ``contracts.plant_answer.PlantAnswer``
+    (what ``answer_plant`` returns is checked to be one), and
+    ``answer_plant`` is ``economics.plant.answer_plant``. Typed ``Any`` so
+    this module imports nothing of the plant layer.
+    """
+
+    request_model: Any
+    answer_model: Any
+    answer_plant: Any
+
+
+class PlantLayer(Protocol):
+    """Gives the parts of the plant layer, or says why it is not built.
+
+    PROPOSED (unit ``l2/plant-layer-by-name``). The route
+    ``POST /api/plant/run`` depends on this interface only. The default
+    implementation (``api/plant_layer.py``, ``DiscoveredPlantLayer``) finds
+    the parts by name on each request. ``Missing`` (``NOT_AVAILABLE``) means
+    "not built"; what an implementation raises is a defect, which the route
+    answers ``500``.
+    """
+
+    def parts(self) -> PlantParts | Missing: ...

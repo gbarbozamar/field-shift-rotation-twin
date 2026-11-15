@@ -286,9 +286,63 @@ export function readPlantServiceAnswer(body: unknown, request: unknown): PlantSe
   }
 }
 
-/** Call the route with one request; resolves with the answer read, rejects with an ApiError. */
+/** The contract of the 200 body the route writes while its plant layer is not built. */
+export const PLANT_NOT_BUILT_CONTRACT = 'plant_answer_not_built'
+
+/**
+ * The service answered 200 with the not-built body (S-031, PROPOSED): its
+ * plant layer is not built, so there is no answer; missing carries the
+ * reason (NOT_AVAILABLE) and the service's detail, shown as data. Thrown by
+ * runPlant so the call is a typed absence, never an answer and never zeros.
+ */
+export class PlantNotBuiltError extends Error {
+  readonly missing: MissingPart
+
+  constructor(missing: MissingPart) {
+    super('plant-answer-not-built')
+    this.name = 'PlantNotBuiltError'
+    this.missing = missing
+  }
+}
+
+/**
+ * Read a 2xx body as the not-built body (PlantAnswerNotBuilt of
+ * contracts/plant_answer/), or null when it is another body. Exactly
+ * contract and answer_missing; answer_missing exactly reason NOT_AVAILABLE
+ * and a non-empty detail. A body that says it is not built and breaks one
+ * of these is ApiError UNEXPECTED. Pure, and never reads anything else.
+ */
+export function readPlantNotBuilt(body: unknown): MissingPart | null {
+  if (!isRecord(body) || body.contract !== PLANT_NOT_BUILT_CONTRACT) {
+    return null
+  }
+  const missing = body.answer_missing
+  const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
+    Object.keys(value).length === keys.length && keys.every((key) => key in value)
+  if (
+    !exactKeys(body, ['contract', 'answer_missing']) ||
+    !isRecord(missing) ||
+    !exactKeys(missing, ['reason', 'detail']) ||
+    missing.reason !== 'NOT_AVAILABLE' ||
+    typeof missing.detail !== 'string' ||
+    missing.detail.length === 0
+  ) {
+    throw new ApiError('UNEXPECTED')
+  }
+  return { reason: 'NOT_AVAILABLE', detail: missing.detail }
+}
+
+/**
+ * Call the route with one request; resolves with the answer read, rejects
+ * with an ApiError, or with a PlantNotBuiltError when the service says its
+ * plant layer is not built (S-031).
+ */
 export async function runPlant(base: string, request: Record<string, unknown>): Promise<PlantServiceAnswer> {
   const body = await postToRoute(plantRunUrl(base), request)
+  const notBuilt = readPlantNotBuilt(body)
+  if (notBuilt !== null) {
+    throw new PlantNotBuiltError(notBuilt)
+  }
   return readPlantServiceAnswer(body, request)
 }
 

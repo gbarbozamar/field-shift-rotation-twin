@@ -25,11 +25,16 @@ from api.engines import (
 )
 from api.errors import install_error_handlers
 from api.plant import EnginesFactory, make_plant_router
-from api.ports import RotationEngines, RotationValidator, RunSettings, SoilSlopeSource
+from api.ports import (
+    PlantLayer,
+    RotationEngines,
+    RotationValidator,
+    RunSettings,
+    SoilSlopeSource,
+)
 from api.rotation_validator import RotationDefinitionValidator
 from api.rotations import make_router
 from api.standins import ClimateUnavailable, SoilSlopeNotLoaded
-from kinds_of_year import load_record
 
 
 class Health(BaseModel):
@@ -57,6 +62,7 @@ def create_app(
     decision_layer: DecisionLayer | None = None,
     kinds_of_year_record: Mapping[str, Any] | None = None,
     engines_factory: EnginesFactory | None = None,
+    plant_layer: PlantLayer | None = None,
 ) -> FastAPI:
     """Build the application. ``None`` for an implementation means its default.
 
@@ -81,8 +87,11 @@ def create_app(
 
     PROPOSED (unit ``l2/plant-route``), both for ``POST /api/plant/run`` only:
     ``kinds_of_year_record`` is the ONI record the kinds of year are
-    classified on; ``None`` loads the committed one
-    (``kinds_of_year.load_record()``) once, here. ``engines_factory`` builds
+    classified on. PROPOSED (S-031): ``None`` means no record (never the
+    committed one): every kind of year of a plant answer is then missing
+    ``NOT_AVAILABLE``; ``api.config.build_app`` passes the record that
+    ``KINDS_OF_YEAR_RECORD_FILE`` names, read and checked once at start-up.
+    ``engines_factory`` builds
     the engines of a run with a rain-stress factor from the catalogue whose
     erosivity is scaled (``parameters`` or ``{}``, through
     ``api.rain_stress.scale_erosivity``). ``None`` means: with the default
@@ -91,6 +100,14 @@ def create_app(
     applied, and why. With ``engines`` and a factory both given, the
     catalogue of the injected engines is not known, so the factory is not
     called and the answer says the factor was not applied, and why.
+
+    PROPOSED (unit ``l2/plant-layer-by-name``, S-031): ``plant_layer`` gives
+    the parts of the plant layer to ``POST /api/plant/run``; ``None`` means
+    ``DiscoveredPlantLayer`` (``api/plant_layer.py``), which finds
+    ``economics.plant.answer_plant`` and ``contracts.plant_answer`` by name
+    on each request, never when the app is built, and answers "not built"
+    when one is absent. Nothing of ``economics/``, ``kinds_of_year/`` or
+    ``contracts.plant_answer`` is imported by this module.
     """
     if engines is not None and parameters is not None:
         raise TypeError(
@@ -154,13 +171,10 @@ def create_app(
     app.include_router(
         make_plant_router(
             **shared,
-            kinds_of_year_record=(
-                kinds_of_year_record
-                if kinds_of_year_record is not None
-                else load_record()
-            ),
+            kinds_of_year_record=kinds_of_year_record,
             engines_factory=engines_factory,
             parameters=plant_catalogue,
+            plant_layer=plant_layer,
         )
     )
 
