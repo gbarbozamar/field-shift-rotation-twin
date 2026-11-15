@@ -3,7 +3,7 @@
   "example_data": true,
   "case_id": "example-case",
   "field_id": "example-field-1",
-  "saved_on": "2026-11-15",
+  "saved_on": "2026-11-15T11:56Z",
   "field_identity": {
     "contract": "field_identity",
     "example_data": true,
@@ -203,6 +203,7 @@
     {
       "rotation_id": "example-rotation-1",
       "carbon_model": "amg",
+      "variant": "placeholder_variant",
       "carbon_balance": {
         "contract": "carbon_balance",
         "example_data": true,
@@ -481,18 +482,21 @@
     {
       "rotation_id": "example-rotation-1",
       "carbon_model": "rothc",
+      "variant": "placeholder_variant",
       "carbon_balance": null,
       "carbon_balance_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
     },
     {
       "rotation_id": "example-rotation-2",
       "carbon_model": "amg",
+      "variant": "placeholder_variant",
       "carbon_balance": null,
       "carbon_balance_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the example carries one carbon balance, for the first rotation"}
     },
     {
       "rotation_id": "example-rotation-2",
       "carbon_model": "rothc",
+      "variant": "placeholder_variant",
       "carbon_balance": null,
       "carbon_balance_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: this carbon model is not enabled in the example"}
     }

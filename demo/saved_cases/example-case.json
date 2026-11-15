@@ -3,7 +3,7 @@
   "example_data": true,
   "case_id": "example-case",
   "field_id": "example-field-1",
-  "saved_on": "2026-11-15",
+  "saved_on": "2026-11-15T12:02Z",
   "field_identity": {
     "contract": "field_identity",
     "example_data": true,
@@ -1292,6 +1292,7 @@
     {
       "rotation_id": "A",
       "carbon_model": "amg",
+      "variant": "amg_a",
       "carbon_balance": null,
       "carbon_balance_missing": {
         "reason": "MISSING_INPUT",
@@ -1301,15 +1302,17 @@
     {
       "rotation_id": "A",
       "carbon_model": "rothc",
+      "variant": "rothc_26_3",
       "carbon_balance": null,
       "carbon_balance_missing": {
-        "reason": "MISSING_INPUT",
-        "detail": "the CarbonForcing of rotation 'A': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed"
+        "reason": "NOT_AVAILABLE",
+        "detail": "the RothC balance of rotation 'A' is not available: the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed (#297, change 3; D122)"
       }
     },
     {
       "rotation_id": "B",
       "carbon_model": "amg",
+      "variant": "amg_a",
       "carbon_balance": null,
       "carbon_balance_missing": {
         "reason": "MISSING_INPUT",
@@ -1319,15 +1322,17 @@
     {
       "rotation_id": "B",
       "carbon_model": "rothc",
+      "variant": "rothc_26_3",
       "carbon_balance": null,
       "carbon_balance_missing": {
-        "reason": "MISSING_INPUT",
-        "detail": "the CarbonForcing of rotation 'B': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed"
+        "reason": "NOT_AVAILABLE",
+        "detail": "the RothC balance of rotation 'B' is not available: the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed (#297, change 3; D122)"
       }
     },
     {
       "rotation_id": "C",
       "carbon_model": "amg",
+      "variant": "amg_a",
       "carbon_balance": null,
       "carbon_balance_missing": {
         "reason": "MISSING_INPUT",
@@ -1337,10 +1342,11 @@
     {
       "rotation_id": "C",
       "carbon_model": "rothc",
+      "variant": "rothc_26_3",
       "carbon_balance": null,
       "carbon_balance_missing": {
-        "reason": "MISSING_INPUT",
-        "detail": "the CarbonForcing of rotation 'C': the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed"
+        "reason": "NOT_AVAILABLE",
+        "detail": "the RothC balance of rotation 'C' is not available: the thin matrix (issue #240) is a results table approved by the designer of the case, and no forcing exists for its rotations, so EP6 (run_rothc) is not run and no balance is computed (#297, change 3; D122)"
       }
     }
   ],
