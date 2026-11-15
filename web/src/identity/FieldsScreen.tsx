@@ -6,6 +6,7 @@ import { RotationRibbon } from '../rotation/RotationRibbon'
 import { exampleRotation } from '../rotation/exampleRotation'
 import ClocksScreen from '../clocks/ClocksScreen'
 import ResultCards from '../results/ResultCards'
+import DecisionSection from '../decision/DecisionSection'
 import RotationRun from '../seam/RotationRun'
 import { strings } from '../strings'
 
@@ -16,7 +17,6 @@ import { strings } from '../strings'
  * selected field as the display-only rotation ribbon when the example
  * rotation belongs to that field. The list, the map and the sheet share the
  * selected-field state through the selection module.
->>>>>>> 2af2064 (web: rotation ribbon, display-only timeline of the contract example)
  * every render, the map of the fields and the field list below it, and the
  * site sheet of the selected field after the list. The list, the map and the
  * sheet share the selected-field state through the selection module, so a
@@ -32,7 +32,9 @@ import { strings } from '../strings'
  * CP1 seam: for the selected field that matches the example rotation's
  * field, the action that runs that rotation through the platform route
  * (issue #119); it decides itself whether it shows, and renders nothing for
- * every other field.
+ * every other field. The decision section of the decision output example
+ * follows the result cards for a selected field (issue #241); it renders
+ * the pairs the example carries, and nothing else.
  */
 export default function FieldsScreen() {
   const selectedFieldId = useSelectedFieldId()
@@ -117,6 +119,8 @@ export default function FieldsScreen() {
       {selectedFieldId !== null && <ClocksScreen />}
 
       {selectedFieldId !== null && <ResultCards />}
+
+      {selectedFieldId !== null && <DecisionSection />}
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${strings['identity.selected']}: ${selectedField.name}` : ''}
