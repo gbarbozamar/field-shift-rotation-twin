@@ -1,15 +1,15 @@
-# Core of the AMG soil carbon model
+# The AMG soil carbon model: core and entry point EP5
 
-Unit `l1/amg-core`, brief in issue #174. Status: `PROPOSED` (blueprint section 3.7): it takes effect only when a person approves the pull request.
+Units `l1/amg-core` (brief in issue #174: the core) and `l1/amg-ep5` (brief in issue #192: the entry point, section [EP5 run_amg](#ep5-run_amg)). Status: `PROPOSED` (blueprint section 3.7): it takes effect only when a person approves the pull request.
 
-Decision D1 of issue #77 makes AMG one of the two carbon models. Its entry point EP5, `run_amg(forcing) -> CarbonBalance`, is `OPEN` in `contracts/ENTRYPOINTS.md`: `CarbonBalance` does not exist yet, and what EP5 receives and returns is Q14. This folder builds only the model core, as pure functions, so that EP5 can use it once its contracts exist:
+Decision D1 of issue #77 makes AMG one of the two carbon models. Unit `l1/amg-core` built the model core, as pure functions:
 
 - the two pools and one step of the carbon balance: humified carbon inputs enter the active pool, the active pool mineralises at a rate coefficient, the stable pool does not change (`pools.py`);
 - the rate coefficient as a potential rate times modifiers of soil and climate, each modifier its own function (`modifiers.py`);
 - a run over a sequence of steps from an initial state (`pools.py`);
 - the three trend measures of C1.6 for `soil_carbon_trend` (`trend.py`).
 
-There is no `run_amg` and no EP5 function here. The folder does not read the parameter catalogue, builds no contract model, and computes neither RothC nor the residue ledger.
+Unit `l1/amg-ep5` adds EP5, `run_amg(forcing, *, parameters) -> CarbonBalance` (`entry.py`), on that core; it is the only part of the folder that reads the parameter catalogue and builds contract models. The sections up to [OPEN](#open) describe the core as unit `l1/amg-core` wrote it; the sections from [EP5 run_amg](#ep5-run_amg) describe the entry point. The folder computes neither RothC nor the residue ledger.
 
 ## The forms
 
@@ -212,13 +212,13 @@ Each case is a test function of `test_amg.py`; a test checks that this list and 
 | `test_argument_of_another_type_raises_type_error` | `None`, text, a boolean or a list as a number argument raises `TypeError` naming it |
 | `test_structured_argument_of_another_type_raises_type_error` | The same for a mapping, a state, the steps, a unit string, the scheme, a series, the cycle boundaries and the run |
 
-### No constant of the method, no entry point
+### No constant of the method; the entry point
 
 | Case | What it shows |
 |---|---|
 | `test_every_argument_is_passed_by_name_and_none_has_a_default` | Every public function takes keyword arguments only, without a default; no field of a result type has a default |
 | `test_the_modules_hold_no_number_but_zero_and_one` | The modules of this folder write no number but zero and one |
-| `test_no_entry_point_yet` | The package has no `run_amg`: EP5 is OPEN |
+| `test_entry_point_is_run_amg_of_entry_module` | `engine.amg.run_amg` is the function of `entry.py` (unit `l1/amg-ep5` changed this case, which stated that EP5 did not exist yet) |
 | `test_readme_lists_every_constant_with_an_empty_value` | The table of constants has one row per constant, each an argument of its function, a well-formed and distinct identifier, and an empty value |
 | `test_readme_lists_the_cases_of_this_file` | This list and `test_amg.py` name the same cases |
 
@@ -250,13 +250,133 @@ Each item is a question a person has to answer; the role that answers it is name
 12. **Raising for a caller defect.** These functions raise `TypeError` for an argument of another type and `ValueError` for an unknown scheme or series of different lengths, as G5 allows; whether they may is Q7 of `contracts/ENTRYPOINTS.md`. For the platform developer.
 13. **Reason codes.** A unit that is not accepted, a value outside what a quantity can be and a non-finite number are `NOT_COMPUTABLE` (Q11 of `contracts/ENTRYPOINTS.md`). For the lead developer.
 14. **The proposed identifiers.** The table of constants proposes twelve with the prefix `amg_`, and `SCHEMES` proposes `"explicit"` and `"exponential"`. For the lead developer, who owns `params/`.
-15. **EP5.** `CarbonBalance` and `ModelState` do not exist; `CarbonForcing` is in `contracts/carbon_forcing/` (PR #155, now merged into `main`). How EP5 maps the forcing's monthly and annual series onto steps, modifiers and inputs is Q14 (b) and (d). For the lead developer.
+15. **EP5.** Built by unit `l1/amg-ep5`: see [EP5 run_amg](#ep5-run_amg) and its own OPEN list. `ModelState` still does not exist.
 
 ## Not verified
 
 - **The forms and every constant against a source of AMG.** The session read none, by rule.
 - **The published worked examples.** The three tests are skipped until a person transcribes them.
 - **The candidate sources of OPEN 1.** Named from memory; their titles, authors, years and journals are not checked.
-- **Use by an entry point.** No caller exists yet: EP5 is OPEN.
 - **The names scan of CI.** The list of forbidden names is a secret of the repository.
 - **Lint in CI.** The CI workflow runs ruff on `api/`, `adapters/` and `ci/` only; the session ran ruff on this folder.
+
+## EP5 run_amg
+
+Unit `l1/amg-ep5`, brief in issue #192. Status: `PROPOSED`. The entry point EP5 of `contracts/ENTRYPOINTS.md`, in `entry.py`, exported by `engine/amg/__init__.py`:
+
+```python
+run_amg(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonBalance
+```
+
+- `forcing`: `contracts.carbon_forcing.CarbonForcing` (#155, D62, D65).
+- `parameters`: the catalogue as `params.catalogue.load_folder` returns it, after `check_catalogue` reported no problem (G3, D46, D56).
+- Returns `contracts.carbon_balance.CarbonBalance` (PROPOSED by this unit, `contracts/carbon_balance/README.md`), carbon model `amg`, variant `amg_a`.
+- Raises `TypeError` when `forcing` is not a `CarbonForcing`, or `parameters` is not a `dict` from text to `dict` (G5). Nothing else is raised for data. One argument carries the identifiers, so the `ValueError` of G5 does not arise.
+- Pure (G1): reads records only with `params.catalogue.identity` and `params.catalogue.read_value`, changes no argument, reads no file, clock or environment.
+
+### What it builds
+
+Only **AMG-A**, the annual published reference that takes part in the selection (D80). AMG-M, the monthly variant, is experimental under D80 and is not built (EP5 OPEN 1).
+
+1. **Steps.** One step per agricultural year of the horizon, from its first month (C5.3), each of length one `yr` (C1.1: one agricultural year). Months after the last whole agricultural year make one more step, which is not computed: its inputs are missing, reason `NOT_COMPUTABLE`, "not a whole agricultural year" (the core then reports the step `MISSING_INPUT` naming them).
+2. **Initial state.** `initial_state(total_carbon, stable_fraction)` of the core: the starting soil carbon of the forcing and `amg_stable_fraction`.
+3. **Each step.** `humified_input` of the core, over every series of `annual_carbon_inputs` (keyed by the series' quantity, each with the humification coefficient of its `origin`). `rate_coefficient` of the core: the potential rate times the five modifiers of the core (temperature and moisture of that agricultural year; clay, carbonate and pH of the soil). `run` of the core with scheme `explicit` (EP5 OPEN 3).
+4. **Trend.** `trend_measures` of the core over the total stocks and elapsed times of the run. `mean_over_cycles` is given no cycle boundaries, because `CarbonForcing` carries no rotation cycle: it is always missing, `MISSING_INPUT`, naming that input, and also the first missing stock when there is one (EP5 OPEN 6).
+5. **The balance.** `total_stock` (`soil_organic_carbon`), `pools` (`amg_active_pool`, `amg_stable_pool`) and `flows` (`amg_humified_input`, `amg_mineralised_carbon`), all in `t C ha-1`, one value per step; the three `SoilCarbonTrend` values in `t C ha-1 yr-1`. The initial stocks carry `DERIVED` (a fixed formula of declared values, C4.3); step values and trend values carry `SIMULATED` (C4.1). Each present value carries a source naming `engine.amg.run_amg`, the variant, the scheme, the forcing quantities and the parameter records read, and `range_missing` with reason `NOT_AVAILABLE` (no range is computed; Q6 of `contracts/ENTRYPOINTS.md`). `horizon`, `soil_depth`, `example_data` and the three identifiers are copied from the forcing.
+
+### What it reads from the forcing
+
+The identifiers are PROPOSED (`entry.FORCING_QUANTITIES`), for the producer of `CarbonForcing` (the platform developer) and the science reviewers. The vocabulary of the forcing is OPEN in `contracts/carbon_forcing/README.md`.
+
+| Input of the core | Part of `CarbonForcing` | Quantity (PROPOSED) | Unit required |
+|---|---|---|---|
+| `initial_state.total_carbon` | `starting_state` | `soil_organic_carbon` | `t C ha-1` (C1.5 without `yr-1`); another unit is `NOT_COMPUTABLE`, nothing is converted |
+| `humified_input.carbon_inputs` | `annual_carbon_inputs` | every series, by its own quantity; its `origin` chooses the coefficient | `t C ha-1` over the agricultural year, as above |
+| `temperature_modifier.temperature` | `annual_climate` | `mean_temperature` | compared by the core with the unit of `amg_temperature_reference` and of `amg_temperature_sensitivity` |
+| `moisture_modifier.water_balance` | `annual_climate` | `water_balance` | compared by the core with the unit of `amg_moisture_sensitivity` |
+| `clay_modifier.clay_content` | `soil_properties` | `clay_content` | compared by the core with the unit of `amg_clay_sensitivity` |
+| `carbonate_modifier.carbonate_content` | `soil_properties` | `carbonate_content` | compared by the core with the unit of `amg_carbonate_sensitivity` |
+| `ph_modifier.ph` | `soil_properties` | `ph` | `dimensionless` (C1.1) |
+
+Not read by AMG-A: `climate`, `carbon_inputs` and `soil_cover` (the monthly series). `soil_depth` is copied unchanged.
+
+### What it reads from the parameter catalogue
+
+The twelve parameters of the table [Constants a person has to transcribe](#constants-a-person-has-to-transcribe), with those identifiers, each found by its `id` and its `scope`, exactly, as in `engine/water/` (question 5 of `params/README.md`). Every scope is empty except that of `amg_humification_coefficient`: one record per origin, with the origin under the scope key `crop` (EP5 OPEN 4). How the unit of each record is used (`entry.PARAMETERS`; C1.1 writes "per X" as `X-1`):
+
+| Parameters | Unit of the record |
+|---|---|
+| `amg_humification_coefficient`, `amg_stable_fraction`, `amg_temperature_shape`, `amg_moisture_shape`, `amg_ph_optimum`, `amg_ph_sensitivity` | `dimensionless`; another text is `NOT_COMPUTABLE` |
+| `amg_potential_mineralisation_rate` | `X-1`; `X` goes to the core as the time unit of the rate, which must be `yr` |
+| `amg_temperature_sensitivity`, `amg_moisture_sensitivity`, `amg_clay_sensitivity`, `amg_carbonate_sensitivity` | `X-1`; `X` goes to the core, which compares it with the unit of the input; a unit not written `X-1` is `NOT_COMPUTABLE` |
+| `amg_temperature_reference` | goes to the core as it is |
+
+### What it returns in each case
+
+| Case | What the balance holds |
+|---|---|
+| Every input and parameter present | Every stock, pool, flow and step computed by the core; `end_minus_start` and `fitted_slope` computed; `mean_over_cycles` missing, `MISSING_INPUT`, naming the cycle boundaries |
+| A parameter with no record (also: an empty catalogue) | The values that need it missing, `MISSING_INPUT`, the detail naming `parameter '<id>' with scope {...}: no record in parameters (D56)` |
+| A record whose value is `null` | The same, the detail repeating the reason of the record |
+| A record that `read_value` refuses (a placeholder, malformed), two records with one identity, or a record anywhere without a well-formed `id` and `scope` | The same, the detail saying why the record is not read |
+| A unit of a record that is not accepted | `NOT_COMPUTABLE` for the parameter, so the values that need it are missing, naming it and its unit |
+| A quantity the forcing does not carry | `MISSING_INPUT` naming the quantity and the part (G4, third row) |
+| A value of the forcing that is missing | `MISSING_INPUT` with the reason of that value; for an annual value, that step and every later step (the core's `run`) |
+| The starting carbon or a carbon input in another unit than `t C ha-1` | `NOT_COMPUTABLE`, naming the unit; nothing is converted |
+| Months after the last whole agricultural year | One last step, not computed (step 1 of [What it builds](#what-it-builds)) |
+| The forcing example of `contracts/carbon_forcing/` with an empty catalogue | Every value missing, `MISSING_INPUT`, each detail naming at least `amg_stable_fraction`, and the forcing quantities it lacks |
+
+Once the initial state is missing, every step, stock, flow and trend value is missing and names it (the core's `run` and `trend_measures`).
+
+### The runner
+
+`api/engines.py` imports each engine by module path and function name, with `importlib.import_module` and `getattr`; `engine.amg` with `run_amg` resolves to this function (`test_the_runner_finds_run_amg_by_its_module_path_and_name`). But the runner does not import EP5 today. Its list `DISCOVERED` holds EP2, EP1 and EP3 only, and `EngineFunctions` has no field for EP5. It writes the carbon modules `residues`, `amg` and `rothc` as `not_available`, `NOT_AVAILABLE`, "no carbon engine is built yet", and `soil_carbon_trend` as missing, `NOT_AVAILABLE`, for each carbon model. Nothing in `api/` produces a `CarbonForcing`. So with this unit the running app returns the same response as before (EP5 OPEN 9 and 10).
+
+## EP5 run_amg: PROPOSED cases
+
+Each case is a test function of `test_entry.py`; a test checks that this list and the file agree. Every number in the tests is a PLACEHOLDER; computed numbers are compared with the core functions called a second time, or with the mass balance. The PLACEHOLDER records pass `check_catalogue` only in their in-memory copy with the word replaced, as in `engine/water/`.
+
+| Case | What it shows |
+|---|---|
+| `test_example_forcing_and_empty_catalogue_give_every_value_missing_naming_parameters` | The forcing example and `{}`: a valid `CarbonBalance` in which every value is missing, `MISSING_INPUT`, naming a parameter with "no record in parameters (D56)" |
+| `test_placeholder_catalogue_passes_check_catalogue_and_stocks_are_computed_by_the_core` | A PLACEHOLDER catalogue that passes `check_catalogue`: every stock, pool and flow equals the core's run built a second time by hand |
+| `test_mass_balance_holds_at_every_step` | At every step and over the run, the change of total stock equals humified input minus mineralised carbon; total equals active plus stable; the stable pool does not change |
+| `test_trend_values_are_those_of_the_core_and_mean_over_cycles_waits_for_its_input` | `end_minus_start` and `fitted_slope` equal the core functions, with unit, provenance, model and range reason; `mean_over_cycles` missing, naming the cycle input |
+| `test_wrong_types_raise_type_error` | A forcing that is not a `CarbonForcing`, or a `parameters` that is not `dict[str, dict]`, raises `TypeError` |
+| `test_the_runner_finds_run_amg_by_its_module_path_and_name` | `engine.amg` and `run_amg`, the module path and name of EP5, resolve to this function |
+| `test_each_parameter_without_a_record_is_named` | Each of the twelve parameters removed alone: the trend and the last stock are missing, naming it |
+| `test_a_record_without_a_value_is_named_with_its_reason` | A `null` value: `MISSING_INPUT` naming the parameter and repeating its reason; the initial stock, which does not need it, is computed |
+| `test_a_placeholder_record_is_not_read` | A record that still carries the word PLACEHOLDER is not read, and is named |
+| `test_a_unit_of_a_record_that_is_not_accepted_is_not_computed` | A dimensionless parameter in another unit; a sensitivity not written `X-1`; a rate per another time unit: each not computed, named |
+| `test_each_quantity_the_forcing_lacks_is_named` | Each quantity of the forcing removed alone: `MISSING_INPUT` naming it and its part |
+| `test_a_missing_climate_year_makes_that_step_and_every_later_step_missing` | A missing annual temperature: earlier steps kept; that step and every later one missing with the reason; trend missing |
+| `test_starting_carbon_or_input_in_another_unit_is_not_computed` | The starting carbon or a carbon input in another unit: `NOT_COMPUTABLE`, nothing converted |
+| `test_months_after_the_last_whole_agricultural_year_are_one_step_not_computed` | A horizon that ends inside an agricultural year: one last step, not computed, "not a whole agricultural year" |
+| `test_two_inputs_of_one_origin_take_the_coefficient_of_that_origin` | Two series of one origin both use its coefficient; an origin without a record is named with its scope |
+| `test_the_balance_names_the_forcing_and_the_variant` | Identifiers, model, variant, horizon, soil depth, units, provenance and series identifiers; the result reloads from JSON |
+| `test_run_amg_is_pure` | The same arguments give the same result; neither argument is changed |
+| `test_signature_of_the_entry_point` | `forcing` then `parameters`, the second keyword-only, no default |
+| `test_entry_holds_no_value_of_the_method` | `entry.py` writes no number but zero and one |
+| `test_readme_lists_the_cases_of_this_file` | This list and `test_entry.py` name the same cases |
+
+## EP5 run_amg: OPEN
+
+Each item is a question a person answers; the role is named. None is answered by this unit.
+
+1. **AMG-M.** The monthly variant (blueprint section 8; experimental under D80, checked against AMG-A under uniform forcing, no carbon vote) is not built. Whether `run_amg` returns it too (a second balance, or a second function), how it is labelled, and which monthly series of the forcing it reads (Q14 (d)). For the lead developer.
+2. **The forcing quantities.** `soil_organic_carbon`, `mean_temperature`, `water_balance`, `clay_content`, `carbonate_content`, `ph` (PROPOSED). Which temperature (air or soil, mean of what) and which water balance feed the modifiers (OPEN 4 of the core), and who makes the annual values from the daily record. For the platform developer, as producer of `CarbonForcing`, and the science reviewers.
+3. **The scheme of the annual step.** `explicit` is used so that AMG-A can run (OPEN 2 of the core). For the science lead.
+4. **The scope of a humification coefficient.** The origin is written under the scope key `crop`; `params/catalogue.py` has no key for an origin, and the vocabulary of origins is OPEN (OPEN 7 of the core; OPEN 4 of `contracts/carbon_forcing/README.md`). For the lead developer.
+5. **Which modifiers.** All five of the core multiply the rate (OPEN 4 of the core). For the science lead.
+6. **Cycle boundaries.** `mean_over_cycles` needs the whole rotation cycles. `CarbonForcing` carries no cycle length or boundaries, so it is always missing. Either the forcing gains them (a change of `contracts/carbon_forcing/`: the platform developer and the lead developer) or EP5 gains an argument (a change of `contracts/ENTRYPOINTS.md`: lane L0).
+7. **Units.** The stocks and inputs must be in `t C ha-1` and the rate per `yr`; nothing is converted (OPEN 9 of the core). The unit string of a dimensionless record (`dimensionless`, C1.1) is also question 1 of `params/README.md`. For the lead developer.
+8. **The carbon inputs per agricultural year.** An annual carbon input is read as the amount entering over that agricultural year, in `t C ha-1`. For the platform developer and the science reviewers.
+9. **`contracts/ENTRYPOINTS.md`, for a later L0 unit.** EP5 should say: Status `PROPOSED`; return type `CarbonBalance` of `contracts/carbon_balance/models.py` (PROPOSED); signature `run_amg(forcing: CarbonForcing, *, parameters: dict[str, dict]) -> CarbonBalance` (`parameters` keyword-only, as the runner passes it); AMG-A only (D80), variant `amg_a`; `soil_carbon_trend` travels inside the balance (Q14 (c)); the row `soil_carbon_trend` of "From the entry points to one response" names EP5 and EP6. EP6 should name the same return type. For Q14 (a), the state at the end is the last step of each stock series.
+10. **The runner (`api/engines.py`, platform developer).** To use EP5 it needs: an entry `EntryPoint("EP5", "amg", "engine.amg", "run_amg")` in its discovery and a field in `EngineFunctions`; a `CarbonForcing` for the request (no adapter builds one: a port and an adapter of lane L2a); a call `run_amg(forcing, parameters=...)` with the catalogue it already loads; a check that the result is a `CarbonBalance`; the module status of `amg` from the values of the balance; and copying `balance.soil_carbon_trend` into `ResultsPerRotation.soil_carbon_trend` in place of the missing values for `amg`, keeping `rothc` missing while EP6 is not built. Whether the response also carries the stocks (a new part of the response) is for the platform developer and the interface developer.
+11. **The source text of a value** (question 11 of `contracts/results/README.md`). PROPOSED here: it names the engine, the variant, the scheme, the forcing quantities and the parameter records. For the lead developer.
+
+## EP5 run_amg: not verified
+
+- **Any value of AMG.** Every number in the tests is a PLACEHOLDER; `params/records/` is empty (D34).
+- **Use by the runner.** The runner does not call EP5 (see [The runner](#the-runner)).
+- **The names scan of CI** (the list is a secret) and **lint in CI** (ruff runs on `api/`, `adapters/` and `ci/` only; this session ran it on this folder and on `contracts/carbon_balance/`).
