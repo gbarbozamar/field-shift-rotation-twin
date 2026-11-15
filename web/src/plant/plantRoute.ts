@@ -286,14 +286,12 @@ export function readPlantServiceAnswer(body: unknown, request: unknown): PlantSe
   }
 }
 
-/** The contract of the 200 body the route writes while its plant layer is not built. */
-export const PLANT_NOT_BUILT_CONTRACT = 'plant_answer_not_built'
-
 /**
- * The service answered 200 with the not-built body (S-031, PROPOSED): its
- * plant layer is not built, so there is no answer; missing carries the
- * reason (NOT_AVAILABLE) and the service's detail, shown as data. Thrown by
- * runPlant so the call is a typed absence, never an answer and never zeros.
+ * The service answered 200 with the not-built body (S-031, adapted to R28 of
+ * S-035, PROPOSED): its plant layer is not built, so there is no answer;
+ * missing carries the reason (NOT_AVAILABLE) and the service's detail, shown
+ * as data. Thrown by runPlant so the call is a typed absence, never an answer
+ * and never zeros.
  */
 export class PlantNotBuiltError extends Error {
   readonly missing: MissingPart
@@ -306,21 +304,22 @@ export class PlantNotBuiltError extends Error {
 }
 
 /**
- * Read a 2xx body as the not-built body (PlantAnswerNotBuilt of
- * contracts/plant_answer/), or null when it is another body. Exactly
- * contract and answer_missing; answer_missing exactly reason NOT_AVAILABLE
- * and a non-empty detail. A body that says it is not built and breaks one
- * of these is ApiError UNEXPECTED. Pure, and never reads anything else.
+ * Read a 2xx body as the not-built body the route writes while its plant
+ * layer is not built (api/app.py, the form of #427: {answer: null,
+ * answer_missing: {reason: NOT_AVAILABLE, detail}}), or null when it is
+ * another body. A body with answer null that breaks this form (another
+ * member, another reason, no or an empty detail) is ApiError UNEXPECTED.
+ * Pure, and never reads anything else.
  */
 export function readPlantNotBuilt(body: unknown): MissingPart | null {
-  if (!isRecord(body) || body.contract !== PLANT_NOT_BUILT_CONTRACT) {
+  if (!isRecord(body) || !('answer' in body) || body.answer !== null) {
     return null
   }
   const missing = body.answer_missing
   const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
     Object.keys(value).length === keys.length && keys.every((key) => key in value)
   if (
-    !exactKeys(body, ['contract', 'answer_missing']) ||
+    !exactKeys(body, ['answer', 'answer_missing']) ||
     !isRecord(missing) ||
     !exactKeys(missing, ['reason', 'detail']) ||
     missing.reason !== 'NOT_AVAILABLE' ||
@@ -335,7 +334,7 @@ export function readPlantNotBuilt(body: unknown): MissingPart | null {
 /**
  * Call the route with one request; resolves with the answer read, rejects
  * with an ApiError, or with a PlantNotBuiltError when the service says its
- * plant layer is not built (S-031).
+ * plant layer is not built.
  */
 export async function runPlant(base: string, request: Record<string, unknown>): Promise<PlantServiceAnswer> {
   const body = await postToRoute(plantRunUrl(base), request)

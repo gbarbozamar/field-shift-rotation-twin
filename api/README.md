@@ -288,9 +288,9 @@ In order:
    `economics.plant.answer_plant`, on each request, never at start-up, as
    `api/decision_layer.py` finds the decision function. Only an absent
    module (or a package above it) or an absent name is "not built": `200`
-   with exactly `{"contract": "plant_answer_not_built", "answer_missing":
-   {"reason": "NOT_AVAILABLE", "detail": "<what is absent>"}}` (written as a
-   dict; `PlantAnswerNotBuilt` of the contract loads it), and no source or
+   with exactly `{"answer": null, "answer_missing": {"reason":
+   "NOT_AVAILABLE", "detail": "<what is absent>"}}` (written as a dict, the
+   form of #427, R27 PROPOSED; main's contract has no model of it), and no source or
    engine is called. Any other import error, or an answer that is not a
    `PlantAnswer`, is `500` `INTERNAL_ERROR` on this route; `/health` and the
    other routes are untouched, since `api/app.py` imports nothing of
@@ -308,8 +308,8 @@ In order:
    text. Nothing is called before that. Malformed JSON is `400`.
 2. **Sources.** Climate and soil and slope are asked for once for the site,
    as `POST /api/decisions/run` does. `sources` lists them, then the ONI
-   record (PROPOSED, S-031: state `transcribed`, a state of the plant
-   contract's `SourceOut` only, OPEN 5 of the contract, detail
+   record (PROPOSED: state `cached`, as OPEN 5 of main's contract lists
+   the record (#424, R27), detail
    `transcribed record <id>, read on <date_read>` with no path, the date
    left out when the record has none, fix round 1 F7; with no record
    configured, state `unavailable`, `NOT_AVAILABLE`, detail `NO_RECORD` of
@@ -326,7 +326,8 @@ In order:
    (`api/config.py`) and passed to `create_app(..., kinds_of_year_record=)`;
    `None` now means **no record** (PROPOSED, S-031), never the committed one:
    every year is then missing `NOT_AVAILABLE` with the not-configured detail,
-   `kinds_of_year.source` is null, every count is null, and the means and
+   `kinds_of_year.source` is `NO_RECORD_ID`, the id of the record's source
+   row (main's contract requires a source text, #424; R27 PROPOSED), every count is null, and the means and
    margins of each kind follow through `economics/` as for any year without
    a kind (with a period, the years are still those of the period, so the
    soil-loss mean of the period is kept). The years come
@@ -478,7 +479,7 @@ only its path and the reason.
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
-| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on, such as `kinds_of_year/records/oni_v6.json`; read once at start-up (parsed with `json.loads`, then classified once by `kinds_of_year.classify_agricultural_years` as a check) and passed to `create_app`. `compose.yaml` sets it to `kinds_of_year/records/oni_v6.json` for the local stack only (PROPOSED, R24; start with `KINDS_OF_YEAR_RECORD_FILE=` to run without it) | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
+| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on (none is in the repository until a person signs one, D240 (5), R26); read once at start-up (parsed with `json.loads`, then classified once by `kinds_of_year.classify_agricultural_years` as a check) and passed to `create_app`. `compose.yaml` does not set it (R26, PROPOSED) | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
 | `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` sets it to `on` for the local stack only (`${RAIN_STRESS_TEST-on}`; start with `RAIN_STRESS_TEST=` to switch it off). The detail shown to users (`NOT_SWITCHED_ON`) names no variable | Off: a declared rain-stress factor is echoed `applied: false` with the reason `NOT_SWITCHED_ON`, and the engines run unchanged |
 
 Relative paths are resolved against the working directory of the server.
@@ -548,7 +549,7 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
 | `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
-| `KINDS_OF_YEAR_RECORD_FILE` | Unset until the operator switches the record on after signing it; then `kinds_of_year/records/oni_v6.json` | S-031 (PROPOSED) |
+| `KINDS_OF_YEAR_RECORD_FILE` | Unset until a person signs a record (D240 (5)); then the path of that record | S-031 (PROPOSED) |
 | `RAIN_STRESS_TEST` | Unset (off) unless a person decides to switch the heavier-rain stress test on; then `on` | S-032 (PROPOSED) |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
@@ -563,7 +564,7 @@ SOIL_SLOPE_EXAMPLE_FILE=<the soil-and-slope example> \
 uv run uvicorn api.main:app --reload
 ```
 
-**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on, except `KINDS_OF_YEAR_RECORD_FILE`, which the local stack sets to the committed record (PROPOSED, R24; the record still carries `UNSIGNED_AI_PRECHECK`).
+**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on; `KINDS_OF_YEAR_RECORD_FILE` is not set either, since no record is shipped (D240 (5), R26, PROPOSED).
 
 ## Interfaces and their implementations
 

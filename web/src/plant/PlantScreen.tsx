@@ -70,8 +70,9 @@ import type {
  * disabled and the stress test is not available, with its reason.
  *
  * Ask the service (S-021, PROPOSED). When a backend address is configured
- * (VITE_API_URL set and not blank, plantRoute.ts), the screen still opens on
- * the saved example answers and also offers "Ask the service": the example
+ * (VITE_API_URL set and not blank, plantRoute.ts), the screen opens on the
+ * questions and "Ask the service", with no answer until the service answers
+ * (D251 of #77, read strictly: no sample answer values are shown): the example
  * plant request, with the questions chosen (how strict, the kind of year,
  * heavier rain on or off), goes to POST /api/plant/run, one call per distinct
  * request (cached, no retry, no refetch on focus). With a backend, heavier
@@ -84,9 +85,10 @@ import type {
  * fails an error panel with its code in plain words, are shown in place of an
  * answer: no example answer is rendered then. "Back to the saved example"
  * goes back. A line says where the answer shown comes from. PROPOSED
- * (S-031): when the service answers that its plant layer is not built (the
- * body plant_answer_not_built), a panel says the answer is not available,
- * with the reason and the service's detail; no answer and no number.
+ * (S-031, adapted to the not-built form of #427 by R28 of S-035): when the
+ * service answers that its plant layer is not built ({answer: null,
+ * answer_missing}), a panel says the answer is not available, with the
+ * reason and the service's detail; no answer and no number.
  *
  * Each option is a row (S-020, PROPOSED): its rotation label from the
  * definition in the request, the strip of its crops year by year
@@ -162,6 +164,12 @@ function SoilLossLine({
       {item.value !== null && item.assumption ? (
         <p className="text-xs text-slate-500">{strings['assumption.mark']}</p>
       ) : null}
+      {item.value !== null ? (
+        // D148 (issue #77): every soil-loss figure shown carries this label.
+        <p data-testid="plant-soil-loss-label" className="text-xs text-slate-500">
+          {strings['soil_loss.headline_label']}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -176,15 +184,18 @@ function DeclaredMark({ testid }: { testid: string }) {
 }
 
 function LimitLine({ option }: { option: PlantOption }) {
-  if (option.limit === null) {
-    // The parser keeps a reason on the check whenever the limit is missing.
-    return <MissingLine what={strings['plant.limit']} missing={option.on_average.missing!} />
+  if (option.limit === null || option.limit_labels === null) {
+    // A missing limit (a declared Value) carries its own reason; the parser
+    // also keeps a reason on the check whenever the limit is missing.
+    return (
+      <MissingLine what={strings['plant.limit']} missing={option.limit_missing ?? option.on_average.missing!} />
+    )
   }
   return (
     <div>
       <MeasuredLine
         what={strings['plant.limit']}
-        item={{ value: option.limit, unit: option.limit_unit, missing: null }}
+        item={{ value: option.limit, unit: option.limit_unit, missing: null, labels: option.limit_labels }}
       />
       <DeclaredMark testid="plant-limit-declared" />
     </div>
@@ -312,6 +323,11 @@ function AnswerCard({ answer }: { answer: PlantAnswer }) {
       className="rounded-lg border-2 border-teal-700 bg-white px-4 py-3"
     >
       <h3 className="text-xs font-semibold uppercase text-slate-500">{strings['plant.answer.heading']}</h3>
+      {answer.declared_limits.map((limit) => (
+        <p key={limit} data-testid="plant-declared-limit" className="text-sm text-slate-600">
+          {formatString(strings['plant.declared_limit'], { limit })}
+        </p>
+      ))}
       {chosen !== null ? (
         <div>
           <p className="text-sm text-slate-600">{strings['plant.answer.chosen']}</p>
@@ -687,6 +703,7 @@ const ORIGIN_EXAMPLE: AnswerOrigin = { kind: 'example' }
  * service said its plant layer is not built, with the reason and its detail.
  */
 export type ServiceStatus =
+  | { kind: 'not_asked' }
   | { kind: 'pending' }
   | { kind: 'failed'; code: ApiErrorCode }
   | { kind: 'not_built'; missing: MissingPart }
@@ -708,7 +725,7 @@ function OriginLine({
       <p className="text-sm text-slate-600">
         {origin.kind === 'service'
           ? formatString(strings['plant.service.origin_service'], { api: origin.api })
-          : strings['plant.service.origin_example']}
+          : null}
       </p>
       {onAskService !== undefined ? (
         <button
@@ -736,6 +753,13 @@ function OriginLine({
 
 /** The pending line, or the error panel with the code in plain words and the raw code. */
 function StatusPanel({ status }: { status: ServiceStatus }) {
+  if (status.kind === 'not_asked') {
+    return (
+      <p data-testid="plant-service-not-asked" className="text-sm text-slate-500">
+        {strings['plant.service.not_asked']}
+      </p>
+    )
+  }
   if (status.kind === 'pending') {
     return (
       <p data-testid="plant-service-pending" className="text-sm text-slate-500">
@@ -975,12 +999,18 @@ export function PlantView(props: PlantViewProps) {
       </h2>
       <p className="mt-1 text-sm text-slate-600">{strings['plant.rule']}</p>
 
-      {set.example_data ? (
+      {set.example_data && status === undefined ? (
         <div role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
           <p data-testid="plant-example-banner" className="text-sm text-amber-900">
             {strings['example.banner']}
           </p>
         </div>
+      ) : null}
+
+      {status !== undefined && status.kind !== 'failed' ? (
+        <p data-testid="plant-example-inputs" className="mt-3 text-sm text-slate-600">
+          {strings['plant.q.example_inputs']}
+        </p>
       ) : null}
 
       <OriginLine origin={origin} onAskService={onAskService} onBackToExample={onBackToExample} />
@@ -1214,6 +1244,29 @@ export function servicePhaseOf(query: {
 }
 
 /**
+ * The screen with no service configured (D251 of #77): it says the service
+ * is not available and shows nothing of the example answers (no answer card,
+ * no options, no questions drawn from their prices). The example answers stay
+ * test fixtures only.
+ */
+export function PlantNoServiceView() {
+  return (
+    <section aria-labelledby="plant-title" className="mx-auto max-w-5xl">
+      <h2 id="plant-title" className="text-2xl font-semibold">
+        {strings['plant.title']}
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">{strings['plant.rule']}</p>
+      <p data-testid="plant-service-not-available" className="mt-3 text-sm font-medium text-slate-700">
+        {strings['plant.service.not_available']}
+      </p>
+      <p data-testid="plant-disclaimer" className="mt-6 text-xs text-slate-500">
+        {strings['disclaimer.full']}
+      </p>
+    </section>
+  )
+}
+
+/**
  * The screen for a state: a pure function of the state, the configured
  * backend (null: none), what is read of the base request (the example
  * request by default) and, in service mode, the phase of the call.
@@ -1237,15 +1290,22 @@ export function PlantScreenView({
     onStrictness: (value: Strictness) => dispatch({ type: 'strictness', value }),
     onMarginOf: (value: MarginOf) => dispatch({ type: 'margin_of', value }),
   }
+  if (apiBase === null) {
+    // D251: no service, no answer; the example answers are not shown.
+    return <PlantNoServiceView />
+  }
   const rain = rainControlOf(state, apiBase, read, dispatch)
-  if (state.mode === 'example' || apiBase === null || service === null) {
-    // PROPOSED (fix round 1): a request that cannot be read is not offered to the service.
+  if (state.mode === 'example' || service === null) {
+    // D251 read strictly: no example answer is shown before the service has
+    // answered; the questions and the ask button only. A request that
+    // cannot be read is not offered to the service (fix round 1).
+    const set: PlantAnswerSet = { example_data: rawPlantRequest.example_data, answers: [] }
     return (
       <PlantView
-        set={plantExamples}
-        price={state.price}
-        onPrice={(price) => dispatch({ type: 'price', price, key: null })}
-        onAskService={apiBase !== null && read.readable ? () => dispatch({ type: 'ask' }) : undefined}
+        set={set}
+        price={null}
+        status={{ kind: 'not_asked' }}
+        onAskService={read.readable ? () => dispatch({ type: 'ask' }) : undefined}
         rain={rain}
         {...handlers}
       />
@@ -1293,8 +1353,9 @@ const NO_SERVICE_CLIENT = new QueryClient()
 
 /**
  * The screen at #/plant. The backend is the configured one (VITE_API_URL,
- * configuredApiBase) unless given: null means none, and the screen shows the
- * example answers only and calls nothing, as before S-021. One component for
+ * configuredApiBase) unless given: null means none, and the screen says the
+ * service is not available, shows no example answer and calls nothing (D251
+ * of #77; PlantNoServiceView). One component for
  * both: the query is disabled without a backend or outside service mode.
  * initialState (PROPOSED, for tests) is the first state; the example answers
  * by default.

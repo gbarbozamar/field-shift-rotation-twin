@@ -3,6 +3,16 @@
 Pure functions. The threshold and the minimum run of consecutive overlapping
 seasons are read from the record (transcribed from the quoted definition text),
 never written here.
+
+D240 (2) of issue #77: the threshold is applied to the one-decimal values
+printed in the v6 table, as CPC applies it, and not to the two-decimal values
+of ``oni.ascii.txt``. D258: those printed values come from the record itself.
+Each season of the record carries ``printed``, the value as the v6 table
+prints it, next to ``anom``, the two-decimal value of the file, and the
+threshold is compared with ``printed`` as given. This module holds no
+rounding rule: no fixed rule on the file values reproduces what CPC prints.
+A season whose ``printed`` value is missing is a missing input, never a value
+rounded here and never zero.
 """
 
 from __future__ import annotations
@@ -39,6 +49,9 @@ SEASONS: tuple[str, ...] = (
 # C3.2: "NO_COVERAGE | The data source has no data for this place or this
 # period" (and C5.5 for a year the series does not cover).
 _NO_COVERAGE: ReasonCode = "NO_COVERAGE"
+# C3.2: "MISSING_INPUT | The value is computed from an input that is itself
+# missing; `detail` names that input": here, the printed value of a season (D258).
+_MISSING_INPUT: ReasonCode = "MISSING_INPUT"
 
 
 @dataclass(frozen=True)
@@ -106,21 +119,27 @@ def _check_rule(record: Mapping[str, Any]) -> tuple[float, int]:
     return float(threshold), run_length
 
 
-def _season_map(record: Mapping[str, Any]) -> dict[int, float]:
-    """Season ordinal -> ANOM, every row checked (PROPOSED, S-027 F2).
+def _season_map(record: Mapping[str, Any]) -> dict[int, float | None]:
+    """Season ordinal -> the printed value (D258), every row checked (PROPOSED, S-027 F2).
+
+    The value of a season is its ``printed`` field, the value as the v6 table
+    prints it, taken as given. A row without ``printed``, or with ``printed``
+    null, maps to ``None``: its printed value is missing (D258), and it is
+    never rounded from ``anom`` or read as zero.
 
     A ValueError naming the row index and the field when the record has no
     ``seasons`` list, a row is not a mapping or lacks ``season``, ``year`` or
     ``anom``, the season is unknown, the year is not an int (a bool is
-    refused), the anom is not a finite real number (a bool, None, NaN or an
-    infinity is refused), or a (season, year) row is duplicated.
+    refused), the anom, or a printed value that is given, is not a finite
+    real number (a bool, NaN or an infinity is refused; None for the anom
+    too), or a (season, year) row is duplicated.
     """
     rows = record.get("seasons")
     if not isinstance(rows, list):
         # ValueError, not TypeError: one exception type for every structural
         # misuse of the record (README.md).
         raise ValueError("record field 'seasons' must be a list of rows")  # noqa: TRY004
-    values: dict[int, float] = {}
+    values: dict[int, float | None] = {}
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             raise ValueError(f"seasons row {index}: a row is a mapping")  # noqa: TRY004
@@ -138,10 +157,16 @@ def _season_map(record: Mapping[str, Any]) -> dict[int, float]:
             raise ValueError(
                 f"seasons row {index}: field 'anom' must be a finite real number"
             )
+        printed = row.get("printed")
+        if printed is not None and not _is_finite_real(printed):
+            raise ValueError(
+                f"seasons row {index}: field 'printed' must be a finite real number, "
+                "or absent when the printed value is missing"
+            )
         position = _ordinal(season, year)
         if position in values:
             raise ValueError(f"seasons row {index}: duplicated season {season} {year}")
-        values[position] = float(anom)
+        values[position] = None if printed is None else float(printed)
     return values
 
 
@@ -166,11 +191,16 @@ def _ordinal(season: str, year: int) -> int:
 
 
 def _episode_state(
-    values: Mapping[int, float], position: int, threshold: float, run_length: int
+    values: Mapping[int, float | None],
+    position: int,
+    threshold: float,
+    run_length: int,
 ) -> str | None:
     """el_nino, la_nina or neutral for the season at ``position``.
 
-    None when the seasons needed to judge it are not in the record.
+    ``values`` are the printed values of the record (D258), so the threshold
+    is met on the values the v6 table prints (D240). None when a season
+    needed to judge it is not in the record or has no printed value.
     """
     anom = values.get(position)
     if anom is None:
@@ -200,10 +230,12 @@ def classify_agricultural_years(
 
     A season is in an El Nino (La Nina) episode when it belongs to a run of at
     least ``record["min_consecutive_seasons"]`` consecutive overlapping seasons
-    whose anomaly meets ``+threshold`` (``-threshold``); "met" is read as at or
-    beyond the threshold (PROPOSED). The kind of the year is the episode state
-    of its deciding season; a year that cannot be judged from the record is
-    missing ``NO_COVERAGE``.
+    whose printed value, as the v6 table prints it and the record carries it
+    (D240, D258), meets ``+threshold`` (``-threshold``); "met" is read as at
+    or beyond the threshold (PROPOSED). The kind of the year is the episode
+    state of its deciding season. A year that cannot be judged is missing:
+    ``MISSING_INPUT`` when a season it needs has no printed value (D258),
+    naming the seasons, else ``NO_COVERAGE`` (outside the record, or a gap).
     """
     _check_years(first_year, last_year)
     if first_year > last_year:
@@ -216,26 +248,53 @@ def classify_agricultural_years(
     for ag_year in range(first_year, last_year + 1):
         season, season_year = deciding_season(ag_year, start_month)
         position = _ordinal(season, season_year)
+        reason: ReasonCode | None = None
+        detail = None
         if position not in values:
+            kind, reason = None, _NO_COVERAGE
             detail = f"season {season} {season_year} is not in the record"
-            kind = None
         else:
             kind = _episode_state(values, position, threshold, run_length)
-            detail = (
-                None
-                if kind is not None
-                else f"a season needed to judge the run of season {season} "
-                f"{season_year} is not in the record (outside its span or a gap "
-                "in it)"
-            )
+        if kind is None and reason is None:
+            unprinted = _unprinted(values, position, run_length)
+            if unprinted:
+                reason = _MISSING_INPUT
+                detail = (
+                    f"the printed value of the v6 table (D258) is missing for "
+                    f"{', '.join(unprinted)}, needed to judge season {season} "
+                    f"{season_year}; it is not rounded from the file value"
+                )
+            else:
+                reason = _NO_COVERAGE
+                detail = (
+                    f"a season needed to judge the run of season {season} "
+                    f"{season_year} is not in the record (outside its span or a "
+                    "gap in it)"
+                )
         result[ag_year] = KindOfYear(
             kind=kind,
-            missing_reason=None if kind is not None else _NO_COVERAGE,
+            missing_reason=reason,
             detail=detail,
             season=season,
             season_year=season_year,
         )
     return result
+
+
+def _unprinted(
+    values: Mapping[int, float | None], position: int, run_length: int
+) -> list[str]:
+    """The seasons in the record, near ``position``, whose printed value is missing.
+
+    Near: every season a run through ``position`` can hold, from
+    ``run_length - 1`` seasons before it to ``run_length - 1`` after it.
+    """
+    found = []
+    for near in range(position - run_length + 1, position + run_length):
+        if near in values and values[near] is None:
+            year, index = divmod(near, len(SEASONS))
+            found.append(f"{SEASONS[index]} {year}")
+    return found
 
 
 def count_kinds(classified: Mapping[int, KindOfYear]) -> dict[str, int | None]:

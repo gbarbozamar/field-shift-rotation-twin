@@ -10,7 +10,6 @@ This folder holds the Pydantic models of the request and of the answer of "What 
 |---|---|---|---|
 | Plant request | Interface (what the user declares) → the route | `plant_answer.PlantRequest` | `examples/PLACEHOLDER_plant_request.json` |
 | Plant answer | The route → the interface | `plant_answer.PlantAnswer` | `examples/PLACEHOLDER_plant_answer.json` |
-| Plant answer not built (PROPOSED, S-031) | The route → the interface | `plant_answer.PlantAnswerNotBuilt` | `examples_not_built/PLACEHOLDER_plant_answer_not_built.json` |
 
 Acceptance test, from the repository root:
 
@@ -18,7 +17,7 @@ Acceptance test, from the repository root:
 uv run pytest contracts/plant_answer/
 ```
 
-Models and pure validation only: no network call, no parameter value, no computation. The contract imports contracts only (`contracts.inputs.common`, `contracts.economic_facts`, `contracts.rotation_definition`, `contracts.results.models`). The answer is the JSON form of the dataclasses of `economics/` (`decide.py`, `limit.py`, `margin.py`, `tipping.py`), `kinds_of_year/` (`aggregate.py`, `classify.py`) and `api/rain_stress.py`, field for field where it can be; it does not import them. The literals it needs (`Strictness`, `Answer`, `OptionState`, `Verdict`, `Direction`, `MARGINS_OF`, the unit `dimensionless`, the label `stress test`) are defined here, and the test checks with `typing.get_args` that they equal the originals, and that the field names of each mirrored model equal those of its dataclass.
+Models and pure validation only: no network call, no parameter value, no computation. The contract imports contracts only (`contracts.inputs.common`, `contracts.economic_facts`, `contracts.rotation_definition`, `contracts.results.models`); a test checks that it imports neither `kinds_of_year` nor `api` (#387). The tests that read `kinds_of_year/` or `api/rain_stress.py` are skipped (`pytest.importorskip`) while those modules are not on `main`. The answer is the JSON form of the dataclasses of `economics/` (`decide.py`, `limit.py`, `margin.py`, `tipping.py`), `kinds_of_year/` (`aggregate.py`, `classify.py`) and `api/rain_stress.py`, field for field where it can be; it does not import them. The literals it needs (`Strictness`, `Answer`, `OptionState`, `Verdict`, `Direction`, `MARGINS_OF`, the unit `dimensionless`, the label `stress test`) are defined here, and the test checks with `typing.get_args` that they equal the originals, and that the field names of each mirrored model equal those of its dataclass.
 
 ## How the example answer was made
 
@@ -30,9 +29,11 @@ A scratch script (not committed) ran the real pure functions on the example requ
 
 The example answer shows one chosen rotation (`example-rotation-soybean-cover`), one that does not meet the limit (`example-rotation-soybean`), one not resolved because a soil-loss year is missing, missing values with their reasons, and a tipping price.
 
+**The labels of D249 in the example (#387).** Added by hand after the script, no number changed: every present margin, soil-loss mean, limit cost, tipping price and tipping distance is `DERIVED`, with `range_missing` (`distance_range_missing` for the distance) `NOT_AVAILABLE` ("PLACEHOLDER: example data, no range is computed for this number"); every present margin carries the source "computed from the declared economic facts"; today's price carries the labels of the declared soybean price of the example request (`DECLARED`, `range_missing` `NOT_DECLARED`); each option's `limit` is the declared soil-loss limit `Value` of the example request; the soybean price range is `DECLARED` in both examples. The example's soil-loss means carry no D148 label: they are example data, not values of the erosion engine. `scope` and `declared_limits` are the texts below.
+
 ## Field list
 
-All PROPOSED. Every model rejects unknown members and does not coerce types. No member has a default: each is written, `null` where it is absent.
+All PROPOSED. Every model rejects unknown members and does not coerce types. No member has a default: each is written, `null` where it is absent; except the labels of D249 (`provenance`, `range`, `range_missing`, a margin's `source`, a soil loss's `label`), which are left out where they do not apply, as in `Value` of `contracts/inputs/common.py`.
 
 ### `PlantRequest`
 
@@ -51,7 +52,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 | Field | Type | Rule |
 |---|---|---|
 | `soybean_crop_ids` | list of text | Not empty, distinct; in the request each is a grain crop of the facts and is sown by at least one rotation (PROPOSED); the named crops do not carry different declared prices, as `find_tipping_price` refuses that, while a missing price is allowed and gives a tipping price missing `MISSING_INPUT` (PROPOSED) |
-| `soybean_price_range` | `low`, `high`, `unit` | `unit` is `USD t-1`; `0 <= low < high` |
+| `soybean_price_range` | `low`, `high`, `unit`, `provenance` | `unit` is `USD t-1`; `0 <= low < high`; `provenance` is `DECLARED` (D249) |
 | `margin_of` | `"average"`, `"el_nino"`, `"neutral"`, `"la_nina"` | `MARGINS_OF` of `economics/tipping.py`: the kind-of-year question |
 | `rain_stress_factor` | `Value` in `dimensionless`, or null | null: no stress test. `DECLARED` and above zero when present; may be missing with its reason |
 | `strictness` | `"on_average"` or `"every_kind"` | |
@@ -74,17 +75,30 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 | `rain_stress` | applied form, missing form, or null | `RainStress` / `RainStressMissing`; null when no factor was asked |
 | `erosivity` | `"mean_annual"` | Which erosivity the soil-loss run used (S-026 may add `"per_year"`) |
 | `kinds_of_year` | `source`, `start_month`, `years`, `counts` | `KindOfYear` per year and `count_kinds` |
-| `sources` | list | The shape of `SourceOut` of `api/rotations.py`, plus the state `"transcribed"` (PROPOSED, S-031) |
+| `sources` | list | The shape of `SourceOut` of `api/rotations.py` |
+| `scope` | text | D245 (R11): exactly "the most margin within the limit you declared; water and soil carbon are not part of this answer" (`ANSWER_SCOPE`). The screen shows it in place of "Plant this rotation" |
+| `declared_limits` | list of texts | The limits of this answer, declared; includes "phase 1 only: only the first phase of each rotation enters this answer, a limit of this release (D250)" (`PHASE_ONE_ONLY`; D250, point 2: only phase 1 enters the answer, and the answer says so) |
 
-`PlantOption`: `rotation_id`; `state` (`"chosen"`, `"meets"`, `"does_not_meet"`, `"not_resolved"`); `margin` (`average`, `el_nino`, `neutral`, `la_nina`, each `value`, `unit` `USD ha-1 yr-1`, `reason`, `detail`: `MarginResult`); `soil_loss` (the same four keys, each `value`, `unit` `t ha-1 yr-1`, `n_years`, `ag_years`, `reason`, `detail`, `sources`, `assumption`: `KindMean`; `average` is `MeansByKind.record`); `limit` (`limit`, `unit`, `on_average`, `every_kind`, `by_kind`, `kinds_not_met`, `kinds_not_resolved`, `kinds_not_in_record`: `LimitAssessment`, each check `verdict`, `reason`, `detail`: `LimitCheck`); `limit_check` (the check of the strictness used).
+`PlantOption`: `rotation_id`; `state` (`"chosen"`, `"meets"`, `"does_not_meet"`, `"not_resolved"`); `margin` (`average`, `el_nino`, `neutral`, `la_nina`, each `value`, `unit` `USD ha-1 yr-1`, `reason`, `detail`: `MarginResult`); `soil_loss` (the same four keys, each `value`, `unit` `t ha-1 yr-1`, `n_years`, `ag_years`, `reason`, `detail`, `sources`, `assumption`: `KindMean`; `average` is `MeansByKind.record`); `limit` (`limit`, `unit`, `on_average`, `every_kind`, `by_kind`, `kinds_not_met`, `kinds_not_resolved`, `kinds_not_in_record`: `LimitAssessment`, each check `verdict`, `reason`, `detail`: `LimitCheck`; `limit` is the declared `Value` in `t ha-1 yr-1`, missing with its reason when the request's is); `limit_check` (the check of the strictness used).
 
-Tipping point (`up`, `down`): `direction`, `price`, `takes_over`, `answer_after`, `distance_percent`, `reason`, `detail`, `unit` (`TippingPoint`).
+Tipping point (`up`, `down`): `direction`, `price`, `takes_over`, `answer_after`, `distance_percent`, `reason`, `detail`, `unit` (`TippingPoint`), plus the labels of D249 of the price and of the distance.
 
 Rain stress, applied form: `factor`, `declared` (the declared `Value`, unchanged), `detail`, `label` (`"stress test"`), `applied`. Missing form: `missing`, `detail`, `label`.
 
-Kinds of year: `source` (the record id, `oni_v6`; PROPOSED, S-031: null when no record is configured, allowed only when every year is missing), `start_month`, `years` (each `ag_year`, `kind`, `missing_reason`, `detail`, `season`, `season_year`), `counts` (`el_nino`, `neutral`, `la_nina`: every count, or every count null when a year has no kind).
+Kinds of year: `source` (the record id, `oni_v6`), `start_month`, `years` (each `ag_year`, `kind`, `missing_reason`, `detail`, `season`, `season_year`), `counts` (`el_nino`, `neutral`, `la_nina`: every count, or every count null when a year has no kind).
 
 A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its unit, or null with a reason code; never both, and never a zero standing for missing. Whether a `detail` must come with the reason follows the dataclass mirrored (PROPOSED, fix round 2): a margin (`MarginResult`) and a kind of year (`KindOfYear`) may carry a reason without a detail, and carry no detail when present; `KindMean` sets no rule on its detail; a limit check, a limit cost and a tipping point carry the reason and the detail together, as their dataclasses do. The answer does not reuse `Value` for these items because the dataclasses it mirrors carry no provenance label or range (PROPOSED).
+
+**The labels of every number (D249 of #77, #387).** Each number of the answer carries what C4.1 and C2.2 ask of every value: when present, its `provenance` and either its `range` (C2.1, the value inside it) or `range_missing` with its reason, never both; when missing, none of them. These fields are added to the mirrored dataclasses (`D249_LABELS`; the test of the mirror adds them):
+
+- a margin (`MarginOut`): `provenance` `DERIVED`, and `source` exactly "computed from the declared economic facts" (`MARGIN_SOURCE`, C4.2);
+- a soil-loss mean (`SoilLossOut`): `provenance` `DERIVED` (C4.6 and D243, `PROVENANCE_OF_SOIL_LOSS` of `contracts/results/models.py`), and `label`: every real value (`example_data` false) carries exactly the label of D148 (D250, point 3), "based on a Uruguayan no-till measurement; overestimates about 6 times the loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)" (`D148_SOIL_LOSS_LABEL`); a missing value carries none;
+- the limit cost (`LimitCostOut`) and each tipping price (`TippingPointOut.price`): `provenance` `DERIVED`;
+- each tipping distance (`TippingPointOut.distance_percent`): its own labels `distance_provenance` `DERIVED`, and `distance_range` or `distance_range_missing` (`D249_DISTANCE_LABELS`, because the tipping point's `provenance`, `range` and `range_missing` are those of its price);
+- today's price (`TippingPriceOut.today`): the labels of the declared soybean price (checked against the request);
+- the soil-loss limit of each option (`LimitAssessmentOut.limit`): no bare number; the declared `Value` of the request, unchanged, which carries them (`DECLARED`), as the rain-stress factor's `declared`; `check_answer_against_request` checks that it equals the request's `soil_loss_limit`, labels included;
+- the soybean price range (`PriceRange.low` and `PriceRange.high`, in the request and in the answer): `provenance` `DECLARED`, one label for both numbers, as a declared value asks (C4.1);
+- the rain-stress factor: no copy; `declared` is the declared `Value`, which carries them (`DECLARED`).
 
 **Soil loss needs a source or the mark (PROPOSED).** A present soil-loss mean (`SoilLossOut`) with an empty `sources` list and `assumption` false is refused (C4.2). This is stricter than `KindMean`, which allows it, so the route must give every present soil-loss mean its sources or the assumption mark.
 
@@ -99,11 +113,12 @@ A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its u
 - `rain_stress` is null exactly when no factor was asked, the missing form when the factor is missing (same `missing` part), and the applied form carrying the declared factor otherwise.
 - The kind counts are the years of each kind, or all null when a year has no kind.
 - As `choose_rotation` (PROPOSED, fix round 2): `none_meets` only when every option is in state `does_not_meet`; `tied`, when not empty, holds at least two distinct options, each in state `meets`.
-- As `assess_limit` (PROPOSED, fix round 2): `kinds_not_met` is exactly the kinds in the record (not in `kinds_not_in_record`) whose `by_kind` check is `does_not_meet`, and `kinds_not_resolved` those whose check is `not_resolved`, so the three lists are disjoint; the check of a kind not in the record is `not_resolved`; with `limit` null no check is resolved; `every_kind` is `does_not_meet` when a kind in the record does not meet, else `not_resolved` when one is not resolved or no kind is in the record, else `meets`.
+- As `assess_limit` (PROPOSED, fix round 2): `kinds_not_met` is exactly the kinds in the record (not in `kinds_not_in_record`) whose `by_kind` check is `does_not_meet`, and `kinds_not_resolved` those whose check is `not_resolved`, so the three lists are disjoint; the check of a kind not in the record is `not_resolved`; with `limit` missing (its `value` null) no check is resolved; `every_kind` is `does_not_meet` when a kind in the record does not meet, else `not_resolved` when one is not resolved or no kind is in the record, else `meets`.
 - As `find_tipping_price` (PROPOSED, fix round 2): a shared `reason` (with its `detail`) is on both points, which have no price; with no shared reason `today` is present and inside `price_range`; a present tipping price is inside `price_range`; `up.price` is at or above `today` and `down.price` at or below it; `distance_percent` is not negative up and not positive down (0 allowed).
 - `sources`: the text fields are plain text, as in `SourceOut` of `api/rotations.py`, and `retrieved_at` is written in UTC as `YYYY-MM-DDTHH:MM:SSZ`, as that model writes it (PROPOSED, fix round 2).
+- D249, D245, D250 and D148 (#387): each number carries its labels (above); `scope` is `ANSWER_SCOPE`; `declared_limits` includes `PHASE_ONE_ONLY`; with `example_data` false, every present soil-loss mean carries the label of D148. These checks run after the others.
 
-`check_answer_against_request(request, answer)` (PROPOSED) holds the checks that need both: the same field, the same questions, one option per rotation in request order, and every option judged against the declared limit; and (PROPOSED, fix round 2) `example_data` true when the request's is, `tipping_price.today` equal to the declared price of the soybean crops (null when one of them has no price, as `find_tipping_price` reads it), and `kinds_of_year.start_month` equal to the rotations' `ag_year_start.month`. It raises `ValueError`.
+`check_answer_against_request(request, answer)` (PROPOSED) holds the checks that need both: the same field, the same questions, one option per rotation in request order, and every option judged against the declared limit (D249: the declared `Value` with its labels); and (PROPOSED, fix round 2) `example_data` true when the request's is, `tipping_price.today` equal to the declared price of the soybean crops (null when one of them has no price, as `find_tipping_price` reads it), and `kinds_of_year.start_month` equal to the rotations' `ag_year_start.month`; and (D249) a present `tipping_price.today` with the `provenance`, `range` and `range_missing` of the declared soybean price. It raises `ValueError`.
 
 ## PROPOSED cases
 
@@ -175,8 +190,27 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `answer-limit-kind-not-in-the-record-with-a-resolved-check` | A kind not in the record has a resolved check |
 | `answer-limit-missing-with-a-resolved-check` | The limit is null and checks are resolved |
 | `answer-limit-every-kind-not-the-kinds` | `every_kind` meets while a kind does not meet |
-| `answer-kinds-source-null-with-a-classified-year` | `kinds_of_year.source` is null while a year has a kind (PROPOSED, S-031) |
-| `answer-source-state-not-in-the-list` | A source row has a state outside the list (PROPOSED, S-031) |
+| `answer-margin-without-its-provenance` | A present margin has no `provenance` (D249) |
+| `answer-margin-not-derived` | A margin is labelled `DECLARED` |
+| `answer-margin-without-its-source` | A present margin has no `source` (C4.2) |
+| `answer-margin-with-a-range-and-its-absence` | A margin carries a `range` and a `range_missing` |
+| `answer-margin-outside-its-range` | A margin's range ends below the margin |
+| `answer-missing-margin-with-a-provenance` | A missing margin keeps its `provenance` and `range_missing` |
+| `answer-soil-loss-without-a-range-or-its-absence` | A soil-loss mean has neither `range` nor `range_missing` |
+| `answer-soil-loss-not-of-c4-6` | A soil-loss mean is labelled `SIMULATED` |
+| `answer-soil-loss-label-not-the-one-of-d148` | A soil-loss mean carries another label |
+| `answer-real-soil-loss-without-the-label-of-d148` | `example_data` false, the soil-loss means without the label of D148 |
+| `answer-limit-cost-without-its-provenance` | The limit cost has no `provenance` |
+| `answer-tipping-point-not-derived` | The down tipping price is labelled `OBSERVED` |
+| `answer-tipping-today-without-its-provenance` | Today's price has no `provenance` |
+| `answer-distance-without-its-provenance` | The down tipping distance has no `distance_provenance` (D249) |
+| `answer-distance-not-derived` | The down tipping distance is labelled `OBSERVED` |
+| `answer-limit-without-its-labels` | An option's declared limit has no `provenance` and no `range_missing` |
+| `answer-limit-not-declared` | An option's declared limit is labelled `OBSERVED` |
+| `answer-price-range-without-its-provenance` | The question's soybean price range has no `provenance` |
+| `answer-price-range-not-declared` | The tipping price range is labelled `OBSERVED` |
+| `answer-scope-not-the-words-of-d245` | `scope` is "Plant this rotation" |
+| `answer-without-the-limit-phase-one-only` | `declared_limits` is empty |
 
 ### Rejected: an answer to another request (`check_answer_against_request`)
 
@@ -185,9 +219,11 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `answer-options-not-in-request-order` | The options are in reverse order |
 | `answer-of-another-field` | The answer is of another field |
 | `answer-questions-not-those-of-the-request` | The echoed `margin_of` differs from the request |
-| `answer-not-example-data-to-an-example-request` | The answer to an example request says `example_data` false |
+| `answer-not-example-data-to-an-example-request` | The answer to an example request says `example_data` false (its soil-loss means labelled as D148 asks) |
 | `answer-tipping-today-not-the-declared-price` | `tipping_price.today` is not the declared soybean price |
 | `answer-start-month-not-the-rotations` | `kinds_of_year.start_month` is not the rotations' start month |
+| `answer-tipping-today-labels-not-the-declared-price` | Today's price is labelled `OBSERVED`; the declared price is `DECLARED` |
+| `answer-limit-labels-not-the-declared-limit` | Every option's limit has the declared value but `range_missing` `NOT_AVAILABLE`; the declared limit's is `NOT_DECLARED` |
 
 ### Accepted
 
@@ -202,34 +238,27 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `accepted-request-soybean-price-missing` | The soybean price is missing `NOT_DECLARED` |
 | `accepted-answer-without-a-rain-stress-test` | No factor asked, no echo |
 | `accepted-answer-rain-stress-factor-missing` | The factor is missing `NOT_DECLARED`, echoed in the missing form |
-| `accepted-answer-not-example-data` | `example_data` is false (a real answer) |
-| `accepted-answer-without-a-record` | No record configured: `kinds_of_year.source` null, every year missing `NOT_AVAILABLE`, every count null, the record's source row `unavailable` (PROPOSED, S-031) |
-| `accepted-answer-record-source-cached` | The record's source row in the state `"cached"` the route wrote before S-031 |
+| `accepted-answer-not-example-data` | `example_data` is false (a real answer), every present soil-loss mean with the label of D148 |
+| `accepted-answer-margin-with-a-range` | A margin with a range around it instead of `range_missing` |
+| `accepted-answer-example-soil-loss-with-the-label-of-d148` | The example's soil-loss means carry the label of D148 |
+| `accepted-answer-with-a-second-declared-limit` | `declared_limits` holds `PHASE_ONE_ONLY` and one more limit |
 
 ### Checked without a case of their own
 
 - Both examples load, dump and load back unchanged, and the answer example answers the request example.
 - Both examples say `example_data: true`; a test shows the check refuses `false`.
-- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`; `SiteReference` that of `api/rotations.py`).
+- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses, plus the labels of D249 (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`; `SiteReference` that of `api/rotations.py`). The checks against `kinds_of_year/` and `api/rain_stress.py` are skipped while those modules are not on `main`.
+- The contract imports neither `kinds_of_year` nor `api` (read from its source).
+- The example answer says `scope` and `PHASE_ONE_ONLY`, never "Plant this rotation"; every present number in it carries its labels, and every present margin its source.
 - `retrieved_at` is written in UTC with a `Z`, exactly as `SourceOut` of `api/rotations.py` writes it, and reads back.
 - The answer example shows one chosen rotation, one that does not meet the limit, a missing value and a tipping price.
 
 ## OPEN
 
-1. **Margin range.** A margin carries no range (as `MarginResult`); how to give one is OPEN.
+1. **Margin range.** A margin carries a `range` or `range_missing` (D249); how the route computes a range from the declared facts is OPEN, and the example gives `range_missing` `NOT_AVAILABLE`.
 2. **Currency.** `USD` only, as in `contracts/economic_facts/` (its OPEN question 2).
 3. **Dry-year label.** No kind of year is named "dry" here; the screen labels kinds.
 4. **Per-year erosivity.** `erosivity` is `"mean_annual"` only; S-026 may add `"per_year"`.
-5. **Source state of a transcribed record.** PROPOSED (S-031): the ONI record is listed with the state `"transcribed"`, a state of this contract's `SourceOut` only (`SourceOut` of `api/rotations.py` keeps `fresh`, `cached`, `unavailable`, `example`); it was `"cached"` before, which says that a first response of a service was kept. With no record configured (`KINDS_OF_YEAR_RECORD_FILE` unset, `api/config.py`) its row is `"unavailable"`, `NOT_AVAILABLE`. Its detail is `transcribed record <id>, read on <date_read>` (fix round 1, F7: no path, since any path can be configured); the example answer says so. Whether `api/rotations.py` should share the state is OPEN.
+5. **Source state of a transcribed record.** The ONI record is listed with state `"cached"` (PROPOSED): `SourceOut` has no state for a record read from the repository.
 6. **One start month.** `kinds_of_year.start_month` is one month for the whole answer; rotations with different start months are not handled yet.
 7. **Rotation years.** How the route turns a `RotationDefinition` into the crops of each agricultural year for `compute_rotation_margin` is the route's (S-018), not this contract's.
-
-## The answer when the plant layer is not built (PROPOSED, S-031)
-
-While the plant layer (`economics.plant.answer_plant` or this contract) is not built, `POST /api/plant/run` answers `200` with exactly two members, written by `api/plant_layer.py` as a dict:
-
-```json
-{"contract": "plant_answer_not_built", "answer_missing": {"reason": "NOT_AVAILABLE", "detail": "<one sentence naming what is absent>"}}
-```
-
-`PlantAnswerNotBuilt` loads it: `contract` is `"plant_answer_not_built"`, `answer_missing.reason` is `NOT_AVAILABLE` only (C3.2: the module that would produce the value is not built or not enabled), `answer_missing.detail` a non-blank text that never repeats a submitted value; no other member. Its example sits in `examples_not_built/`, since the test of this folder checks that `examples/` holds exactly the request and the answer. It carries no `example_data` member: it holds no value.

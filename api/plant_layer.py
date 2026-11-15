@@ -32,7 +32,6 @@ from api.ports import Missing, PlantLayer, PlantParts
 __all__ = [
     "ANSWER_MODEL",
     "CONTRACT_MODULE",
-    "NOT_BUILT_CONTRACT",
     "PLANT_FUNCTION",
     "PLANT_MODULE",
     "REQUEST_MODEL",
@@ -48,10 +47,6 @@ CONTRACT_MODULE = "contracts.plant_answer"
 REQUEST_MODEL = "PlantRequest"
 ANSWER_MODEL = "PlantAnswer"
 
-# PROPOSED (S-031): the ``contract`` of the body of a plant answer that is not
-# built (``PlantAnswerNotBuilt`` of contracts/plant_answer/).
-NOT_BUILT_CONTRACT = "plant_answer_not_built"
-
 # PROPOSED detail text: English for developers; it names what is absent,
 # never a submitted value.
 NOT_BUILT = "the plant layer is not built yet: {name} is absent"
@@ -66,12 +61,13 @@ def _not_built(module: str, name: str) -> Missing:
 def not_built_body(missing: Missing) -> dict[str, Any]:
     """The ``200`` body of a plant answer that is not built (PROPOSED, S-031).
 
-    Exactly ``{"contract": "plant_answer_not_built", "answer_missing":
-    {"reason", "detail"}}``, written here as a dict so the route needs no
-    contract import; ``PlantAnswerNotBuilt`` of contracts/plant_answer/ loads it.
+    Exactly ``{"answer": null, "answer_missing": {"reason", "detail"}}``,
+    the form of PR #427 (decision R27 of the loop, PROPOSED): main's
+    contracts/plant_answer/ has no model of a not-built answer, so the body
+    is written here as a dict and the route needs no contract import.
     """
     return {
-        "contract": NOT_BUILT_CONTRACT,
+        "answer": None,
         "answer_missing": {"reason": missing.reason, "detail": missing.detail},
     }
 

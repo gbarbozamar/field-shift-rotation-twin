@@ -358,7 +358,8 @@
     "soybean_price_range": {
       "low": 200.0,
       "high": 600.0,
-      "unit": "USD t-1"
+      "unit": "USD t-1",
+      "provenance": "DECLARED"
     },
     "margin_of": "average",
     "rain_stress_factor": {

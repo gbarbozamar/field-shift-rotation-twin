@@ -1,6 +1,8 @@
 """Kinds of year (el_nino, neutral, la_nina) from the Oceanic Nino Index. PROPOSED.
 
-See ``README.md`` in this folder.
+See ``README.md`` in this folder. Nothing is read at import: the ONI record is
+read only by ``load_record``, from the path a caller gives. The record is not
+in the repository until a person checks and signs it (D240 (5), D34, D66).
 """
 
 import json
@@ -22,17 +24,18 @@ from .classify import (
     deciding_season,
 )
 
-DEFAULT_RECORD = Path(__file__).parent / "records" / "oni_v6.json"
 
+def load_record(path: Path | str) -> dict[str, Any]:
+    """Read an ONI record JSON from ``path``.
 
-def load_record(path: Path | str | None = None) -> dict[str, Any]:
-    """Read the ONI record JSON (the committed one when ``path`` is None)."""
-    with open(DEFAULT_RECORD if path is None else path, encoding="utf-8") as handle:
+    There is no default record: the record waits for a person's signature
+    (D34, D66), so the caller names the file it means.
+    """
+    with open(path, encoding="utf-8") as handle:
         return json.load(handle)
 
 
 __all__ = [
-    "DEFAULT_RECORD",
     "SEASONS",
     "KindMean",
     "KindOfYear",

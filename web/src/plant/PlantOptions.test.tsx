@@ -194,7 +194,7 @@ describe('the soil-loss bar and its limit line (4)', () => {
     const shown = rawExample.options
       .map((o) => o.soil_loss.average.value)
       .filter((v): v is number => v !== null)
-    const limits = rawExample.options.map((o) => o.limit.limit)
+    const limits = rawExample.options.map((o) => o.limit.limit.value)
     const scale = Math.max(...shown, ...limits)
     rawExample.options.forEach((option, index) => {
       const row = optionRow(html, index)
@@ -203,7 +203,7 @@ describe('the soil-loss bar and its limit line (4)', () => {
       const line = row.match(/data-testid="plant-bar-limit"[^>]*style="left:([^"]*)%"/)
         ?? row.match(/style="left:([^"]*)%"[^>]*data-testid="plant-bar-limit"/)
       expect(line, option.rotation_id).not.toBeNull()
-      expect(Number(line![1])).toBeCloseTo((option.limit.limit / scale) * 100, 6)
+      expect(Number(line![1])).toBeCloseTo((option.limit.limit.value / scale) * 100, 6)
       const fill = row.match(/data-testid="plant-bar-soil-fill"[^>]*data-verdict="([^"]*)"/)
       expect(fill![1]).toBe(option.limit_check.verdict)
     })
@@ -217,13 +217,21 @@ describe('the soil-loss bar and its limit line (4)', () => {
     raw.detail = raw.options.map((o: { rotation_id: string }) => o.rotation_id).join('; ')
     for (const option of raw.options) {
       const open = { verdict: 'not_resolved', reason: 'NOT_DECLARED', detail: raw.detail }
-      option.limit.limit = null
+      // The limit is a declared Value (#424): missing, with its reason, never zero.
+      option.limit.limit = {
+        value: null,
+        unit: option.limit.limit.unit,
+        missing: { reason: 'NOT_DECLARED', detail: raw.detail },
+      }
       option.limit.on_average = { ...open }
       option.limit.every_kind = { ...open }
       option.limit_check = { ...open }
       option.state = 'not_resolved'
     }
     raw.limit_cost = { ...raw.limit_cost, value: null, against: null, reason: 'NOT_DECLARED', detail: raw.detail }
+    // A missing cost carries no D249 labels.
+    delete raw.limit_cost.provenance
+    delete raw.limit_cost.range_missing
     const html = render(single(raw))
     raw.options.forEach((option: { soil_loss: { average: { value: number | null } } }, index: number) => {
       const row = optionRow(html, index)
