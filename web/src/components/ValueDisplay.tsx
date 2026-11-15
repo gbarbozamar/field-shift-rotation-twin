@@ -107,15 +107,25 @@ function reasonPhrase(missing: MissingPart): string {
   return formatString(strings[`missing.${missing.reason}`], params)
 }
 
+/**
+ * The one-line missing render of the conventions (C3.1): "{what}: {reason
+ * phrase}". Exported for the displays that are not value items and still owe
+ * a missing part the same pattern, such as the dated events of the rotation
+ * ribbon. Pure: it invents no phrase and fills no gap.
+ */
+export function missingPatternText(what: string, missing: MissingPart): string {
+  return formatString(strings['missing.pattern'], {
+    what,
+    [REASON_PHRASE_PLACEHOLDER]: reasonPhrase(missing),
+  })
+}
+
 export function ValueDisplay({ what, item }: ValueDisplayProps) {
   if (item.missing) {
     return (
       <div className="text-sm leading-5">
         <p data-testid="missing-line" className="italic text-slate-500">
-          {formatString(strings['missing.pattern'], {
-            what,
-            [REASON_PHRASE_PLACEHOLDER]: reasonPhrase(item.missing),
-          })}
+          {missingPatternText(what, item.missing)}
         </p>
       </div>
     )
