@@ -99,7 +99,7 @@ from engine.calendar.repeat import (
     RepeatedRotation,
     repeat_over_record,
 )
-from engine.water import balance, evaporation, fallow
+from engine.water import balance, evaporation, fallow, living_crop
 from engine.water._parameters import Catalogue, Scope, check_parameters
 from engine.water.et0 import Et0Bounds, Et0Constants, PointUnits
 from engine.water.et0 import (
@@ -121,9 +121,7 @@ from engine.water.runoff import (
 )
 from engine.water.stages import (
     STAGE_LENGTH_PARAMETERS,
-    PlacedStages,
     by_stage,
-    place_stages,
 )
 
 __all__ = ["compute_water_deficit_exposure"]
@@ -720,8 +718,9 @@ def _growth_of_day(
     (``_component_of_day`` gives a component only then). The four stage
     lengths of the crop are read by crop (``STAGE_LENGTH_PARAMETERS``) once
     per component and cycle, on the first day of it the chain meets, and the
-    stages are placed from the start of the component, its sowing
-    (``stages.place_stages``), with the dates the repetition gives it. A
+    days with a live crop are taken from ``living_crop.live_crop_days`` (unit
+    #357), which places the stages from the start of the component, its
+    sowing (``stages.place_stages``), with the dates the repetition gives it. A
     component that starts before the record (D141) keeps its declared sowing,
     so its first day in the record is the day of its stages counted from that
     sowing; nothing of the days before the record is computed.
@@ -743,7 +742,7 @@ def _growth_of_day(
     curves). A record the stage of the day needs that is missing makes the
     day ``MISSING_INPUT``, naming it.
     """
-    placed: dict[tuple[int, str], PlacedStages | Missing] = {}
+    placed: dict[tuple[int, str], living_crop.LiveCropDays | Missing] = {}
 
     def growth(day: dt.date, component: RepeatedComponent) -> Growth | Missing | None:
         scope: Scope = ((CROP_KEY, component.crop_id),)
@@ -753,28 +752,27 @@ def _growth_of_day(
                 stage: catalogue.value(parameter_id, scope, day)
                 for stage, parameter_id in STAGE_LENGTH_PARAMETERS.items()
             }
-            numbers = {
-                stage: value
-                for stage, value in lengths.items()
-                if not isinstance(value, Missing)
-            }
-            placed[key] = (
-                place_stages(
-                    component.start,
-                    component.end,
-                    numbers,
-                    what=f"component '{component.component_id}'",
-                )
-                if len(numbers) == len(lengths)
-                else Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
+            # The days with a live crop of the period (D135, D136), the one
+            # rule of engine/water/living_crop.py (unit #357).
+            live = living_crop.live_crop_days(
+                component.start,
+                component.end,
+                lengths,
+                what=f"component '{component.component_id}'",
             )
-        stages = placed[key]
-        if isinstance(stages, Missing):
-            return stages
-        if day in stages.tail:
+            if isinstance(live, Missing) and live.reason == "MISSING_INPUT":
+                # A stage length has no value: EP3 names it with its own text,
+                # since without the stage neither Kcb nor the root depth can
+                # be taken (D79); the records are named by the catalogue.
+                live = Missing(reason="MISSING_INPUT", detail=STAGE_UNKNOWN)
+            placed[key] = live
+        live = placed[key]
+        if isinstance(live, Missing):
+            return live
+        if not live.is_live(day):
             # After maturity: no living crop (D136).
             return None
-        stage_day = stages[day]
+        stage_day = live.stages[day]
         kcb = by_stage(
             stage_day,
             *(
