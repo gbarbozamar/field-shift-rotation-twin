@@ -29,6 +29,7 @@ from contracts.economic_facts import KINDS_OF_YEAR
 from .plant_answer import (
     ANSWER_SCOPE,
     D148_SOIL_LOSS_LABEL,
+    D249_DISTANCE_LABELS,
     D249_LABELS,
     DIMENSIONLESS,
     MARGIN_SOURCE,
@@ -106,6 +107,12 @@ def label_real_soil_losses(data: dict[str, Any]) -> None:
         for item in option["soil_loss"].values():
             if item["value"] is not None:
                 item["label"] = D148_SOIL_LOSS_LABEL
+
+
+def limit_range_missing_not_declared(data: dict[str, Any]) -> None:
+    """Every option's limit with another range_missing reason than the request's."""
+    for option in data["options"]:
+        option["limit"]["limit"]["range_missing"]["reason"] = "NOT_AVAILABLE"
 
 
 def range_around(path: list[Any], low: float, high: float) -> Mutation:
@@ -293,6 +300,13 @@ TIPPING_UP_AT = {
     "unit": "USD t-1",
     "provenance": "DERIVED",
     "range_missing": {"reason": "NOT_AVAILABLE", "detail": "example detail"},
+    "distance_provenance": "DERIVED",
+    "distance_range_missing": {"reason": "NOT_AVAILABLE", "detail": "example detail"},
+}
+MISSING_LIMIT = {
+    "value": None,
+    "unit": "t ha-1 yr-1",
+    "missing": {"reason": "NOT_DECLARED"},
 }
 MARGIN = [*CHOSEN, "margin", "average"]
 SOIL_LOSS = [*CHOSEN, "soil_loss", "average"]
@@ -378,7 +392,7 @@ INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
     ),
     (
         "answer-limit-missing-with-a-resolved-check",
-        put([*NOT_MET, "limit", "limit"], None),
+        put([*NOT_MET, "limit", "limit"], MISSING_LIMIT),
         "with no limit, no check is resolved",
     ),
     (
@@ -570,6 +584,36 @@ INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
         "answer-tipping-today-without-its-provenance",
         drop(["tipping_price"], "provenance"),
         "tipping price: a present value carries its provenance",
+    ),
+    (
+        "answer-distance-without-its-provenance",
+        drop(["tipping_price", "down"], "distance_provenance"),
+        "tipping distance: a present value carries its provenance",
+    ),
+    (
+        "answer-distance-not-derived",
+        put(["tipping_price", "down", "distance_provenance"], "OBSERVED"),
+        "tipping distance: the provenance is DERIVED",
+    ),
+    (
+        "answer-limit-without-its-labels",
+        drop([*NOT_MET, "limit", "limit"], "provenance", "range_missing"),
+        "carries a provenance label",
+    ),
+    (
+        "answer-limit-not-declared",
+        put([*NOT_MET, "limit", "limit", "provenance"], "OBSERVED"),
+        "its provenance is DECLARED",
+    ),
+    (
+        "answer-price-range-without-its-provenance",
+        drop(["questions", "soybean_price_range"], "provenance"),
+        "soybean_price_range.provenance: Field required",
+    ),
+    (
+        "answer-price-range-not-declared",
+        put(["tipping_price", "price_range", "provenance"], "OBSERVED"),
+        "price range: low and high are declared by the user",
     ),
     (
         "answer-scope-not-the-words-of-d245",
@@ -817,7 +861,10 @@ def test_answer_fields_mirror_the_dataclasses() -> None:
     assert set(m.LimitCheckOut.model_fields) == _names(LimitCheck)
     assert set(m.LimitAssessmentOut.model_fields) == _names(LimitAssessment)
     assert set(m.LimitCostOut.model_fields) == _names(LimitCost) | D249_LABELS
-    assert set(m.TippingPointOut.model_fields) == _names(TippingPoint) | D249_LABELS
+    assert (
+        set(m.TippingPointOut.model_fields)
+        == _names(TippingPoint) | D249_LABELS | D249_DISTANCE_LABELS
+    )
     assert (
         set(m.TippingPriceOut.model_fields)
         == (_names(TippingPrice) - {"decision"}) | D249_LABELS
@@ -876,13 +923,15 @@ def test_the_answer_says_what_it_is_and_its_limit() -> None:
 
 def test_every_number_of_the_example_carries_its_labels() -> None:
     """D249: provenance and range or range_missing on every present number; a
-    margin's source."""
+    margin's source; a tipping distance's own labels; the declared limit with
+    its labels; the price range DECLARED."""
     answer = load(ANSWER)
-    numbers = [answer["limit_cost"], answer["tipping_price"]]
-    numbers += [answer["tipping_price"]["up"], answer["tipping_price"]["down"]]
+    tipping = answer["tipping_price"]
+    numbers = [answer["limit_cost"], tipping, tipping["up"], tipping["down"]]
     for option in answer["options"]:
         numbers += option["margin"].values()
         numbers += option["soil_loss"].values()
+        numbers.append(option["limit"]["limit"])
     for item in numbers:
         value = item.get("value", item.get("price", item.get("today")))
         if value is None:
@@ -890,10 +939,22 @@ def test_every_number_of_the_example_carries_its_labels() -> None:
             continue
         assert item["provenance"] in ("DECLARED", "DERIVED")
         assert ("range" in item) != ("range_missing" in item)
+    for point in (tipping["up"], tipping["down"]):
+        if point["distance_percent"] is None:
+            assert "distance_provenance" not in point
+            continue
+        assert point["distance_provenance"] == "DERIVED"
+        assert ("distance_range" in point) != ("distance_range_missing" in point)
     for option in answer["options"]:
+        assert option["limit"]["limit"]["provenance"] == "DECLARED"
         for margin in option["margin"].values():
             if margin["value"] is not None:
                 assert margin["source"] == MARGIN_SOURCE
+    for price_range in (
+        answer["questions"]["soybean_price_range"],
+        tipping["price_range"],
+    ):
+        assert price_range["provenance"] == "DECLARED"
 
 
 def test_retrieved_at_is_written_in_utc_as_api_writes_it() -> None:
@@ -1009,6 +1070,11 @@ AGAINST_REQUEST: list[tuple[str, Mutation, str]] = [
         "answer-tipping-today-labels-not-the-declared-price",
         put(["tipping_price", "provenance"], "OBSERVED"),
         "the provenance and range of the declared soybean price",
+    ),
+    (
+        "answer-limit-labels-not-the-declared-limit",
+        limit_range_missing_not_declared,
+        "judged against the declared limit, with its provenance and range",
     ),
 ]
 

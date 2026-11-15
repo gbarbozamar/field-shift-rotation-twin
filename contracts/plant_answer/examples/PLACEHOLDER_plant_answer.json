@@ -10,7 +10,8 @@
     "soybean_price_range": {
       "low": 200.0,
       "high": 600.0,
-      "unit": "USD t-1"
+      "unit": "USD t-1",
+      "provenance": "DECLARED"
     },
     "margin_of": "average",
     "rain_stress_factor": {
@@ -178,7 +179,15 @@
         }
       },
       "limit": {
-        "limit": 6.0,
+        "limit": {
+          "value": 6.0,
+          "unit": "t ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
         "unit": "t ha-1 yr-1",
         "on_average": {
           "verdict": "does_not_meet",
@@ -369,7 +378,15 @@
         }
       },
       "limit": {
-        "limit": 6.0,
+        "limit": {
+          "value": 6.0,
+          "unit": "t ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
         "unit": "t ha-1 yr-1",
         "on_average": {
           "verdict": "meets",
@@ -546,7 +563,15 @@
         }
       },
       "limit": {
-        "limit": 6.0,
+        "limit": {
+          "value": 6.0,
+          "unit": "t ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
         "unit": "t ha-1 yr-1",
         "on_average": {
           "verdict": "not_resolved",
@@ -607,7 +632,8 @@
     "price_range": {
       "low": 200.0,
       "high": 600.0,
-      "unit": "USD t-1"
+      "unit": "USD t-1",
+      "provenance": "DECLARED"
     },
     "up": {
       "direction": "up",
@@ -630,6 +656,11 @@
       "unit": "USD t-1",
       "provenance": "DERIVED",
       "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: example data, no range is computed for this number"
+      },
+      "distance_provenance": "DERIVED",
+      "distance_range_missing": {
         "reason": "NOT_AVAILABLE",
         "detail": "PLACEHOLDER: example data, no range is computed for this number"
       }

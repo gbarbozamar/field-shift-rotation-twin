@@ -154,16 +154,26 @@ class SiteReference(ContractModel):
 
 
 class PriceRange(ContractModel):
-    """The soybean price range the user declares, ``PriceRange`` of tipping.py."""
+    """The soybean price range the user declares, ``PriceRange`` of tipping.py.
+
+    D249: ``provenance`` labels ``low`` and ``high``, two numbers the user
+    declares, so it is ``DECLARED`` (C4.1), as in ``_declared_value``.
+    """
 
     low: FiniteFloat
     high: FiniteFloat
     unit: NonEmptyStr
+    provenance: Provenance
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
         if self.unit != PRICE_UNIT:
             raise ValueError(f"price range: the unit is {PRICE_UNIT!r} (C1.1)")
+        if self.provenance != DECLARED:
+            raise ValueError(
+                "price range: low and high are declared by the user; the "
+                f"provenance is {DECLARED} (C4.1, D249)"
+            )
         if self.low < 0 or self.high < 0:
             raise ValueError("price range: a price is not negative")
         if not self.low < self.high:
@@ -336,9 +346,14 @@ D148_SOIL_LOSS_LABEL = (
     "loss measured on the La Estanzuela plots in 2017–2019 (Grahmann et al. 2022)"
 )
 D249_LABELS = frozenset({"provenance", "range", "range_missing"})
+# A tipping point holds two numbers: the labels of its price are D249_LABELS,
+# those of its distance_percent these.
+D249_DISTANCE_LABELS = frozenset(
+    {"distance_provenance", "distance_range", "distance_range_missing"}
+)
 # C4.1: a number the answer computes from other values (the margins, the limit
-# cost, the tipping prices) is DERIVED; a soil-loss mean by kind of year is
-# DERIVED by C4.6 and D243 (``PROVENANCE_OF_SOIL_LOSS``).
+# cost, the tipping prices and their distances) is DERIVED; a soil-loss mean by
+# kind of year is DERIVED by C4.6 and D243 (``PROVENANCE_OF_SOIL_LOSS``).
 DERIVED = "DERIVED"
 
 
@@ -534,7 +549,11 @@ def _kinds(kinds: list[str], what: str) -> None:
 class LimitAssessmentOut(ContractModel):
     """``LimitAssessment`` of economics/limit.py."""
 
-    limit: Annotated[FiniteFloat, Field(ge=0)] | None
+    # D249: the declared limit as the whole declared ``Value``, with its
+    # provenance (DECLARED) and its range or range_missing, as
+    # ``RainStressApplied.declared``; not a bare number. Missing: the ``Value``
+    # with its missing part.
+    limit: SoilLossLimit
     unit: NonEmptyStr
     on_average: LimitCheckOut
     every_kind: LimitCheckOut
@@ -572,7 +591,7 @@ class LimitAssessmentOut(ContractModel):
             raise ValueError(
                 "limit: the check of a kind not in the record is not resolved"
             )
-        if self.limit is None and (
+        if self.limit.value is None and (
             self.on_average.verdict != "not_resolved"
             or self.every_kind.verdict != "not_resolved"
             or any(v != "not_resolved" for v in verdict.values())
@@ -661,6 +680,10 @@ class TippingPointOut(ContractModel):
     provenance: Provenance | None = None
     range: Range | None = None
     range_missing: Missing | None = None
+    # D249, of distance_percent (D249_DISTANCE_LABELS)
+    distance_provenance: Provenance | None = None
+    distance_range: Range | None = None
+    distance_range_missing: Missing | None = None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -701,6 +724,14 @@ class TippingPointOut(ContractModel):
             self.range,
             self.range_missing,
             "tipping point",
+            computed_as=DERIVED,
+        )
+        _labels(
+            self.distance_percent,
+            self.distance_provenance,
+            self.distance_range,
+            self.distance_range_missing,
+            "tipping distance",
             computed_as=DERIVED,
         )
         return self
@@ -995,8 +1026,11 @@ class PlantAnswer(ContractModel):
                 "options: the state chosen is on the chosen rotation and on no other"
             )
         strictness = self.questions.strictness
-        limits = {(o.limit.limit, o.limit.unit) for o in self.options}
-        if len(limits) != 1:
+        first = self.options[0].limit
+        if any(
+            (o.limit.limit, o.limit.unit) != (first.limit, first.unit)
+            for o in self.options
+        ):
             raise ValueError("options: every rotation is judged against one limit")
         for option in self.options:
             check = getattr(option.limit, strictness)
@@ -1088,9 +1122,12 @@ def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> 
     given = [option.rotation_id for option in answer.options]
     if given != asked:
         raise ValueError("answer: one option per rotation, in request order")
-    limit = request.soil_loss_limit.value
-    if any(option.limit.limit != limit for option in answer.options):
-        raise ValueError("answer: every option is judged against the declared limit")
+    # D249: the declared limit with its labels, not only its value.
+    if any(option.limit.limit != request.soil_loss_limit for option in answer.options):
+        raise ValueError(
+            "answer: every option is judged against the declared limit, with its "
+            "provenance and range"
+        )
     # PROPOSED (fix round 2): an answer to example data is example data.
     if request.example_data and not answer.example_data:
         raise ValueError("answer: example_data is true when the request's is")
