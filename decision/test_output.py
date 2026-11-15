@@ -322,22 +322,168 @@ def test_only_the_computation_used_to_compare_enters_the_state():
     ]
 
 
-def test_the_counts_of_the_soil_carbon_trend_wait_for_the_key_of_d169():
-    """OPEN until the contract keys a count by carbon model and computation
-    (brief #314): those counts are left out, never added (D169). The other
-    indicators keep their counts."""
+def test_the_counts_of_the_soil_carbon_trend_name_their_model_and_computation():
+    """D169 with the key of #331: one count per pair, scenario, indicator,
+    carbon model and computation, each the one ``pair_counts`` gives, never
+    added across models; the other indicators name neither."""
+    from decision.functions import pair_counts
+
     rows = [
         soil("A", "s", 2001, 5.0, 4.5, 5.5),
         soil("B", "s", 2001, 4.0, 3.5, 4.5),
         carbon("A", "s", "end_minus_start", 0.1, 0.0, 0.2),
         carbon("B", "s", "end_minus_start", 0.9, 0.8, 1.0),
-        carbon("A", "s", "end_minus_start", 0.1, 0.0, 0.2, model="rothc"),
-        carbon("B", "s", "end_minus_start", 0.9, 0.8, 1.0, model="rothc"),
+        carbon("A", "s", "end_minus_start", 0.9, 0.8, 1.0, model="rothc"),
+        carbon("B", "s", "end_minus_start", 0.1, 0.0, 0.2, model="rothc"),
+    ]
+    given = table(rows)
+    document = assemble_decision_output(given, example_data=True)
+    assert sorted(
+        (c.indicator, c.carbon_model or "", c.computation or "")
+        for c in document.pair_cell_counts
+    ) == [
+        ("soil_carbon_trend", "amg", "end_minus_start"),
+        ("soil_carbon_trend", "rothc", "end_minus_start"),
+        ("soil_loss", "", ""),
+    ]
+    expected = {
+        (c.indicator, c.carbon_model, c.computation): c.by_range
+        for c in pair_counts(given, "A", "B", equal_tolerance=0.0)
+    }
+    for count in document.pair_cell_counts:
+        by_range = expected[(count.indicator, count.carbon_model, count.computation)]
+        assert count.by_difference_range.model_dump() == {
+            "strict_improvement": by_range.strict_improvement,
+            "deterioration": by_range.deterioration,
+            "not_separated": by_range.not_separated,
+        }
+    # AMG improves and RothC deteriorates: added, they would read as one
+    # strict improvement and one deterioration in a single count.
+    carbon_counts = {
+        c.carbon_model: c.by_difference_range
+        for c in document.pair_cell_counts
+        if c.indicator == "soil_carbon_trend"
+    }
+    assert carbon_counts["amg"].strict_improvement == 1
+    assert carbon_counts["amg"].deterioration == 0
+    assert carbon_counts["rothc"].deterioration == 1
+    assert carbon_counts["rothc"].strict_improvement == 0
+
+
+def test_a_missing_difference_is_never_written_as_zero():
+    """C3.1, C3.3: a cell with a missing side gives a difference with no value
+    and the reason MISSING_INPUT naming the side, never 0."""
+    given = matrix.thin_matrix()
+    document = assemble_decision_output(given, example_data=True)
+    missing_cells = {
+        (row.rotation_id, row.scenario_id, row.indicator, row.ag_year)
+        for row in given.rows
+        if row.value is None
+    }
+    checked = 0
+    for item in document.paired_differences:
+        first, second = item.pair
+        sides = {
+            (first, item.scenario_id, item.indicator, item.ag_year),
+            (second, item.scenario_id, item.indicator, item.ag_year),
+        }
+        if sides & missing_cells:
+            checked += 1
+            assert item.difference.value is None
+            assert item.difference.missing.reason == "MISSING_INPUT"
+    assert checked > 0
+
+
+def test_the_indicators_not_resolved_are_those_pair_state_names():
+    """D7: the document names the indicators the pairs do not resolve, as
+    ``pair_state`` names them in the order the state was read (here the order
+    of the table: no pair is a robust preference)."""
+    from decision.functions import pair_state
+
+    given = matrix.thin_matrix()
+    document = assemble_decision_output(given, example_data=True)
+    expected = sorted(
+        {
+            name
+            for first, second in (("A", "B"), ("A", "C"), ("B", "C"))
+            for name in pair_state(given, first, second).indicators_not_resolved
+        }
+    )
+    assert expected
+    assert document.state.indicators_not_resolved == expected
+
+
+def _water(rotation, value, low, high):
+    return ResultsTableRow(
+        rotation_id=rotation,
+        scenario_id="s",
+        time_basis="ag_year",
+        ag_year=2001,
+        indicator="water_deficit_exposure",
+        direction="higher_is_better",
+        value=value,
+        unit="dimensionless",
+        range=Range(low=low, high=high, kind=KIND),
+        provenance="SIMULATED",
+        source=SOURCE,
+    )
+
+
+def test_the_indicators_not_resolved_follow_the_order_of_the_rotations():
+    """The documented dependence on the order: soil loss favours B and water
+    favours A, so each order names the indicator on which its second rotation
+    is worse. The state is the same in both orders."""
+    rows = [
+        soil("A", "s", 2001, 9.0, 8.5, 9.5),
+        soil("B", "s", 2001, 2.0, 1.5, 2.5),
+        _water("A", 0.9, 0.85, 0.95),
+        _water("B", 0.5, 0.45, 0.55),
+    ]
+    forward = assemble_decision_output(table(rows), example_data=True)
+    backward = assemble_decision_output(
+        table([rows[1], rows[0], rows[3], rows[2]]), example_data=True
+    )
+    assert forward.pair_states[0].value == backward.pair_states[0].value
+    assert forward.state.indicators_not_resolved == ["water_deficit_exposure"]
+    assert backward.state.indicators_not_resolved == ["soil_loss"]
+
+
+def _missing_carbon(rotation, computation):
+    return ResultsTableRow(
+        rotation_id=rotation,
+        scenario_id="s",
+        time_basis="rotation",
+        indicator="soil_carbon_trend",
+        direction="higher_is_better",
+        value=None,
+        unit="t C ha-1 yr-1",
+        missing={"reason": "MISSING_INPUT", "detail": "PLACEHOLDER"},
+        carbon_model="amg",
+        computation=computation,
+    )
+
+
+def test_only_a_computation_that_does_not_enter_the_state_gives_no_state():
+    """D173 and D85: with values only in ``fitted_slope`` the pair has no
+    state, and the reason says so, not that no difference holds a value; those
+    differences and their counts are still in the document."""
+    rows = [
+        _missing_carbon("A", "end_minus_start"),
+        _missing_carbon("B", "end_minus_start"),
+        carbon("A", "s", "fitted_slope", 0.1, 0.0, 0.2),
+        carbon("B", "s", "fitted_slope", 0.9, 0.8, 1.0),
     ]
     document = assemble_decision_output(table(rows), example_data=True)
-    assert {c.indicator for c in document.pair_cell_counts} == {"soil_loss"}
-    assert sorted(
-        (d.carbon_model, d.computation)
-        for d in document.paired_differences
-        if d.indicator == "soil_carbon_trend"
-    ) == [("amg", "end_minus_start"), ("rothc", "end_minus_start")]
+    (state,) = document.pair_states
+    assert state.value is None
+    assert "D173" in state.missing.detail
+    assert "no paired difference of the pair holds a value" not in state.missing.detail
+    assert state.coverage.cells_compared == 1
+    computed = [
+        d for d in document.paired_differences if d.difference.value is not None
+    ]
+    assert [d.computation for d in computed] == ["fitted_slope"]
+    assert {(c.carbon_model, c.computation) for c in document.pair_cell_counts} == {
+        ("amg", "end_minus_start"),
+        ("amg", "fitted_slope"),
+    }

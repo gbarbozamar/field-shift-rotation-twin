@@ -39,15 +39,12 @@ and no uncertain input declared (what the route has today):
 - ``equal_tolerances``: every indicator, missing ``NOT_DECLARED`` (D87: set
   by the designer of the case; none is declared). So every count by the sign
   of the point value is missing with that reason (D87, C3.1).
-- ``pair_cell_counts``: ``pair_counts`` (D87, D99, D169); the count by range
-  of D99 is given, the count by sign is missing (above). **OPEN, the counts of
-  ``soil_carbon_trend``:** ``pair_counts`` gives one count per carbon model and
-  computation (D169), and the contract keys a count by pair, scenario and
-  indicator only, with no field for the model or the computation. Those
-  counts are left out until the contract carries the key of D169 (brief
-  #314), never added across models or computations (D169) and never
-  given without the model they belong to. The paired differences of the
-  soil carbon trend, each naming its model and computation, are all there.
+- ``pair_cell_counts``: ``pair_counts`` (D87, D99, D169), one count per pair,
+  scenario, indicator, carbon model and computation, each naming its
+  ``carbon_model`` and ``computation`` (``None`` for the indicators that name
+  neither; the key of D169 in the contract, #331). Counts of different models
+  or computations are never added (D169). The count by range of D99 is given,
+  the count by sign is missing (above).
 - ``pair_states``: one state per pair (below), with the coverage "k of N" of
   ``dominance`` (D91, D156) and the reason of D86.
 - ``state``: null with its reason (OPEN 5 of the README: no decision says
@@ -71,6 +68,23 @@ state does not depend on which rotation comes first. The state of each
 scenario (``PairState.by_scenario``) is shown in the reasons of the document
 (D152: "The conditions that did not give the state are still shown"); the
 contract has no field for it (OPEN 5 of its README).
+
+**The indicators not resolved do depend on the order, and this module keeps
+``pair_state``'s list as it is.** ``pair_state`` names an indicator with a
+cell that blocks a robust preference of its second rotation (D165), and a
+cell that deteriorates in one order is a strict improvement in the other. The
+list is the one of the order the state was read in: the robust order when the
+pair is a robust preference (an empty list), otherwise the order of the
+rotations in the table, which is the order of the request. Choosing a list
+that does not depend on the order (the indicators that block in both orders,
+or in either) would be a rule of the state, so it is left to
+``decision/functions.py`` (OPEN for sub-lane L2b); the reason texts of the
+document name the pair in the order read.
+
+**A pair not evaluated** (no state, D85, D151) says why: either no paired
+difference holds a value, or the only ones that do are of computations of
+the soil carbon trend that do not enter the state (D173); those are still in
+``paired_differences`` and in the counts.
 
 Pure: no network, no file access, no clock.
 """
@@ -136,6 +150,13 @@ NOT_EVALUATED = (
     "no paired difference of the pair holds a value: the pair is not evaluated "
     "and has no state (D85, D151)"
 )
+NOT_EVALUATED_BY_THE_COMPUTATION = (
+    "no paired difference that enters the state holds a value: the only ones "
+    "that do are of computations of the soil carbon trend that do not enter it "
+    "(D173: only the computation used to compare rotations does, end_minus_start "
+    "when the user has not chosen); the pair is not evaluated and has no state "
+    "(D85, D151)"
+)
 NO_REASON_OF_D86 = (
     "D86 writes no reason for the state 'Not separated: within uncertainty' (D97) "
     "and no reason code is decided for it (contracts/decision_output/README.md, K3)"
@@ -193,10 +214,15 @@ def _pair_state(
         for scenario, value in read.by_scenario
     ]
     if read.state is None:
+        detail = (
+            NOT_EVALUATED
+            if coverage.cells_compared == 0
+            else NOT_EVALUATED_BY_THE_COMPUTATION
+        )
         state = PairState(
             pair=pair,
             value=None,
-            missing=Missing(reason="NOT_AVAILABLE", detail=NOT_EVALUATED),
+            missing=Missing(reason="NOT_AVAILABLE", detail=detail),
             coverage=coverage,
         )
         return state, (), texts
@@ -382,14 +408,14 @@ def assemble_decision_output(
         # The tolerance only matters for the count by sign, which is not
         # given without a declared tolerance.
         for count in pair_counts(table, first, second, equal_tolerance=0.0):
-            if count.carbon_model is not None or count.computation is not None:
-                # OPEN until the contract carries the key of D169 (brief #314).
-                continue
             cell_counts.append(
                 PairCellCount(
                     pair=[first, second],
                     scenario_id=count.scenario_id,
                     indicator=count.indicator,
+                    # D169: the key of a count names its model and computation.
+                    carbon_model=count.carbon_model,
+                    computation=count.computation,
                     by_difference_range=CountByDifferenceRange(
                         strict_improvement=count.by_range.strict_improvement,
                         deterioration=count.by_range.deterioration,
