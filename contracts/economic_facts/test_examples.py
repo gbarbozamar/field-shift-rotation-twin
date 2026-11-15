@@ -194,6 +194,11 @@ INVALID: list[tuple[str, Mutation, str]] = [
         f"{AT_MARGIN}.yield",
     ),
     (
+        "declared-margin-crop-with-a-cost",
+        put([*MARGIN, "cost"], a_value("USD ha-1")),
+        f"{AT_MARGIN}.cost",
+    ),
+    (
         "cover-with-a-price",
         put([*COVER, "price"], a_value("USD t-1")),
         f"{AT_COVER}.price",

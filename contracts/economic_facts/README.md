@@ -131,6 +131,7 @@ Every case below is a change to the example, made in memory. The invalid ones mu
 | `grain-with-a-declared-margin` | The grain crop carries a `declared_margin` |
 | `declared-margin-crop-with-a-price` | The pasture carries a `price` |
 | `declared-margin-crop-with-a-yield` | The pasture carries a `yield` |
+| `declared-margin-crop-with-a-cost` | The pasture carries a `cost`: its margin is read as net of cost (OPEN, question 5) |
 | `cover-with-a-price` | The cover crop carries a `price` |
 | `cover-with-a-yield` | The cover crop carries a `yield` |
 | `cover-with-a-declared-margin` | The cover crop carries a `declared_margin` |
