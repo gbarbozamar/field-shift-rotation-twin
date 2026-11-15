@@ -167,13 +167,16 @@ function Tile({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function TileNumber({ item }: { item: Measured }) {
+function TileNumber({ item, mark = null }: { item: Measured; mark?: string | null }) {
   if (item.value === null) {
     return <p className="font-fs-heading text-xl font-bold italic opacity-70">{strings['plant.table.no_value']}</p>
   }
   return (
     <p className="tabular-nums" title={String(item.value)}>
-      <span className="font-fs-heading text-3xl font-extrabold leading-none">{displayNumber(item.value)}</span>{' '}
+      <span className="font-fs-heading text-3xl font-extrabold leading-none">{displayNumber(item.value)}</span>
+      {mark !== null ? (
+        <sup className="ml-0.5 font-mono text-[10px] opacity-80">{mark}</sup>
+      ) : null}{' '}
       <span className="text-xs opacity-70">{item.unit}</span>
     </p>
   )
@@ -190,6 +193,7 @@ export function AnswerBanner({
   label,
   showWhy,
   against = null,
+  marks,
 }: {
   answer: PlantAnswer
   label: string | null
@@ -197,6 +201,8 @@ export function AnswerBanner({
   showWhy: boolean
   /** How the board names the rotation the cost is measured against; its id when not given. */
   against?: string | null
+  /** The marks of the notes the margin and the soil loss carry, as the table names them. */
+  marks: { margin: string; soil: string }
 }) {
   const chosen = answer.options.find((option) => option.rotation_id === answer.chosen) ?? null
   const cost = answer.limit_cost
@@ -218,10 +224,10 @@ export function AnswerBanner({
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <Tile label={formatString(strings['plant.margin_of'], { kind: strings[`plant.kind.${answer.margin_of}`] })}>
-              <TileNumber item={chosen.margin[answer.margin_of]} />
+              <TileNumber item={chosen.margin[answer.margin_of]} mark={marks.margin} />
             </Tile>
-            <Tile label={strings['plant.table.soil_loss']}>
-              <TileNumber item={chosen.soil_loss[answer.margin_of]} />
+            <Tile label={formatString(strings['plant.soil_loss_of'], { kind: strings[`plant.kind.${answer.margin_of}`] })}>
+              <TileNumber item={chosen.soil_loss[answer.margin_of]} mark={marks.soil} />
               {chosen.limit !== null ? (
                 <p data-testid="board-limit" className="text-xs opacity-80">
                   {formatString(strings['board.limit_is'], {
@@ -488,12 +494,11 @@ export function RainEcho({ part }: { part: RainStressPart }) {
 }
 
 /**
- * The limits of the answer, as it declares them (D250), and the label every
- * soil-loss figure shown carries (D148).
+ * The limits of the answer, as it declares them (D250). The label of the
+ * soil-loss figures (D148) is with the notes of the table, beside its mark.
  */
 export function AnswerLimits({ answer }: { answer: PlantAnswer }) {
-  const showsSoilLoss = answer.options.some((option) => option.soil_loss[answer.margin_of].value !== null)
-  if (answer.declared_limits.length === 0 && !showsSoilLoss) {
+  if (answer.declared_limits.length === 0) {
     return null
   }
   return (
@@ -505,9 +510,6 @@ export function AnswerLimits({ answer }: { answer: PlantAnswer }) {
             {formatString(strings['plant.declared_limit'], { limit })}
           </li>
         ))}
-        {showsSoilLoss ? (
-          <li data-testid="board-soil-label">{strings['soil_loss.headline_label']}</li>
-        ) : null}
       </ul>
     </section>
   )

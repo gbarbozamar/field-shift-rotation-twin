@@ -3,7 +3,7 @@ import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { barPercent, drawnSoilVerdict, stateTone, verdictTone } from '../plant/optionBars'
 import { RotationTimeline, StatePill } from '../plant/PlantVisuals'
-import { KINDS_OF_YEAR } from '../plant/plantData'
+import { KINDS_OF_YEAR, MARGINS_OF } from '../plant/plantData'
 import type { Measured, PlantAnswer, PlantOption } from '../plant/plantData'
 import { cropOrder } from '../plant/rotationStrip'
 import type { RotationStrip } from '../plant/rotationStrip'
@@ -71,7 +71,9 @@ export function orderNote(columns: BoardColumn[], sort: SortKey): string | null 
   if (unplaced === columns.length) {
     return strings[sort === 'rule' ? 'board.sort.none_rule' : 'board.sort.none']
   }
-  return formatString(strings[sort === 'rule' ? 'board.sort.some_rule' : 'board.sort.some'], { n: unplaced })
+  // Under the rule, options outside the limit have no place by design: their
+  // state already says why, so no note is added.
+  return sort === 'rule' ? null : formatString(strings['board.sort.some'], { n: unplaced })
 }
 
 /** True when a crop of the rotation is a placeholder of the example data. */
@@ -112,17 +114,80 @@ function Missing({ item }: { item: Measured }) {
   )
 }
 
-/** A number of the table: its unit is said once, in the head of its row. */
-function Number({ item }: { item: Measured }) {
+/** The mark of the note a number carries: its label, its source and its range are said once, under the table. */
+export const SOIL_MARK = '1'
+export const MARGIN_MARK = '2'
+
+function Mark({ mark }: { mark: string }) {
+  return (
+    <sup data-testid="board-mark" className="ml-0.5 font-mono text-[10px] font-normal text-fs-muted">
+      {mark}
+    </sup>
+  )
+}
+
+/**
+ * A number of the table: its unit is said once, in the head of its row, and
+ * its mark points at its note. Its range, when the answer carries one, is
+ * shown under it.
+ */
+function Number({ item, mark }: { item: Measured; mark: string }) {
   if (item.value === null) {
     return (
       <Missing item={item} />
     )
   }
   return (
-    <span className="font-fs-heading text-xl font-extrabold tabular-nums" title={String(item.value)}>
-      {displayNumber(item.value)}
+    <span className="tabular-nums" title={String(item.value)}>
+      <span className="font-fs-heading text-xl font-extrabold">{displayNumber(item.value)}</span>
+      <Mark mark={mark} />
+      {item.labels.range !== null ? (
+        <span data-testid="board-range" className="block text-[11px] text-fs-muted">
+          {formatString(strings['value.range'], {
+            low: displayNumber(item.labels.range.low),
+            high: displayNumber(item.labels.range.high),
+            kind: item.labels.range.kind,
+          })}
+        </span>
+      ) : null}
     </span>
+  )
+}
+
+/**
+ * The one value a row holds when every option has the same: the same number,
+ * or the same missing value with the same reason. Null when the options
+ * differ, or there is a single option. Equality of values the answer
+ * carries; nothing is computed.
+ */
+export function uniformItem(items: Measured[]): Measured | null {
+  if (items.length < 2) {
+    return null
+  }
+  const [first, ...rest] = items
+  const same = rest.every((item) =>
+    first.value !== null
+      ? item.value === first.value
+      : item.value === null && JSON.stringify(item.missing) === JSON.stringify(first.missing),
+  )
+  return same ? first : null
+}
+
+/** A row that holds one value for every option: said once, across the columns. */
+function MergedCell({ item, mark, span }: { item: Measured; mark: string; span: number }) {
+  const text =
+    item.missing !== null ? missingPatternText(strings['plant.table.no_value'], item.missing) : null
+  return (
+    <td data-testid="board-merged" colSpan={span} className="border-l border-fs-border px-4 py-3 align-top">
+      <span className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.same_for_all']}</span>
+      {text !== null ? (
+        <span className="block text-sm italic text-fs-muted">{text}</span>
+      ) : (
+        <span className="block">
+          <Number item={item} mark={mark} />
+        </span>
+      )}
+    </td>
   )
 }
 
@@ -173,6 +238,7 @@ function Row({
   selected = false,
   columns,
   cell,
+  merged = null,
 }: {
   label: string
   /** What is said once for the whole row: its unit, the limit it is read against. */
@@ -181,6 +247,8 @@ function Row({
   selected?: boolean
   columns: BoardColumn[]
   cell: (option: PlantOption) => ReactNode
+  /** Given when every option holds the same value: one cell across the columns, in place of theirs. */
+  merged?: ReactNode
 }) {
   return (
     <tr data-selected={String(selected)} className="border-t border-fs-border data-[selected=true]:font-semibold">
@@ -190,15 +258,17 @@ function Row({
           <span className="mt-0.5 block font-normal normal-case tracking-normal">{note}</span>
         ) : null}
       </th>
-      {columns.map(({ option }) => (
-        <td
-          key={option.rotation_id}
-          data-tone={stateTone(option.state)}
-          className="border-l border-fs-border px-4 py-3 align-top data-[tone=chosen]:bg-fs-selection"
-        >
-          {cell(option)}
-        </td>
-      ))}
+      {merged !== null
+        ? merged
+        : columns.map(({ option }) => (
+            <td
+              key={option.rotation_id}
+              data-tone={stateTone(option.state)}
+              className="border-l border-fs-border px-4 py-3 align-top data-[tone=chosen]:bg-fs-selection"
+            >
+              {cell(option)}
+            </td>
+          ))}
     </tr>
   )
 }
@@ -238,6 +308,7 @@ function KindCell({
           title={String(loss.value)}
         >
           {formatString(strings['board.kind.soil'], { value: displayNumber(loss.value) })}
+          <Mark mark={SOIL_MARK} />
           {tone === 'over' ? (
             <span className="ml-1 uppercase">{strings['plant.table.over_limit']}</span>
           ) : null}
@@ -282,6 +353,8 @@ export function CompareTable({
   const soilUnit = first.soil_loss[kind].unit
   const limited = answer.options.find((option) => option.limit !== null)
   const limit = limited !== undefined ? { value: limited.limit!, unit: limited.limit_unit } : null
+  const sameMargin = uniformItem(columns.map((column) => column.option.margin[kind]))
+  const sameSoil = uniformItem(columns.map((column) => column.option.soil_loss[kind]))
   return (
     <div className="overflow-x-auto rounded-2xl border border-fs-border bg-fs-surface">
       <table
@@ -365,9 +438,14 @@ export function CompareTable({
             label={formatString(strings['plant.margin_of'], { kind: strings[`plant.kind.${kind}`] })}
             note={marginUnit}
             columns={columns}
+            merged={
+              sameMargin !== null ? (
+                <MergedCell item={sameMargin} mark={MARGIN_MARK} span={columns.length} />
+              ) : null
+            }
             cell={(option) => (
               <div>
-                <Number item={option.margin[kind]} />
+                <Number item={option.margin[kind]} mark={MARGIN_MARK} />
                 <Bar testid="board-bar-margin" item={option.margin[kind]} scale={scales.margin} tone="chosen" />
               </div>
             )}
@@ -385,9 +463,14 @@ export function CompareTable({
               </>
             }
             columns={columns}
+            merged={
+              sameSoil !== null ? (
+                <MergedCell item={sameSoil} mark={SOIL_MARK} span={columns.length} />
+              ) : null
+            }
             cell={(option) => (
               <div>
-                <Number item={option.soil_loss[kind]} />
+                <Number item={option.soil_loss[kind]} mark={SOIL_MARK} />
                 <Bar
                   testid="board-bar-soil"
                   item={option.soil_loss[kind]}
@@ -413,5 +496,66 @@ export function CompareTable({
         </tbody>
       </table>
     </div>
+  )
+}
+
+/** The first number present among these, or null when none is. */
+function firstPresent(items: Measured[]): Extract<Measured, { value: number }> | null {
+  for (const item of items) {
+    if (item.value !== null) return item
+  }
+  return null
+}
+
+/**
+ * The notes of the numbers of the table, said once: what every soil-loss
+ * figure carries (its label of D148, its sources or the assumption mark) and
+ * where the margins come from; and, when a number has no range, the reason
+ * the answer gives. Shown only for the kinds of number the table holds.
+ */
+export function TableNotes({ answer }: { answer: PlantAnswer }) {
+  const kinds = MARGINS_OF
+  const soil = answer.options.flatMap((option) => kinds.map((kind) => option.soil_loss[kind]))
+  const margins = answer.options.flatMap((option) => kinds.map((kind) => option.margin[kind]))
+  const soilShown = soil.filter((item) => item.value !== null)
+  const marginShown = firstPresent(margins)
+  if (soilShown.length === 0 && marginShown === null) {
+    return null
+  }
+  const sources = [...new Set(soilShown.flatMap((item) => item.sources))]
+  const soilFirst = firstPresent(soilShown)
+  return (
+    <ol data-testid="board-notes" className="mt-3 space-y-1.5 text-xs text-fs-muted">
+      {soilFirst !== null ? (
+        <li data-testid="board-note-soil">
+          <span className="font-mono font-semibold text-fs-text">{SOIL_MARK}</span>{' '}
+          <span className="font-semibold text-fs-text">{strings['plant.table.soil_loss']}.</span>{' '}
+          <span data-testid="board-soil-label">{strings['soil_loss.headline_label']}</span>{' '}
+          {sources.length !== 0 ? (
+            <span>{formatString(strings['value.source'], { source: sources.join('; ') })}. </span>
+          ) : null}
+          {soilShown.some((item) => item.assumption) ? (
+            <span>{strings['assumption.mark']}. </span>
+          ) : null}
+          {soilFirst.labels.range === null && soilFirst.labels.range_missing !== null ? (
+            <span data-testid="board-no-range">
+              {missingPatternText(strings['board.no_range'], soilFirst.labels.range_missing)}
+            </span>
+          ) : null}
+        </li>
+      ) : null}
+      {marginShown !== null ? (
+        <li data-testid="board-note-margin">
+          <span className="font-mono font-semibold text-fs-text">{MARGIN_MARK}</span>{' '}
+          <span className="font-semibold text-fs-text">{strings['plant.table.margin']}.</span>{' '}
+          <span>{formatString(strings['value.source'], { source: strings['plant.source.economics'] })}. </span>
+          {marginShown.labels.range === null && marginShown.labels.range_missing !== null ? (
+            <span data-testid="board-no-range">
+              {missingPatternText(strings['board.no_range'], marginShown.labels.range_missing)}
+            </span>
+          ) : null}
+        </li>
+      ) : null}
+    </ol>
   )
 }

@@ -12,7 +12,7 @@ import type { ServicePhase } from '../plant/PlantScreen'
 import { buildRotationStrip, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
 import { SORT_KEYS, answerChanges, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
-import { CompareTable, cropsText, orderNote } from './CompareTable'
+import { CompareTable, cropsText, orderNote, uniformItem } from './CompareTable'
 import { BoardView, initialBoardState } from './BoardScreen'
 
 /**
@@ -417,13 +417,75 @@ describe('quantities and required labels (5)', () => {
     )
   })
 
-  it('shows every limit the answer declares (D250) and the label of the soil-loss figures (D148)', () => {
+  it('shows every limit the answer declares (D250)', () => {
     const limits = after(html, 'board-limits').split('</section>')[0]
     expect(count(limits, 'data-testid="board-declared-limit"')).toBe(rawExample.declared_limits.length)
     for (const limit of rawExample.declared_limits) {
       expect(visibleText(`<${limits}`)).toContain(formatString(strings['plant.declared_limit'], { limit }))
     }
-    expect(decode(after(limits, 'board-soil-label').split('</li>')[0])).toBe(`>${strings['soil_loss.headline_label']}`)
+  })
+
+  it('every soil-loss figure carries the mark of its note, and the note says the label of D148 and its sources', () => {
+    const table = after(html, 'board-compare').split('</table>')[0]
+    const shown = example.options.flatMap((o) =>
+      (['el_nino', 'neutral', 'la_nina'] as const).filter((kind) => o.soil_loss[kind].value !== null),
+    ).length
+    const main = example.options.filter((o) => o.soil_loss[example.margin_of].value !== null).length
+    const margins = example.options.filter((o) => o.margin[example.margin_of].value !== null).length
+    expect(count(table, 'data-testid="board-mark"')).toBe(shown + main + margins)
+    const note = after(html, 'board-note-soil').split('</li>')[0]
+    expect(decode(after(note, 'board-soil-label').split('</span>')[0])).toBe(`>${strings['soil_loss.headline_label']}`)
+    for (const source of new Set(example.options.flatMap((o) => o.soil_loss[example.margin_of].sources))) {
+      expect(decode(note)).toContain(source)
+    }
+    expect(decode(after(html, 'board-note-margin').split('</li>')[0])).toContain(strings['plant.source.economics'])
+  })
+
+  it('a number without a range says why, once, in its note', () => {
+    const missing = example.options[0].margin[example.margin_of].labels!.range_missing!
+    expect(decode(after(html, 'board-note-margin').split('</li>')[0])).toContain(
+      missingPatternText(strings['board.no_range'], missing),
+    )
+    expect(count(html, 'data-testid="board-range"')).toBe(0)
+  })
+
+  it('a range the answer carries is shown under its number', () => {
+    const kind = example.margin_of
+    const first = example.options[0]
+    const item = first.margin[kind]
+    const ranged: PlantAnswer = {
+      ...example,
+      options: [
+        {
+          ...first,
+          margin: {
+            ...first.margin,
+            [kind]: { ...item, labels: { ...item.labels!, range: { low: 1.5, high: 9.5, kind: 'RANGE_KIND_MARKER' }, range_missing: null } },
+          },
+        },
+        ...example.options.slice(1),
+      ],
+    }
+    const rendered = view(FIELD, answered(ranged))
+    expect(count(rendered, 'data-testid="board-range"')).toBe(1)
+    expect(decode(after(rendered, 'board-range').split('</span>')[0])).toContain(
+      formatString(strings['value.range'], { low: displayNumber(1.5), high: displayNumber(9.5), kind: 'RANGE_KIND_MARKER' }),
+    )
+  })
+
+  it('a row where every option holds the same value is said once, across the columns', () => {
+    const kind = example.margin_of
+    const one = example.options[0].soil_loss[kind]
+    const same: PlantAnswer = {
+      ...example,
+      options: example.options.map((option) => ({ ...option, soil_loss: { ...option.soil_loss, [kind]: one } })),
+    }
+    const rendered = view(FIELD, answered(same))
+    expect(count(rendered, 'data-testid="board-merged"')).toBe(1)
+    expect(count(rendered, 'data-testid="board-bar-soil"')).toBe(0)
+    expect(visibleText(after(rendered, 'board-merged').split('</td>')[0])).toContain(strings['board.same_for_all'])
+    expect(count(view(FIELD, answered(example)), 'data-testid="board-merged"')).toBe(0)
+    expect(uniformItem([one])).toBeNull()
   })
 
   it('a missing number says why, not only "no value"', () => {
@@ -673,6 +735,7 @@ describe('names, the order note and a board that does not blank (10)', () => {
     expect(orderNote(columns('margin'), 'margin')).toBeNull()
     expect(orderNote(columns('yours'), 'yours')).toBeNull()
     expect(orderNote(columns('rule', open), 'rule')).toBe(strings['board.sort.none_rule'])
+    expect(orderNote(columns('rule'), 'rule')).toBeNull()
     const unplaced = columns('soil').filter((c) => c.position === null).length
     expect(unplaced).toBeGreaterThan(0)
     expect(orderNote(columns('soil'), 'soil')).toBe(formatString(strings['board.sort.some'], { n: unplaced }))

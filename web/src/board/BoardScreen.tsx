@@ -35,7 +35,7 @@ import {
   RainEcho,
   RecordRibbon,
 } from './BoardParts'
-import { CompareTable, SortPicker, optionTitle, orderNote } from './CompareTable'
+import { CompareTable, MARGIN_MARK, SOIL_MARK, SortPicker, TableNotes, optionTitle, orderNote } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
 import { exampleRotations, normalizeDraft } from './rotationDraft'
@@ -204,6 +204,7 @@ function Answered({
           label={chosen !== null ? nameOf(chosen.rotation_id) : null}
           showWhy={!lacksSources}
           against={againstText}
+          marks={{ margin: MARGIN_MARK, soil: SOIL_MARK }}
         />
         {previous !== null ? (
           <ChangesNote changes={answerChanges(previous, answer)} nameOf={nameOf} />
@@ -233,6 +234,7 @@ function Answered({
             </span>
           ) : null}
         </div>
+        <TableNotes answer={answer} />
       </div>
       <div>
         <StepTitle n={firstStep + 1} title={strings['board.step.holds']} />
