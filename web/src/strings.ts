@@ -23,6 +23,10 @@
  * - site.*       the site sheet of the selected field (climate monthly series,
  *                soil and slope), wording addendum Block 3
  * - ribbon.*     the rotation timeline of the selected field
+ * - clocks.*     the two clocks of a rotation of the results example (soil
+ *                clock, water clock, year columns), Block 2 addendum
+ * - cards.*      the results cards (title, rotation heading, availability
+ *                heading, carbon model and computation labels)
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -70,6 +74,11 @@ export const strings = {
   'entry.title': 'Case',
   'entry.open_field': 'Open field',
   'entry.fields_count': '{n} fields',
+  'cards.title': 'Results',
+  'cards.per_rotation': 'Rotation {id}',
+  'cards.availability': 'Availability',
+  'cards.model_label': 'Model: {model}',
+  'cards.computation_label': 'Computation: {computation}',
   'identity.title': 'Fields',
   'identity.case_label': 'Case',
   'identity.banner_title': 'Example data',
@@ -102,6 +111,11 @@ export const strings = {
   'ribbon.mgmt_residue': 'Residue',
   'ribbon.mgmt_grazing': 'Grazing',
   'ribbon.mgmt_termination': 'Termination',
+  'clocks.title': 'Two clocks',
+  'clocks.soil': 'The soil clock',
+  'clocks.water': 'The water clock',
+  'clocks.years_hint': 'Each column is one agricultural year',
+  'clocks.example_note': 'Example data — real years arrive with the seam',
 } as const
 
 /**

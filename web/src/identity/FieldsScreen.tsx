@@ -4,6 +4,8 @@ import FieldsMap from '../map/FieldsMap'
 import SiteSheet from '../site/SiteSheet'
 import { RotationRibbon } from '../rotation/RotationRibbon'
 import { exampleRotation } from '../rotation/exampleRotation'
+import ClocksScreen from '../clocks/ClocksScreen'
+import ResultCards from '../results/ResultCards'
 import { strings } from '../strings'
 
 /**
@@ -14,6 +16,17 @@ import { strings } from '../strings'
  * rotation belongs to that field. The list, the map and the sheet share the
  * selected-field state through the selection module.
 >>>>>>> 2af2064 (web: rotation ribbon, display-only timeline of the contract example)
+ * every render, the map of the fields and the field list below it, and the
+ * site sheet of the selected field after the list. The list, the map and the
+ * sheet share the selected-field state through the selection module, so a
+ * click on either selects the field on all three.
+ * two clocks of the results example after the list, under their own example
+ * banner. The list and the map share the selected-field state through the
+ * selection module, so a click on either selects the field on both.
+ * every render, the map of the fields and the field list below it, and the
+ * result cards of the results example after the list. The list and the map
+ * share the selected-field state through the selection module, so a click on
+ * either selects the field on both.
  */
 export default function FieldsScreen() {
   const selectedFieldId = useSelectedFieldId()
@@ -93,6 +106,9 @@ export default function FieldsScreen() {
           <RotationRibbon rotation={exampleRotation} />
         </div>
       )}
+      {selectedFieldId !== null && <ClocksScreen />}
+
+      {selectedFieldId !== null && <ResultCards />}
 
       <p aria-live="polite" className="sr-only">
         {selectedField ? `${strings['identity.selected']}: ${selectedField.name}` : ''}

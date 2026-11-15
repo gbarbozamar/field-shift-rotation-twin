@@ -104,11 +104,21 @@ const WORDING_SHEET: Record<string, string> = {
   'ribbon.mgmt_residue': 'Residue',
   'ribbon.mgmt_grazing': 'Grazing',
   'ribbon.mgmt_termination': 'Termination',
+  'clocks.title': 'Two clocks',
+  'clocks.soil': 'The soil clock',
+  'clocks.water': 'The water clock',
+  'clocks.years_hint': 'Each column is one agricultural year',
+  'clocks.example_note': 'Example data — real years arrive with the seam',
   'common.loading': 'Loading…',
   'common.error': 'Something failed. Nothing was invented to fill in.',
   'entry.title': 'Case',
   'entry.open_field': 'Open field',
   'entry.fields_count': '{n} fields',
+  'cards.title': 'Results',
+  'cards.per_rotation': 'Rotation {id}',
+  'cards.availability': 'Availability',
+  'cards.model_label': 'Model: {model}',
+  'cards.computation_label': 'Computation: {computation}',
 }
 
 /** Source of the shell page as it was before the strings unit. */
