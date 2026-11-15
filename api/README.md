@@ -216,8 +216,10 @@ to `main` redeploys the service before CI ends, so nothing of `decision/` (nor
 only `api.decisions`, `api.results_table` and `api.decision_layer` to what it
 imports.
 
-- Not found: `200`, `decision` null, `decision_missing` `NOT_AVAILABLE`
-  naming the function.
+- The function is in `decision/output.py` (PROPOSED, unit
+  `l2/decision-assembly-d198`, brief #315), so the route serves a document.
+  Not found (a tree without it): `200`, `decision` null, `decision_missing`
+  `NOT_AVAILABLE` naming the function.
 - What it returns is checked by the route itself (`check_document`), whatever
   the implementation: a `DecisionOutput`, validated again, of the case and
   field of the table, with its rotations and scenarios, and the example mark
@@ -418,7 +420,7 @@ implementations; `None` means the default.
 | `SoilSlopeSource` | `adapters/ports.py` (re-exported by `api/ports.py`) | Stand-in `SoilSlopeNotLoaded` | `data=None`, `unavailable`, `NOT_AVAILABLE` | `adapters.example_soil_slope.ExampleSoilSlopeSource(path)` is wired by `SOIL_SLOPE_EXAMPLE_FILE` and serves the example for any field (D38); `adapters.soil_tables.SoilTableSource(table_paths, groups_path)` is wired by `SOIL_TABLE_FILES` and `SOIL_GROUPS_FILE` (soil by soil group, D48, D49; slope not built). Then slope from an elevation model (D48) |
 | `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; a soil-loss or water engine that is not found gives its part in the not-built form (D12) | Nothing in `api/`: each engine is picked up when its lane lands it |
 | `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
-| `DecisionLayer` (PROPOSED) | `api/ports.py` | `DiscoveredDecisionLayer()` (`api/decision_layer.py`) | Looks `decision.output.assemble_decision_output` up on each request, calls it and checks what it returns; when it is absent or fails, a typed absence, `NOT_AVAILABLE` | The function, in sub-lane L2b (`decision/`) |
+| `DecisionLayer` (PROPOSED) | `api/ports.py` | `DiscoveredDecisionLayer()` (`api/decision_layer.py`) | Looks `decision.output.assemble_decision_output` up on each request, calls it and checks what it returns; when it is absent or fails, a typed absence, `NOT_AVAILABLE` | Built in sub-lane L2b: `decision/output.py` (PROPOSED). Its counts of `soil_carbon_trend` wait for the key of D169 in the contract (#314) |
 
 The engine stand-in `EnginesNotBuilt` and the validator stand-in
 `AcceptAnyRotation` are **removed**: no test needs them. The runner reports an

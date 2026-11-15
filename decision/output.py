@@ -5,12 +5,14 @@
 assembled only in ``demo/run.py``, for the thin matrix of #240. This module
 assembles it for any ``ResultsTable``, from the functions of
 ``decision/functions.py``, so that the platform's route
-``POST /api/decisions/run`` (``api/decisions.py``) can serve it: the route
-finds ``assemble_decision_output`` by name and never imports it.
+``POST /api/decisions/run`` (``api/decisions.py``, D198) can serve it: the
+route finds ``assemble_decision_output`` by name and never imports it.
 
 **PROPOSED by an AI session working for the lead developer (D159, D161 of
-#77), for the interface developer to accept, change or replace: this is his
-sub-lane.** Every choice below is marked; none adds a rule of the science.
+#77; brief #315), for the interface developer to accept, change or replace:
+this is his sub-lane.** Every choice below is marked; none adds a rule of the
+science. Every rule of the state, the counts and the coverage is
+``decision/functions.py``'s, as #309 brought it to D165 to D176.
 
 What the document holds, for a table with no limit, no tolerance of "equal"
 and no uncertain input declared (what the route has today):
@@ -37,10 +39,17 @@ and no uncertain input declared (what the route has today):
 - ``equal_tolerances``: every indicator, missing ``NOT_DECLARED`` (D87: set
   by the designer of the case; none is declared). So every count by the sign
   of the point value is missing with that reason (D87, C3.1).
-- ``pair_cell_counts``: ``pair_counts`` by pair, scenario and indicator; the
-  count by range of D99 is given, the count by sign is missing (above).
-- ``pair_states``: one state per pair across the scenarios (below), with the
-  coverage of D91 over every cell of the pair and the reason of D86.
+- ``pair_cell_counts``: ``pair_counts`` (D87, D99, D169); the count by range
+  of D99 is given, the count by sign is missing (above). **OPEN, the counts of
+  ``soil_carbon_trend``:** ``pair_counts`` gives one count per carbon model and
+  computation (D169), and the contract keys a count by pair, scenario and
+  indicator only, with no field for the model or the computation. Those
+  counts are left out until the contract carries the key of D169 (brief
+  #314), never added across models or computations (D169) and never
+  given without the model they belong to. The paired differences of the
+  soil carbon trend, each naming its model and computation, are all there.
+- ``pair_states``: one state per pair (below), with the coverage "k of N" of
+  ``dominance`` (D91, D156) and the reason of D86.
 - ``state``: null with its reason (OPEN 5 of the README: no decision says
   how the document's one state relates to the states of its pairs), the
   indicators the pairs do not resolve (D7), and one reason text per pair and
@@ -50,19 +59,18 @@ and no uncertain input declared (what the route has today):
   mapping of the uncertain inputs (``UncertainInput``), which the table does
   not carry.
 
-**The state of a pair across the scenarios (D103, D117, D152; PROPOSED
-reading).** In each scenario the state is read alone, by ``pair_state`` on
-the rows of that scenario, in the order of D152. A robust preference is
-looked for in both orders of the pair, so that the state does not depend on
-which rotation comes first (``pair_state`` detects a preference for its
-second rotation only); ``preferred_rotation_id`` names the rotation preferred.
-With one scenario, the pair takes the state of that scenario. With several,
-the pair is a robust preference only if it is one in every scenario, for the
-same rotation; otherwise it is "Not robust across scenarios", with the reason
-of D86 "not robust across the admitted scenarios" (D103: "when any member is
-not a robust preference"; D117 for phases). A pair none of whose differences
-holds a value has no state (D85, D151). This differs from ``demo/run.py``,
-which reads every scenario's cells together in one ``pair_state``.
+**The state of a pair is ``pair_state``'s, unchanged** (D152, D165, D166,
+D173, D175): over the scenarios of the table it reads each scenario on its
+own and gives the state of the set; only the computation of the soil carbon
+trend used to compare rotations enters it (``end_minus_start``: the table
+carries no choice of the user, C1.6). This module composes and decides
+nothing. Its one PROPOSED step: ``pair_state`` finds a robust preference for
+its second rotation, so the pair is read in both orders, and a robust
+preference in either names its rotation in ``preferred_rotation_id``; the
+state does not depend on which rotation comes first. The state of each
+scenario (``PairState.by_scenario``) is shown in the reasons of the document
+(D152: "The conditions that did not give the state are still shown"); the
+contract has no field for it (OPEN 5 of its README).
 
 Pure: no network, no file access, no clock.
 """
@@ -70,7 +78,7 @@ Pure: no network, no file access, no clock.
 from __future__ import annotations
 
 import itertools
-from collections.abc import Iterable
+from collections.abc import Hashable, Iterable
 
 from contracts.decision_output import (
     CountByDifferenceRange,
@@ -90,8 +98,11 @@ from contracts.decision_output.models import REASON_OF_A_STATE
 from contracts.inputs.common import Missing, Range, Value
 from contracts.results.models import ResultsTable
 from decision.functions import (
-    NOT_ROBUST_ACROSS_SCENARIOS,
+    NOT_EVALUATED as NOT_EVALUATED_LABEL,
+)
+from decision.functions import (
     ROBUST_PREFERENCE,
+    dominance,
     limit_counts,
     pair_counts,
     pair_state,
@@ -121,7 +132,10 @@ NO_COUNT_BY_SIGN = (
     "no tolerance of 'equal' is declared for this indicator, so its cells are "
     "counted by the range of their difference only (D87, D99)"
 )
-NOT_EVALUATED = "no paired difference of the pair holds a value: the pair is not evaluated and has no state (D85, D151)"
+NOT_EVALUATED = (
+    "no paired difference of the pair holds a value: the pair is not evaluated "
+    "and has no state (D85, D151)"
+)
 NO_REASON_OF_D86 = (
     "D86 writes no reason for the state 'Not separated: within uncertainty' (D97) "
     "and no reason code is decided for it (contracts/decision_output/README.md, K3)"
@@ -133,8 +147,8 @@ NO_DOCUMENT_STATE = (
 )
 
 
-def _in_order(items: Iterable[str]) -> list[str]:
-    seen: dict[str, None] = {}
+def _in_order(items: Iterable[Hashable]) -> list:
+    seen: dict = {}
     for item in items:
         seen.setdefault(item, None)
     return list(seen)
@@ -155,75 +169,30 @@ def _not_declared(unit: str, detail: str) -> Value:
     )
 
 
-def _scenario_table(table: ResultsTable, scenario_id: str) -> ResultsTable:
-    return ResultsTable(
-        case_id=table.case_id,
-        field_id=table.field_id,
-        rows=[row for row in table.rows if row.scenario_id == scenario_id],
-    )
-
-
-def _state_in_one_scenario(
-    table: ResultsTable, first: str, second: str
-) -> tuple[str | None, str | None, tuple[str, ...]]:
-    """The state of a pair in one scenario, its preferred rotation and the
-    indicators it does not resolve. A robust preference is looked for in both
-    orders (module docstring)."""
-    forward = pair_state(table, first, second)
-    if forward.state == ROBUST_PREFERENCE:
-        return ROBUST_PREFERENCE, second, ()
-    backward = pair_state(table, second, first)
-    if backward.state == ROBUST_PREFERENCE:
-        return ROBUST_PREFERENCE, first, ()
-    return forward.state, None, forward.indicators_not_resolved
-
-
 def _pair_state(
-    table: ResultsTable, scenarios: list[str], first: str, second: str
+    table: ResultsTable, first: str, second: str
 ) -> tuple[PairState, tuple[str, ...], list[str]]:
-    """The state of one pair across the scenarios (D103, D117, D152), the
-    indicators it does not resolve, and one reason text per scenario."""
-    differences = paired_differences(table, first, second)
+    """The state of one pair, the indicators it does not resolve, and one
+    reason text per scenario of the table, from ``pair_state`` and
+    ``dominance`` of ``decision/functions.py`` (module docstring)."""
+    covered = dominance(table, first, second)
     coverage = Coverage(
-        cells_compared=sum(1 for d in differences if d.value is not None),
-        cells_of_the_pair=len(differences),
+        cells_compared=covered.cells_compared,
+        cells_of_the_pair=covered.cells_of_the_pair,
     )
     pair = [first, second]
-    if coverage.cells_compared == 0:
-        state = PairState(
-            pair=pair,
-            value=None,
-            missing=Missing(reason="NOT_AVAILABLE", detail=NOT_EVALUATED),
-            coverage=coverage,
-        )
-        return state, (), [f"the pair ('{first}', '{second}') is not evaluated (D85)"]
-
-    members = {
-        scenario: _state_in_one_scenario(
-            _scenario_table(table, scenario), first, second
-        )
-        for scenario in scenarios
-    }
-    not_resolved = tuple(
-        sorted({indicator for _, _, names in members.values() for indicator in names})
-    )
+    read = pair_state(table, first, second)
+    preferred = second if read.state == ROBUST_PREFERENCE else None
+    if preferred is None:
+        backward = pair_state(table, second, first)
+        if backward.state == ROBUST_PREFERENCE:
+            read, preferred = backward, first
     texts = [
         f"in scenario '{scenario}' the pair ('{first}', '{second}') is "
-        f"'{value or 'Not evaluated'}'"
-        + (f", preferring '{preferred}'" if preferred else "")
-        for scenario, (value, preferred, _) in members.items()
+        f"'{value or NOT_EVALUATED_LABEL}'"
+        for scenario, value in read.by_scenario
     ]
-    preferred = {member[1] for member in members.values()}
-    if len(members) == 1:
-        ((value, chosen, _),) = members.values()
-    elif (
-        all(m[0] == ROBUST_PREFERENCE for m in members.values()) and len(preferred) == 1
-    ):
-        value, chosen = ROBUST_PREFERENCE, next(iter(preferred))
-    else:
-        value, chosen = NOT_ROBUST_ACROSS_SCENARIOS, None
-    if value is None:
-        # One scenario, and it holds no computed difference: no state (D85).
+    if read.state is None:
         state = PairState(
             pair=pair,
             value=None,
@@ -231,15 +200,18 @@ def _pair_state(
             coverage=coverage,
         )
         return state, (), texts
-    if value == ROBUST_PREFERENCE:
+    if read.state == ROBUST_PREFERENCE:
         state = PairState(
-            pair=pair, value=value, preferred_rotation_id=chosen, coverage=coverage
+            pair=pair,
+            value=read.state,
+            preferred_rotation_id=preferred,
+            coverage=coverage,
         )
-        return state, (), texts
-    reason = REASON_OF_A_STATE.get(value)
+        return state, read.indicators_not_resolved, texts
+    reason = REASON_OF_A_STATE.get(read.state)
     state = PairState(
         pair=pair,
-        value=value,
+        value=read.state,
         reason=reason,
         reason_missing=(
             None
@@ -248,7 +220,7 @@ def _pair_state(
         ),
         coverage=coverage,
     )
-    return state, not_resolved, texts
+    return state, read.indicators_not_resolved, texts
 
 
 def assemble_decision_output(
@@ -311,22 +283,21 @@ def assemble_decision_output(
 
     ranges = []
     for key in _in_order(
-        f"{c.rotation_id}\x00{c.indicator}\x00{c.carbon_model or ''}\x00{c.computation or ''}"
+        (c.rotation_id, c.indicator, c.carbon_model, c.computation)
         for c in counts.values()
     ):
-        rotation_id, indicator, carbon_model, computation = key.split("\x00")
+        rotation_id, indicator, carbon_model, computation = key
         of_key = [
             c
             for c in counts.values()
-            if (c.rotation_id, c.indicator, c.carbon_model or "", c.computation or "")
-            == (rotation_id, indicator, carbon_model, computation)
+            if (c.rotation_id, c.indicator, c.carbon_model, c.computation) == key
         ]
         within = {c.scenario_id: c.within for c in of_key if c.within is not None}
         common = dict(
             rotation_id=rotation_id,
             indicator=indicator,
-            carbon_model=carbon_model or None,
-            computation=computation or None,
+            carbon_model=carbon_model,
+            computation=computation,
         )
         if not within:
             ranges.append(
@@ -411,6 +382,9 @@ def assemble_decision_output(
         # The tolerance only matters for the count by sign, which is not
         # given without a declared tolerance.
         for count in pair_counts(table, first, second, equal_tolerance=0.0):
+            if count.carbon_model is not None or count.computation is not None:
+                # OPEN until the contract carries the key of D169 (brief #314).
+                continue
             cell_counts.append(
                 PairCellCount(
                     pair=[first, second],
@@ -427,12 +401,13 @@ def assemble_decision_output(
                     ),
                 )
             )
-        state, names, texts = _pair_state(table, scenarios, first, second)
+        state, names, texts = _pair_state(table, first, second)
         pair_states.append(state)
         not_resolved.update(names)
         reasons.append(
-            f"the pair ('{first}', '{second}') is '{state.value or 'Not evaluated'}'"
-            f" over {len(scenarios)} scenario(s); indicators not resolved: "
+            f"the pair ('{first}', '{second}') is "
+            f"'{state.value or NOT_EVALUATED_LABEL}' over {len(scenarios)} "
+            "scenario(s); indicators not resolved: "
             f"{', '.join(names) or 'none'}"
         )
         reasons.extend(texts)

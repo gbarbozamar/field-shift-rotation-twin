@@ -92,8 +92,8 @@ def test_over_several_scenarios_a_pair_not_robust_in_one_is_not_robust_across_th
     texts = "\n".join(document.state.reasons)
     for scenario in matrix.SCENARIOS:
         assert (
-            f"in scenario '{scenario}' the pair ('A', 'B') is 'Not separated: within uncertainty'"
-            in texts
+            f"in scenario '{scenario}' the pair ('A', 'B') is "
+            "'Not separated: within uncertainty'" in texts
         )
 
 
@@ -227,3 +227,117 @@ def test_differences_without_ranges_are_not_separated_uncertainty_missing():
     (state,) = assemble_decision_output(table(rows), example_data=True).pair_states
     assert state.value == "Not separated: uncertainty missing"
     assert state.reason == "a difference without its range"
+
+
+# --- the assembly composes decision/functions.py (#309) and decides nothing ---
+
+
+def carbon(rotation, scenario, computation, value, low, high, model="amg"):
+    return ResultsTableRow(
+        rotation_id=rotation,
+        scenario_id=scenario,
+        time_basis="rotation",
+        indicator="soil_carbon_trend",
+        direction="higher_is_better",
+        value=value,
+        unit="t C ha-1 yr-1",
+        range=Range(low=low, high=high, kind=KIND),
+        provenance="SIMULATED",
+        source=SOURCE,
+        carbon_model=model,
+        computation=computation,
+    )
+
+
+def test_every_state_is_the_one_pair_state_gives():
+    """The state of each pair of the thin matrix is ``pair_state``'s for that
+    pair, unchanged, and the state of each scenario is the one it carries in
+    ``by_scenario`` (D152, D166, D175)."""
+    from decision.functions import pair_state
+
+    given = matrix.thin_matrix()
+    document = assemble_decision_output(given, example_data=True)
+    for item in document.pair_states:
+        first, second = item.pair
+        read = pair_state(given, first, second)
+        assert item.value == read.state
+        for scenario, value in read.by_scenario:
+            assert (
+                f"in scenario '{scenario}' the pair ('{first}', '{second}') is "
+                f"'{value}'" in document.state.reasons
+            )
+
+
+def test_the_coverage_is_the_one_dominance_gives():
+    from decision.functions import dominance
+
+    given = matrix.thin_matrix()
+    document = assemble_decision_output(given, example_data=True)
+    for item in document.pair_states:
+        covered = dominance(given, *item.pair)
+        assert (item.coverage.cells_compared, item.coverage.cells_of_the_pair) == (
+            covered.cells_compared,
+            covered.cells_of_the_pair,
+        )
+
+
+def test_a_range_touching_zero_on_the_side_that_is_not_worse_does_not_block():
+    """D165, through ``pair_state``: a cell [-1.0, 0.0] (lower is better) is
+    non-deteriorating and does not block; with a strictly improving cell the
+    pair is a robust preference."""
+    rows = [
+        soil("A", "s", 2001, 5.0, 4.5, 5.5),
+        soil("B", "s", 2001, 4.5, 4.0, 5.0),  # B - A in [-1.5, 0.5]: crosses zero
+    ]
+    (crossing,) = assemble_decision_output(table(rows), example_data=True).pair_states
+    assert crossing.value == "Not separated: within uncertainty"
+    rows = [
+        soil("A", "s", 2001, 5.0, 4.5, 5.5),
+        soil("B", "s", 2001, 4.0, 3.5, 4.5),  # B - A in [-2.0, 0.0]: touches zero
+        soil("A", "s", 2002, 9.0, 8.5, 9.5),
+        soil("B", "s", 2002, 2.0, 1.5, 2.5),  # strict improvement
+    ]
+    (state,) = assemble_decision_output(table(rows), example_data=True).pair_states
+    assert state.value == "Robust preference"
+    assert state.preferred_rotation_id == "B"
+
+
+def test_only_the_computation_used_to_compare_enters_the_state():
+    """D173, through ``pair_state``: a deteriorating ``fitted_slope`` does not
+    block when ``end_minus_start`` (the default, C1.6) improves; its
+    difference is still in the document, with its model and computation."""
+    rows = [
+        carbon("A", "s", "end_minus_start", 0.1, 0.0, 0.2),
+        carbon("B", "s", "end_minus_start", 0.9, 0.8, 1.0),
+        carbon("A", "s", "fitted_slope", 0.9, 0.8, 1.0),
+        carbon("B", "s", "fitted_slope", 0.1, 0.0, 0.2),
+    ]
+    document = assemble_decision_output(table(rows), example_data=True)
+    (state,) = document.pair_states
+    assert state.value == "Robust preference"
+    assert state.preferred_rotation_id == "B"
+    assert sorted(d.computation for d in document.paired_differences) == [
+        "end_minus_start",
+        "fitted_slope",
+    ]
+
+
+def test_the_counts_of_the_soil_carbon_trend_wait_for_the_key_of_d169():
+    """OPEN until the contract keys a count by carbon model and computation
+    (brief #314): those counts are left out, never added (D169). The other
+    indicators keep their counts."""
+    rows = [
+        soil("A", "s", 2001, 5.0, 4.5, 5.5),
+        soil("B", "s", 2001, 4.0, 3.5, 4.5),
+        carbon("A", "s", "end_minus_start", 0.1, 0.0, 0.2),
+        carbon("B", "s", "end_minus_start", 0.9, 0.8, 1.0),
+        carbon("A", "s", "end_minus_start", 0.1, 0.0, 0.2, model="rothc"),
+        carbon("B", "s", "end_minus_start", 0.9, 0.8, 1.0, model="rothc"),
+    ]
+    document = assemble_decision_output(table(rows), example_data=True)
+    assert {c.indicator for c in document.pair_cell_counts} == {"soil_loss"}
+    assert sorted(
+        (d.carbon_model, d.computation)
+        for d in document.paired_differences
+        if d.indicator == "soil_carbon_trend"
+    ) == [("amg", "end_minus_start"), ("rothc", "end_minus_start")]
