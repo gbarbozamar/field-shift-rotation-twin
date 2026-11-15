@@ -784,6 +784,19 @@ def test_the_document_carries_the_counts_of_the_pairs_cells() -> None:
         assert count.by_sign_of_point_value_missing.reason == "NOT_DECLARED"
 
 
+def test_the_counts_of_the_carbon_cells_name_their_model_and_computation() -> None:
+    """D169: one count per pair, scenario, indicator, carbon model and computation."""
+    document = run.build_decision_output(TABLE)
+    keys = [item.key_with_the_carbon_model() for item in document.pair_cell_counts]
+    assert len(set(keys)) == len(keys) == 27
+    for item in document.pair_cell_counts:
+        if item.indicator == "soil_carbon_trend":
+            # The matrix holds one carbon model and one computation (#240).
+            assert (item.carbon_model, item.computation) == ("amg", "end_minus_start")
+        else:
+            assert (item.carbon_model, item.computation) == (None, None)
+
+
 def test_the_document_carries_the_states_and_their_coverage() -> None:
     document = run.build_decision_output(TABLE)
     states = {tuple(item.pair): item for item in document.pair_states}

@@ -57,12 +57,6 @@ as a gap (the contract is never changed here):
   enters no state at all (D6: a missing value does not enter the state)
   and its not being evaluated is carried by ``indicator_ranking`` and by
   a reason of the document's state;
-- the carbon model and computation of a count of a pair's cells (D169):
-  ``PairCellCount`` has no field for them and the document refuses two
-  counts of one pair, scenario and indicator. On this matrix each holds
-  one carbon model and one computation (amg, end minus start), so no
-  count repeats; a table with more is refused by the contract until
-  lane L0 adds the two fields;
 - ``measure_first`` is not keyed by a pair, so each item names its pair
   in ``what`` (three items, one per pair; the ranks stay the machinery's);
 - the document's one ``state`` (D7): no decision says how it relates to
@@ -312,7 +306,10 @@ def pair_cell_count_items(
 
     The count by the sign of the point value is given only for the
     indicator whose tolerance of "equal" the demo declared; without a
-    tolerance it is missing with its reason (C3.1, D87).
+    tolerance it is missing with its reason (C3.1, D87). Each count of the
+    soil carbon trend names its carbon model and computation, as
+    ``pair_counts`` gives them (D169): on this matrix, amg and
+    end_minus_start; the other indicators name neither.
     """
     table = matrix.thin_matrix() if table is None else table
     tolerances = _tolerance_values()
@@ -349,6 +346,8 @@ def pair_cell_count_items(
                     pair=[first, second],
                     scenario_id=count.scenario_id,
                     indicator=count.indicator,
+                    carbon_model=count.carbon_model,  # D169
+                    computation=count.computation,  # D169
                     by_difference_range=CountByDifferenceRange(
                         strict_improvement=count.by_range.strict_improvement,
                         deterioration=count.by_range.deterioration,
