@@ -107,9 +107,6 @@ from engine.calendar.repeat import (
 from engine.water import balance, evaporation, fallow, living_crop
 from engine.water._parameters import Catalogue, Scope, check_parameters
 from engine.water.et0 import Et0Bounds, Et0Constants, PointUnits
-from engine.water.et0 import (
-    reference_evapotranspiration_from_climate_with_bounds as et0_days,
-)
 from engine.water.et0.quantities import (
     ACCEPTED_UNITS,
     CLIMATE_QUANTITIES,
@@ -956,36 +953,12 @@ def _run_chain(
         return []
     start = min(days)
 
-    # 1. The reference evapotranspiration of every day of the record.
-    et0_constants = Et0Constants(
-        **{
-            group: _ET0_GROUPS[group](
-                **{name: _site(catalogue, f"{group}_{name}", start) for name in names}
-            )
-            for group, names in ET0_PARAMETERS.items()
-        }
+    # 1. The reference evapotranspiration of every day of the record (D256).
+    from engine.water import reference_et0
+
+    et0_by_day = reference_et0.et0_by_day_for_catalogue(
+        climate, catalogue=catalogue, day=start
     )
-    et0_bounds = Et0Bounds(
-        **{
-            group: _BOUND_GROUPS[group](
-                **{
-                    field: _site(catalogue, parameter_id, start)
-                    for field, parameter_id in names.items()
-                }
-            )
-            for group, names in ET0_BOUND_PARAMETERS.items()
-        }
-    )
-    et0_by_day = {
-        item.date: item.value
-        for item in et0_days(
-            climate,
-            point_units=POINT_UNITS,
-            constants=et0_constants,
-            bounds=et0_bounds,
-            unit_guard_reason=_UNIT_GUARD_REASON,
-        )
-    }
 
     # The constants of the other parts, read once.
     runoff_constants = CurveNumberConstants(

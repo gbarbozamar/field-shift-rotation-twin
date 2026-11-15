@@ -1,8 +1,10 @@
 """Acceptance test of ``engine.water.daily_reference_evapotranspiration`` (D256).
 
 The public function gives exactly the daily reference evapotranspiration EP3
-uses. EP3's own series is read where EP3 calls the function of
-``engine/water/et0/`` (``exposure.et0_days``), and compared day by day: the same days, the same numbers, the same reasons.
+uses. Both ``daily_reference_evapotranspiration`` and EP3's ``_run_chain``
+delegate ET0 computation to ``reference_et0.et0_by_day_for_catalogue``, and
+their series are compared day by day: the same days, the same numbers, the
+same reasons.
 
 EXAMPLE DATA. The climate, the soil and the calendars are the PLACEHOLDER
 chain examples of ``contracts/inputs/examples/``; the two calendars carry the
@@ -24,7 +26,9 @@ Run from the repository root: ``python -m pytest engine/water/test_reference_et0
 from __future__ import annotations
 
 import copy
+import datetime as dt
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +45,7 @@ from engine.water import (
 )
 from engine.water import exposure as ep3
 from engine.water import reference_et0 as public_module
+from engine.water._parameters import Catalogue
 from engine.water.et0.daily import WIND_SPEED_BOUND
 from params.catalogue import load_folder
 
@@ -101,22 +106,22 @@ def repository_catalogue() -> dict[str, dict]:
 
 
 def ep3_series(monkeypatch, calendar_, climate_, parameters) -> dict:
-    """The daily ET0 EP3 runs its chain on, read where EP3 calls it."""
-    seen: list[Any] = []
-    real = ep3.et0_days
+    """The daily ET0 EP3 runs its chain on, read via the shared ET0 helper."""
+    seen: list[dict[dt.date, float | Missing]] = []
+    real = public_module.et0_by_day_for_catalogue
 
-    def recording(*args: Any, **kwargs: Any) -> Any:
+    def recording(*args: Any, **kwargs: Any) -> dict[dt.date, float | Missing]:
         days = real(*args, **kwargs)
         seen.append(days)
         return days
 
-    monkeypatch.setattr(ep3, "et0_days", recording)
+    monkeypatch.setattr(public_module, "et0_by_day_for_catalogue", recording)
     compute_water_deficit_exposure(
         calendar_, climate_, soil(climate_), parameters=parameters
     )
     monkeypatch.undo()
     assert len(seen) == 1, "EP3 computes its daily ET0 once per call"
-    return {item.date: item.value for item in seen[0]}
+    return seen[0]
 
 
 def assert_same(public: dict, of_ep3: dict) -> None:
@@ -127,7 +132,9 @@ def assert_same(public: dict, of_ep3: dict) -> None:
             assert isinstance(given, Missing), day
             assert (given.reason, given.detail) == (value.reason, value.detail), day
         else:
+            assert isinstance(given, float) and isinstance(value, float), day
             assert given == value, day
+            assert math.copysign(1.0, given) == math.copysign(1.0, value), day
 
 
 @pytest.mark.parametrize("rotation", sorted(DEMO_ROTATIONS))
@@ -322,3 +329,138 @@ def test_it_is_found_by_name_beside_ep3_and_listed_in_entrypoints():
     text = DOCS.read_text(encoding="utf-8")
     assert "engine.water.daily_reference_evapotranspiration" in text
     assert "D256" in text
+
+
+def test_ep3_delegates_to_shared_helper_and_tracks_missing_parameters_in_catalogue(
+    monkeypatch,
+):
+    assert not hasattr(ep3, "et0_days")
+    climate_ = climate()
+    parameters = {
+        key: record
+        for key, record in repository_catalogue().items()
+        if record.get("id") != WIND_BOUND_RECORD
+    }
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    real = public_module.et0_by_day_for_catalogue
+
+    def recording(*args: Any, **kwargs: Any) -> dict[dt.date, float | Missing]:
+        calls.append((args, kwargs))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(public_module, "et0_by_day_for_catalogue", recording)
+    ep3_result = compute_water_deficit_exposure(
+        calendar("soybean-winter-fallow", climate_),
+        climate_,
+        soil(climate_),
+        parameters=parameters,
+    )
+    public_result = daily_reference_evapotranspiration(
+        climate_, parameters=parameters
+    )
+    monkeypatch.undo()
+
+    assert len(calls) == 2
+    (_, ep3_kwargs), (_, public_kwargs) = calls
+    assert isinstance(ep3_kwargs["catalogue"], Catalogue)
+    assert isinstance(public_kwargs["catalogue"], Catalogue)
+    assert ep3_kwargs["catalogue"] is not public_kwargs["catalogue"]
+    expected_start = min(s.start_date for s in climate_.daily_series)
+    assert ep3_kwargs["day"] == expected_start
+    assert public_kwargs["day"] == expected_start
+    assert ep3_result
+    for item in ep3_result:
+        assert item.missing is not None
+        assert item.missing.reason == "MISSING_INPUT"
+        assert WIND_BOUND_RECORD in item.missing.detail
+    assert_same(
+        public_result,
+        real(climate_, catalogue=Catalogue(parameters), day=expected_start),
+    )
+
+
+def test_shared_helper_matches_on_unit_mismatch_and_ep3_checks_units_first(
+    monkeypatch,
+):
+    doc = document("PLACEHOLDER_chain_site_climate.json")
+    for series in doc["daily_series"]:
+        if series["quantity"] == "wind_speed_2m":
+            series["unit"] = "PLACEHOLDER_unaccepted_unit"
+            break
+    bad_climate = SiteClimate.model_validate(doc)
+    parameters = repository_catalogue()
+    first = min(s.start_date for s in bad_climate.daily_series)
+
+    public_result = daily_reference_evapotranspiration(
+        bad_climate, parameters=parameters
+    )
+    shared_result = public_module.et0_by_day_for_catalogue(
+        bad_climate, catalogue=Catalogue(parameters), day=first
+    )
+    assert_same(public_result, shared_result)
+    assert public_result and all(
+        isinstance(value, Missing) and value.reason == ep3._UNIT_GUARD_REASON
+        for value in public_result.values()
+    )
+
+    calls: list[Any] = []
+    real = public_module.et0_by_day_for_catalogue
+
+    def recording(*args: Any, **kwargs: Any) -> dict[dt.date, float | Missing]:
+        calls.append((args, kwargs))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(public_module, "et0_by_day_for_catalogue", recording)
+    ep3_result = compute_water_deficit_exposure(
+        calendar("soybean-winter-fallow", bad_climate),
+        bad_climate,
+        soil(bad_climate),
+        parameters=parameters,
+    )
+    monkeypatch.undo()
+    assert calls == []
+    assert ep3_result and all(
+        item.missing is not None
+        and item.missing.reason == "MISSING_INPUT"
+        and "Q11" in item.missing.detail
+        for item in ep3_result
+    )
+
+
+def test_shared_helper_and_public_return_empty_when_climate_series_are_empty(
+    monkeypatch,
+):
+    doc = document("PLACEHOLDER_chain_site_climate.json")
+    doc["daily_series"] = []
+    empty_climate = SiteClimate.model_validate(doc)
+    parameters = repository_catalogue()
+    placeholder_day = dt.date(2001, 1, 1)
+
+    assert daily_reference_evapotranspiration(empty_climate, parameters=parameters) == {}
+    assert (
+        public_module.et0_by_day_for_catalogue(
+            empty_climate, catalogue=Catalogue(parameters), day=placeholder_day
+        )
+        == {}
+    )
+
+    calls: list[Any] = []
+    real = public_module.et0_by_day_for_catalogue
+
+    def recording(*args: Any, **kwargs: Any) -> dict[dt.date, float | Missing]:
+        calls.append((args, kwargs))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(public_module, "et0_by_day_for_catalogue", recording)
+    ep3_result = compute_water_deficit_exposure(
+        calendar("soybean-winter-fallow", empty_climate),
+        empty_climate,
+        soil(empty_climate),
+        parameters=parameters,
+    )
+    monkeypatch.undo()
+    assert calls == []
+    assert len(ep3_result) == 1
+    assert ep3_result[0].time_basis == "rotation"
+    assert ep3_result[0].missing is not None
+    assert ep3_result[0].missing.reason == "MISSING_INPUT"
