@@ -37,6 +37,9 @@ from api.ports import (
 logger = logging.getLogger(__name__)
 
 PERIOD_NOT_CONFIGURED = "the climate record period is not configured"
+# The reason code (contracts/CONVENTIONS.md C3.2) of an absent period, on the
+# climate source row (get_climate) and in the plant answer (api/plant.py).
+PERIOD_NOT_CONFIGURED_REASON = "NOT_AVAILABLE"
 # The identifier of the run on the calendar unchanged (api/phases.py, PROPOSED).
 FIRST_SCENARIO = "phase_1"
 
@@ -216,7 +219,7 @@ def derive_outcome(
     return "partial"
 
 
-def _source_out(info: SourceInfo) -> SourceOut:
+def source_out(info: SourceInfo) -> SourceOut:
     return SourceOut(
         id=info.id,
         contract=info.contract,
@@ -294,7 +297,7 @@ def build_envelope(
         result=first.result,
         result_missing=first.result_missing,
         modules=first.modules,
-        sources=[_source_out(s) for s in sources],
+        sources=[source_out(s) for s in sources],
         scenarios=scenarios,
     )
 
@@ -327,7 +330,7 @@ def make_router(
                     ErrorCode.ROTATION_INVALID,
                     [_under_rotation(p) for p in problems],
                 )
-            climate_result = _get_climate(climate, body.site, settings)
+            climate_result = get_climate(climate, body.site, settings)
             soil_result = soil_slope.get_soil_slope(
                 body.site.case_id, body.site.field_id
             )
@@ -343,7 +346,7 @@ def make_router(
     return router
 
 
-def _get_climate(
+def get_climate(
     climate: ClimateSource, site: SiteReference, settings: RunSettings
 ) -> ClimateResult:
     if not settings.has_period:
@@ -353,7 +356,7 @@ def _get_climate(
                 id=climate.source_id,
                 contract=climate.contract,
                 state="unavailable",
-                missing_reason="NOT_AVAILABLE",
+                missing_reason=PERIOD_NOT_CONFIGURED_REASON,
                 detail=PERIOD_NOT_CONFIGURED,
             ),
         )
