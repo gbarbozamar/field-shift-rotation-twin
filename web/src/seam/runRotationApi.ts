@@ -108,9 +108,19 @@ export async function runRotation(
   rotation: Record<string, unknown>,
 ): Promise<unknown> {
   const body: RunRotationRequest = { site, rotation }
+  return postToRoute(runRotationUrl(), body)
+}
+
+/**
+ * POST a JSON body to a platform route, with the rules above: the parsed
+ * JSON of a 2xx answer, or an ApiError carrying the code of the error shape
+ * of api/errors.py, or UNEXPECTED for a failed connection or a body that is
+ * not JSON. Shared by every route the interface calls.
+ */
+export async function postToRoute(url: string, body: unknown): Promise<unknown> {
   let response: Response
   try {
-    response = await fetch(runRotationUrl(), {
+    response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

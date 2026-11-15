@@ -2,22 +2,32 @@ import rawDecisionOutput from '../data/PLACEHOLDER_decision_output.json'
 import type { MissingPart, ReasonCode } from '../components/ValueDisplay'
 
 /**
- * The decision of the decision section: the contract example of decision
- * output, copied unchanged from contracts/decision_output/examples/ into
- * web/src/data/ (issue #241). Its values are placeholders, written by hand;
- * no decision layer produced them.
+ * The decision of the decision section. Two documents reach it, read by the
+ * one parser below:
  *
- * The parser below reads exactly the parts the section renders — the state
- * of each rotation pair with its reason and its coverage (D85, D86, D91),
- * the two counts of a pair's cells shown apart and never added (D87, D99),
- * and the range across scenarios of the years within the limit (D96) — and
- * enforces, on those parts, the rules of the contract that the render
- * relies on:
+ * - the contract example of decision output, copied unchanged from
+ *   contracts/decision_output/examples/ into web/src/data/ (issue #241). Its
+ *   values are placeholders, written by hand; no decision layer produced
+ *   them. It is the labelled fallback of the section;
+ * - the document POST /api/decisions/run returns (D198, issue #354), which
+ *   the platform serializes with every null kept (model_dump(mode="json"),
+ *   never exclude_none). On a key whose null carries no meaning of its own,
+ *   an explicit null is read as the key being absent (withoutOptionalNulls).
+ *
+ * The parser reads exactly the parts the section renders — the state of the
+ * decision with its reasons (D7), the state of each rotation pair with its
+ * reason, its preferred rotation and its coverage (D85, D86, D91), the two
+ * counts of a pair's cells shown apart and never added, each naming its
+ * carbon model and computation when it carries them (D87, D99, D169), and
+ * the range across scenarios of the years within the limit (D96) — and
+ * enforces, on those parts, the rules of the contract that the render relies
+ * on:
  *
  * - a pair holds two different non-empty rotation ids (D2);
  * - a state holds a value or a missing part with its reason, never both,
  *   never neither (C3.1); its reason and its reason-missing part are never
- *   both present (C3.1);
+ *   both present (C3.1); a preferred rotation is one of the pair, and a pair
+ *   that is not evaluated names none (D74, D85);
  * - the coverage holds non-negative counts and "k of N" never has k above N
  *   (D91);
  * - the count by the sign of the point value holds counts or a missing part
@@ -28,10 +38,10 @@ import type { MissingPart, ReasonCode } from '../components/ValueDisplay'
  *
  * Pure: value in, typed decision out, or an Error naming what is wrong. The
  * errors are technical codes without wording; nothing user-visible lives
- * here. The parts of the document the brief of this unit does not name for
- * the section — the limits, the counts by year, the paired differences, the
- * tolerances, the state of the whole decision, the measurement priority —
- * are not parsed and not rendered; nothing is invented for them.
+ * here. The parts of the document the section does not render — the limits,
+ * the counts by year, the paired differences, the tolerances, the indicators
+ * not resolved, the measurement priority — are not parsed; nothing is
+ * invented for them.
  */
 
 /** The three indicator identifiers of the conventions (C1.1). */
@@ -46,12 +56,17 @@ export interface Coverage {
   cells_of_the_pair: number
 }
 
-/** The state of a pair that is evaluated: its value verbatim, and its reason or the reason-missing part (D85, D86). */
+/**
+ * The state of a pair that is evaluated: its value verbatim, its reason or
+ * the reason-missing part (D85, D86), and the rotation a robust preference
+ * prefers when the state names one (D74).
+ */
 export interface PairStateEvaluated {
   pair: Pair
   value: string
   reason?: string
   reason_missing?: MissingPart
+  preferred_rotation_id?: string
   coverage: Coverage
 }
 
@@ -67,11 +82,20 @@ export interface PairStateNotEvaluated {
  * The state of one pair of rotations across the scenarios (D85, D86, D88,
  * D97): its value verbatim — the science wording travels as data — or its
  * missing part when the pair is not evaluated (D85), its reason or the
- * reason-missing part of a state no decision gives a reason (D86), and its
- * coverage "k of N" (D91). The preferred rotation of a robust preference is
- * not rendered by this unit and is not parsed.
+ * reason-missing part of a state no decision gives a reason (D86), the
+ * preferred rotation of a robust preference (D74), and its coverage "k of N"
+ * (D91).
  */
 export type PairState = PairStateEvaluated | PairStateNotEvaluated
+
+/**
+ * The state of the whole decision (D7): its value verbatim, or the missing
+ * part that says why the decision layer gives none, and its reasons, each a
+ * sentence of the decision layer rendered as data.
+ */
+export type DecisionState =
+  | { value: string; reasons: string[] }
+  | { value: null; missing: MissingPart; reasons: string[] }
 
 /** The cells of a pair whose paired difference has a range, classed by that range (D99). */
 export interface CountByDifferenceRange {
@@ -93,6 +117,8 @@ export interface PairCellCountGiven {
   pair: Pair
   scenario_id: string
   indicator: IndicatorId
+  carbon_model?: string
+  computation?: string
   by_difference_range: CountByDifferenceRange
   by_sign_of_point_value: CountBySignOfPointValue
 }
@@ -102,6 +128,8 @@ export interface PairCellCountToleranceMissing {
   pair: Pair
   scenario_id: string
   indicator: IndicatorId
+  carbon_model?: string
+  computation?: string
   by_difference_range: CountByDifferenceRange
   by_sign_of_point_value: null
   by_sign_of_point_value_missing: MissingPart
@@ -110,7 +138,9 @@ export interface PairCellCountToleranceMissing {
 /**
  * The two counts of one pair of rotations, in one scenario, for one
  * indicator (D87): by difference range and by sign of the point value,
- * shown apart and never added (D99).
+ * shown apart and never added (D99). A count of soil carbon trend names its
+ * carbon model and computation (D169): the counts of two models are two
+ * counts, never one.
  */
 export type PairCellCount = PairCellCountGiven | PairCellCountToleranceMissing
 
@@ -146,7 +176,8 @@ export type RangeAcrossScenarios = RangeGiven | RangeMissing
 
 /** One decision-output document, reduced to the parts the section renders. */
 export interface DecisionOutput {
-  example_data: true
+  example_data: boolean
+  state: DecisionState
   pair_states: PairState[]
   pair_cell_counts: PairCellCount[]
   range_across_scenarios: RangeAcrossScenarios[]
@@ -156,6 +187,30 @@ export interface DecisionOutput {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/**
+ * The keys whose explicit null carries a meaning of the contract: a state
+ * that is not given (value) and a count by sign that is not given
+ * (by_sign_of_point_value). Their null is kept.
+ */
+const NULL_MEANS_SOMETHING: readonly string[] = ['value', 'by_sign_of_point_value']
+
+/**
+ * The platform serializes the contract models with every null kept. On
+ * every other key an explicit null means the part is absent, so it is read
+ * as absent: a copy of the object without those keys. The object passed in
+ * is not changed.
+ */
+function withoutOptionalNulls(value: Record<string, unknown>): Record<string, unknown> {
+  const copy: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(value)) {
+    if (item === null && !NULL_MEANS_SOMETHING.includes(key)) {
+      continue
+    }
+    copy[key] = item
+  }
+  return copy
 }
 
 function isCount(value: unknown): value is number {
@@ -191,10 +246,12 @@ function isReasonCode(value: unknown): value is ReasonCode {
   return typeof value === 'string' && (REASON_CODES as readonly string[]).includes(value)
 }
 
-function parseMissing(value: unknown, what: string): MissingPart {
-  if (!isRecord(value)) {
+/** A missing part: a reason code of C3.2, and its detail when it carries one (C3.1). */
+export function parseMissing(raw: unknown, what: string): MissingPart {
+  if (!isRecord(raw)) {
     throw new Error(`${what}:missing-not-an-object`)
   }
+  const value = withoutOptionalNulls(raw)
   if (!isReasonCode(value.reason)) {
     throw new Error(`${what}:reason-not-a-code`)
   }
@@ -242,12 +299,14 @@ function parseCoverage(value: unknown, what: string): Coverage {
   return { cells_compared: value.cells_compared, cells_of_the_pair: value.cells_of_the_pair }
 }
 
-function parsePairState(value: unknown, what: string): PairState {
-  if (!isRecord(value)) {
+function parsePairState(raw: unknown, what: string): PairState {
+  if (!isRecord(raw)) {
     throw new Error(`${what}:not-an-object`)
   }
+  const value = withoutOptionalNulls(raw)
   const pair = parsePair(value.pair, what)
   const coverage = parseCoverage(value.coverage, `${what}:coverage`)
+  const preferred = parseOptionalId(value.preferred_rotation_id, `${what}:preferred-rotation-id`)
   if (value.value === null) {
     if (value.missing === undefined) {
       throw new Error(`${what}:value-null-without-missing-part`)
@@ -255,7 +314,13 @@ function parsePairState(value: unknown, what: string): PairState {
     if (value.reason !== undefined || value.reason_missing !== undefined) {
       throw new Error(`${what}:not-evaluated-with-a-reason`)
     }
+    if (preferred !== undefined) {
+      throw new Error(`${what}:not-evaluated-with-a-preferred-rotation`)
+    }
     return { pair, value: null, missing: parseMissing(value.missing, what), coverage }
+  }
+  if (preferred !== undefined && !pair.includes(preferred)) {
+    throw new Error(`${what}:preferred-rotation-not-of-the-pair`)
   }
   if (!isNonEmptyString(value.value)) {
     throw new Error(`${what}:value-not-a-state-name`)
@@ -276,7 +341,38 @@ function parsePairState(value: unknown, what: string): PairState {
   if (value.reason_missing !== undefined) {
     state.reason_missing = parseMissing(value.reason_missing, `${what}:reason-missing`)
   }
+  if (preferred !== undefined) {
+    state.preferred_rotation_id = preferred
+  }
   return state
+}
+
+// --- the state of the decision (D7) ----------------------------------------------
+
+function parseDecisionState(raw: unknown, what: string): DecisionState {
+  if (!isRecord(raw)) {
+    throw new Error(`${what}:not-an-object`)
+  }
+  const value = withoutOptionalNulls(raw)
+  const reasons = parseList(value.reasons, `${what}:reasons`).map((reason, index) => {
+    if (!isNonEmptyString(reason)) {
+      throw new Error(`${what}:reasons[${index}]-empty`)
+    }
+    return reason
+  })
+  if (value.value === null) {
+    if (value.missing === undefined) {
+      throw new Error(`${what}:value-null-without-missing-part`)
+    }
+    return { value: null, missing: parseMissing(value.missing, what), reasons }
+  }
+  if (!isNonEmptyString(value.value)) {
+    throw new Error(`${what}:value-not-a-state-name`)
+  }
+  if (value.missing !== undefined) {
+    throw new Error(`${what}:value-and-missing-part`)
+  }
+  return { value: value.value, reasons }
 }
 
 // --- the two counts of a pair's cells (D87, D99) ---------------------------------
@@ -296,16 +392,26 @@ function parseCounts(
   return counts
 }
 
-function parsePairCellCount(value: unknown, what: string): PairCellCount {
-  if (!isRecord(value)) {
+function parsePairCellCount(raw: unknown, what: string): PairCellCount {
+  if (!isRecord(raw)) {
     throw new Error(`${what}:not-an-object`)
   }
+  const value = withoutOptionalNulls(raw)
   const pair = parsePair(value.pair, what)
   if (!isNonEmptyString(value.scenario_id)) {
     throw new Error(`${what}:scenario-id-empty`)
   }
   if (!isIndicatorId(value.indicator)) {
     throw new Error(`${what}:indicator-not-an-id`)
+  }
+  // The key of D169: a count of soil carbon trend names its model and
+  // computation; they travel as data, and the count is never merged.
+  const cell = {
+    pair,
+    scenario_id: value.scenario_id,
+    indicator: value.indicator,
+    carbon_model: parseOptionalId(value.carbon_model, `${what}:carbon-model`),
+    computation: parseOptionalId(value.computation, `${what}:computation`),
   }
   if (!isRecord(value.by_difference_range)) {
     throw new Error(`${what}:by-difference-range-not-an-object`)
@@ -324,9 +430,7 @@ function parsePairCellCount(value: unknown, what: string): PairCellCount {
       throw new Error(`${what}:by-sign-of-point-value-missing-not-an-object`)
     }
     return {
-      pair,
-      scenario_id: value.scenario_id,
-      indicator: value.indicator,
+      ...cell,
       by_difference_range: {
         strict_improvement: byDifferenceRange.strict_improvement,
         deterioration: byDifferenceRange.deterioration,
@@ -351,9 +455,7 @@ function parsePairCellCount(value: unknown, what: string): PairCellCount {
     `${what}:by-sign-of-point-value`,
   )
   return {
-    pair,
-    scenario_id: value.scenario_id,
-    indicator: value.indicator,
+    ...cell,
     by_difference_range: {
       strict_improvement: byDifferenceRange.strict_improvement,
       deterioration: byDifferenceRange.deterioration,
@@ -380,10 +482,15 @@ function parseOptionalId(value: unknown, what: string): string | undefined {
   return value
 }
 
-function parseRangeAcrossScenarios(value: unknown, what: string): RangeAcrossScenarios {
-  if (!isRecord(value)) {
+function parseRangeAcrossScenarios(raw: unknown, what: string): RangeAcrossScenarios {
+  if (!isRecord(raw)) {
     throw new Error(`${what}:not-an-object`)
   }
+  // The route serializes the contract without exclude_none: an explicit null
+  // of a bound, of the scenario of the minimum or of the missing part means
+  // the part was never set, so it is read as absent before the key-presence
+  // checks (the same rule the run seam applies).
+  const value = withoutOptionalNulls(raw)
   if (!isNonEmptyString(value.rotation_id)) {
     throw new Error(`${what}:rotation-id-empty`)
   }
@@ -392,14 +499,6 @@ function parseRangeAcrossScenarios(value: unknown, what: string): RangeAcrossSce
   }
   const carbonModel = parseOptionalId(value.carbon_model, `${what}:carbon-model`)
   const computation = parseOptionalId(value.computation, `${what}:computation`)
-  // The route serializes the contract without exclude_none: an explicit null
-  // means the field was never set, so a null is normalized away before the
-  // key-presence checks (the same rule the run seam applies).
-  for (const key of ['minimum', 'maximum', 'scenario_of_the_minimum', 'missing']) {
-    if (value[key] === null) {
-      delete value[key]
-    }
-  }
   const given =
     value.minimum !== undefined ||
     value.maximum !== undefined ||
@@ -460,11 +559,12 @@ export function parseDecisionOutput(value: unknown): DecisionOutput {
   if (!isRecord(value)) {
     throw new Error('invalid-decision:not-an-object')
   }
-  if (value.example_data !== true) {
-    throw new Error('invalid-decision:example-data-not-true')
+  if (typeof value.example_data !== 'boolean') {
+    throw new Error('invalid-decision:example-data-not-a-boolean')
   }
   return {
-    example_data: true,
+    example_data: value.example_data,
+    state: parseDecisionState(value.state, 'invalid-decision:state'),
     pair_states: parseList(value.pair_states, 'invalid-decision:pair-states').map(
       (entry, index) => parsePairState(entry, `invalid-decision:pair-states[${index}]`),
     ),
