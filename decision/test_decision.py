@@ -6,7 +6,7 @@ lead developer on #96 (decisions D59 to D61 of #77); every expected value
 on it is that supplied one, or follows from the decisions D74 and D85 to
 D99 of #77 as the person-approved expectations of #202 state them. The
 second case is the v2.1 tables of #223 (issue #177, comment of 14
-November 2026), approved by Martín as table designer and confirmed by
+November 2026), approved by the designer of the case as table designer and confirmed by
 the lead developer in review (D103 confirmed the design readings, D97
 and D98 re-derived the rows the case carries): every value, range,
 bracket, rank, state and refusal on it is that approved one, and none is

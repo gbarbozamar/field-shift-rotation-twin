@@ -82,6 +82,27 @@ def finite(item: Number) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _absent_detail(missing_items: list[tuple[str, InputMissing | ResultMissing]]) -> str:
+    """The detail of a missing-input refusal, per the lead coordinator's request.
+
+    Every absent argument named with its reason while they differ; when they
+    all carry one reason and one detail, the count with the first and the last
+    name instead — a series of hundreds of missing points says how many it is
+    missing, not each one by name. No reason and no value changes.
+    """
+    reasons = {item.reason for _, item in missing_items}
+    details = {item.detail for _, item in missing_items}
+    if len(reasons) == 1 and len(details) == 1 and len(missing_items) > 1:
+        first = missing_items[0][0]
+        last = missing_items[-1][0]
+        summary = f"{len(missing_items)} arguments are missing (from {first} to {last}), reason {reasons.pop()}"
+        detail = details.pop()
+        if detail is not None:
+            summary += f": {detail}"
+        return summary
+    return "; ".join(describe_missing(name, item) for name, item in missing_items)
+
+
 def numbers_or_missing(
     numbers: Mapping[str, NumberOrMissing],
 ) -> dict[str, float] | ResultMissing:
@@ -91,13 +112,9 @@ def numbers_or_missing(
     every missing argument with its own reason. Then an argument that is not
     a finite number: ``NOT_COMPUTABLE``, named likewise.
     """
-    absent = [
-        describe_missing(name, item)
-        for name, item in numbers.items()
-        if is_missing(item)
-    ]
-    if absent:
-        return ResultMissing(reason="MISSING_INPUT", detail="; ".join(absent))
+    missing_items = [(name, item) for name, item in numbers.items() if is_missing(item)]
+    if missing_items:
+        return ResultMissing(reason="MISSING_INPUT", detail=_absent_detail(missing_items))
     values = {name: finite(item) for name, item in numbers.items()}
     not_finite = [name for name, value in values.items() if value is None]
     if not_finite:

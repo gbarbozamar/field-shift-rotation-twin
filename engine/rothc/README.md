@@ -218,6 +218,7 @@ Each case is a test function of `test_rothc.py`; a test checks that this list an
 | `test_entry_point_is_run_rothc_of_entry_module` | `engine.rothc.run_rothc` is the function of `entry.py`; the runner's `EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")` resolves to it |
 | `test_readme_lists_the_cases_of_this_file` | This list and `test_rothc.py` name the same cases |
 
+| `test_a_uniform_run_of_missing_arguments_is_summarized_not_enumerated` | A uniform run of hundreds of missing monthly stocks is summarized (count, first, last, reason) instead of enumerated — the enumerated form of 277 stocks measured ~550k characters; mixed reasons keep the enumeration |
 ## The reference case of section 2.2 (D64, D104 as amended by D130)
 
 `test_reference_case.py` holds the acceptance case the persons chose and transcribed (issue #176; the worked example of section 2.2 of the February 2024 Model Description, pp. 20–22): Hoosfield, January 1852, the month after a 10 000-year equilibrium run, no plant input in January, the combined rate modifying factor **abc = 0.3561 an exact input** (D104: the individual `a`, `b`, `c` are not compared against the document). The expected pools are compared at the person-set tolerance **5 × 10⁻⁵ absolute** (the case designer, 14 November 2026: half of the last printed digit). The parameters are the transcribed values of the table above, as in-memory records.
