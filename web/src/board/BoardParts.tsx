@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DeclaredFactor } from '../plant/plantRoute'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
@@ -5,7 +6,7 @@ import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import { MARGINS_OF, STRICTNESSES } from '../plant/plantData'
-import { KINDS_OF_YEAR } from '../plant/plantData'
+import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
 import type {
   KindOfYear,
   KindsOfYearRecord,
@@ -335,6 +336,63 @@ function SideLine({
 }
 
 /**
+ * The price the user looks at: a slider over the declared range, and what
+ * the answer is at that price, read with answerAtPrice exactly as the plant
+ * screen reads it. Nothing is computed: past a tipping point the answer is
+ * the one the service gave for it, and whether it changes again further is
+ * said to be not computed.
+ */
+function PriceProbe({
+  tipping,
+  price,
+  nameOf,
+  onPrice,
+}: {
+  tipping: TippingPrice
+  price: number
+  nameOf: (rotationId: string) => string
+  onPrice: (price: number) => void
+}) {
+  const at = answerAtPrice(tipping, price)
+  const unit = unitText(tipping.unit)
+  return (
+    <div data-testid="board-price-probe" className="mt-3 rounded-xl bg-fs-bg px-3 py-2">
+      <label className="block">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">
+          {formatString(strings['plant.q.price_looked_at'], { price: displayNumber(price), unit })}
+        </span>
+        <input
+          type="range"
+          className="mt-1 block w-full accent-fs-primary"
+          min={tipping.low}
+          max={tipping.high}
+          step="any"
+          value={price}
+          onChange={(event) => onPrice(globalThis.Number(event.target.value))}
+        />
+      </label>
+      <p data-testid="board-price-at" data-at={at.kind} className="text-sm font-semibold">
+        {at.kind === 'today'
+          ? strings['plant.price.today']
+          : at.kind === 'same'
+            ? strings['board.price.same']
+            : at.kind === 'past'
+              ? formatString(strings['board.price.past'], {
+                  after:
+                    at.point.answer_after === 'chosen' && at.point.takes_over !== null
+                      ? formatString(strings['plant.after.chosen'], { rotation: nameOf(at.point.takes_over) })
+                      : strings[`plant.after.${at.point.answer_after === 'chosen' ? 'not_resolved' : at.point.answer_after}`],
+                })
+              : missingPatternText(
+                  formatString(strings['plant.price.unknown_what'], { price: displayNumber(price), unit }),
+                  at.missing,
+                )}
+      </p>
+    </div>
+  )
+}
+
+/**
  * The soybean price as a track over the range the user declared: the price
  * of today, the stretch where the answer stays the one of today, and where
  * it changes. A stretch whose answer is not computed is hatched.
@@ -342,12 +400,19 @@ function SideLine({
 export function PriceTrackPanel({
   tipping,
   nameOf,
+  initialPrice = null,
 }: {
   tipping: TippingPrice
   /** How the board names a rotation: the one that takes over past a tipping point. */
   nameOf: (rotationId: string) => string
+  /** The price looked at when the panel opens; the price of today when not given. */
+  initialPrice?: number | null
 }) {
   const track = priceTrack(tipping)
+  // The price the user looks at, for this tipping price: another answer
+  // starts again at its own price of today.
+  const [looked, setLooked] = useState<{ of: TippingPrice; price: number } | null>(null)
+  const price = looked !== null && looked.of === tipping ? looked.price : (initialPrice ?? tipping.today)
   if (track === null) {
     const missing: MissingPart = tipping.missing ?? { reason: 'NOT_AVAILABLE' }
     return (
@@ -393,6 +458,14 @@ export function PriceTrackPanel({
         <span>{displayNumber(tipping.low)}</span>
         <span>{displayNumber(tipping.high)}</span>
       </div>
+      {price !== null ? (
+        <PriceProbe
+          tipping={tipping}
+          price={price}
+          nameOf={nameOf}
+          onPrice={(next) => setLooked({ of: tipping, price: next })}
+        />
+      ) : null}
       <ul className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
         <SideLine
           testid="board-price-down"

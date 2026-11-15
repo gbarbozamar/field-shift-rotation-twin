@@ -14,6 +14,7 @@ import { strings } from '../strings'
 import { SORT_KEYS, answerChanges, unitText, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
 import { CompareTable, cropsText, orderNote, uniformItem } from './CompareTable'
 import { BoardView, initialBoardState } from './BoardScreen'
+import { PriceTrackPanel } from './BoardParts'
 
 /**
  * Acceptance test of the rotation board (l3/board). PROPOSED. The view is
@@ -808,5 +809,40 @@ describe('units as they are read (12)', () => {
     expect(html).toContain(strings['unit.USD ha-1 yr-1'])
     expect(html).toContain(strings['unit.t ha-1 yr-1'])
     expect(html).toContain(displayNumber(example.options[0].margin[example.margin_of].value!))
+  })
+})
+
+describe('the price the user looks at (13)', () => {
+  const tipping = example.tipping_price
+  const at = (price: number | null) =>
+    renderToString(<PriceTrackPanel tipping={tipping} nameOf={(id) => id} initialPrice={price} />)
+  const kindOf = (html: string) => after(html, 'board-price-at').split('>')[0]
+
+  it('opens at the price of today, and says so', () => {
+    const html = at(null)
+    expect(kindOf(html)).toContain('data-at="today"')
+    expect(visibleText(`<${after(html, 'board-price-at').split('</p>')[0]}`)).toBe(strings['plant.price.today'])
+    expect(decode(html)).toContain(
+      formatString(strings['plant.q.price_looked_at'], { price: displayNumber(tipping.today!), unit: unitText(tipping.unit) }),
+    )
+  })
+
+  it('between today and a tipping price: the same answer; past it: what the service says it becomes', () => {
+    for (const direction of ['down', 'up'] as const) {
+      const point = tipping[direction]
+      const end = direction === 'down' ? tipping.low : tipping.high
+      if (point.price === null) {
+        expect(kindOf(at(end))).toContain(
+          `data-at="${point.missing.reason === 'NOT_APPLICABLE' ? 'same' : 'unknown'}"`,
+        )
+        continue
+      }
+      expect(kindOf(at((tipping.today! + point.price) / 2))).toContain('data-at="same"')
+      const past = at(end)
+      expect(kindOf(past)).toContain('data-at="past"')
+      if (point.answer_after !== 'chosen') {
+        expect(decode(past)).toContain(strings[`plant.after.${point.answer_after as 'not_resolved'}`])
+      }
+    }
   })
 })

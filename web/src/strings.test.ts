@@ -372,6 +372,8 @@ const WORDING_SHEET: Record<string, string> = {
   'board.price.title': 'Soybean price',
   'board.price.holds_to': 'same answer all the way to {price} {unit}',
   'board.price.unknown': 'not computed',
+  'board.price.same': 'Same answer as at the price of today.',
+  'board.price.past': 'Past a tipping price: {after}. Further changes are not computed.',
   'board.report': 'Open the full report',
   'board.compare.title': 'Compare the options',
   'board.option': 'Option {letter}',
