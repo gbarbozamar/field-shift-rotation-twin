@@ -122,9 +122,13 @@ class Phase:
     notes: tuple[str, ...] = ()
 
 
-def _ag_year_of(day: dt.date, start_month: int) -> int:
+def ag_year_of(day: dt.date, start_month: int) -> int:
     """The agricultural year a day belongs to, by the year in which it begins."""
     return day.year if day.month >= start_month else day.year - 1
+
+
+# The old private name, kept so that nothing that imports it breaks (S-029).
+_ag_year_of = ag_year_of
 
 
 def first_phase(calendar: RotationCalendar, notes: tuple[str, ...] = ()) -> Phase:

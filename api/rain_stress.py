@@ -68,6 +68,7 @@ __all__ = [
     "RainStress",
     "RainStressMissing",
     "applied_echo",
+    "not_applied_detail",
     "rain_stress",
     "scale_erosivity",
 ]
@@ -106,11 +107,15 @@ def _applied_detail(factor: float) -> str:
     )
 
 
-def _not_applied_detail(factor: float, why: str) -> str:
+def not_applied_detail(factor: float, why: str) -> str:
     return (
         f"rain erosivity not multiplied by {_factor_text(factor)}: {why}, so the "
         f"{STRESS_TEST_LABEL} of heavier rain was not applied; not a forecast"
     )
+
+
+# The old private name, kept so that nothing that imports it breaks (S-029).
+_not_applied_detail = not_applied_detail
 
 
 def _missing_detail(missing: Missing) -> str:
@@ -325,6 +330,4 @@ def applied_echo(
     why = _why_not_read(parameters)
     if why is None:
         return stress
-    return replace(
-        stress, applied=False, detail=_not_applied_detail(stress.factor, why)
-    )
+    return replace(stress, applied=False, detail=not_applied_detail(stress.factor, why))

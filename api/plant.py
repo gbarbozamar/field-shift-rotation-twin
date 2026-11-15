@@ -39,7 +39,6 @@ result or from the request. What an engine raises is a defect: ``500``
 from __future__ import annotations
 
 import dataclasses
-import datetime as dt
 import json
 import logging
 from collections.abc import Callable, Mapping, Sequence
@@ -53,6 +52,7 @@ from adapters.ports import ClimateSource
 from api.carbon_forcing import whole_ag_years
 from api.decisions import example_data_of
 from api.errors import ErrorCode, error_response, join_path
+from api.phases import ag_year_of
 from api.ports import (
     EnginesResult,
     ErrorDetail,
@@ -64,13 +64,13 @@ from api.ports import (
 from api.rain_stress import (
     RainStress,
     RainStressMissing,
-    _not_applied_detail,
     applied_echo,
+    not_applied_detail,
     rain_stress,
     scale_erosivity,
 )
-from api.rotation_validator import _field_names, _submitted_texts
-from api.rotations import PERIOD_NOT_CONFIGURED, _get_climate, _source_out
+from api.rotation_validator import field_names, safe_message, submitted_texts
+from api.rotations import PERIOD_NOT_CONFIGURED, get_climate, source_out
 from contracts.economic_facts import KINDS_OF_YEAR, DeclaredMarginCrop
 from contracts.plant_answer import (
     PlantAnswer,
@@ -131,6 +131,10 @@ NO_FACTORY = (
 NO_CATALOGUE = (
     "the engines were given to the app without the parameter catalogue they "
     "use, so there is no erosivity to scale"
+)
+NOT_FINITE = (
+    "the rainfall erosivity of the parameter catalogue times the factor is not "
+    "a finite number"
 )
 NO_WHOLE_YEAR = (
     "the climate record period holds no whole agricultural year for the start "
@@ -212,19 +216,18 @@ def request_problems(
         errors = error.errors(
             include_url=False, include_context=False, include_input=False
         )
-        submitted = _submitted_texts(body) - _field_names(PlantRequest)
-        details = []
-        for item in errors:
-            message = str(item["msg"])
-            if any(text in message.casefold() for text in submitted):
-                message = REDACTED_MESSAGE
-            details.append(
-                ErrorDetail(
-                    path=join_path(_safe_loc(item["loc"], str(item["type"]))),
-                    code=str(item["type"]),
-                    message=message,
-                )
+        submitted = submitted_texts(body)
+        known = field_names(PlantRequest)
+        details = [
+            ErrorDetail(
+                path=join_path(_safe_loc(item["loc"], str(item["type"]))),
+                code=str(item["type"]),
+                message=safe_message(
+                    str(item["msg"]), submitted, known, REDACTED_MESSAGE
+                ),
             )
+            for item in errors
+        ]
         return None, _code_of(errors), details
     return request, None, []
 
@@ -239,11 +242,6 @@ def _under_rotation(index: int, problem: ErrorDetail) -> ErrorDetail:
 
 
 # --- years of the record and of the rotation ----------------------------------
-
-
-def _ag_year_of(day: dt.date, start_month: int) -> int:
-    """The agricultural year a day belongs to, by the year in which it begins."""
-    return day.year if day.month >= start_month else day.year - 1
 
 
 @dataclasses.dataclass(frozen=True)
@@ -288,7 +286,7 @@ def classify_years(
         )
     declared = sorted(
         {
-            _ag_year_of(day, start_month)
+            ag_year_of(day, start_month)
             for rotation in rotations
             for component in rotation.components
             for day in (component.sowing.date, component.harvest.date)
@@ -339,24 +337,39 @@ def cycle_years(rotation: RotationDefinition, crops: Mapping[str, Any]) -> Cycle
     cycle with no crop, or a declared-margin crop sharing its year with
     another crop (both ``NOT_COMPUTABLE``: ``compute_rotation_margin`` takes
     neither) gives no years, with the reason.
+
+    PROPOSED (S-029, review finding F1): a declared-margin crop kept past its
+    sowing year counts from its sowing year up to the year before the sowing
+    year of the next component (by position), and in its harvest year only
+    when no crop follows it in that year. So a pasture that ends in year Y
+    with the next crop sown later in Y gives Y to that crop. A next crop sown
+    in an earlier year of the pasture (before its harvest year) is not moved:
+    the two still share that year (``NOT_COMPUTABLE``). The last component
+    has no next component inside the definition, so it counts through its
+    harvest year.
     """
     month = rotation.ag_year_start.month
-    by_year: dict[int, list[str]] = {}
-    for component in sorted(rotation.components, key=lambda c: c.position):
-        day = component.sowing.date
-        if day is None:
+    ordered = sorted(rotation.components, key=lambda c: c.position)
+    for component in ordered:
+        if component.sowing.date is None:
             return CycleYears(
                 None,
                 "MISSING_INPUT",
                 f"the sowing date of component {component.component_id!r} is "
                 "missing, so the crops of each agricultural year are not known",
             )
-        first = last = _ag_year_of(day, month)
+    sown = [ag_year_of(c.sowing.date, month) for c in ordered]
+    by_year: dict[int, list[str]] = {}
+    for index, component in enumerate(ordered):
+        first = last = sown[index]
         harvest = component.harvest.date
         if harvest is not None and isinstance(
             crops.get(component.crop_id), DeclaredMarginCrop
         ):
-            last = _ag_year_of(harvest, month)
+            last = ag_year_of(harvest, month)
+            follows = sown[index + 1] if index + 1 < len(ordered) else None
+            if follows is not None and first < last == follows:
+                last -= 1
         for year in range(first, last + 1):
             by_year.setdefault(year, []).append(component.crop_id)
     first, last = min(by_year), max(by_year)
@@ -535,7 +548,11 @@ def _todays_price(request: PlantRequest) -> float | None:
     (contracts/plant_answer/plant_answer.py, PROPOSED fix round 2), which
     exposes no public helper for it. That rule also keeps only ``GrainCrop``
     items; ``PlantRequest`` already refuses a soybean crop_id that is not a
-    grain crop, so the two read the same prices. Keep them in step.
+    grain crop, so the two read the same prices. Keep them in step: it also
+    mirrors the private ``economics.tipping._todays_price``, and
+    ``test_f6_todays_price_reads_as_economics_tipping_does`` in
+    api/test_plant.py compares the two on the contract example (S-029, F6:
+    neither economics/ nor the contract exposes a public helper).
     """
     prices = [
         crop.price.value
@@ -566,6 +583,15 @@ def stressed_run(
     engines were injected, so the catalogue they use is not known): the
     engines unchanged and the echo ``applied`` false, with the reason in its
     detail; never a silent run.
+
+    PROPOSED (S-029, review findings F2 and F3): the echo is computed first.
+    When it says the factor is not applied (EP1 would not read the erosivity
+    of the catalogue as a number), the factory is not called and the engines
+    are unchanged: a run on a copy EP1 reads as unscaled would only repeat the
+    plain run. When the scaled erosivity is not a finite number
+    (``scale_erosivity`` raises ``ValueError``; every other case in which it
+    raises one is already a reason of the echo), the factor is not applied
+    either, with ``NOT_FINITE`` as the reason, never a ``500``.
     """
     factor = request.questions.rain_stress_factor
     if factor is None:
@@ -575,16 +601,20 @@ def stressed_run(
         return StressedRun(engines, stress)
     if factory is None or catalogue is None:
         why = NO_FACTORY if factory is None else NO_CATALOGUE
-        return StressedRun(
-            engines,
-            dataclasses.replace(
-                stress,
-                applied=False,
-                detail=_not_applied_detail(stress.factor, why),
-            ),
-        )
-    return StressedRun(
-        factory(scale_erosivity(catalogue, stress)), applied_echo(catalogue, stress)
+        return StressedRun(engines, _not_applied(stress, why))
+    echo = applied_echo(catalogue, stress)
+    if isinstance(echo, RainStress) and not echo.applied:
+        return StressedRun(engines, echo)
+    try:
+        scaled = scale_erosivity(catalogue, stress)
+    except ValueError:
+        return StressedRun(engines, _not_applied(stress, NOT_FINITE))
+    return StressedRun(factory(scaled), echo)
+
+
+def _not_applied(stress: RainStress, why: str) -> RainStress:
+    return dataclasses.replace(
+        stress, applied=False, detail=not_applied_detail(stress.factor, why)
     )
 
 
@@ -809,7 +839,7 @@ def make_plant_router(
                     problems,
                 )
 
-            climate_result = _get_climate(climate, request.site, settings)
+            climate_result = get_climate(climate, request.site, settings)
             soil_result = soil_slope.get_soil_slope(
                 request.site.case_id, request.site.field_id
             )
@@ -820,7 +850,7 @@ def make_plant_router(
             ]
             infos = [climate_result.source, soil_result.source]
             sources = [
-                *(_source_out(info).model_dump(mode="json") for info in infos),
+                *(source_out(info).model_dump(mode="json") for info in infos),
                 _record_source(kinds_of_year_record),
             ]
             example_data = (

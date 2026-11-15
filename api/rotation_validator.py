@@ -37,15 +37,15 @@ REDACTED_MESSAGE = "The value breaks a rule of the rotation definition contract.
 _SHORTEST_VALUE_LOOKED_FOR = 3
 
 
-def _submitted_texts(value: Any) -> set[str]:
+def submitted_texts(value: Any) -> set[str]:
     """Every value and key of the submitted item, as lower-case text."""
     texts: set[str] = set()
     if isinstance(value, Mapping):
         for key, item in value.items():
-            texts |= _submitted_texts(key) | _submitted_texts(item)
+            texts |= submitted_texts(key) | submitted_texts(item)
     elif isinstance(value, list | tuple):
         for item in value:
-            texts |= _submitted_texts(item)
+            texts |= submitted_texts(item)
     elif isinstance(value, str | int | float) and not isinstance(value, bool):
         text = str(value).strip().casefold()
         if len(text) >= _SHORTEST_VALUE_LOOKED_FOR:
@@ -53,19 +53,25 @@ def _submitted_texts(value: Any) -> set[str]:
     return texts
 
 
-def _safe_message(message: str, submitted: set[str], known: set[str]) -> str:
-    """The message, or the fixed text when it repeats a submitted value.
+def safe_message(
+    message: str,
+    submitted: set[str],
+    known: set[str],
+    redacted: str = REDACTED_MESSAGE,
+) -> str:
+    """The message, or the fixed text ``redacted`` when it repeats a submitted value.
 
     ``known`` holds the texts the contract itself defines (its field names):
     a message may name them even though the request also contains them.
+    ``redacted`` lets another route write its own fixed text (PROPOSED, S-029).
     """
     lowered = message.casefold()
     if any(text in lowered for text in submitted - known):
-        return REDACTED_MESSAGE
+        return redacted
     return message
 
 
-def _field_names(model: type[BaseModel], seen: set[type] | None = None) -> set[str]:
+def field_names(model: type[BaseModel], seen: set[type] | None = None) -> set[str]:
     """Field names of a model and of the models it nests, lower-case."""
     seen = seen if seen is not None else set()
     if model in seen:
@@ -75,8 +81,14 @@ def _field_names(model: type[BaseModel], seen: set[type] | None = None) -> set[s
     for name, field in model.model_fields.items():
         names.add(name.casefold())
         for nested in _nested_models(field.annotation):
-            names |= _field_names(nested, seen)
+            names |= field_names(nested, seen)
     return names
+
+
+# The old private names, kept so that nothing that imports them breaks (S-029).
+_submitted_texts = submitted_texts
+_safe_message = safe_message
+_field_names = field_names
 
 
 def _nested_models(annotation: Any) -> list[type[BaseModel]]:
@@ -100,13 +112,13 @@ class RotationDefinitionValidator:
         try:
             load_rotation_definition(rotation)
         except ValidationError as error:
-            submitted = _submitted_texts(rotation)
-            known = _field_names(RotationDefinition)
+            submitted = submitted_texts(rotation)
+            known = field_names(RotationDefinition)
             return [
                 ErrorDetail(
                     path=join_path(item["loc"]),
                     code=str(item["type"]),
-                    message=_safe_message(str(item["msg"]), submitted, known),
+                    message=safe_message(str(item["msg"]), submitted, known),
                 )
                 for item in error.errors(
                     include_url=False, include_context=False, include_input=False
