@@ -68,6 +68,7 @@ __all__ = [
     "RainStress",
     "RainStressMissing",
     "applied_echo",
+    "not_applied_detail",
     "rain_stress",
     "scale_erosivity",
 ]
@@ -106,7 +107,7 @@ def _applied_detail(factor: float) -> str:
     )
 
 
-def _not_applied_detail(factor: float, why: str) -> str:
+def not_applied_detail(factor: float, why: str) -> str:
     return (
         f"rain erosivity not multiplied by {_factor_text(factor)}: {why}, so the "
         f"{STRESS_TEST_LABEL} of heavier rain was not applied; not a forecast"
@@ -308,6 +309,36 @@ def scale_erosivity(
     }
 
 
+def scales_to_finite(
+    parameters: dict[str, dict], stress: RainStress | RainStressMissing
+) -> bool:
+    """Whether every number ``scale_erosivity`` multiplies stays finite.
+
+    PROPOSED (S-029, remark R3): the same records as ``_scaled_record`` scales
+    (EP1's ``R_ID`` records that are not placeholders and whose value
+    ``read_value`` reads as a number), and the same products (the value and
+    both bounds of a range that is not null), each checked with
+    ``math.isfinite``. A ``RainStressMissing`` multiplies nothing: true.
+    Raises ``TypeError`` for an argument of another type and ``ValueError``
+    where ``read_value`` refuses a record, as ``scale_erosivity`` does.
+    """
+    _check_parameters(parameters)
+    _check_stress(stress)
+    if isinstance(stress, RainStressMissing):
+        return True
+    for record in parameters.values():
+        if not _is_ep1_record(record) or is_placeholder(record):
+            continue
+        if isinstance(read_value(record), CatalogueMissing):
+            continue
+        numbers = [record["value"]]
+        if record["range"] is not None:
+            numbers += [record["range"]["low"], record["range"]["high"]]
+        if not all(math.isfinite(number * stress.factor) for number in numbers):
+            return False
+    return True
+
+
 def applied_echo(
     parameters: dict[str, dict], stress: RainStress | RainStressMissing
 ) -> RainStress | RainStressMissing:
@@ -325,6 +356,4 @@ def applied_echo(
     why = _why_not_read(parameters)
     if why is None:
         return stress
-    return replace(
-        stress, applied=False, detail=_not_applied_detail(stress.factor, why)
-    )
+    return replace(stress, applied=False, detail=not_applied_detail(stress.factor, why))

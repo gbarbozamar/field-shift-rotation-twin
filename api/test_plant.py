@@ -841,3 +841,429 @@ def test_the_rotation_route_is_unchanged_next_to_the_new_one():
     )
     assert response.status_code == 200, response.text
     assert response.json()["result"]["rotation_id"] == SOYBEAN
+
+
+# --- review of the whole 3 (brief S-029), PROPOSED test cases ---------------------------
+
+
+def _day(ag_year: int, month: int, day: int) -> dt.date:
+    """The day of agricultural year ``ag_year`` (START_MONTH) with this month
+    and day: built from explicit numbers, never by ``date.replace(year=...)``."""
+    assert (month, day) != (2, 29), "a day that every year has"
+    return dt.date(ag_year if month >= START_MONTH else ag_year + 1, month, day)
+
+
+def _declared(day: dt.date) -> dict[str, Any]:
+    return {"date": day.isoformat(), "provenance": "DECLARED", "source": "user"}
+
+
+def _date_of(item: dict[str, Any]) -> dt.date:
+    return dt.date.fromisoformat(item["date"])
+
+
+def _pasture_rotation(request: dict[str, Any]) -> dict[str, Any]:
+    (pasture,) = [r for r in request["rotations"] if r["rotation_id"] == PASTURE]
+    return pasture
+
+
+def _ag(day: dt.date) -> int:
+    from api.phases import ag_year_of
+
+    return ag_year_of(day, START_MONTH)
+
+
+def _example_years() -> tuple[int, list[str], str]:
+    """The example pasture rotation read as agricultural years: the year the
+    pasture is sown, the crop_ids of the year before it (every other
+    component) and the pasture's crop_id."""
+    *first_ones, pasture = _pasture_rotation(REQUEST)["components"]
+    (first_year,) = {_ag(_date_of(c["sowing"])) for c in first_ones}
+    pasture_year = _ag(_date_of(pasture["sowing"]))
+    assert pasture_year == first_year + 1
+    return pasture_year, [c["crop_id"] for c in first_ones], pasture["crop_id"]
+
+
+def _pasture_then_soybean(harvest_after_sowing_days: int | None = None):
+    """The pasture rotation with the pasture kept until a harvest two
+    agricultural years after its sowing and a soybean sown later in that same
+    year (example data of this test, derived from the example request).
+
+    With ``harvest_after_sowing_days``, the pasture is harvested that many
+    days after the follower is sown instead (an overlap when above zero).
+    Returns the request and the pasture's harvest year.
+    """
+    request = copy.deepcopy(REQUEST)
+    pasture = _pasture_rotation(request)
+    soybean, last = pasture["components"][0], pasture["components"][-1]
+    pasture_year, _, _ = _example_years()
+    soy_sown, soy_harvest = _date_of(soybean["sowing"]), _date_of(soybean["harvest"])
+    end_year = pasture_year + 2
+    follower_sown = _day(end_year, soy_sown.month, soy_sown.day)
+    if harvest_after_sowing_days is None:
+        # The first day of the agricultural year: before the follower's sowing.
+        end = _day(end_year, START_MONTH, 1)
+        assert end < follower_sown
+    else:
+        end = follower_sown + dt.timedelta(days=harvest_after_sowing_days)
+    assert _ag(end) == end_year
+    last["harvest"] = _declared(end)
+    follower = copy.deepcopy(soybean)
+    follower["component_id"] = soybean["component_id"] + "-after-pasture"
+    follower["position"] = last["position"] + 1
+    follower["sowing"] = _declared(follower_sown)
+    harvest_year = end_year + _ag(soy_harvest) - _ag(soy_sown)
+    follower["harvest"] = _declared(
+        _day(harvest_year, soy_harvest.month, soy_harvest.day)
+    )
+    pasture["components"].append(follower)
+    return request, end_year
+
+
+def _cycle_of(request: dict[str, Any]):
+    from api.plant import cycle_years
+    from contracts.rotation_definition import RotationDefinition
+
+    plant_request = PlantRequest.model_validate_json(json.dumps(request))
+    crops = {c.crop_id: c for c in plant_request.economic_facts.crops}
+    definition = RotationDefinition.model_validate(_pasture_rotation(request))
+    return plant_request, cycle_years(definition, crops)
+
+
+def _pasture_option(request: dict[str, Any]) -> tuple[dict, dict]:
+    data = answered(client().post(ROUTE, json=request))
+    checked(request, data)
+    (option,) = [o for o in data["options"] if o["rotation_id"] == PASTURE]
+    return data, option
+
+
+def _margin_reasons(option: dict[str, Any]) -> set[str | None]:
+    return {m["reason"] for m in option["margin"].values()}
+
+
+def _assert_margin_as_computed(request: dict[str, Any]) -> None:
+    from economics.margin import compute_rotation_margin
+
+    plant_request, cycle = _cycle_of(request)
+    data, option = _pasture_option(request)
+    assert "NOT_COMPUTABLE" not in _margin_reasons(option)
+    expected = compute_rotation_margin(
+        cycle.years, plant_request.economic_facts, data["kinds_of_year"]["counts"]
+    )
+    assert option["margin"]["average"] == json.loads(
+        json.dumps(dataclasses.asdict(expected.average))
+    )
+
+
+def test_f1_a_crop_sown_in_the_year_a_pasture_ends_gets_computed_margins():
+    """F1: a declared-margin crop counts up to the year before the next crop's
+    sowing year; its harvest year only when no crop follows it in that year."""
+    request, end_year = _pasture_then_soybean()
+    pasture_year, first_crops, pasture_id = _example_years()
+    _, cycle = _cycle_of(request)
+    soybean_id = _pasture_rotation(request)["components"][-1]["crop_id"]
+    kept = end_year - pasture_year  # from its sowing year to its harvest year - 1
+    assert cycle.years == [first_crops, *[[pasture_id]] * kept, [soybean_id]]
+    _assert_margin_as_computed(request)
+
+
+def test_f1_a_crop_sown_while_the_pasture_is_kept_still_shares_its_year():
+    """F1: only a crop sown in the pasture's harvest year ends it early; one
+    sown in an earlier year of the pasture still shares that year."""
+    request, _ = _pasture_then_soybean()
+    follower = _pasture_rotation(request)["components"][-1]
+    for key in ("sowing", "harvest"):
+        day = _date_of(follower[key])
+        follower[key] = _declared(_day(_ag(day) - 1, day.month, day.day))
+    _, option = _pasture_option(request)
+    assert _margin_reasons(option) == {"NOT_COMPUTABLE"}
+
+
+def test_r2_a_crop_sown_before_the_pasture_harvest_date_shares_the_year():
+    """R2: the harvest year goes to the follower only when it is sown on or
+    after the harvest date; sown one day before it, the two overlap and keep
+    sharing the year (NOT_COMPUTABLE): the trimming never hides an overlap."""
+    request, end_year = _pasture_then_soybean(harvest_after_sowing_days=1)
+    pasture_year, first_crops, pasture_id = _example_years()
+    _, cycle = _cycle_of(request)
+    soybean_id = _pasture_rotation(request)["components"][-1]["crop_id"]
+    kept = end_year - pasture_year
+    assert cycle.years == [
+        first_crops,
+        *[[pasture_id]] * kept,
+        [pasture_id, soybean_id],
+    ]
+    _, option = _pasture_option(request)
+    assert _margin_reasons(option) == {"NOT_COMPUTABLE"}
+
+
+def test_r2_a_crop_sown_on_the_pasture_harvest_date_takes_the_year():
+    """R2: sown on the harvest date itself ("on or after"), the follower
+    takes the harvest year."""
+    request, end_year = _pasture_then_soybean(harvest_after_sowing_days=0)
+    pasture_year, first_crops, pasture_id = _example_years()
+    _, cycle = _cycle_of(request)
+    soybean_id = _pasture_rotation(request)["components"][-1]["crop_id"]
+    kept = end_year - pasture_year
+    assert cycle.years == [first_crops, *[[pasture_id]] * kept, [soybean_id]]
+    _assert_margin_as_computed(request)
+
+
+def _pasture_last_until(end: dt.date, repeats: bool = True) -> dict[str, Any]:
+    """The example pasture rotation with its pasture, the last component,
+    harvested on ``end`` (example data of this test)."""
+    request = copy.deepcopy(REQUEST)
+    pasture = _pasture_rotation(request)
+    pasture["components"][-1]["harvest"] = _declared(end)
+    pasture["repeats"] = repeats
+    return request
+
+
+def _next_cycle_sowing() -> tuple[int, dt.date]:
+    """The year after the pasture's sowing year and the day of that year on
+    which the first component is sown (by its month and day)."""
+    pasture_year, _, _ = _example_years()
+    sown = _date_of(_pasture_rotation(REQUEST)["components"][0]["sowing"])
+    return pasture_year + 1, _day(pasture_year + 1, sown.month, sown.day)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "OPEN (S-029 remark R1): fixing it changes the expected cycle of "
+        "test_a_pasture_kept_several_years_counts_in_each_year_until_its_harvest, "
+        "which a person decides"
+    ),
+)
+def test_r1_the_last_pasture_gives_its_harvest_year_to_the_next_cycle():
+    """R1: a declared-margin crop that is the last component, harvested in
+    the year the first component of the next cycle is sown and before that
+    sowing date, does not count that year: the cycle is not one year longer
+    than the one the calendar repeats (point 3 of engine/calendar/repeat.py)."""
+    next_year, next_sown = _next_cycle_sowing()
+    _, first_crops, pasture_id = _example_years()
+    end = _day(next_year, START_MONTH, 1)
+    assert end < next_sown
+    request = _pasture_last_until(end)
+    _, cycle = _cycle_of(request)
+    assert cycle.years == [first_crops, [pasture_id]]
+    _assert_margin_as_computed(request)
+
+
+def test_r1_a_pasture_harvested_after_the_next_sowing_day_keeps_its_year():
+    """R1: harvested after the next cycle's first sowing day of that year, the
+    calendar's cycle is one year longer too, so the pasture keeps its harvest
+    year and the next cycle starts a year later (true now and under the rule
+    R1 asks for)."""
+    _, next_sown = _next_cycle_sowing()
+    _, first_crops, pasture_id = _example_years()
+    request = _pasture_last_until(next_sown + dt.timedelta(days=1))
+    _, cycle = _cycle_of(request)
+    assert cycle.years == [first_crops, [pasture_id], [pasture_id]]
+
+
+def test_r1_a_rotation_that_does_not_repeat_keeps_the_harvest_year():
+    """R1: with ``repeats`` false no cycle follows, so the last pasture counts
+    through its harvest year (true now and under the rule R1 asks for)."""
+    next_year, _ = _next_cycle_sowing()
+    _, first_crops, pasture_id = _example_years()
+    request = _pasture_last_until(_day(next_year, START_MONTH, 1), repeats=False)
+    _, cycle = _cycle_of(request)
+    assert cycle.years == [first_crops, [pasture_id], [pasture_id]]
+
+
+# PROPOSED example factor of this test: large enough that the erosivity of
+# the repository catalogue times it is not a finite number.
+HUGE_FACTOR = 1e308
+
+
+def test_f2_a_factor_whose_scaled_erosivity_is_not_finite_is_not_applied():
+    """F2: a typed absence (the echo applied false, with why), never a 500."""
+    from api.plant import NOT_FINITE
+
+    factor = dict(REQUEST["questions"]["rain_stress_factor"], value=HUGE_FACTOR)
+    factory = Factory()
+    request = body(rain_stress_factor=factor)
+    data = answered(client(engines_factory=factory).post(ROUTE, json=request))
+    checked(request, data)
+    assert factory.catalogues == []
+    echo = data["rain_stress"]
+    assert echo["applied"] is False
+    assert NOT_FINITE in echo["detail"]
+
+
+def _counting_factory():
+    calls: list[dict[str, dict]] = []
+
+    def factory(catalogue: dict[str, dict]) -> FakeEngines:
+        calls.append(catalogue)
+        return FakeEngines()
+
+    return factory, calls
+
+
+WITHOUT_R = {k: r for k, r in CATALOGUE.items() if r.get("id") != R_ID}
+
+
+def test_f3_a_catalogue_without_the_r_record_never_calls_the_factory():
+    """F3: when EP1 would not read the level, the factory is not called."""
+    from api.plant import stressed_run
+
+    factory, calls = _counting_factory()
+    engines = FakeEngines()
+    request = PlantRequest.model_validate_json(json.dumps(REQUEST))
+    run = stressed_run(request, engines, factory, WITHOUT_R)
+    assert calls == []
+    assert run.engines is engines
+    assert run.echo.applied is False
+    assert R_ID in run.echo.detail
+
+
+def test_f3_through_the_route_the_factory_is_not_called():
+    factory, calls = _counting_factory()
+    response = client(
+        parameters=WITHOUT_R, engines_factory=factory, settings=RunSettings()
+    ).post(ROUTE, json=REQUEST)
+    data = answered(response)
+    checked(REQUEST, data)
+    assert calls == []
+    assert data["rain_stress"]["applied"] is False
+
+
+def test_r3_another_value_error_of_scale_erosivity_is_not_called_not_finite(
+    monkeypatch,
+):
+    """R3: only a scaled erosivity that is not finite is the NOT_FINITE
+    absence; any other ValueError of scale_erosivity surfaces as before (the
+    route's 500, a defect), never relabelled."""
+    import api.plant
+
+    def raises(parameters, stress):
+        raise ValueError("another defect")
+
+    monkeypatch.setattr(api.plant, "scale_erosivity", raises)
+    factory = Factory()
+    response = client(engines_factory=factory).post(ROUTE, json=REQUEST)
+    assert response.status_code == 500, response.text
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert factory.catalogues == []
+
+
+def test_r3_scales_to_finite_reads_the_products():
+    from api.rain_stress import scales_to_finite
+
+    stress = rain_stress(
+        Value.model_validate(REQUEST["questions"]["rain_stress_factor"])
+    )
+    huge = rain_stress(
+        Value.model_validate(
+            dict(REQUEST["questions"]["rain_stress_factor"], value=HUGE_FACTOR)
+        )
+    )
+    assert scales_to_finite(CATALOGUE, stress) is True
+    assert scales_to_finite(CATALOGUE, huge) is False
+
+
+def _with_soybean_price(price: dict[str, Any]) -> PlantRequest:
+    request = copy.deepcopy(REQUEST)
+    soy = REQUEST["questions"]["soybean_crop_ids"][0]
+    (crop,) = [c for c in request["economic_facts"]["crops"] if c["crop_id"] == soy]
+    if price:
+        crop["price"] = price
+    return PlantRequest.model_validate_json(json.dumps(request))
+
+
+@pytest.mark.parametrize(
+    "price",
+    [
+        {},
+        {"value": None, "unit": "USD t-1", "missing": {"reason": "NOT_DECLARED"}},
+    ],
+)
+def test_f6_todays_price_reads_as_economics_tipping_does(price):
+    """F6: the route's copy of the rule and the private rule of
+    economics.tipping read the same price on the contract example (keep them
+    in step)."""
+    from api.plant import _todays_price
+    from contracts.economic_facts import GrainCrop
+    from economics.tipping import _todays_price as tipping_today
+
+    request = _with_soybean_price(price)
+    soybeans = {
+        c.crop_id: c
+        for c in request.economic_facts.crops
+        if c.crop_id in request.questions.soybean_crop_ids and isinstance(c, GrainCrop)
+    }
+    assert _todays_price(request) == tipping_today(soybeans)[0]
+
+
+def _two_soybeans_at(prices: tuple[float, float]) -> dict[str, Any]:
+    """The example request with a second soybean crop (example data of this
+    test): the first at ``prices[0]``, the copy at ``prices[1]``."""
+    request = copy.deepcopy(REQUEST)
+    soy = REQUEST["questions"]["soybean_crop_ids"][0]
+    (crop,) = [c for c in request["economic_facts"]["crops"] if c["crop_id"] == soy]
+    other = copy.deepcopy(crop)
+    other["crop_id"] = soy + "_second"
+    crop["price"]["value"], other["price"]["value"] = prices
+    request["economic_facts"]["crops"].append(other)
+    request["questions"]["soybean_crop_ids"] = [soy, other["crop_id"]]
+    # Every named soybean crop is sown by a rotation (PlantRequest).
+    (first,) = [r for r in request["rotations"] if r["rotation_id"] == SOYBEAN]
+    first["components"][0]["crop_id"] = other["crop_id"]
+    return request
+
+
+def _named_soybeans(facts: Any, ids: Any) -> dict[str, Any]:
+    from contracts.economic_facts import GrainCrop
+
+    return {
+        c.crop_id: c
+        for c in facts.crops
+        if c.crop_id in ids and isinstance(c, GrainCrop)
+    }
+
+
+def test_r7_soybean_crops_with_different_prices_are_refused_as_economics_does():
+    """R7: economics.tipping refuses named soybean crops with different
+    prices (ValueError); PlantRequest refuses them too, so the route answers
+    422 with the one error shape and never reaches its reading of today's
+    price (no 500)."""
+    from contracts.economic_facts import EconomicFacts
+    from economics.tipping import _todays_price as tipping_today
+
+    price = _example_soybean_price()
+    request = _two_soybeans_at((price, price + price))
+    facts = EconomicFacts.model_validate(request["economic_facts"])
+    soybeans = _named_soybeans(facts, request["questions"]["soybean_crop_ids"])
+    with pytest.raises(ValueError, match="different prices"):
+        tipping_today(soybeans)
+    with pytest.raises(ValueError, match="different prices"):
+        PlantRequest.model_validate_json(json.dumps(request))
+    response = client().post(ROUTE, json=request)
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert set(error) == {"code", "message", "details"}
+    assert error["code"] == "INVALID_REQUEST"
+
+
+def test_r7_two_soybean_crops_at_one_price_read_as_economics_does():
+    """R7: named soybean crops at one and the same price: the route's
+    today's price is the one economics.tipping reads."""
+    from api.plant import _todays_price
+    from economics.tipping import _todays_price as tipping_today
+
+    price = _example_soybean_price()
+    request = PlantRequest.model_validate_json(
+        json.dumps(_two_soybeans_at((price, price)))
+    )
+    soybeans = _named_soybeans(
+        request.economic_facts, request.questions.soybean_crop_ids
+    )
+    assert _todays_price(request) == tipping_today(soybeans)[0] == price
+
+
+def _example_soybean_price() -> float:
+    """The declared soybean price of the example request."""
+    soy = REQUEST["questions"]["soybean_crop_ids"][0]
+    (crop,) = [c for c in REQUEST["economic_facts"]["crops"] if c["crop_id"] == soy]
+    return crop["price"]["value"]

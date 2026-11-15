@@ -216,7 +216,7 @@ def derive_outcome(
     return "partial"
 
 
-def _source_out(info: SourceInfo) -> SourceOut:
+def source_out(info: SourceInfo) -> SourceOut:
     return SourceOut(
         id=info.id,
         contract=info.contract,
@@ -294,7 +294,7 @@ def build_envelope(
         result=first.result,
         result_missing=first.result_missing,
         modules=first.modules,
-        sources=[_source_out(s) for s in sources],
+        sources=[source_out(s) for s in sources],
         scenarios=scenarios,
     )
 
@@ -327,7 +327,7 @@ def make_router(
                     ErrorCode.ROTATION_INVALID,
                     [_under_rotation(p) for p in problems],
                 )
-            climate_result = _get_climate(climate, body.site, settings)
+            climate_result = get_climate(climate, body.site, settings)
             soil_result = soil_slope.get_soil_slope(
                 body.site.case_id, body.site.field_id
             )
@@ -343,7 +343,7 @@ def make_router(
     return router
 
 
-def _get_climate(
+def get_climate(
     climate: ClimateSource, site: SiteReference, settings: RunSettings
 ) -> ClimateResult:
     if not settings.has_period:
