@@ -230,16 +230,17 @@ compute_water_deficit_exposure(
 
 The lead developer confirms or corrects this: Q2.
 
-Why these arguments: the indicator is defined over the critical period of the crop (C1.4), which needs the calendar; the balance is daily (C1.4), which needs the daily series of `SiteClimate`; soil data reaches the engines lane through `SiteSoilSlope` (blueprint section 5). Which series and which soil properties the engine reads are questions 9 and 16 of `contracts/inputs/README.md`.
+Why these arguments: the indicator is defined over the critical period of the crop (C1.4), and until that is defined over the whole cycle of each crop, from sowing to harvest (D105, [D157](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888807199)); either needs the calendar; the balance is daily (C1.4), which needs the daily series of `SiteClimate`; soil data reaches the engines lane through `SiteSoilSlope` (blueprint section 5). Which series and which soil properties the engine reads are questions 9 and 16 of `contracts/inputs/README.md`.
 
 What it returns: a list with at least one `WaterDeficitExposure`, all on one time basis. It goes unchanged into the field `water_deficit_exposure` of `ResultsPerRotation`, which checks those two rules; a bare list is not checked by any model.
 
 When it cannot compute:
 
-- While the definition of the indicator is incomplete (C1.4), every item is missing, with its reason, in the unit `dimensionless`. The reason code for that case is question 4 of `contracts/results/README.md`; the examples use `NOT_AVAILABLE`.
-- Otherwise G4 applies to every item.
+- **When an item is a number (D157).** Decided by [D157 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888807199), which amends D61: "EP3 reports `water_deficit_exposure` as a number when the daily balance was computed on every day of the agricultural year." "A year with no day with a living crop is `NOT_APPLICABLE`." "Every value carries the label "whole cycle, not critical period" (D105)." "This amends D61: `NOT_AVAILABLE` no longer applies to a year the chain computed." The ratio and its two quantities are in C1.4.
+- **Decided by D157, not built yet.** On `main`, `compute_water_deficit_exposure` returns no number: a year whose daily balance was computed on every day is missing with reason `NOT_AVAILABLE` and a detail saying that the definition of the indicator is incomplete (C1.4, D61; `_definition_incomplete` in `engine/water/exposure.py`). That is the behaviour of D61, which stays on `main` until the unit that builds D157 lands in `engine/water/`. Every item is in the unit `dimensionless`.
+- Otherwise G4 applies to every item. D157: "a year the chain cannot compute keeps its own reason."
 - The list is never empty and an agricultural year is never left out.
-- The time basis of the items is `OPEN` in C1.3. The signature is the same for either answer.
+- The time basis of the items is one value per agricultural year (D47), decided by D157 (C1.3). The signature does not change. On `main` EP3 writes one item per agricultural year, on the time basis `ag_year`, and one item on the time basis `rotation` only when the agricultural years cannot be laid out (the start month is missing, or the record has no daily `precipitation` series; docstring of `compute_water_deficit_exposure`).
 
 Phases (D132, D141): by [D132](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887062652), EP3 is called on the calendar of a phase, a `RotationCalendar` that the runner moved, and this signature does not change (D56). How EP3 lays that calendar over the record, and so how [D141](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887747713) reads in this engine, is not described in this section: it is the text of the unit that builds it (`engine/water/EXPOSURE.md`, OPEN 5). D147 and D148 do not concern this entry.
 
