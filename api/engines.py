@@ -201,6 +201,9 @@ class EngineFunctions:
     # when both are given; otherwise only phase 1 runs.
     phase_calendar: Callable[..., RotationCalendar] | None = None
     list_phases: Callable[..., list[int]] | None = None
+    # Optional: the components lane L1 names as crossing into a phase's first
+    # year, only counted for the calendar module's note.
+    components_crossing_phase: Callable[..., list[str]] | None = None
 
 
 def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
@@ -231,6 +234,7 @@ def _import_function(point: EntryPoint) -> Callable[..., Any] | None:
 PHASE_FUNCTIONS: tuple[EntryPoint, ...] = (
     EntryPoint("D109", "calendar", REPEAT_MODULE, "phase_calendar"),
     EntryPoint("D109", "calendar", REPEAT_MODULE, "list_phases"),
+    EntryPoint("D109", "calendar", REPEAT_MODULE, "components_crossing_phase"),
 )
 
 
@@ -238,7 +242,8 @@ def discover_engine_functions() -> EngineFunctions:
     """Import each engine function by its exact module path and name.
 
     Also the two phase functions of issue #221; either one absent leaves both
-    ``None`` in effect (the runner then runs phase 1 only).
+    ``None`` in effect (the runner then runs phase 1 only); and
+    ``components_crossing_phase``, optional (without it no count is written).
     """
     return EngineFunctions(
         **{point.function: _import_function(point) for point in DISCOVERED},
@@ -250,7 +255,10 @@ def phase_functions_of(functions: EngineFunctions) -> PhaseFunctions | None:
     """Lane L1's phase functions when both exist, else ``None`` (phase 1 only)."""
     if functions.phase_calendar is not None and functions.list_phases is not None:
         return PhaseFunctions(
-            functions.phase_calendar, functions.list_phases, REPEAT_MODULE
+            functions.phase_calendar,
+            functions.list_phases,
+            REPEAT_MODULE,
+            functions.components_crossing_phase,
         )
     return None
 
@@ -609,8 +617,9 @@ def ledger_carbon_inputs(ledger: Any) -> Any:
 def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     """The note on the carbon inputs copied from the ledger (PROPOSED text).
 
-    States, when a series is not in the unit AMG requires, that D147 has EP4
-    write that unit (the runner converts none), that the ledger
+    States, when a series is not in the unit AMG requires, that it does not
+    follow D147 (EP4 is to write that unit; the runner converts none), so AMG
+    refuses it; that the ledger
     wrote no series when it wrote none, and how many series carry
     ``NOT_COMPUTABLE`` years, copied, never left out.
     """
@@ -629,8 +638,9 @@ def ledger_inputs_detail(forcing: CarbonForcing) -> str:
     )
     if any(unit != STOCK_UNIT for unit in units):
         note += (
-            f" and {_name(AMG)} requires {STOCK_UNIT!r}: by D147 of issue #77 "
-            f"{_name(RESIDUES)} writes these series in {STOCK_UNIT!r}"
+            f"; {_name(AMG)} requires {STOCK_UNIT!r}: these series do not follow "
+            f"D147 of issue #77 ({_name(RESIDUES)} is to write {STOCK_UNIT!r}), "
+            "so AMG refuses them"
         )
     not_computable = sum(
         1

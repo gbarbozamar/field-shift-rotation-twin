@@ -351,7 +351,8 @@ def test_the_series_reach_ep5_unchanged_in_their_unit():
     assert {s.unit for s in forcing.annual_carbon_inputs} == {LEDGER_UNIT}
     detail = modules(result)["amg"].detail
     assert LEFT_UNCHANGED in detail
-    assert "D147" in detail and "OPEN" not in detail
+    assert "do not follow D147" in detail and "OPEN" not in detail
+    assert "AMG refuses them" in detail
     assert producer.STOCK_UNIT in detail
     # The example's crops are not identifiers: the note is kept with a ledger.
     crops = {c["crop_id"] for c in CALENDAR_DOCUMENT["components"]}

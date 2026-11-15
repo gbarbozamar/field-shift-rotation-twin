@@ -33,10 +33,10 @@ from api.engines import (
 )
 from api.main import create_app
 from api.phases import (
-    CROSSING_D141,
+    CROSSING_COUNTED,
+    LEAP_DAYS_MOVED,
     PHASE_FUNCTIONS_NOT_FOUND,
     PhaseFunctions,
-    crossing_components,
     phase_calendars,
     scenario_id,
 )
@@ -109,24 +109,25 @@ THREE_YEARS = hand_calendar(
     ],
 )
 # Hand-written answers of a fake phase function for THREE_YEARS (PLACEHOLDER
-# dates, not computed): phase 1 and phase 2 with c on 28 February.
+# dates, not computed): phase p starts in agricultural year 2001 + p, the
+# components of earlier years one cycle later.
 THREE_YEARS_PHASES = {
     1: hand_calendar(
-        "2001-07-01",
-        "2004-06-30",
+        "2002-09-01",
+        "2004-12-31",
         [
-            component("b", "2001-09-01", "2002-02-28"),
-            component("c", "2002-09-01", "2003-02-28"),
-            component("a", "2003-09-01", "2003-12-31"),
+            component("b", "2002-09-01", "2003-02-28"),
+            component("c", "2003-09-01", "2004-02-29"),
+            component("a", "2004-09-01", "2004-12-31"),
         ],
     ),
     2: hand_calendar(
-        "2001-07-01",
-        "2004-06-30",
+        "2003-09-01",
+        "2006-02-28",
         [
-            component("c", "2001-09-01", "2002-02-28"),
-            component("a", "2002-09-01", "2002-12-31"),
-            component("b", "2003-09-01", "2004-02-28"),
+            component("c", "2003-09-01", "2004-02-29"),
+            component("a", "2004-09-01", "2004-12-31"),
+            component("b", "2005-09-01", "2006-02-28"),
         ],
     ),
 }
@@ -135,11 +136,37 @@ ONE_YEAR = hand_calendar(
 )
 
 
-class FakePhases:
-    """``phase_calendar`` and ``list_phases`` as issue #221 names them.
+def _example_phase_1() -> RotationCalendar:
+    """A hand-written phase 2 of the PLACEHOLDER calendar of test_engines, in
+    the flagged form (PLACEHOLDER dates, not computed): it starts in the
+    agricultural year 2002; component 1 one cycle later; component 2, which
+    crosses 2002-07-01, one cycle later with its end missing."""
+    document = calendar().model_dump(mode="json")
+    first, second, third = document["components"]
+    document["start_date"], document["end_date"] = "2002-11-01", "2004-04-01"
+    first["start"]["date"], first["end"]["date"] = "2003-09-01", "2004-02-28"
+    first["periods"][0]["start"]["date"] = "2003-09-01"
+    first["periods"][0]["end"]["date"] = "2003-11-30"
+    first["periods"][1]["start"]["date"] = "2003-12-01"
+    first["periods"][1]["end"]["date"] = "2004-02-28"
+    second["start"]["date"] = "2004-04-01"
+    second["end"] = {
+        "date": None,
+        "missing": {"reason": "NOT_COMPUTABLE", "detail": "PLACEHOLDER"},
+    }
+    document["components"] = [third, first, second]
+    return RotationCalendar.model_validate(document)
 
-    ``count`` phases; phase ``p`` answers ``answers[p]``, else a copy of the
-    calendar it was given (hand-written answers, never a computed rule).
+
+EXAMPLE_PHASES = {1: _example_phase_1()}
+
+
+class FakePhases:
+    """The phase functions of issue #221, as fakes with hand-written answers.
+
+    ``count`` phases; phase ``p`` answers ``answers[p]`` (never a computed
+    rule). ``crossing``: what ``components_crossing_phase`` names per phase;
+    ``None`` leaves that function out.
     """
 
     def __init__(
@@ -147,53 +174,52 @@ class FakePhases:
         count: int,
         answers: dict[int, Any] | None = None,
         raises: bool = False,
+        crossing: dict[int, list[str]] | None = None,
     ) -> None:
         self.calls: list[tuple[str, tuple]] = []
         self.count = count
         self.answers = answers or {}
         self.raises = raises
+        self.crossing = crossing
 
     def phase_calendar(self, cal: RotationCalendar, p: int) -> RotationCalendar:
         self.calls.append(("phase_calendar", (cal, p)))
         if self.raises:
             raise ValueError("PLACEHOLDER: a defect of the phase function")
-        if p in self.answers:
-            return self.answers[p]
-        return cal.model_copy(deep=True)
+        return self.answers[p]
 
     def list_phases(self, cal: RotationCalendar) -> list[int]:
         self.calls.append(("list_phases", (cal,)))
         return list(range(self.count))
 
+    def components_crossing_phase(self, cal: RotationCalendar, p: int) -> list[str]:
+        self.calls.append(("components_crossing_phase", (cal, p)))
+        assert self.crossing is not None
+        return self.crossing.get(p, [])
+
+    def extra(self) -> dict[str, Any]:
+        found = {"phase_calendar": self.phase_calendar, "list_phases": self.list_phases}
+        if self.crossing is not None:
+            found["components_crossing_phase"] = self.components_crossing_phase
+        return found
+
     def functions(self) -> PhaseFunctions:
-        return PhaseFunctions(self.phase_calendar, self.list_phases, "PLACEHOLDER")
+        return PhaseFunctions(
+            self.phase_calendar,
+            self.list_phases,
+            "PLACEHOLDER",
+            self.components_crossing_phase if self.crossing is not None else None,
+        )
 
 
 def _functions(found: FakePhases | None = None, **kwargs: Any) -> EngineFunctions:
     calendar_fn, soil_fn, water_fn = fakes(**kwargs)
-    extra = {}
-    if found is not None:
-        extra = {
-            "phase_calendar": found.phase_calendar,
-            "list_phases": found.list_phases,
-        }
     return EngineFunctions(
         build_rotation_calendar=calendar_fn,
         compute_soil_loss=soil_fn,
         compute_water_deficit_exposure=water_fn,
-        **extra,
+        **(found.extra() if found is not None else {}),
     )
-
-
-def dates(cal: RotationCalendar) -> list[tuple[str, str | None, str | None]]:
-    return [
-        (
-            c.component_id,
-            c.start.date.isoformat() if c.start.date else None,
-            c.end.date.isoformat() if c.end.date else None,
-        )
-        for c in cal.components
-    ]
 
 
 def calendar_detail(modules: list[dict]) -> str:
@@ -216,22 +242,28 @@ def test_each_phase_is_what_phase_calendar_returns():
     found = FakePhases(3, THREE_YEARS_PHASES)
     first, second, third = phase_calendars(THREE_YEARS, found.functions())
     assert first.calendar is THREE_YEARS  # phase 0 unchanged, never asked
-    assert [args[1] for name, args in found.calls if name == "phase_calendar"] == [
-        1,
-        2,
-    ]
+    asked = [args[1] for name, args in found.calls if name == "phase_calendar"]
+    assert asked == [1, 2]
     assert [p.scenario_id for p in (first, second, third)] == [
         "phase_1",
         "phase_2",
         "phase_3",
     ]
+    # The first agricultural year of each phase is the one its calendar
+    # starts in, checked against the EP2 calendar's year + p.
     assert [p.first_ag_year for p in (first, second, third)] == [2001, 2002, 2003]
     assert second.calendar == THREE_YEARS_PHASES[1]
     assert third.calendar == THREE_YEARS_PHASES[2]
-    assert dates(third.calendar)[2] == ("b", "2003-09-01", "2004-02-28")
-    for phase in (second, third):
-        assert any("29 February" in note for note in phase.notes)
-        assert not any("D141" in note for note in phase.notes)
+    assert second.notes == third.notes == ()  # no crossing function, no count
+
+
+def test_a_29_february_that_came_back_28_february_is_counted():
+    document = THREE_YEARS_PHASES[1].model_dump(mode="json")
+    document["components"][1]["end"]["date"] = "2004-02-28"  # c, hand-written
+    answers = {1: RotationCalendar.model_validate(document), 2: THREE_YEARS_PHASES[2]}
+    _, second, third = phase_calendars(THREE_YEARS, FakePhases(3, answers).functions())
+    assert second.notes == (LEAP_DAYS_MOVED.format(count=1),)
+    assert third.notes == ()
 
 
 def test_without_the_start_month_only_phase_1_runs_and_says_so():
@@ -277,18 +309,24 @@ def test_the_route_without_the_phase_functions_answers_phase_1_with_its_note():
 
 
 def test_with_one_of_the_two_missing_there_are_no_phase_functions():
-    found = FakePhases(2)
-    assert (
-        phase_functions_of(EngineFunctions(phase_calendar=found.phase_calendar)) is None
-    )
-    assert phase_functions_of(EngineFunctions(list_phases=found.list_phases)) is None
-    assert phase_functions_of(EngineFunctions()) is None
+    found = FakePhases(2, crossing={})
+    for only in (
+        EngineFunctions(phase_calendar=found.phase_calendar),
+        EngineFunctions(list_phases=found.list_phases),
+        EngineFunctions(
+            phase_calendar=found.phase_calendar,
+            components_crossing_phase=found.components_crossing_phase,
+        ),
+        EngineFunctions(),
+    ):
+        assert phase_functions_of(only) is None
 
 
 def test_lane_l1_functions_are_used_when_both_exist():
-    found = FakePhases(2)
+    found = FakePhases(2, EXAMPLE_PHASES)
     chosen = phase_functions_of(_functions(found))
     assert chosen is not None and chosen.name == "engine.calendar.repeat"
+    assert chosen.components_crossing_phase is None
     result = EntryPointEngines(_functions(found), carbon_models=CARBON_MODELS).run(
         ROTATION, climate_result(), soil_result()
     )
@@ -302,81 +340,68 @@ def test_discovery_finds_them_by_name_in_engine_calendar_repeat():
     found = discover_engine_functions()
     assert found.phase_calendar is getattr(repeat, "phase_calendar", None)
     assert found.list_phases is getattr(repeat, "list_phases", None)
+    assert found.components_crossing_phase is getattr(
+        repeat, "components_crossing_phase", None
+    )
 
 
 def test_discovery_without_an_engine_package_gives_none(engines_hidden):
     found = discover_engine_functions()
     assert found.phase_calendar is None and found.list_phases is None
+    assert found.components_crossing_phase is None
     assert phase_functions_of(found) is None
 
 
-# --- 3. a component that spans the start of a phase (D141) ---------------------
+# --- 3. a component that crosses into a phase's first year --------------------
 
 
-def test_a_crossing_component_is_counted_on_the_calendar_of_ep2():
-    # The PLACEHOLDER calendar: component 2 runs 2002-04-01 to 2002-10-31,
-    # across the first day of the agricultural year 2002.
-    example = calendar()
-    assert crossing_components(example, 0) == 0
-    assert crossing_components(example, 1) == 1
-    cal = hand_calendar(
-        "2001-09-01",
-        "2003-02-28",
-        [
-            component("a", "2001-09-01", None),  # an end date missing
-            component("b", "2002-09-01", "2003-02-28"),
-        ],
-    )
-    assert crossing_components(cal, 1) == 1
-    assert (
-        crossing_components(THREE_YEARS, 1) == crossing_components(THREE_YEARS, 2) == 0
-    )
-
-
-def test_a_phase_with_a_crossing_component_is_computed_with_the_d141_note():
-    # The fake returns the calendar unchanged (a form with no date missing):
-    # whatever lane L1 returns is used, nothing is refused.
-    example = calendar()
-    _, second = phase_calendars(example, FakePhases(2).functions())
-    assert second.calendar == example
+def test_the_count_is_the_one_lane_l1_names_never_an_identifier():
+    names = ["PLACEHOLDER-component-2", "PLACEHOLDER-component-3"]
+    found = FakePhases(2, EXAMPLE_PHASES, crossing={1: names})
+    first, second = phase_calendars(calendar(), found.functions())
+    assert first.notes == ()  # phase 0 is never asked
+    assert ("components_crossing_phase", (calendar(), 1)) in found.calls
     (note,) = second.notes
-    assert note == CROSSING_D141.format(count=1)
-    assert "D141" in note and "OPEN" not in note
-    assert "PLACEHOLDER-component-2" not in note  # counts only, no identifier
+    assert note == CROSSING_COUNTED.format(count=2, name="PLACEHOLDER")
+    assert "PLACEHOLDER.phase_calendar returned" in note
+    assert all(name not in note for name in names)
+    assert "laid out" not in note and "OPEN" not in note
 
 
-def _d141_form() -> RotationCalendar:
-    """A hand-written phase 2 of the PLACEHOLDER calendar in the form of D141:
-    component 2 keeps its declared dates, starting before the first day of
-    the phase's first year (2002-07-01); component 1 one cycle later; a date
-    of component 3 missing with its reason. PLACEHOLDER dates, not computed."""
-    document = calendar().model_dump(mode="json")
-    first, second, third = document["components"]
-    document["start_date"], document["end_date"] = "2002-04-01", "2004-06-30"
-    first["start"]["date"], first["end"]["date"] = "2003-09-01", "2004-02-29"
-    first["periods"][0]["start"]["date"] = "2003-09-01"
-    first["periods"][0]["end"]["date"] = "2003-11-30"
-    first["periods"][1]["start"]["date"] = "2003-12-01"
-    first["periods"][1]["end"]["date"] = "2004-02-29"
-    third["end"] = {
-        "date": None,
-        "missing": {"reason": "NOT_COMPUTABLE", "detail": "PLACEHOLDER"},
-    }
-    document["components"] = [second, third, first]
-    return RotationCalendar.model_validate(document)
+def test_none_named_writes_no_count():
+    found = FakePhases(2, EXAMPLE_PHASES, crossing={})
+    _, second = phase_calendars(calendar(), found.functions())
+    assert second.notes == ()
 
 
-def test_a_calendar_in_the_d141_form_is_used_as_returned_and_computed():
-    returned = _d141_form()
-    found = FakePhases(2, {1: returned})
+def test_without_the_crossing_function_no_count_is_written():
+    # The PLACEHOLDER calendar has a component across 2002-07-01; without
+    # lane L1's function the runner does not count it itself.
+    found = FakePhases(2, EXAMPLE_PHASES)
+    _, second = phase_calendars(calendar(), found.functions())
+    assert second.notes == ()
+    assert "components_crossing_phase" not in [name for name, _ in found.calls]
+
+
+@pytest.mark.parametrize("named", ["PLACEHOLDER", 2, None])
+def test_a_crossing_answer_that_is_no_sequence_is_a_defect(named):
+    found = FakePhases(2, EXAMPLE_PHASES, crossing={})
+    found.components_crossing_phase = lambda cal, p: named  # type: ignore[method-assign]
+    with pytest.raises(TypeError):
+        phase_calendars(calendar(), found.functions())
+
+
+def test_a_flagged_phase_is_used_as_returned_and_computed():
+    # Whatever lane L1 returns is used, a date left missing included; no
+    # phase is refused (D141).
+    returned = EXAMPLE_PHASES[1]
+    found = FakePhases(2, EXAMPLE_PHASES, crossing={1: ["PLACEHOLDER-component-2"]})
     calendar_fn, soil_fn, water_fn = fakes()
-    functions = _functions(found)
     functions = EngineFunctions(
         build_rotation_calendar=calendar_fn,
         compute_soil_loss=soil_fn,
         compute_water_deficit_exposure=water_fn,
-        phase_calendar=found.phase_calendar,
-        list_phases=found.list_phases,
+        **found.extra(),
     )
     engines = EntryPointEngines(functions, carbon_models=CARBON_MODELS)
     response = client(engines).post(ROUTE, json=BODY)
@@ -388,8 +413,9 @@ def test_a_calendar_in_the_d141_form_is_used_as_returned_and_computed():
     for item in (first, second):
         assert item["result_missing"] is None
         ResultsPerRotation.model_validate(item["result"])
-    assert CROSSING_D141.format(count=1) in calendar_detail(second["modules"])
-    assert "D141" not in calendar_detail(first["modules"])
+    note = CROSSING_COUNTED.format(count=1, name="engine.calendar.repeat")
+    assert note in calendar_detail(second["modules"])
+    assert "crossing" not in calendar_detail(first["modules"])
 
 
 def test_a_value_error_of_phase_calendar_is_a_defect_500():
@@ -436,9 +462,58 @@ def test_a_phase_calendar_that_changes_more_than_dates_is_a_defect(answer):
         phase_calendars(THREE_YEARS, found.functions())
 
 
+@pytest.mark.parametrize(
+    "answers",
+    [
+        {1: THREE_YEARS_PHASES[1], 2: THREE_YEARS_PHASES[1]},  # phase 2 repeated
+        {1: THREE_YEARS, 2: THREE_YEARS_PHASES[2]},  # the calendar unchanged
+        {1: THREE_YEARS_PHASES[2], 2: THREE_YEARS_PHASES[1]},  # swapped
+    ],
+    ids=["duplicate", "unchanged", "swapped"],
+)
+def test_a_phase_calendar_that_does_not_start_in_year_p_is_a_defect_500(answers):
+    found = FakePhases(3, answers)
+    with pytest.raises(TypeError):
+        phase_calendars(THREE_YEARS, found.functions())
+    engines = EntryPointEngines(
+        _functions(found, calendar_answer=THREE_YEARS), carbon_models=CARBON_MODELS
+    )
+    assert client(engines).post(ROUTE, json=BODY).status_code == 500
+
+
+def _with_end_missing() -> RotationCalendar:
+    document = THREE_YEARS.model_dump(mode="json")
+    document["components"][0]["end"] = date_value(None)  # a: end not declared
+    return RotationCalendar.model_validate(document)
+
+
+def test_a_phase_calendar_that_fills_a_missing_date_is_a_defect_500():
+    # THREE_YEARS with the end of a missing; the fake's phase 2 gives it a date.
+    ep2 = _with_end_missing()
+    found = FakePhases(3, THREE_YEARS_PHASES)
+    with pytest.raises(TypeError):
+        phase_calendars(ep2, found.functions())
+    engines = EntryPointEngines(
+        _functions(found, calendar_answer=ep2), carbon_models=CARBON_MODELS
+    )
+    assert client(engines).post(ROUTE, json=BODY).status_code == 500
+
+
+def test_a_present_date_may_come_back_missing():
+    document = THREE_YEARS_PHASES[1].model_dump(mode="json")
+    document["components"][2]["end"] = {  # a, hand-written flagged form
+        "date": None,
+        "missing": {"reason": "NOT_COMPUTABLE", "detail": "PLACEHOLDER"},
+    }
+    flagged = RotationCalendar.model_validate(document)
+    answers = {1: flagged, 2: THREE_YEARS_PHASES[2]}
+    _, second, _ = phase_calendars(THREE_YEARS, FakePhases(3, answers).functions())
+    assert second.calendar == flagged
+
+
 @pytest.mark.parametrize("returned", [[1, 2], [], "012", 3, [0, 2]])
 def test_phases_that_are_not_0_to_n_minus_1_are_a_defect(returned):
-    found = FakePhases(3)
+    found = FakePhases(3, THREE_YEARS_PHASES)
     functions = PhaseFunctions(
         found.phase_calendar, lambda cal: returned, "PLACEHOLDER"
     )
@@ -715,33 +790,84 @@ def _repository_engines() -> None:
         pytest.skip("the phase functions of engine.calendar.repeat are not built")
 
 
-# For each rotation: the number of phases, and the phases (0-based) whose
-# first year a component spans (the D141 note). Every phase has a result.
-EXPECTED_PHASES = {
-    "example": (1, ()),
-    "crossing": (2, (1,)),
-    "two_crops": (2, ()),
-}
+# For each rotation: the number of phases. Every phase has a result.
+EXPECTED_PHASES = {"example": 1, "crossing": 2, "two_crops": 2}
 
 
 @pytest.mark.parametrize("kind", list(EXPECTED_PHASES))
 def test_the_engines_of_the_repository_answer_one_scenario_per_phase(kind):
     _repository_engines()
+    found = discover_engine_functions()
     answer = _post(_rotation(kind))
-    count, crossing = EXPECTED_PHASES[kind]
     scenarios = answer["scenarios"]
     assert [s["scenario_id"] for s in scenarios] == [
-        scenario_id(i) for i in range(count)
+        scenario_id(i) for i in range(EXPECTED_PHASES[kind])
     ]
+    ep2 = RotationCalendar.model_validate(scenarios[0]["calendar"])
     for index, item in enumerate(scenarios):
         # D141: no phase is refused; each is computed on its calendar.
         assert item["result_missing"] is None, item["result_missing"]
         ResultsPerRotation.model_validate(item["result"])
         RotationCalendar.model_validate(item["calendar"])
-        calendar_module = next(m for m in item["modules"] if m["id"] == "calendar")
-        detail = calendar_module.get("detail") or ""
-        assert ("D141" in detail) == (index in crossing), detail
+        assert item["first_ag_year"] == scenarios[0]["first_ag_year"] + index
+        detail = calendar_detail(item["modules"])
+        counted = 0
+        if index and found.components_crossing_phase is not None:
+            counted = len(found.components_crossing_phase(ep2, index))
+        assert ("cross into" in detail) == bool(counted), detail
         assert "OPEN" not in detail
+
+
+def _days(first: dt.date, last: dt.date) -> list[dt.date]:
+    return [first + dt.timedelta(days=n) for n in range((last - first).days + 1)]
+
+
+def test_the_crossing_days_of_the_real_phase_calendar_are_missing_never_no_crop():
+    """The PLACEHOLDER calendar of contracts/inputs/examples/ through
+    ``phase_calendars`` with lane L1's functions: on every day of phase 2's
+    first year that its crossing component (component 2, across 2002-07-01)
+    covers in the calendar of EP2, EP1 finds that component itself (the D141
+    form) or the field state missing with a reason, never "no crop". Observed with ``repeat_over_record`` and EP1's
+    own day lookup, read from outside (``engine/`` is not edited)."""
+    repeat = pytest.importorskip("engine.calendar.repeat")
+    soil_loss_module = pytest.importorskip("engine.erosion.soil_loss")
+    functions = phase_functions_of(discover_engine_functions())
+    covering = getattr(soil_loss_module, "_covering", None)
+    if functions is None or covering is None:
+        pytest.skip("the phase functions or EP1's day lookup are not built")
+    example = RotationCalendar.model_validate_json(
+        (
+            ROOT
+            / "contracts"
+            / "inputs"
+            / "examples"
+            / "PLACEHOLDER_rotation_calendar.json"
+        ).read_text(encoding="utf-8")
+    )
+    first, second = phase_calendars(example, functions)
+    assert (first.first_ag_year, second.first_ag_year) == (2001, 2002)
+    crossing = next(
+        c for c in example.components if c.component_id == "PLACEHOLDER-component-2"
+    )
+    cut = dt.date(2002, 7, 1)
+    assert crossing.start.date < cut <= crossing.end.date
+    record = (dt.date(2001, 1, 1), dt.date(2012, 12, 31))  # PLACEHOLDER record
+    repeated = repeat.repeat_over_record(second.calendar, *record)
+    checked = 0
+    for cycle in repeated.cycles:
+        for day in _days(cut, crossing.end.date):
+            moved = repeat.shifted_date(day, cycle.shift_years)[0]
+            if not repeated.first_day <= moved <= repeated.last_day:
+                continue
+            state = covering(repeated, moved)
+            if state is None:  # "no crop": never for a day the crop covers
+                pytest.fail(f"{moved} reads as no crop")
+            if hasattr(state, "component_id"):  # D141: the crop itself, present
+                assert state.component_id == crossing.component_id, moved
+            else:  # missing, with its reason
+                assert state.reason in ("MISSING_INPUT", "NOT_COMPUTABLE"), moved
+            checked += 1
+    assert checked
 
 
 def test_the_real_ep1_lays_year_p_crops_on_the_first_year_of_the_record(monkeypatch):
