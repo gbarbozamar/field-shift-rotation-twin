@@ -127,6 +127,7 @@ One line per merged unit. Every AI-assisted commit also carries a co-author trai
 | 2026-11-15 | L0 | `l0/c-records`: 67 computed-C records in `params/records/computed_c/`, test guard, ATTRIBUTIONS | Claude Code (Anthropic) | The first-number session transcribed the records from AH703, DIEA and NIST; the lead developer checked each against the page and signed it; a separate verifier reviewed the PR | Values signed by the lead developer (D34) |
 | 2026-11-15 | L1 | `l1/water-stage-tail-d135` (#224): `engine/water/stages.py`, `exposure.py`, tests, `EXPOSURE.md` | Claude Code (Anthropic) | A builder session made EP3 cut stages at harvest and run the tail after maturity as no_crop days (D135 to D137); a separate verifier reviewed it | Table 11 rows per crop still to be chosen |
 | 2026-11-15 | L1 | `l1/residue-ledger-ep4` (#220): `contracts/residue_ledger/`, `engine/residues/`, ENTRYPOINTS EP4/Q13 | Claude Code (Anthropic) | A builder session wrote the PROPOSED ResidueLedger contract and build_residue_ledger; a separate verifier reviewed it | Contract PROPOSED; merge needs the lead and the platform developer |
+| 2026-11-15 | L1 | `l1/calendar-phases-d141`: `engine/calendar/repeat.py`, `test_repeat.py` | Claude Code (Anthropic) | A builder session applied D141 (lead-in cycle in repeat_over_record; crossing components placed whole in phase_calendar); a separate verifier reviewed it | Fallback case listed under OPEN |
 Rules:
 
 - No generated images, video or voice in the submission.
