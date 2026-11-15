@@ -1,4 +1,6 @@
 import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
+import { strings } from '../strings'
+import type { StringKey } from '../strings'
 import type {
   AnswerKind,
   KindOfYear,
@@ -278,4 +280,16 @@ export function answerChanges(before: PlantAnswer, after: PlantAnswer): AnswerCh
     }
   }
   return changes
+}
+
+/**
+ * A unit as it is read on the board (PROPOSED): the unit of the contract
+ * written with a slash ("t/ha/yr" for "t ha-1 yr-1"). A display form only:
+ * the wording is in strings.ts under "unit." followed by the unit of the
+ * contract, and a unit with no entry there is shown as it travels. The
+ * values and the units sent and received do not change.
+ */
+export function unitText(unit: string): string {
+  const key = `unit.${unit}`
+  return key in strings ? strings[key as StringKey] : unit
 }

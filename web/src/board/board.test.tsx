@@ -11,7 +11,7 @@ import type { PlantAnswer, RainStressPart, TippingPrice } from '../plant/plantDa
 import type { ServicePhase } from '../plant/PlantScreen'
 import { buildRotationStrip, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
-import { SORT_KEYS, answerChanges, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
+import { SORT_KEYS, answerChanges, unitText, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
 import { CompareTable, cropsText, orderNote, uniformItem } from './CompareTable'
 import { BoardView, initialBoardState } from './BoardScreen'
 
@@ -378,7 +378,7 @@ describe('quantities and required labels (5)', () => {
     const limit = rawRequest.soil_loss_limit
     for (const key of ['on_average', 'every_kind'] as const) {
       expect(visibleText(`<${rule}`)).toContain(
-        formatString(strings[`board.rule.${key}.limit`], { limit: displayNumber(limit.value), unit: limit.unit }),
+        formatString(strings[`board.rule.${key}.limit`], { limit: displayNumber(limit.value), unit: unitText(limit.unit) }),
       )
     }
   })
@@ -631,7 +631,7 @@ describe('the steps of the plan (8)', () => {
     const tile = after(view(null, null), 'board-your-limit').split('</div>')[0]
     const limit = rawRequest.soil_loss_limit
     expect(visibleText(`<${tile}`)).toContain(strings['board.limit.yours'])
-    expect(visibleText(`<${tile}`)).toContain(`${displayNumber(limit.value)} ${limit.unit}`)
+    expect(visibleText(`<${tile}`)).toContain(`${displayNumber(limit.value)} ${unitText(limit.unit)}`)
     expect(visibleText(`<${tile}`)).toContain(strings['plant.declared'])
   })
 
@@ -793,5 +793,20 @@ describe('polish (11)', () => {
       const letter = strings[`plant.kind.${year.kind as 'el_nino'}`].charAt(0).toUpperCase()
       expect(visibleText(`<${cells[index]}`)).toContain(`${letter} ${year.ag_year}`)
     })
+  })
+})
+
+describe('units as they are read (12)', () => {
+  it('a unit of the contract with wording is read with a slash; another is shown as it travels', () => {
+    expect(unitText('t ha-1 yr-1')).toBe(strings['unit.t ha-1 yr-1'])
+    expect(unitText('USD t-1')).toBe(strings['unit.USD t-1'])
+    expect(unitText('UNIT_MARKER')).toBe('UNIT_MARKER')
+  })
+
+  it('the board shows the units of the example answer in that form, and never changes a number', () => {
+    const html = decode(view(FIELD, answered(example)))
+    expect(html).toContain(strings['unit.USD ha-1 yr-1'])
+    expect(html).toContain(strings['unit.t ha-1 yr-1'])
+    expect(html).toContain(displayNumber(example.options[0].margin[example.margin_of].value!))
   })
 })

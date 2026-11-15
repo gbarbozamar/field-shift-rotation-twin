@@ -16,7 +16,7 @@ import type {
   Strictness,
   TippingPrice,
 } from '../plant/plantData'
-import { priceTrack } from './boardModel'
+import { priceTrack, unitText } from './boardModel'
 import type { AnswerChange, TrackSide } from './boardModel'
 
 /**
@@ -144,7 +144,7 @@ export function BoardControls({
         legend={strings['board.hud.rule']}
         labels={STRICTNESSES.map((value) =>
           limit !== null
-            ? formatString(strings[`board.rule.${value}.limit`], { limit: displayNumber(limit.value), unit: limit.unit })
+            ? formatString(strings[`board.rule.${value}.limit`], { limit: displayNumber(limit.value), unit: unitText(limit.unit) })
             : strings[`board.rule.${value}`],
         )}
         selected={STRICTNESSES.indexOf(strictness)}
@@ -189,7 +189,7 @@ function TileNumber({ item, mark = null }: { item: Measured; mark?: string | nul
       {mark !== null ? (
         <sup className="ml-0.5 font-mono text-[10px] opacity-80">{mark}</sup>
       ) : null}{' '}
-      <span className="text-xs opacity-70">{item.unit}</span>
+      <span className="text-xs opacity-70">{unitText(item.unit)}</span>
     </p>
   )
 }
@@ -244,7 +244,7 @@ export function AnswerBanner({
                 <p data-testid="board-limit" className="text-xs opacity-80">
                   {formatString(strings['board.limit_is'], {
                     limit: displayNumber(chosen.limit),
-                    unit: chosen.limit_unit,
+                    unit: unitText(chosen.limit_unit),
                   })}
                 </p>
               ) : null}
@@ -314,7 +314,7 @@ function SideLine({
         <span className="text-fs-muted">
           {formatString(strings['plant.tip.point'], {
             price: displayNumber(side.point.price),
-            unit: tipping.unit,
+            unit: unitText(tipping.unit),
             after: afterText(side, nameOf),
           })}
           {side.point.distance_percent !== null ? (
@@ -327,7 +327,7 @@ function SideLine({
         <span className="text-fs-muted">
           {side.kind === 'unknown'
             ? strings['board.price.unknown']
-            : formatString(strings['board.price.holds_to'], { price: displayNumber(end), unit: tipping.unit })}
+            : formatString(strings['board.price.holds_to'], { price: displayNumber(end), unit: unitText(tipping.unit) })}
         </span>
       )}
     </li>
@@ -362,7 +362,7 @@ export function PriceTrackPanel({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
         <h3 className="text-lg font-bold">{strings['board.price.title']}</h3>
         <p className="text-sm text-fs-muted">
-          {formatString(strings['plant.q.price_today'], { price: displayNumber(tipping.today!), unit: tipping.unit })}
+          {formatString(strings['plant.q.price_today'], { price: displayNumber(tipping.today!), unit: unitText(tipping.unit) })}
         </p>
       </div>
       <div aria-hidden="true" className="relative mt-6 h-3 overflow-hidden rounded-full bg-fs-faint">

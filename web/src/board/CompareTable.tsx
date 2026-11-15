@@ -9,7 +9,7 @@ import { cropOrder } from '../plant/rotationStrip'
 import type { RotationStrip } from '../plant/rotationStrip'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { strings } from '../strings'
-import { SORT_KEYS, cropName, isExampleCrop, worstKind } from './boardModel'
+import { SORT_KEYS, cropName, isExampleCrop, unitText, worstKind } from './boardModel'
 import type { BoardColumn, SortKey } from './boardModel'
 import { isUserRotation } from './rotationDraft'
 
@@ -349,8 +349,8 @@ export function CompareTable({
   // option is judged against one limit (a rule of the contract), so the first
   // option that carries it speaks for the row.
   const first = answer.options[0]
-  const marginUnit = first.margin[kind].unit
-  const soilUnit = first.soil_loss[kind].unit
+  const marginUnit = unitText(first.margin[kind].unit)
+  const soilUnit = unitText(first.soil_loss[kind].unit)
   const limited = answer.options.find((option) => option.limit !== null)
   const limit = limited !== undefined ? { value: limited.limit!, unit: limited.limit_unit } : null
   const sameMargin = uniformItem(columns.map((column) => column.option.margin[kind]))
@@ -457,7 +457,7 @@ export function CompareTable({
                 {soilUnit}
                 {limit !== null ? (
                   <span data-testid="board-row-limit" className="block font-semibold text-fs-text">
-                    {formatString(strings['board.limit_is'], { limit: displayNumber(limit.value), unit: limit.unit })}
+                    {formatString(strings['board.limit_is'], { limit: displayNumber(limit.value), unit: unitText(limit.unit) })}
                   </span>
                 ) : null}
               </>

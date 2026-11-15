@@ -24,7 +24,7 @@ import { buildRotationStrip, cropOrder, plantRotations, readPlantRotations } fro
 import type { PlantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { answerChanges, boardColumns, cropName, isExampleCrop, optionLetter } from './boardModel'
+import { answerChanges, boardColumns, cropName, isExampleCrop, optionLetter, unitText } from './boardModel'
 import type { SortKey } from './boardModel'
 import {
   AnswerBanner,
@@ -407,7 +407,7 @@ export function BoardView({
               <p className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.limit.yours']}</p>
               <p className="tabular-nums">
                 <span className="font-fs-heading text-2xl font-extrabold leading-none">{displayNumber(REQUEST_LIMIT.value)}</span>{' '}
-                <span className="text-xs text-fs-muted">{REQUEST_LIMIT.unit}</span>
+                <span className="text-xs text-fs-muted">{unitText(REQUEST_LIMIT.unit)}</span>
               </p>
               <p className="text-[11px] text-fs-muted">{strings['plant.declared']}</p>
             </div>
