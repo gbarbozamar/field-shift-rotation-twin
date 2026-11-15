@@ -33,6 +33,8 @@ Pure (G1): no file, no clock, no network; no argument is changed.
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Callable
+from typing import Any
 
 from contracts.inputs.site_climate import SiteClimate
 from contracts.results.models import Missing
@@ -47,13 +49,19 @@ __all__ = ["daily_reference_evapotranspiration"]
 
 
 def et0_by_day_for_catalogue(
-    climate: SiteClimate, *, catalogue: Catalogue, day: dt.date
+    climate: SiteClimate,
+    *,
+    catalogue: Catalogue,
+    day: dt.date,
+    et0_fn: Callable[..., Any],
 ) -> dict[dt.date, float | Missing]:
     """Daily FAO-56 reference evapotranspiration for an existing ``Catalogue``.
 
     Reads ``Et0Constants`` and ``Et0Bounds`` through ``exposure._site`` on
     ``day`` so missing parameter lookups are tracked on ``catalogue``, then
-    calls ``reference_evapotranspiration_from_climate_with_bounds``.
+    calls ``et0_fn`` (``exposure.et0_days`` from EP3, or
+    ``reference_evapotranspiration_from_climate_with_bounds`` from
+    ``daily_reference_evapotranspiration``).
     """
     from engine.water import exposure as ep3
 
@@ -79,7 +87,7 @@ def et0_by_day_for_catalogue(
             for group, names in ep3.ET0_BOUND_PARAMETERS.items()
         }
     )
-    days = reference_evapotranspiration_from_climate_with_bounds(
+    days = et0_fn(
         climate,
         point_units=ep3.POINT_UNITS,
         constants=constants,
@@ -121,5 +129,8 @@ def daily_reference_evapotranspiration(
     # the catalogue notes a problem (``Catalogue.value``).
     first = min(series.start_date for series in climate.daily_series)
     return et0_by_day_for_catalogue(
-        climate, catalogue=Catalogue(parameters), day=first
+        climate,
+        catalogue=Catalogue(parameters),
+        day=first,
+        et0_fn=reference_evapotranspiration_from_climate_with_bounds,
     )

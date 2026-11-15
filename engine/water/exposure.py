@@ -107,6 +107,9 @@ from engine.calendar.repeat import (
 from engine.water import balance, evaporation, fallow, living_crop
 from engine.water._parameters import Catalogue, Scope, check_parameters
 from engine.water.et0 import Et0Bounds, Et0Constants, PointUnits
+from engine.water.et0 import (
+    reference_evapotranspiration_from_climate_with_bounds as et0_days,
+)
 from engine.water.et0.quantities import (
     ACCEPTED_UNITS,
     CLIMATE_QUANTITIES,
@@ -957,7 +960,7 @@ def _run_chain(
     from engine.water import reference_et0
 
     et0_by_day = reference_et0.et0_by_day_for_catalogue(
-        climate, catalogue=catalogue, day=start
+        climate, catalogue=catalogue, day=start, et0_fn=et0_days
     )
 
     # The constants of the other parts, read once.

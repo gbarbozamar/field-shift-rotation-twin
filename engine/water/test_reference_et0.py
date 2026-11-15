@@ -334,7 +334,7 @@ def test_it_is_found_by_name_beside_ep3_and_listed_in_entrypoints():
 def test_ep3_delegates_to_shared_helper_and_tracks_missing_parameters_in_catalogue(
     monkeypatch,
 ):
-    assert not hasattr(ep3, "et0_days")
+    assert hasattr(ep3, "et0_days")
     climate_ = climate()
     parameters = {
         key: record
@@ -365,6 +365,11 @@ def test_ep3_delegates_to_shared_helper_and_tracks_missing_parameters_in_catalog
     assert isinstance(ep3_kwargs["catalogue"], Catalogue)
     assert isinstance(public_kwargs["catalogue"], Catalogue)
     assert ep3_kwargs["catalogue"] is not public_kwargs["catalogue"]
+    assert ep3_kwargs["et0_fn"] is ep3.et0_days
+    assert (
+        public_kwargs["et0_fn"]
+        is public_module.reference_evapotranspiration_from_climate_with_bounds
+    )
     expected_start = min(s.start_date for s in climate_.daily_series)
     assert ep3_kwargs["day"] == expected_start
     assert public_kwargs["day"] == expected_start
@@ -375,7 +380,12 @@ def test_ep3_delegates_to_shared_helper_and_tracks_missing_parameters_in_catalog
         assert WIND_BOUND_RECORD in item.missing.detail
     assert_same(
         public_result,
-        real(climate_, catalogue=Catalogue(parameters), day=expected_start),
+        real(
+            climate_,
+            catalogue=Catalogue(parameters),
+            day=expected_start,
+            et0_fn=ep3.et0_days,
+        ),
     )
 
 
@@ -395,7 +405,10 @@ def test_shared_helper_matches_on_unit_mismatch_and_ep3_checks_units_first(
         bad_climate, parameters=parameters
     )
     shared_result = public_module.et0_by_day_for_catalogue(
-        bad_climate, catalogue=Catalogue(parameters), day=first
+        bad_climate,
+        catalogue=Catalogue(parameters),
+        day=first,
+        et0_fn=ep3.et0_days,
     )
     assert_same(public_result, shared_result)
     assert public_result and all(
@@ -439,7 +452,10 @@ def test_shared_helper_and_public_return_empty_when_climate_series_are_empty(
     assert daily_reference_evapotranspiration(empty_climate, parameters=parameters) == {}
     assert (
         public_module.et0_by_day_for_catalogue(
-            empty_climate, catalogue=Catalogue(parameters), day=placeholder_day
+            empty_climate,
+            catalogue=Catalogue(parameters),
+            day=placeholder_day,
+            et0_fn=ep3.et0_days,
         )
         == {}
     )
