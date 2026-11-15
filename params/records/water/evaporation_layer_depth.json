@@ -1,0 +1,19 @@
+{
+  "id": "evaporation_layer_depth",
+  "scope": {},
+  "value": 0.1,
+  "unit": "m",
+  "range": {
+    "low": 0.1,
+    "high": 0.15,
+    "basis": "Sensitivity levels declared by the lead developer (USER-AG)"
+  },
+  "citation": {
+    "reference": "Decision of the lead developer, 14 November 2026, in docs/SCIENCE_DECISIONS.md (branch l0/science-integration); to be recorded in issue #77 (draft D77)",
+    "locator": "docs/SCIENCE_DECISIONS.md, section Water, USER-AG",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: USER-AG: «Use 0.10 m principal evaporation-layer depth and 0.15 m in sensitivity for the accepted Capurro water profile». FAO-56 chapter 7: «Where unknown, a value for Z e , the effective depth of the soil evaporation layer, of 0.10-0.15 m is recommended.» DECLARED assumption, not a measurement. Identifier PROPOSED (surface_layer_depth in the evaporation README). The citation is the decision; FAO-56 chapter 7 is the support quoted. SIGNED on 2026-11-15: checked_by gbarbozamar, row 8 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

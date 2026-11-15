@@ -1,0 +1,16 @@
+{
+  "id": "upper_limit_base",
+  "scope": {},
+  "value": 1.2,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, Eq. 72",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare: image x0490e2q.gif: «Kc max = max({1.2 + [0.04(u2 − 2) − 0.004(RHmin − 45)](h/3)^0.3}, {Kcb + 0.05})» The text adds that the «1.2» coefficient «can be reduced to about 1.1» when wettings are daily or every two days; the choice for rain-fed days is the lead developer's. UPDATED on 2026-11-15 by an AI session to follow D206 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D206: 1.2. Text below Eq. 72: «The \"1.2\" coefficient in Equation 72 represents effects of wetting intervals that are greater than 3 or 4 days»; with wettings daily or every two days it «can be reduced to about 1.1», which is the sensitivity of D206. Site data D206 names, not results of the method: mean interval between rains above 3 mm of 5.3 days, median 3 (research session's control on the public daily series of NASA POWER at the point, 2001-2024). SIGNED on 2026-11-15: checked_by gbarbozamar, row 13 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

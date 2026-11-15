@@ -1,0 +1,16 @@
+{
+  "id": "initial_depletion",
+  "scope": {},
+  "value": 0,
+  "unit": "mm",
+  "range": null,
+  "range_missing_reason": "No range: D208 takes the wet start (zero) for the main catalogue. The dry start (the total evaporable water, 26.5 mm with the drafted records) goes with the empty column in the second run of the check of D189; it is not an interval.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 7, the paragraph that begins «To initiate the water balance for the evaporating layer» (found by text search; its heading was not read)",
+    "url": "https://www.fao.org/4/X0490E/x0490e0c.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15. Transcribed by an AI session under D34 of issue #77. Verbatim text to compare (FAO-56 chapter 7): «To initiate the water balance for the evaporating layer, the user can assume that the topsoil is near field capacity following a heavy rain or irrigation, i.e., De, i-1 = 0. Where a long period of time has elapsed since the last wetting, the user can assume that all evaporable water has been depleted from the evaporation layer at the beginning of calculations, i.e., De, i-1 = TEW = 1000 (q FC - 0.5 q WP) Ze.» (q is the page's rendering of theta). The paragraph was found by text search; confirm on the page where it stands. UPDATED on 2026-11-15 by an AI session to follow D208 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D208: a surface depletion of 0 goes with the full column of the main catalogue. The other start (De = TEW) goes with the empty column in the second run of D189. EP3 refuses a depletion above the total evaporable water. SIGNED on 2026-11-15: checked_by gbarbozamar, row 6 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_AGUA_FINAL.md. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}
