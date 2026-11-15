@@ -2,7 +2,9 @@
 l1/water-ep3-identifiers (issue #191), l1/water-crop-stages (issue #206;
 the stages themselves are checked in ``test_stages.py``) and
 l1/water-fallow-residue (issue #217; ``fallow.py`` alone is checked in
-``test_fallow.py``).
+``test_fallow.py``), l1/water-ep3-repeat-d47 (issue #253: the rotation
+repeated over the record, D47, D109, D132, D141) and l1/water-indicator-d157
+(issue #264: the ratio of D157 for a year computed on every day).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases"; a test checks that the two lists
@@ -50,6 +52,11 @@ from contracts.results.models import (
     ReasonCode,
     ResultsPerRotation,
     WaterDeficitExposure,
+)
+from engine.calendar.repeat import (
+    components_crossing_phase,
+    list_phases,
+    phase_calendar,
 )
 from engine.water import _parameters
 from engine.water import exposure as module
@@ -555,24 +562,22 @@ def calendar() -> RotationCalendar:
     return RotationCalendar.model_validate(calendar_document())
 
 
-# The days between the last day of the record and the sowing of the component
-# that follows it in the test calendars (``after_the_record``).
-DAYS_TO_SOWING_AFTER_THE_RECORD = 31
+def sown_on_the_last_day(document: dict[str, Any]) -> dict[str, Any]:
+    """A component of crop-a sown on the last day of the record.
 
-
-def after_the_record(document: dict[str, Any]) -> dict[str, Any]:
-    """A component of crop-a sown after the last day of the record.
-
-    It is copied from the first component of the example calendar. No day of
-    the record has its crop, so none of its crop parameters is read; it gives
+    It is copied from the first component of the example calendar. It gives
     the fallow at the end of the record a crop that follows it, which names
-    the record of its surface residue cover (D110, D115; OPEN 31). The end
-    date of the calendar is moved to its last day.
+    the record of its surface residue cover (D110, D115; OPEN 31). Since unit
+    #253 the sowing has to lie inside the record: nothing is laid out past
+    the record (D109), so a fallow whose next sowing lies after it has no
+    following crop (OPEN 41 of EXPOSURE.md). The last day of the record is
+    therefore the one day of this component in the record, the first of its
+    initial stage. The end date of the calendar is moved to its last day.
     """
     _, last = several_full_years()
     added = copy.deepcopy(calendar_document()["components"][0])
-    added["component_id"] = "PLACEHOLDER-component-after-the-record"
-    sowing = last + ONE_DAY * DAYS_TO_SOWING_AFTER_THE_RECORD
+    added["component_id"] = "PLACEHOLDER-component-on-the-last-day"
+    sowing = last
     added["start"]["date"] = sowing.isoformat()
     end = sowing + ONE_DAY * (period_days("crop-a") - 1)
     added["end"]["date"] = end.isoformat()
@@ -590,8 +595,9 @@ def chain_calendar_document(*, fill_periods: bool = True) -> dict[str, Any]:
     of a crop holds the days of its first one (``period_days``), which the
     four PLACEHOLDER stage lengths of the crop fill; without it, the third and
     fourth periods are each one day off from the first period of their crop.
-    A last component is sown after the record (``after_the_record``), so that
-    every day of the record with no crop has a crop that follows it.
+    A last component is sown on the last day of the record
+    (``sown_on_the_last_day``), so that every day of the record with no crop
+    has a crop that follows it.
     """
     document = calendar_document()
     first, last = several_full_years()
@@ -604,7 +610,7 @@ def chain_calendar_document(*, fill_periods: bool = True) -> dict[str, Any]:
     ).isoformat()
     added["end"]["date"] = (last - dt.timedelta(days=91)).isoformat()
     document["components"].append(added)
-    document["components"].append(after_the_record(document))
+    document["components"].append(sown_on_the_last_day(document))
     for component in document["components"]:
         if fill_periods:
             crop = component["crop_id"].split("-", 1)[1]
@@ -620,12 +626,13 @@ def chain_calendar() -> RotationCalendar:
 
 
 def bare_calendar() -> RotationCalendar:
-    """The calendar of ``chain_calendar`` with only the component sown after
-    the record: no day of the record has a crop.
+    """The calendar of ``chain_calendar`` with only the component sown on the
+    last day of the record: no day of the record before its last has a crop.
 
-    Every day of the record is a day of one fallow, before crop-a (D110). The
-    cases that check the chain itself and the parameters of the site run on
-    this calendar, so that no crop parameter is needed.
+    Every day of the record but the last is a day of one fallow, before
+    crop-a (D110); the last day is the sowing day of crop-a. The cases that
+    check the chain itself and the parameters of the site run on this
+    calendar, so that no crop parameter is needed before that day.
     """
     document = chain_calendar_document()
     *_, after = document["components"]
@@ -719,11 +726,45 @@ def assert_loads(result: list[WaterDeficitExposure]) -> None:
         assert WaterDeficitExposure.model_validate_json(json.dumps(document)) == item
 
 
-def assert_definition_incomplete(item: WaterDeficitExposure) -> None:
-    assert item.missing.reason == "NOT_AVAILABLE"
-    assert "C1.4" in item.missing.detail
-    assert "D61" in item.missing.detail
+# The label of decision D105, which D162 places at the start of the source.
+WINDOW_LABEL = "whole cycle, not critical period"
+
+
+def is_computed(item: WaterDeficitExposure) -> bool:
+    """The daily balance of the year was computed on every day (D157): the
+    item is a number, or ``NOT_APPLICABLE`` for a year with no living crop."""
+    return item.value is not None or item.missing.reason == "NOT_APPLICABLE"
+
+
+def assert_is_a_value(item: WaterDeficitExposure) -> None:
+    """A number of the indicator, as D157 and D162 and the results model ask."""
+    assert item.missing is None
+    assert is_number(item.value)
+    # The balance transpires at most what is demanded, and never below zero.
+    assert 0 <= item.value <= 1
+    assert item.time_basis == "ag_year" and item.ag_year is not None
+    assert item.source.startswith(f"{WINDOW_LABEL} (")
+    assert "D105" in item.source and "D157" in item.source
+    assert f"agricultural year {item.ag_year}" in item.source
+    assert item.assumption is False
+    assert item.provenance == "SIMULATED"  # PROPOSED (C4.1, C4.3)
+    assert item.range is None
+    assert item.range_missing.reason == "NOT_AVAILABLE"  # PROPOSED
+    assert "C2.3" in item.range_missing.detail
+
+
+def assert_computed(item: WaterDeficitExposure) -> None:
+    """The year was computed on every day: the ratio of D157, or
+    ``NOT_APPLICABLE`` when no day of the year has a living crop."""
+    if item.value is not None:
+        assert_is_a_value(item)
+        return
+    assert item.missing.reason == "NOT_APPLICABLE"
     assert "computed on every day of the year" in item.missing.detail
+    assert "no day of the year has a living crop" in item.missing.detail
+    assert "D157" in item.missing.detail
+    assert item.provenance is None and item.source is None
+    assert item.range is None and item.range_missing is None
 
 
 def no_record_item(detail: str, scope: str) -> str:
@@ -749,8 +790,7 @@ def test_placeholder_catalogue_passes_check_catalogue_and_every_year_is_computed
     assert_loads(result)
     assert [item.ag_year for item in result] == expected_ag_years(*several_full_years())
     for item in result:
-        assert item.value is None
-        assert_definition_incomplete(item)
+        assert_computed(item)
 
 
 def test_the_chain_gives_a_number_every_day_from_each_part():
@@ -797,7 +837,9 @@ def test_daily_balance_closes_its_mass_every_day():
         assert 0 <= b.storage_end <= capacity
         branches["drainage"] += b.drainage > 0
         branches["runoff"] += b.runoff > 0
-        assert b.transpiration == 0  # no day of the calendar has a crop
+        if day is not days[-1]:
+            # No day before the last has a crop; the last is a sowing day.
+            assert b.transpiration == 0
     assert all(count > 0 for count in branches.values()), branches
 
 
@@ -892,7 +934,7 @@ def test_daily_balance_closes_its_mass_on_days_with_transpiration_given_stage_le
     result = run(calendar_=calendar_)
     assert_loads(result)
     for item in result:
-        assert_definition_incomplete(item)
+        assert_computed(item)
 
 
 def test_crop_of_each_day_follows_the_calendar():
@@ -1067,7 +1109,7 @@ def test_stage_lengths_that_do_not_fill_the_period_leave_a_no_crop_tail_or_are_c
     result = run(calendar_=calendar_)
     assert_loads(result)
     for item in result:
-        assert_definition_incomplete(item)
+        assert_computed(item)
 
 
 def test_stage_length_that_is_not_whole_days_is_not_computable():
@@ -1078,7 +1120,7 @@ def test_stage_length_that_is_not_whole_days_is_not_computable():
     result = run(calendar_=chain_calendar(), parameters=parameters)
     assert_loads(result)
     for item in result:
-        assert item.missing.reason != "NOT_AVAILABLE"
+        assert not is_computed(item)
         assert (
             "chain NOT_COMPUTABLE: the growth stages of component"
             in item.missing.detail
@@ -1109,7 +1151,7 @@ def test_a_record_only_late_days_need_leaves_the_earlier_days_computed():
     result = run(calendar_=calendar_, parameters=parameters)
     scope = json.dumps(unmarked(scope_of("crop-a:end")))
     for item in result:
-        if item.missing.reason == "NOT_AVAILABLE":
+        if is_computed(item):
             assert last_day_of(item.ag_year) < first_late
         else:
             named = no_record_item(item.missing.detail, scope)
@@ -1210,7 +1252,7 @@ def test_parameter_with_no_record_is_missing_input_naming_it_and_no_other(key):
     calendar_ = chain_calendar() if with_crops else bare_calendar()
     result = run(calendar_=calendar_, parameters=catalogue_with({key: None}))
     scope = "{}" if label is None else json.dumps(unmarked(scope_of(label)))
-    missing = [item for item in result if item.missing.reason != "NOT_AVAILABLE"]
+    missing = [item for item in result if not is_computed(item)]
     assert missing, "the parameter is needed by some year"
     if not with_crops:
         assert missing == result  # removing the record makes every year missing
@@ -1220,7 +1262,7 @@ def test_parameter_with_no_record_is_missing_input_naming_it_and_no_other(key):
         assert named.endswith(f": '{parameter_id}'")
         assert item.missing.detail.count("parameters with no record") == 1
     # The years before the one that first needs it are computed.
-    computed = [item for item in result if item.missing.reason == "NOT_AVAILABLE"]
+    computed = [item for item in result if is_computed(item)]
     assert all(item.ag_year < missing[0].ag_year for item in computed)
 
 
@@ -1246,7 +1288,7 @@ def test_record_with_null_value_is_missing_input_repeating_its_reason():
         assert check_catalogue(parameters) == []
         calendar_ = bare_calendar() if crop is None else chain_calendar()
         result = run(calendar_=calendar_, parameters=parameters)
-        missing = [item for item in result if item.missing.reason != "NOT_AVAILABLE"]
+        missing = [item for item in result if not is_computed(item)]
         assert missing
         for item in missing:
             assert item.missing.reason == "MISSING_INPUT"
@@ -1338,7 +1380,7 @@ def drafted_key(parameter_id: str, scope: dict) -> tuple[str, str]:
 
 def drafted_calendar() -> RotationCalendar:
     """The calendar of ``chain_calendar``, one component per crop of the drafts
-    in the record; the component sown after the record takes the first crop."""
+    before its last day; the one sown on that day takes the first crop."""
     document = chain_calendar_document()
     *in_the_record, after = document["components"]
     assert len(in_the_record) == len(DRAFTED_CROPS)
@@ -1544,7 +1586,10 @@ def test_fallow_day_takes_the_records_of_a_day_with_no_crop_and_the_mulched_evap
     monkeypatch,
 ):
     given = spy_surface_layer(monkeypatch)
-    days = chain()  # every day of the record is a day of one fallow, before crop-a
+    # Every day of the record but the last is a day of one fallow, before
+    # crop-a, which is sown on the last day (``bare_calendar``).
+    *days, sowing_day = chain()
+    assert sowing_day.date == several_full_years()[1]
     expected_tew = mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"])
     assert expected_tew < PLACEHOLDER_TEW
     for day in days:
@@ -1570,8 +1615,10 @@ def test_fallow_day_takes_the_records_of_a_day_with_no_crop_and_the_mulched_evap
 DRY_SPELLS = [14.44] + [0.0] * 59  # zero: a dry day
 
 
-def climate_with_dry_spells() -> SiteClimate:
-    first, last = several_full_years()
+def climate_with_dry_spells(
+    span: tuple[dt.date, dt.date] | None = None,
+) -> SiteClimate:
+    first, last = span or several_full_years()
     series = [daily_series(name, first, last) for name in DAILY_INPUTS]
     (precipitation,) = [item for item in series if item["quantity"] == PRECIPITATION]
     for position, day in enumerate(precipitation["days"]):
@@ -1635,7 +1682,8 @@ def test_readily_evaporable_water_of_a_fallow_day_is_not_above_its_total(
         }
     )
     given = spy_surface_layer(monkeypatch)
-    days = chain(parameters=parameters)
+    # The fallow days: every day but the last, the sowing day of crop-a.
+    *days, _ = chain(parameters=parameters)
     for day in days:
         _, _, constants = given[day.date]
         assert constants["total_evaporable_water"] == pytest.approx(expected_tew)
@@ -1758,7 +1806,7 @@ def test_missing_cover_record_names_itself():
     named_years = 0
     for item in result:
         if last_day_of(item.ag_year) < first_needed:
-            assert_definition_incomplete(item)
+            assert_computed(item)
             continue
         named_years += 1
         assert item.missing.reason == "MISSING_INPUT"
@@ -1811,7 +1859,7 @@ def test_fallow_with_no_crop_after_it_is_missing_naming_open_31():
     assert_loads(result)
     *before, final = result
     for item in before:
-        assert_definition_incomplete(item)
+        assert_computed(item)
     assert final.missing.reason == "MISSING_INPUT"
     assert f"chain MISSING_INPUT: {module.fallow.NO_FOLLOWING_CROP}" in items_of(
         final.missing.detail
@@ -1819,6 +1867,22 @@ def test_fallow_with_no_crop_after_it_is_missing_naming_open_31():
     assert "OPEN 31" in final.missing.detail
     first_missing = (last_crop_day + ONE_DAY).isoformat()
     assert f"the first on {first_missing}" in final.missing.detail
+
+
+def test_calendar_with_no_component_has_no_following_crop_naming_open_31():
+    # Nothing is ever sown, so no fallow has a crop that follows it.
+    document = chain_calendar_document()
+    document["components"] = []
+    result = run(calendar_=RotationCalendar.model_validate(document))
+    assert_loads(result)
+    first, _ = several_full_years()
+    for item in result:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert f"chain MISSING_INPUT: {module.fallow.NO_FOLLOWING_CROP}" in items_of(
+            item.missing.detail
+        )
+        assert "OPEN 31" in item.missing.detail
+    assert f"the first on {first.isoformat()}" in result[0].missing.detail
 
 
 def test_depletion_above_the_reduced_evaporable_water_is_not_computable_naming_open_30():
@@ -1832,7 +1896,7 @@ def test_depletion_above_the_reduced_evaporable_water_is_not_computable_naming_o
     for item in result:
         # The surface layer is NOT_COMPUTABLE; the balance that reads its Ke
         # is missing with that input, as after any refused value upstream.
-        assert item.missing.reason != "NOT_AVAILABLE"
+        assert not is_computed(item)
         assert f"chain NOT_COMPUTABLE: {module.FALLOW_DEPLETION_ABOVE}" in items_of(
             item.missing.detail
         )
@@ -1845,7 +1909,7 @@ def test_depletion_above_the_reduced_evaporable_water_is_not_computable_naming_o
         )
     )
     for item in bare:
-        assert_definition_incomplete(item)
+        assert_computed(item)
 
 
 @pytest.mark.parametrize(
@@ -1878,7 +1942,7 @@ def test_mulch_values_outside_what_the_method_computes_are_not_computable(
     result = run(parameters=catalogue_with({key: record}))
     assert_loads(result)
     for item in result:
-        assert item.missing.reason != "NOT_AVAILABLE"
+        assert not is_computed(item)
         (entry,) = [
             entry
             for entry in items_of(item.missing.detail)
@@ -1962,7 +2026,7 @@ def test_year_not_covered_by_a_series_is_no_coverage():
             assert f"'{PRECIPITATION}'" in item.missing.detail
             assert "C5.5" in item.missing.detail
         else:
-            assert_definition_incomplete(item)
+            assert_computed(item)
 
     # One input of the reference evapotranspiration is shorter than the record.
     for short in CLIMATE_QUANTITIES:
@@ -1976,19 +2040,21 @@ def test_year_not_covered_by_a_series_is_no_coverage():
         assert f"'{short}'" in result[-1].missing.detail
         assert f"'{PRECIPITATION}'" not in result[-1].missing.detail
         for item in result[:-1]:
-            assert_definition_incomplete(item)
+            assert_computed(item)
 
 
 def test_series_one_day_short_at_each_end_leaves_first_and_last_not_covered():
     first, last = several_full_years()
     exact = run(climate_=climate((first, last)))
     for item in exact:
-        assert_definition_incomplete(item)
+        assert_computed(item)
     short = run(climate_=climate((first + ONE_DAY, last - ONE_DAY)))
     assert [item.ag_year for item in short] == [item.ag_year for item in exact]
-    reasons = [item.missing.reason for item in short]
-    assert reasons[0] == reasons[-1] == "NO_COVERAGE"
-    assert set(reasons[1:-1]) == {"NOT_AVAILABLE"}
+    first_year, *between, last_year = short
+    assert first_year.missing.reason == last_year.missing.reason == "NO_COVERAGE"
+    assert between
+    for item in between:
+        assert_computed(item)
 
 
 def test_absent_daily_series_is_missing_input_naming_it():
@@ -2012,7 +2078,7 @@ def test_days_held_missing_are_missing_input_naming_the_series():
     held = first_day_of(first.year + 1) + dt.timedelta(days=100)
     result = run(climate_=climate(held_missing=(held,)))
     computed, holding, after = result
-    assert_definition_incomplete(computed)
+    assert_computed(computed)
     for item in (holding, after):
         assert item.missing.reason == "MISSING_INPUT"
         assert held.isoformat() in item.missing.detail
@@ -2053,7 +2119,7 @@ def test_missing_point_value_is_named_in_an_input_item(names):
     read = [name for name in names if name != "longitude"]
     for item in result:
         if not read:
-            assert_definition_incomplete(item)
+            assert_computed(item)
             continue
         assert item.missing.reason == "MISSING_INPUT"
         point_items = [
@@ -2121,29 +2187,506 @@ def test_no_precipitation_series_returns_one_item_for_the_rotation():
     assert f"'{PRECIPITATION}'" in item.missing.detail
 
 
-def test_calendar_dates_outside_the_record_keep_the_years_and_leave_the_crop_unknown():
-    span = several_full_years()
-    reference = run(climate_=climate(span))
-    document = chain_calendar_document()
-    start = dt.date.fromisoformat(document["start_date"])
-    end = dt.date.fromisoformat(document["end_date"])
-    shift = span[1] - start + ONE_DAY
-    document["start_date"] = (start + shift).isoformat()
-    document["end_date"] = (end + shift).isoformat()
-    for component in document["components"]:
-        for edge in [component, *component["periods"]]:
-            for key in ("start", "end"):
-                if edge[key]["date"] is not None:
-                    moved = dt.date.fromisoformat(edge[key]["date"]) + shift
-                    edge[key]["date"] = moved.isoformat()
-    moved_calendar = RotationCalendar.model_validate(document)
-    assert moved_calendar.start_date > span[1]
-    result = run(calendar_=moved_calendar, climate_=climate(span))
+# --- the cases of #253: the rotation repeated over the record -------------------
+#
+# The dates below are written by hand, and plainly not those of any rotation:
+# every calendar lies thirty years after the record. The start month of the
+# example calendar is July (``literal_record`` checks it), so an agricultural
+# year runs from 1 July to 30 June.
+
+
+def literal_record() -> tuple[dt.date, dt.date]:
+    """Five agricultural years, 2001 to 2005, written as dates."""
+    assert start_month() == 7
+    return dt.date(2001, 7, 1), dt.date(2006, 6, 30)
+
+
+def rotation_calendar(
+    start: str, end: str, components: list[tuple[str, str, str, str]]
+) -> RotationCalendar:
+    """A calendar of the example's field from ``start`` to ``end`` with the
+    components given as (name, crop, first day, last day), ISO dates."""
+    document = calendar_document()
+    template = document["components"][1]
+    built = []
+    for name, crop, first, last in components:
+        component = copy.deepcopy(template)
+        component["component_id"] = f"PLACEHOLDER-component-{name}"
+        component["crop_id"] = unmarked(crop_word(crop))
+        component["start"]["date"] = first
+        component["end"]["date"] = last
+        component["periods"] = []
+        built.append(component)
+    document.update(start_date=start, end_date=end, components=built)
+    return RotationCalendar.model_validate(document)
+
+
+# A two-year rotation of three components, none on the field on 1 July. The
+# periods of w and x are shorter than the stage lengths of their crops (cut
+# at the harvest, D135); y is 21 days longer (a tail, D136).
+TWO_YEAR_COMPONENTS = [
+    ("w", "crop-a", "2031-08-10", "2031-12-20"),
+    ("x", "crop-b", "2032-01-05", "2032-05-25"),
+    ("y", "crop-a", "2032-10-01", "2033-04-20"),
+]
+
+
+def two_year_calendar(start: str = "2031-07-01") -> RotationCalendar:
+    return rotation_calendar(start, "2033-04-20", TWO_YEAR_COMPONENTS)
+
+
+# A two-year rotation in which q is on the field on 1 July of its second
+# year: sown on 20 May, harvested on 25 November.
+CROSSING_COMPONENTS = [
+    ("p", "crop-a", "2031-09-01", "2032-02-10"),
+    ("q", "crop-b", "2032-05-20", "2032-11-25"),
+    ("r", "crop-a", "2033-01-10", "2033-05-31"),
+]
+
+
+def crossing_calendar() -> RotationCalendar:
+    return rotation_calendar("2031-07-01", "2033-05-31", CROSSING_COMPONENTS)
+
+
+# One row of a layout by hand: the first and the last day of a run of days,
+# then the crop of those days and the day it was sown, or ``None`` and the
+# crop sown after those days (which names the cover of the fallow, D110), or
+# ``None`` and NOT_LAID_OUT when that sowing lies after the record: nothing
+# is laid out past the record (D109), so the fallow has no following crop
+# and its days have no value (OPEN 41 of EXPOSURE.md).
+Row = tuple[str, str, str | None, str]
+NOT_LAID_OUT = "the next sowing lies after the record"
+
+# The two-year rotation, its first year laid on the first year of the record
+# (phase 0; the calendar unchanged). 2001-08-10 is 2031-08-10 thirty years
+# earlier, and the cycle starts again every two years. The last living day of
+# y is the 181st from its sowing (the four PLACEHOLDER lengths of crop-a);
+# the days after it, up to its harvest on 20 April, are its tail.
+TWO_YEAR_PHASE_0: dict[int, list[Row]] = {
+    2001: [
+        ("2001-07-01", "2001-08-09", None, "crop-a"),
+        ("2001-08-10", "2001-12-20", "crop-a", "2001-08-10"),
+        ("2001-12-21", "2002-01-04", None, "crop-b"),
+        ("2002-01-05", "2002-05-25", "crop-b", "2002-01-05"),
+        ("2002-05-26", "2002-06-30", None, "crop-a"),
+    ],
+    2002: [
+        ("2002-07-01", "2002-09-30", None, "crop-a"),
+        ("2002-10-01", "2003-03-30", "crop-a", "2002-10-01"),
+        ("2003-03-31", "2003-06-30", None, "crop-a"),  # the tail, then the fallow
+    ],
+    2003: [
+        ("2003-07-01", "2003-08-09", None, "crop-a"),
+        ("2003-08-10", "2003-12-20", "crop-a", "2003-08-10"),
+        ("2003-12-21", "2004-01-04", None, "crop-b"),
+        ("2004-01-05", "2004-05-25", "crop-b", "2004-01-05"),
+        ("2004-05-26", "2004-06-30", None, "crop-a"),
+    ],
+    2004: [
+        ("2004-07-01", "2004-09-30", None, "crop-a"),
+        ("2004-10-01", "2005-03-30", "crop-a", "2004-10-01"),
+        ("2005-03-31", "2005-06-30", None, "crop-a"),
+    ],
+    # The third cycle does not fit whole: w and x are laid out, and y, sown
+    # on 2006-10-01, lies after the record and is not (D109). So the fallow
+    # after x has no following crop.
+    2005: [
+        ("2005-07-01", "2005-08-09", None, "crop-a"),
+        ("2005-08-10", "2005-12-20", "crop-a", "2005-08-10"),
+        ("2005-12-21", "2006-01-04", None, "crop-b"),
+        ("2006-01-05", "2006-05-25", "crop-b", "2006-01-05"),
+        ("2006-05-26", "2006-06-30", None, NOT_LAID_OUT),
+    ],
+}
+
+# The same rotation with its second year laid on the first year of the
+# record (phase 1): y comes first. The y sown on 2003-10-01 crosses 29
+# February 2004, so its 181st day is 29 March.
+TWO_YEAR_PHASE_1: dict[int, list[Row]] = {
+    2001: [
+        ("2001-07-01", "2001-09-30", None, "crop-a"),
+        ("2001-10-01", "2002-03-30", "crop-a", "2001-10-01"),
+        ("2002-03-31", "2002-06-30", None, "crop-a"),
+    ],
+    2002: [
+        ("2002-07-01", "2002-08-09", None, "crop-a"),
+        ("2002-08-10", "2002-12-20", "crop-a", "2002-08-10"),
+        ("2002-12-21", "2003-01-04", None, "crop-b"),
+        ("2003-01-05", "2003-05-25", "crop-b", "2003-01-05"),
+        ("2003-05-26", "2003-06-30", None, "crop-a"),
+    ],
+    2003: [
+        ("2003-07-01", "2003-09-30", None, "crop-a"),
+        ("2003-10-01", "2004-03-29", "crop-a", "2003-10-01"),
+        ("2004-03-30", "2004-06-30", None, "crop-a"),
+    ],
+    2004: [
+        ("2004-07-01", "2004-08-09", None, "crop-a"),
+        ("2004-08-10", "2004-12-20", "crop-a", "2004-08-10"),
+        ("2004-12-21", "2005-01-04", None, "crop-b"),
+        ("2005-01-05", "2005-05-25", "crop-b", "2005-01-05"),
+        ("2005-05-26", "2005-06-30", None, "crop-a"),
+    ],
+    # The w sown on 2006-08-10 lies after the record, so the tail of y and
+    # the fallow after it have no following crop.
+    2005: [
+        ("2005-07-01", "2005-09-30", None, "crop-a"),
+        ("2005-10-01", "2006-03-30", "crop-a", "2005-10-01"),
+        ("2006-03-31", "2006-06-30", None, NOT_LAID_OUT),
+    ],
+}
+
+# The crossing rotation, phase 0. In its third cycle q is sown on 2006-05-20
+# and harvested after the record: its days up to the last day of the record
+# are laid out, and r is not (D109).
+CROSSING_PHASE_0: dict[int, list[Row]] = {
+    2001: [
+        ("2001-07-01", "2001-08-31", None, "crop-a"),
+        ("2001-09-01", "2002-02-10", "crop-a", "2001-09-01"),
+        ("2002-02-11", "2002-05-19", None, "crop-b"),
+        ("2002-05-20", "2002-06-30", "crop-b", "2002-05-20"),
+    ],
+    2002: [
+        ("2002-07-01", "2002-11-25", "crop-b", "2002-05-20"),
+        ("2002-11-26", "2003-01-09", None, "crop-a"),
+        ("2003-01-10", "2003-05-31", "crop-a", "2003-01-10"),
+        ("2003-06-01", "2003-06-30", None, "crop-a"),
+    ],
+    2003: [
+        ("2003-07-01", "2003-08-31", None, "crop-a"),
+        ("2003-09-01", "2004-02-10", "crop-a", "2003-09-01"),
+        ("2004-02-11", "2004-05-19", None, "crop-b"),
+        ("2004-05-20", "2004-06-30", "crop-b", "2004-05-20"),
+    ],
+    2004: [
+        ("2004-07-01", "2004-11-25", "crop-b", "2004-05-20"),
+        ("2004-11-26", "2005-01-09", None, "crop-a"),
+        ("2005-01-10", "2005-05-31", "crop-a", "2005-01-10"),
+        ("2005-06-01", "2005-06-30", None, "crop-a"),
+    ],
+    2005: [
+        ("2005-07-01", "2005-08-31", None, "crop-a"),
+        ("2005-09-01", "2006-02-10", "crop-a", "2005-09-01"),
+        ("2006-02-11", "2006-05-19", None, "crop-b"),
+        ("2006-05-20", "2006-06-30", "crop-b", "2006-05-20"),
+    ],
+}
+
+# The crossing rotation, phase 1: its second year on the first year of the
+# record. q was sown on 20 May, before the first day of the record, and is
+# on the field from that first day to its harvest on 25 November (D141).
+CROSSING_PHASE_1: dict[int, list[Row]] = {
+    2001: [
+        ("2001-07-01", "2001-11-25", "crop-b", "2001-05-20"),
+        ("2001-11-26", "2002-01-09", None, "crop-a"),
+        ("2002-01-10", "2002-05-31", "crop-a", "2002-01-10"),
+        ("2002-06-01", "2002-06-30", None, "crop-a"),
+    ],
+    2002: [
+        ("2002-07-01", "2002-08-31", None, "crop-a"),
+        ("2002-09-01", "2003-02-10", "crop-a", "2002-09-01"),
+        ("2003-02-11", "2003-05-19", None, "crop-b"),
+        ("2003-05-20", "2003-06-30", "crop-b", "2003-05-20"),
+    ],
+    2003: [
+        ("2003-07-01", "2003-11-25", "crop-b", "2003-05-20"),
+        ("2003-11-26", "2004-01-09", None, "crop-a"),
+        ("2004-01-10", "2004-05-31", "crop-a", "2004-01-10"),
+        ("2004-06-01", "2004-06-30", None, "crop-a"),
+    ],
+    2004: [
+        ("2004-07-01", "2004-08-31", None, "crop-a"),
+        ("2004-09-01", "2005-02-10", "crop-a", "2004-09-01"),
+        ("2005-02-11", "2005-05-19", None, "crop-b"),
+        ("2005-05-20", "2005-06-30", "crop-b", "2005-05-20"),
+    ],
+    # The p sown on 2006-09-01 lies after the record.
+    2005: [
+        ("2005-07-01", "2005-11-25", "crop-b", "2005-05-20"),
+        ("2005-11-26", "2006-01-09", None, "crop-a"),
+        ("2006-01-10", "2006-05-31", "crop-a", "2006-01-10"),
+        ("2006-06-01", "2006-06-30", None, NOT_LAID_OUT),
+    ],
+}
+
+# The crop of a balance day, by the PLACEHOLDER fraction of its crop.
+CROP_OF_FRACTION = {
+    value: crop
+    for crop, value in PLACEHOLDER_CROP["readily_available_fraction"].items()
+}
+
+
+def spy_balance(monkeypatch) -> dict[dt.date, Any]:
+    """Wrap the daily step of the balance; keep the crop each day is given."""
+    crops_given: dict[dt.date, Any] = {}
+    step = module.balance.step
+
+    def spy(storage, day, **kwargs):
+        crops_given[day.date] = day.crop
+        return step(storage, day, **kwargs)
+
+    monkeypatch.setattr(module.balance, "step", spy)
+    return crops_given
+
+
+def assert_laid_out_by_hand(
+    monkeypatch, calendar_: RotationCalendar, by_hand: dict[int, list[Row]]
+) -> list[WaterDeficitExposure]:
+    """Every day of ``literal_record`` is given what the layout by hand says.
+
+    A crop day: the balance is given that crop, with the basal coefficient of
+    the stage of the day counted from the sowing written by hand
+    (``expected_by_stage``). A day with no crop: the balance is given none,
+    and the surface layer the total evaporable water reduced by the cover of
+    the fallow before the crop written by hand. The rows of a year fill it
+    from its first day to its last, and the years are those of the record.
+
+    A row marked NOT_LAID_OUT is a fallow whose next sowing lies after the
+    record: the balance is given no crop, the cover of the fallow cannot be
+    named, and the day has no value. Every year before it is computed, so it
+    is missing for the definition only (D61); the year it falls in is
+    ``MISSING_INPUT`` from its first day, saying that the fallow has no
+    following crop.
+    """
+    record = literal_record()
+    assert sorted(by_hand) == expected_ag_years(*record)
+    with monkeypatch.context() as patch:
+        crops_given = spy_balance(patch)
+        surface_given = spy_surface_layer(patch)
+        days = chain(calendar_, climate(record))
+    assert [day.date for day in days] == module._days(*record)
+    by_date = {day.date: day for day in days}
+    kinds = {"crop": 0, "no crop": 0}
+    cut: tuple[int, dt.date] | None = None  # the year and first day with no value
+    for ag_year, rows in by_hand.items():
+        expected_first = first_day_of(ag_year)
+        for first_text, last_text, crop, other in rows:
+            first, last = (dt.date.fromisoformat(t) for t in (first_text, last_text))
+            assert first == expected_first, (ag_year, first_text)
+            assert first <= last
+            for day in module._days(first, last):
+                given = crops_given[day]
+                if other == NOT_LAID_OUT:
+                    assert crop is None and given is None, day
+                    _, _, constants = surface_given[day]
+                    total = constants["total_evaporable_water"]
+                    assert isinstance(total, Missing), day
+                    assert total.reason == "MISSING_INPUT"
+                    assert isinstance(by_date[day].balance.storage_end, Missing)
+                    cut = cut or (ag_year, first)
+                    continue
+                assert cut is None, "a day after the fallow with no following crop"
+                assert is_number(by_date[day].balance.storage_end), day
+                if crop is None:
+                    assert given is None, day
+                    _, _, constants = surface_given[day]
+                    assert constants["total_evaporable_water"] == pytest.approx(
+                        mulched(PLACEHOLDER_RESIDUE_COVER[other])
+                    ), day
+                    kinds["no crop"] += 1
+                    continue
+                assert isinstance(given, module.balance.CropDay), day
+                assert CROP_OF_FRACTION[given.readily_available_fraction] == crop, day
+                day_number = (day - dt.date.fromisoformat(other)).days + 1
+                assert given.transpiration_coefficient == pytest.approx(
+                    expected_by_stage(crop, day_number, *PLACEHOLDER_STAGE.values())
+                ), day
+                kinds["crop"] += 1
+            expected_first = last + ONE_DAY
+        assert expected_first == last_day_of(ag_year) + ONE_DAY, ag_year
+    assert all(count > 0 for count in kinds.values()), kinds
+    result = run(calendar_=calendar_, climate_=climate(record))
+    assert_loads(result)
+    assert [item.ag_year for item in result] == sorted(by_hand)
+    for item in result:
+        assert item.time_basis == "ag_year"
+        if cut is None or item.ag_year < cut[0]:
+            assert_computed(item)
+            continue
+        # The year of the fallow with no following crop, and no later year.
+        assert item.ag_year == cut[0] == max(by_hand)
+        assert item.missing.reason == "MISSING_INPUT"
+        assert f"chain MISSING_INPUT: {module.fallow.NO_FOLLOWING_CROP}" in items_of(
+            item.missing.detail
+        )
+        assert f"the first on {cut[1].isoformat()}" in item.missing.detail
+        assert "D109" in item.missing.detail and "OPEN 41" in item.missing.detail
+    return result
+
+
+def test_calendar_dates_after_the_record_give_the_crops_of_the_repetition_laid_out_by_hand(
+    monkeypatch,
+):
+    # D47: a calendar whose own dates lie outside the record still runs on
+    # the years of the record. Before unit #253 every year was MISSING_INPUT
+    # naming Q5. The last year is still missing, for another reason: the
+    # fallow at the end of the record has no following crop (D109, OPEN 41).
+    calendar_ = two_year_calendar()
+    _, record_end = literal_record()
+    assert calendar_.start_date > record_end
+    result = assert_laid_out_by_hand(monkeypatch, calendar_, TWO_YEAR_PHASE_0)
+    for item in result:
+        assert "Q5" not in (
+            item.source if item.missing is None else item.missing.detail
+        )
+    # The same years as a calendar laid on the record itself (D47).
+    reference = run(climate_=climate(literal_record()))
     assert [item.ag_year for item in result] == [item.ag_year for item in reference]
+
+
+def test_each_phase_of_a_two_year_rotation_runs_through_phase_calendar_and_lists_every_year(
+    monkeypatch,
+):
+    # D109, D132: one run per phase, each on the calendar the runner moves
+    # with phase_calendar. EP3 takes it like any calendar.
+    calendar_ = two_year_calendar()
+    assert list_phases(calendar_) == [0, 1]
+    by_phase = {0: TWO_YEAR_PHASE_0, 1: TWO_YEAR_PHASE_1}
+    assert TWO_YEAR_PHASE_0 != TWO_YEAR_PHASE_1
+    for phase in list_phases(calendar_):
+        moved = phase_calendar(calendar_, phase)
+        assert components_crossing_phase(calendar_, phase) == []
+        result = assert_laid_out_by_hand(monkeypatch, moved, by_phase[phase])
+        assert [item.ag_year for item in result] == expected_ag_years(*literal_record())
+
+
+def test_component_that_crosses_the_first_day_of_the_record_is_present_from_that_day(
+    monkeypatch,
+):
+    # D141: q starts before the first agricultural year of the record and
+    # ends inside it. It keeps its declared dates, is present from the first
+    # day of the record and is computed normally.
+    calendar_ = crossing_calendar()
+    assert list_phases(calendar_) == [0, 1]
+    assert components_crossing_phase(calendar_, 1) == ["PLACEHOLDER-component-q"]
+    moved = phase_calendar(calendar_, 1)
+    assert all(
+        c.start.date is not None and c.end.date is not None for c in moved.components
+    )
+    first_row, *_ = CROSSING_PHASE_1[2001]
+    record_start, _ = literal_record()
+    # The crop of the first day was sown before the record.
+    assert first_row[0] == record_start.isoformat()
+    assert dt.date.fromisoformat(first_row[3]) < record_start
+    assert_laid_out_by_hand(monkeypatch, moved, CROSSING_PHASE_1)
+    # The stage of the first day is counted from the declared sowing: it is
+    # the 43rd day of q, inside its development stage.
+    crops_given = spy_balance(monkeypatch)
+    chain(moved, climate(literal_record()))
+    lengths = placeholder_stage_lengths("crop-b")
+    assert lengths["initial"] < 43 <= lengths["initial"] + lengths["development"]
+    assert crops_given[record_start].transpiration_coefficient == pytest.approx(
+        PLACEHOLDER_STAGE["initial"]
+        + (43 - lengths["initial"])
+        / lengths["development"]
+        * (PLACEHOLDER_STAGE["mid"] - PLACEHOLDER_STAGE["initial"])
+    )
+
+
+def test_cycle_that_does_not_fit_whole_is_cut_at_the_end_of_the_record(monkeypatch):
+    # D109. Phase 0 of the crossing rotation: the third cycle starts in the
+    # last year of the record. p is whole; q is sown inside the record and
+    # harvested after it, so its days up to the last day of the record are
+    # laid out with its stages; r is sown after the record and is not.
+    calendar_ = crossing_calendar()
+    record = literal_record()
+    result = assert_laid_out_by_hand(monkeypatch, calendar_, CROSSING_PHASE_0)
+    *_, last_row = CROSSING_PHASE_0[2005]
+    assert last_row == ("2006-05-20", "2006-06-30", "crop-b", "2006-05-20")
+    # The record ends on a crop day, so every year is computed. Where it ends
+    # in a fallow, the sowing after it is not laid out either, and the fallow
+    # has no following crop: the last rows of the other layouts by hand.
+    for item in result:
+        assert_computed(item)
+    for cut_layout in (TWO_YEAR_PHASE_0, TWO_YEAR_PHASE_1, CROSSING_PHASE_1):
+        *_, cut_row = cut_layout[2005]
+        assert cut_row[2:] == (None, NOT_LAID_OUT)
+    # No day after the record is computed, and no year after it is listed.
+    days = chain(calendar_, climate(record))
+    assert days[-1].date == record[1]
+    assert result[-1].ag_year == 2005
+
+
+def test_calendar_that_starts_at_its_first_sowing_runs_on_a_record_that_starts_inside_a_year():
+    # The calendar as EP2 lays it out starts on its first sowing (10 August),
+    # and the record of D29 starts on 1 January, inside an agricultural year.
+    # The first cycle starts in the first agricultural year of the record
+    # (2000-08-10), before the first day of the record, so every day is
+    # described; the years the record covers whole are computed, and the two
+    # it covers in part are NO_COVERAGE (C5.5).
+    calendar_ = two_year_calendar(start="2031-08-10")
+    record = (dt.date(2001, 1, 1), dt.date(2005, 12, 31))
+    result = run(calendar_=calendar_, climate_=climate(record))
+    assert_loads(result)
+    assert [item.ag_year for item in result] == [2000, 2001, 2002, 2003, 2004, 2005]
+    first, *whole, last = result
+    for item in (first, last):
+        assert item.missing.reason == "NO_COVERAGE"
+    for item in whole:
+        assert_computed(item)
+
+
+def test_days_before_the_first_cycle_are_not_described_and_leave_the_years_missing():
+    # The same calendar on a record that starts on the first day of an
+    # agricultural year: the first cycle starts on 2001-08-10 and no
+    # component of the cycle before it reaches the record, so the forty days
+    # before it are not described (point 6 of engine/calendar/repeat.py).
+    # The crop is not known on them, and the balance never restarts (D44).
+    calendar_ = two_year_calendar(start="2031-08-10")
+    record = literal_record()
+    days = chain(calendar_, climate(record))
+    assert all(isinstance(day.balance.storage_end, Missing) for day in days)
+    result = run(calendar_=calendar_, climate_=climate(record))
+    assert_loads(result)
+    assert [item.ag_year for item in result] == expected_ag_years(*record)
     for item in result:
         assert item.missing.reason == "MISSING_INPUT"
-        assert "Q5" in item.missing.detail
-        assert "outside the dates of the calendar" in item.missing.detail
+        assert f"chain MISSING_INPUT: {module.CROP_UNKNOWN}" in items_of(
+            item.missing.detail
+        )
+        assert "Q5" not in item.missing.detail
+    assert "the first on 2001-07-01" in result[0].missing.detail
+    assert "D47" in module.CROP_UNKNOWN and "OPEN 5" in module.CROP_UNKNOWN
+
+
+def test_crossing_component_that_phase_calendar_cannot_place_leaves_its_days_missing_naming_d141():
+    # A component of the first year that runs past the last day of the second
+    # cannot lie whole in one cycle of the moved calendar, so phase_calendar
+    # gives it missing dates with their reason (OPEN of
+    # engine/calendar/repeat.py). EP3 guesses nothing: the days it could
+    # cover have no known crop, naming the component and that reason.
+    calendar_ = rotation_calendar(
+        "2031-07-01",
+        "2033-08-15",
+        [
+            ("p", "crop-a", "2031-09-01", "2032-02-10"),
+            ("long", "crop-b", "2032-03-01", "2033-08-15"),
+        ],
+    )
+    assert list_phases(calendar_) == [0, 1, 2]
+    assert components_crossing_phase(calendar_, 1) == ["PLACEHOLDER-component-long"]
+    moved = phase_calendar(calendar_, 1)
+    (long,) = [c for c in moved.components if c.component_id.endswith("long")]
+    assert long.start.date is None and long.end.date is None
+    record = literal_record()
+    result = run(calendar_=moved, climate_=climate(record))
+    assert_loads(result)
+    assert [item.ag_year for item in result] == expected_ag_years(*record)
+    for item in result:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert item.value is None
+    # The reason of the calendar holds "; ", so the whole detail is read, not
+    # its items.
+    named = [
+        item.missing.detail
+        for item in result
+        if f"chain MISSING_INPUT: {module.CROP_DATES_MISSING}" in item.missing.detail
+    ]
+    assert named
+    for detail in named:
+        assert "component 'PLACEHOLDER-component-long' (start and end date" in detail
+        assert "NOT_COMPUTABLE" in detail
+        assert "D141" in detail
 
 
 def every_kind_of_result() -> list[list[WaterDeficitExposure]]:
@@ -2173,23 +2716,357 @@ def every_kind_of_result() -> list[list[WaterDeficitExposure]]:
         run(calendar_=calendar_without_start_month()),
         run(climate_=climate(quantities=CLIMATE_QUANTITIES)),
         run(calendar_=calendar()),
+        # Years with a number (D157), from the calendar with crops.
+        run(calendar_=chain_calendar()),
+        run(
+            calendar_=chain_calendar(),
+            climate_=climate_with_dry_spells(),
+            parameters=dry_catalogue(),
+        ),
     ]
 
 
-def test_the_list_is_never_empty_and_no_item_is_a_number():
+def test_the_list_is_never_empty_and_every_item_is_a_labelled_number_or_missing_with_its_reason():
+    numbers = 0
     for result in every_kind_of_result():
         assert isinstance(result, list)
         assert len(result) >= 1
+        assert_loads(result)
         for item in result:
-            assert item.value is None
-            assert item.value != 0
-            assert item.missing is not None
-            assert item.missing.reason in REASON_CODES
-            assert item.provenance is None
-            assert item.range is None and item.range_missing is None
+            if item.value is None:
+                # Missing with a reason of C3.2, and nothing of a value.
+                assert item.missing is not None
+                assert item.missing.reason in REASON_CODES
+                assert item.provenance is None and item.source is None
+                assert item.assumption is False
+                assert item.range is None and item.range_missing is None
+            else:
+                # A number of D157: never a zero written for a missing value.
+                assert_is_a_value(item)
+                numbers += 1
         assert len({item.time_basis for item in result}) == 1
         ag_years = [item.ag_year for item in result]
         assert len(set(ag_years)) == len(ag_years)
+    assert numbers > 0
+
+
+# --- the cases of #264: the ratio of D157 ---------------------------------------
+
+
+def dry_catalogue() -> dict[str, dict]:
+    """The test catalogue with no residue cover on any fallow.
+
+    With the long dry spells of ``climate_with_dry_spells`` the surface layer
+    of a crop day dries to its total evaporable water. A fallow with a cover
+    has a smaller total, and a depletion above it is not computed (OPEN 30),
+    which would leave the years missing. A cover of zero, structurally,
+    leaves the total unchanged, so every day is computed.
+    """
+    no_cover = 0.0
+    return catalogue_with(
+        {
+            (module.SURFACE_RESIDUE_COVER, f"fallow:{crop}"): fallow_record(
+                crop, no_cover
+            )
+            for crop in CROPS
+        }
+    )
+
+
+def spy_balance_days(monkeypatch) -> dict[dt.date, tuple[Any, Any]]:
+    """Wrap the daily step of the balance; keep the day it is given and the
+    day it gives back, so that a case recomputes from the run it checks."""
+    seen: dict[dt.date, tuple[Any, Any]] = {}
+    step = module.balance.step
+
+    def spy(storage, day, **kwargs):
+        result = step(storage, day, **kwargs)
+        seen[day.date] = (day, result)
+        return result
+
+    monkeypatch.setattr(module.balance, "step", spy)
+    return seen
+
+
+def ratio_by_hand(
+    seen: dict[dt.date, tuple[Any, Any]], first: dt.date, last: dt.date
+) -> tuple[float | None, list[dt.date]]:
+    """The ratio of D157 from ``first`` to ``last``, written out here, and its
+    days with a living crop.
+
+    A day with a living crop is a day on which the balance was given a crop.
+    Water transpired is the transpiration the balance gave back; water
+    demanded is the basal crop coefficient it was given times the reference
+    evapotranspiration it was given. Each is summed over those days.
+    """
+    living = [
+        day
+        for day in module._days(first, last)
+        if isinstance(seen[day][0].crop, module.balance.CropDay)
+    ]
+    if not living:
+        return None, living
+    transpired = math.fsum(seen[day][1].transpiration for day in living)
+    demanded = math.fsum(
+        seen[day][0].crop.transpiration_coefficient
+        * seen[day][0].reference_evapotranspiration
+        for day in living
+    )
+    return transpired / demanded, living
+
+
+def days_in_source(item: WaterDeficitExposure) -> tuple[int, dt.date, dt.date]:
+    """The count of days with a living crop, the first and the last, as the
+    source of a value states them."""
+    found = re.search(
+        r"summed over the (\d+) day\(s\) with a living crop of agricultural year "
+        r"(\d+), the first on (\d{4}-\d{2}-\d{2}) and the last on (\d{4}-\d{2}-\d{2})",
+        item.source,
+    )
+    assert found, item.source
+    assert int(found.group(2)) == item.ag_year
+    return (
+        int(found.group(1)),
+        dt.date.fromisoformat(found.group(3)),
+        dt.date.fromisoformat(found.group(4)),
+    )
+
+
+def test_year_computed_on_every_day_gives_the_ratio_recomputed_by_hand_from_the_daily_balance(
+    monkeypatch,
+):
+    # Long dry spells, so that the root zone dries and the balance transpires
+    # less than is demanded on some days: a ratio below one.
+    seen = spy_balance_days(monkeypatch)
+    calendar_ = chain_calendar()
+    result = run(
+        calendar_=calendar_,
+        climate_=climate_with_dry_spells(),
+        parameters=dry_catalogue(),
+    )
+    assert_loads(result)
+    assert [item.ag_year for item in result] == expected_ag_years(*several_full_years())
+    values = []
+    for item in result:
+        first, last = first_day_of(item.ag_year), last_day_of(item.ag_year)
+        expected, living = ratio_by_hand(seen, first, last)
+        assert living, "every year of the calendar with crops has crop days"
+        assert_is_a_value(item)
+        assert item.value == pytest.approx(expected, rel=1e-12)
+        assert days_in_source(item) == (len(living), living[0], living[-1])
+        # The days with a living crop are those the calendar gives a crop,
+        # and the demanded transpiration of the balance is the product.
+        for day in living:
+            assert crop_period_of(calendar_, day) is not None
+            given, back = seen[day]
+            assert back.transpiration_demanded == pytest.approx(
+                given.crop.transpiration_coefficient
+                * given.reference_evapotranspiration
+            )
+            assert 0 <= back.transpiration <= back.transpiration_demanded
+        values.append(item.value)
+    # Some year is short of water, and the years are not all alike.
+    assert min(values) < 1
+    assert len(set(values)) > 1
+    # A second run gives the same numbers (G1).
+    again = run(
+        calendar_=calendar_,
+        climate_=climate_with_dry_spells(),
+        parameters=dry_catalogue(),
+    )
+    assert [item.value for item in again] == values
+
+
+def test_cycle_that_crosses_the_start_of_the_agricultural_year_gives_its_days_to_each_year(
+    monkeypatch,
+):
+    # D157, D47. In phase 0 of the crossing rotation, q is sown on 20 May
+    # and harvested on 25 November: its days up to 30 June count in the year
+    # they fall in, and its days from 1 July in the next one.
+    seen = spy_balance_days(monkeypatch)
+    record = literal_record()
+    result = run(
+        calendar_=crossing_calendar(),
+        climate_=climate_with_dry_spells(record),
+        parameters=dry_catalogue(),
+    )
+    assert_loads(result)
+    by_year = {item.ag_year: item for item in result}
+    assert sorted(by_year) == sorted(CROSSING_PHASE_0)
+    for ag_year, rows in CROSSING_PHASE_0.items():
+        # The days with a crop, from the layout by hand of that year.
+        by_hand = [
+            day
+            for first, last, crop, _ in rows
+            if crop is not None
+            for day in module._days(
+                dt.date.fromisoformat(first), dt.date.fromisoformat(last)
+            )
+        ]
+        expected, living = ratio_by_hand(
+            seen, first_day_of(ag_year), last_day_of(ag_year)
+        )
+        assert living == by_hand
+        item = by_year[ag_year]
+        assert_is_a_value(item)
+        assert item.value == pytest.approx(expected, rel=1e-12)
+        assert days_in_source(item) == (len(by_hand), by_hand[0], by_hand[-1])
+    # The cycle of q that crosses 1 July 2002: 42 days in the year 2001 and
+    # 148 in the year 2002, each with the other crop days of its year.
+    _, _, last_of_2001 = days_in_source(by_year[2001])
+    _, first_of_2002, _ = days_in_source(by_year[2002])
+    assert last_of_2001 == dt.date(2002, 6, 30)
+    assert first_of_2002 == dt.date(2002, 7, 1)
+    whole_cycle, _ = ratio_by_hand(seen, dt.date(2002, 5, 20), dt.date(2002, 11, 25))
+    assert by_year[2001].value != pytest.approx(whole_cycle, rel=1e-9)
+    assert by_year[2002].value != pytest.approx(whole_cycle, rel=1e-9)
+
+
+def test_year_with_no_living_crop_is_not_applicable(monkeypatch):
+    # The calendar with one component, sown on the last day of the record:
+    # the first two years have no crop day; the last has one, its sowing day.
+    seen = spy_balance_days(monkeypatch)
+    result = run()
+    assert_loads(result)
+    *fallow_years, last_year = result
+    assert len(fallow_years) == 2
+    for item in fallow_years:
+        assert item.value is None
+        assert item.value != 0
+        assert item.missing.reason == "NOT_APPLICABLE"
+        assert_computed(item)
+        assert "D106" in item.missing.detail and "D136" in item.missing.detail
+    assert_is_a_value(last_year)
+    assert days_in_source(last_year) == (1, *([several_full_years()[1]] * 2))
+    expected, _ = ratio_by_hand(
+        seen, first_day_of(last_year.ag_year), last_day_of(last_year.ag_year)
+    )
+    assert last_year.value == pytest.approx(expected, rel=1e-12)
+
+
+def test_tail_days_after_maturity_do_not_enter_the_ratio(monkeypatch):
+    # D136. One component of crop-a from the first day of the record to the
+    # day before its last, far longer than the stage lengths of the crop: its
+    # living days lie in the first year, the whole second year is its tail,
+    # and the third year holds its tail and the sowing day of the component
+    # sown on the last day of the record.
+    first, last = several_full_years()
+    document = chain_calendar_document()
+    *_, closing = document["components"]
+    long = copy.deepcopy(closing)
+    long["component_id"] = "PLACEHOLDER-component-long"
+    long["start"]["date"] = first.isoformat()
+    long["end"]["date"] = (last - ONE_DAY).isoformat()
+    document["components"] = [long, closing]
+    calendar_ = RotationCalendar.model_validate(document)
+    seen = spy_balance_days(monkeypatch)
+    result = run(calendar_=calendar_)
+    assert_loads(result)
+    first_year, second_year, third_year = result
+    living_days = period_days("crop-a")  # the four stage lengths of crop-a
+    assert_is_a_value(first_year)
+    assert days_in_source(first_year) == (
+        living_days,
+        first,
+        first + ONE_DAY * (living_days - 1),
+    )
+    # Every day of the second year is a tail day: the balance was given no
+    # crop on any of them, so the year has no living crop.
+    for day in module._days(
+        first_day_of(second_year.ag_year), last_day_of(second_year.ag_year)
+    ):
+        assert seen[day][0].crop is None
+    assert second_year.value is None
+    assert second_year.missing.reason == "NOT_APPLICABLE"
+    assert_computed(second_year)
+    # The third year: its tail days are left out, its one sowing day counts.
+    assert_is_a_value(third_year)
+    assert days_in_source(third_year) == (1, last, last)
+
+
+def test_year_with_one_day_the_chain_could_not_compute_is_missing_with_the_reason_of_that_day():
+    first, _ = several_full_years()
+    held = first_day_of(first.year + 1) + ONE_DAY * 99
+    calendar_ = chain_calendar()
+    result = run(calendar_=calendar_, climate_=climate(held_missing=(held,)))
+    assert_loads(result)
+    before, year, after = result
+    # The year before is computed: a number.
+    assert_is_a_value(before)
+    # The year of the day: not a number, and not NOT_APPLICABLE; the reason
+    # of the first day without a value, which is that day.
+    assert year.value is None
+    assert year.value != 0
+    assert year.missing.reason == "MISSING_INPUT"
+    assert f"the first on {held.isoformat()}" in year.missing.detail
+    assert "no gap is filled" in year.missing.detail
+    assert year.provenance is None and year.source is None
+    assert year.range is None and year.range_missing is None
+    # The 99 days before it were computed, and give no number for the year.
+    days = chain(calendar_, climate(held_missing=(held,)))
+    computed = [
+        day
+        for day in days
+        if first_day_of(year.ag_year) <= day.date < held
+        and is_number(day.balance.storage_end)
+    ]
+    assert len(computed) == 99
+    # The balance does not restart, so the year after is missing too.
+    assert after.value is None
+    assert after.missing.reason == "MISSING_INPUT"
+
+
+def test_year_whose_demanded_sum_is_zero_is_not_computable(monkeypatch):
+    # A basal crop coefficient of zero in every stage of both crops (and a
+    # minimum crop coefficient of zero, so that the cover fraction exists):
+    # the balance is computed on every day, the crops demand nothing, and the
+    # ratio has no denominator. Zero here is structural, not a value.
+    zero = 0.0
+    changes: dict[tuple[str, str | None], dict | None] = {
+        ("minimum_crop_coefficient", None): site_record(
+            "minimum_crop_coefficient", zero
+        )
+    }
+    for crop in CROPS:
+        for stage in module.STAGES:
+            label = f"{crop}:{stage}"
+            changes[("basal_crop_coefficient", label)] = unmarked(
+                placeholder_record("basal_crop_coefficient", zero, scope_of(label))
+            )
+    seen = spy_balance_days(monkeypatch)
+    calendar_ = chain_calendar()
+    result = run(calendar_=calendar_, parameters=catalogue_with(changes))
+    assert_loads(result)
+    crop_days = 0
+    for day, (given, back) in seen.items():
+        assert is_number(back.storage_end), day
+        if isinstance(given.crop, module.balance.CropDay):
+            assert back.transpiration_demanded == 0
+            assert back.transpiration == 0
+            crop_days += 1
+    assert crop_days > 0
+    for item in result:
+        assert item.value is None
+        assert item.value != 0
+        assert item.missing.reason == "NOT_COMPUTABLE"  # PROPOSED, OPEN 43
+        assert "is not above zero" in item.missing.detail
+        assert "D157" in item.missing.detail and "OPEN 43" in item.missing.detail
+        assert item.provenance is None and item.source is None
+
+
+def test_label_of_d105_is_on_every_value_and_on_no_missing_item():
+    numbers = 0
+    for result in every_kind_of_result():
+        for item in result:
+            if item.value is None:
+                assert item.source is None
+                continue
+            # D162: the label, verbatim, at the start of the source text.
+            assert item.source.startswith("whole cycle, not critical period")
+            assert item.source.count(WINDOW_LABEL) == 1
+            numbers += 1
+    assert numbers > 0
+    assert module.WINDOW_LABEL == "whole cycle, not critical period"
 
 
 # --- the caller (G3, G5) and purity (G1) --------------------------------------
@@ -2280,6 +3157,9 @@ def test_arguments_unchanged_and_second_call_equal():
                 or name == "contracts.results.models"
                 or name
                 in (
+                    # The repetition of the rotation over the record (unit
+                    # #253): the one place its rule lives.
+                    "engine.calendar.repeat",
                     "engine.water",
                     "engine.water._parameters",
                     "engine.water.et0",
@@ -2288,7 +3168,9 @@ def test_arguments_unchanged_and_second_call_equal():
                     "engine.water.stages",
                 )
             ),
-            {1},
+            # One, and the zero the demanded sum of a year is compared with
+            # (unit #264).
+            {0, 1},
         ),
         ("stages.py", lambda name: name == "contracts.results.models", {1}),
         (
@@ -2297,14 +3179,7 @@ def test_arguments_unchanged_and_second_call_equal():
             {1},
         ),
         # The bounds of a fraction and the whole of the total evaporable water.
-        (
-            "fallow.py",
-            lambda name: (
-                name
-                in ("contracts.inputs.rotation_calendar", "contracts.results.models")
-            ),
-            {0, 1},
-        ),
+        ("fallow.py", lambda name: name == "contracts.results.models", {0, 1}),
     ],
 )
 def test_modules_import_only_allowed_modules_and_hold_only_the_integer_one(

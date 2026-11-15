@@ -107,6 +107,7 @@ Each case is a test in `test_ledger.py`. All numbers are PLACEHOLDER numbers; no
 | `test_marked_or_malformed_record_is_missing_input_naming_why` | A PLACEHOLDER record and a record without an identity are named |
 | `test_years_are_the_whole_agricultural_years_of_the_record` | A record that does not start on the start month: only whole years |
 | `test_first_year_before_the_first_cycle_is_missing` | A first year that begins before the first cycle is `MISSING_INPUT`; the others are computed |
+| `test_component_starting_before_the_start_month_gives_a_lead_in_entry` | A first component that starts before the start month: the cycle before the first is written as cycle -1 (the lead-in of D141), its harvests fall in the first agricultural year, and that year is their value, not missing |
 | `test_undated_harvest_leaves_the_years_it_may_fall_in_missing` | A component without an end date: its entries have no year and its crop's years are missing, naming it |
 | `test_year_without_a_harvest_of_a_crop_is_zero` | A two-year cycle: the year without a harvest of a crop is zero, the other one is its value |
 | `test_ledger_without_years_says_why` | No daily series (`MISSING_INPUT`) or no whole year (`NO_COVERAGE`): no years, no entries |

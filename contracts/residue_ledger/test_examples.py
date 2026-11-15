@@ -124,6 +124,21 @@ def test_component_twice_in_one_cycle_is_rejected():
     rejected(data, "appears twice in cycle 0")
 
 
+def test_lead_in_cycle_is_admitted_and_nothing_lower():
+    """Cycle -1 is the lead-in of D141 (point 13 of engine/calendar/repeat.py),
+    admitted by D160; no cycle comes before it."""
+    data = load()
+    data["components"][0]["cycle"] = -1
+    ledger = ResidueLedger.model_validate(data)
+    assert [item.cycle for item in ledger.components] == [-1, 0, 1]
+    assert ResidueLedger.model_validate(ledger.model_dump(mode="json")) == ledger
+    twice = copy.deepcopy(data)
+    twice["components"][2]["cycle"] = -1
+    rejected(twice, "appears twice in cycle -1")
+    data["components"][0]["cycle"] = -2
+    rejected(data, "greater than or equal to -1")
+
+
 def test_value_in_another_unit_than_the_ledger_is_rejected():
     data = load()
     data["components"][0]["root_mass"]["unit"] = "PLACEHOLDER_other_unit"
