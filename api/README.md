@@ -240,6 +240,7 @@ imports.
 | A problem the `RotationValidator` reports | `ROTATION_INVALID` | `rotations.<index>.<path>`, its code |
 | A rotation whose `case_id` or `field_id` is not that of `site` | `ROTATION_INVALID` | `rotations.<index>.case_id` or `.field_id`, `not_the_site` (PROPOSED) |
 | A `rotation_id` given twice | `ROTATION_INVALID` | `rotations.<index>.rotation_id` of the second, `repeated` (PROPOSED) |
+| A rotation whose `ag_year_start.month` is not that of the first rotation (D255 of #77: a pair shares one start month) | `ROTATION_INVALID` | `rotations.<index>.ag_year_start.month`, `not_the_start_month` (PROPOSED) |
 
 A message names the field, never the value the request carried.
 
