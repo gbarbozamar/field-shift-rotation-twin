@@ -14,6 +14,7 @@ Shared conventions that every contract, engine, adapter and screen in this repos
 - The numbers in this sheet are only labels: item numbers, month numbers, exponents in unit strings and the date of a decision. The sheet contains no parameter value, threshold, uncertainty range or expected value. Those are supplied by people and live in the parameter catalogue, the test plan and the validation files.
 - Field names given here say what travels with a value. The exact shape of each contract is fixed by its schema and its accepted example, which are separate units.
 - Where a source would have to be cited, the text says `CITATION NEEDED`. A person supplies the citation.
+- Three decisions of 15 November 2026 are restated as notes where they apply, each with the link to its comment on issue #77: D148 under C1.2, D147 under C1.5 and D141 under C5.5. A note changes no `Status:` line, no identifier, no unit string, no reason code and no label of this sheet.
 
 ## 1. Unit and direction of each indicator
 
@@ -41,6 +42,8 @@ Status: PROPOSED
 | Direction | `lower_is_better` |
 
 The method that produces the value is not defined here. Its description and its source belong to the method documentation: CITATION NEEDED.
+
+**What the demonstration shows (D148).** Decision of [issue #77, D148](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6888128333), 15 November 2026, which amends D145 and D146: "The computed `C` is withdrawn from the demonstration. Its per-rotation values are not shown, neither as absolute values nor as a comparison. Its code (#229) and its signed records (#237) stay in the repository as a documented, not validated capability." By the same decision the headline soil loss is the declared-`C` figure of D125, shown with the label that D148 words. The figure and the wording of that label are a value and interface text, so they are not repeated in this sheet: they are in D148, and the check behind the decision is the entry at the end of `docs/VALIDATION.md`. The identifier, the unit, the time basis and the direction of the table above do not change.
 
 ### C1.3 Exposure to water deficit: identifier, unit, time basis and direction
 
@@ -107,6 +110,8 @@ Status: PROPOSED
 | Direction | `higher_is_better` |
 
 Each value names the carbon model and the computation that produced it. Values from different models are never averaged or merged into one value by an engine.
+
+**Unit of the carbon inputs (D147).** The carbon inputs are not this indicator; the note is here because it fixes a unit string that travels between two contracts. Decision of [issue #77, D147](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887951649), 15 November 2026: the residue ledger engine (EP4 of `contracts/ENTRYPOINTS.md`) converts. "The annual carbon-input series that EP4 writes for `CarbonForcing.annual_carbon_inputs` are in **`t C ha-1`**", obtained from the ledger's `kg C ha-1` "by the SI definition of the prefixes". "That is a definition, not a value of the method, so it needs no catalogue record. The masses and the carbon of the ledger itself stay in `kg ha-1`. The runner and AMG do no arithmetic on them". The vocabulary of C1.1 lists `t` and does not list `kg`: whether C1.1 accepts the `kg` unit strings of the ledger stays `OPEN` in `engine/residues/README.md` (OPEN 3) and in EP4 of `contracts/ENTRYPOINTS.md`, and this note does not add them to C1.1.
 
 ### C1.6 Trend of soil carbon: what the trend is computed over
 
@@ -296,6 +301,8 @@ Status: PROPOSED
 An agricultural year that the data series does not cover from its first day to its last is not reported as a full year. Its yearly values are missing with reason `NO_COVERAGE`.
 
 This item is about the extent of the series only: a year that begins before the first day of the series or ends after its last day. Days missing inside the series are covered by C3.3 and C3.4.
+
+**A crop component that crosses the first day of the record (D133, D141).** Decision of [issue #77, D141](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887747713), 15 November 2026, which amends [D133](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887062652): "Each phase is laid out as the first one already is. A component that starts before the first agricultural year of the record and ends inside it keeps its declared dates. The part before the record falls outside the record and is not described, exactly as `repeat_over_record` treats the first phase (D47). Inside the record, the component is present from the first day of the record and is computed normally. No date is moved and no value is guessed: the convention is the one the first phase already uses, now applied to every phase. Where an engine cannot compute a quantity because it would need the part before the record (for example, a state carried in from it), that quantity stays missing with its reason (C3.2), as for the first phase. Science class: a science reviewer may still review it." D141 names no reason code, and this note adds none to C3.2. The phases themselves, and how a phase reaches an engine (D109, D132), are under Q5 of `contracts/ENTRYPOINTS.md`.
 
 ## 6. Time zone of every daily series
 
