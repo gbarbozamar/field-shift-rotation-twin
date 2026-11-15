@@ -47,9 +47,20 @@ are listed under OPEN at the end of this docstring and in OPEN 2 of
 OPEN, for the lead developer and the science reviewers (Q5 of
 contracts/ENTRYPOINTS.md keeps "how the rotation is repeated" open):
 
-- Point 4, where the first cycle starts. The alternative is to keep the
-  calendar's own phase (a year Y of the record takes the calendar year that is
-  a whole number of cycles away), which leaves a partial cycle at both ends.
+- Point 4, where the first cycle starts, and the phases of D109 (issue #77,
+  published after the brief of #207): "each phase of a rotation is a
+  scenario", each phase starting in the first agricultural year of the
+  record, cycles repeating, a cycle that does not fit whole cut at the end;
+  the runner (L2a) makes one call per phase. This helper lays out the phase
+  that starts with the calendar's first year only. Not built here: a start
+  phase needs an explicit argument with no default, and EP1's signature
+  cannot carry it (ENTRYPOINTS, D56), so how a phase reaches an engine (a
+  field of the calendar, or a calendar the runner moves) is for the lead
+  developer and the platform developer first. A candidate form: phase ``p``
+  (0 to ``cycle_length - 1``) lays the calendar's year ``p`` on the first
+  agricultural year of the record (shift reduced by ``p``); the components of
+  the first cycle that end before the record are then not laid out, and one
+  that starts before and ends inside it needs a rule.
 - Point 6, the residue and the crop before the first cycle. Laying out one
   cycle before the record (a lead-in) would give the first year a last
   harvest; the residue ledger (Q12) is the other candidate. Not done: no
