@@ -135,10 +135,16 @@ class Classified:
     ``of_record`` is false when the years are not years of the record (no
     period, or no whole year in it): they are then written unclassified and
     no count of years is known.
+
+    PROPOSED (S-030, code review): ``start_month`` is the start month the
+    years were classified with, or ``None`` when not known (a ``Classified``
+    built by hand, positionally, with two fields). ``assemble_answer``
+    refuses one that differs from the start month of the request.
     """
 
     kinds: dict[int, KindOfYear]
     of_record: bool
+    start_month: int | None = None
 
 
 def classify_years(
@@ -162,11 +168,20 @@ def classify_years(
     contract asks for at least one), the agricultural years of every declared
     date of the rotations, each missing ``NOT_AVAILABLE`` with a detail that
     says they are not years of the record.
+
+    PROPOSED (S-030, code review): ``record_years`` whose first year is after
+    its last is a ``ValueError``, a defect of the caller, not an absence.
     """
     if record_years is not None:
         first, last = record_years
+        if first > last:
+            raise ValueError(
+                "record_years: the first agricultural year is after the last"
+            )
         return Classified(
-            classify_agricultural_years(record, first, last, start_month), True
+            classify_agricultural_years(record, first, last, start_month),
+            True,
+            start_month,
         )
     declared = sorted(
         {
@@ -192,6 +207,7 @@ def classify_years(
             for year in declared
         },
         False,
+        start_month,
     )
 
 
@@ -330,16 +346,24 @@ def soil_loss_means(
     no year of the result in the list, as when the period holds no whole
     agricultural year) gives every mean missing ``NO_COVERAGE`` (C3.2: no data
     for this period), never a zero.
+
+    PROPOSED (S-030, code review): a run with neither a result nor
+    ``result_missing``, or a soil loss of another type, is a ``ValueError``
+    naming the problem (the route answers ``500``, as before).
     """
     if run.result is None:
         missing = run.result_missing
-        assert missing is not None
+        if missing is None:
+            raise ValueError("a run has neither a result nor result_missing")
         reason, detail = missing.reason, missing.detail
     elif isinstance(run.result.soil_loss, SoilLossNotBuilt):
         reason = run.result.soil_loss.missing.reason
         detail = run.result.soil_loss.missing.detail
+    elif not isinstance(run.result.soil_loss, SoilLossResults):
+        raise ValueError(
+            "the soil_loss of a result is neither SoilLossResults nor SoilLossNotBuilt"
+        )
     else:
-        assert isinstance(run.result.soil_loss, SoilLossResults)
         annual = run.result.soil_loss.annual
         read = set(classified.kinds) if classified.of_record else set()
         kept = [item for item in annual if item.ag_year in read]
@@ -384,10 +408,6 @@ def plain(value: Any) -> Any:
     if isinstance(value, list | tuple):
         return [plain(item) for item in value]
     return value
-
-
-def _margin_out(margin: MarginResult) -> dict[str, Any]:
-    return plain(margin)
 
 
 def _missing_margin(reason: str, detail: str) -> MarginResult:
@@ -460,12 +480,18 @@ def assemble_answer(
     the source of the kinds of year). ``rain_stress`` is the rain-stress echo
     already as JSON-ready data, or ``None`` when no factor was asked; it is
     copied into the answer unchanged. ``sources`` are the source rows of the
-    answer, as JSON-ready data, copied unchanged.
+    answer, as JSON-ready data, copied unchanged. A ``classified`` whose
+    ``start_month`` is set and differs from the request's is a ``ValueError``.
     """
     questions = request.questions
     facts = request.economic_facts
     crops = {crop.crop_id: crop for crop in facts.crops}
     start_month = request.rotations[0].ag_year_start.month
+    if classified.start_month is not None and classified.start_month != start_month:
+        raise ValueError(
+            "classified: the years were classified with another start month "
+            "than the one of the request"
+        )
     kinds = classified.kinds
 
     # The counts of years of each kind, and the kinds with a year (R7, R13).
@@ -514,7 +540,8 @@ def assemble_answer(
                 "crop, and a declared margin covers the whole year",
             )
         if cycle.years is None:
-            assert cycle.reason is not None and cycle.detail is not None
+            if cycle.reason is None or cycle.detail is None:
+                raise ValueError("a cycle without years carries no reason")
             missing = _missing_margin(cycle.reason, cycle.detail)
             margins.append(
                 {"average": missing, **dict.fromkeys(KINDS_OF_YEAR, missing)}
@@ -592,7 +619,7 @@ def assemble_answer(
             {
                 "rotation_id": definition.rotation_id,
                 "state": verdict.state,
-                "margin": {key: _margin_out(margin[key]) for key in margin},
+                "margin": {key: plain(margin[key]) for key in margin},
                 "soil_loss": {
                     "average": plain(record_mean),
                     **{kind: plain(by_kind[kind]) for kind in KINDS_OF_YEAR},
@@ -616,7 +643,7 @@ def assemble_answer(
         "options": options,
         "limit_cost": plain(decision.limit_cost),
         "tipping_price": tipping,
-        "rain_stress": None if rain_stress is None else plain(rain_stress),
+        "rain_stress": rain_stress,
         "erosivity": EROSIVITY,
         "kinds_of_year": {
             "source": record["id"],

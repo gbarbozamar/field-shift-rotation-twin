@@ -4,9 +4,11 @@ brief S-030). PROPOSED.
 The route cases stay in api/test_plant.py; these call ``economics.plant``
 directly. No number is typed here: the request, the answer's years and its
 source rows are read from the contract examples (example data), and the runs
-carry no soil loss (a missing result with a PLACEHOLDER detail). A test may
-import ``api`` (to compare with it, or to build the rain-stress echo as the
-route does); ``economics/plant.py`` may not.
+carry no soil loss (a missing result with a PLACEHOLDER detail), or are the
+contract results example; the rain-stress echo is the example answer's.
+The tests import nothing of ``api`` but ``api.phases.ag_year_of``, the rule
+``_ag_year_of`` is checked against; ``economics/plant.py`` may not import
+``api`` at all.
 """
 
 from __future__ import annotations
@@ -17,10 +19,15 @@ import datetime as dt
 import json
 from pathlib import Path
 
+import pytest
+
 from api.phases import ag_year_of
-from api.plant import stressed_run
 from contracts.economic_facts import KINDS_OF_YEAR, DeclaredMarginCrop
-from contracts.plant_answer import PlantRequest, check_answer_against_request
+from contracts.plant_answer import (
+    PlantAnswer,
+    PlantRequest,
+    check_answer_against_request,
+)
 from contracts.results.models import ResultsPerRotation
 from economics import plant
 from kinds_of_year import load_record
@@ -120,21 +127,21 @@ def test_assemble_answer_on_the_contract_example_passes_the_contract_check():
         record, _record_years(), WHY, start_month, request.rotations
     )
     assert classified.of_record
-    # The echo of the example's factor as the route writes it with no way to
-    # rebuild the engines (api.plant.stressed_run), as JSON-ready data.
-    echo = stressed_run(request, None, None, None).echo
-    assert echo is not None
+    # The echo of the example answer, unchanged (JSON-ready data).
+    echo = ANSWER["rain_stress"]
     answer = plant.assemble_answer(
         request,
         [NO_RESULT for _ in request.rotations],
         classified=classified,
         record=record,
-        rain_stress=plant.plain(echo),
+        rain_stress=echo,
         sources=ANSWER["sources"],
         example_data=True,
     )
     check_answer_against_request(request, answer)
-    assert answer.rain_stress.model_dump(mode="json") == plant.plain(echo)
+    # Copied as given: it reads back as the example answer's echo does.
+    example = PlantAnswer.model_validate_json(json.dumps(ANSWER))
+    assert answer.rain_stress == example.rain_stress
     assert answer.kinds_of_year.source == record["id"]
     for option in answer.options:
         assert option.soil_loss.average.value is None
@@ -167,7 +174,7 @@ def test_assemble_answer_averages_the_soil_loss_of_a_contract_results_example():
         runs,
         classified=classified,
         record=record,
-        rain_stress=plant.plain(stressed_run(request, None, None, None).echo),
+        rain_stress=ANSWER["rain_stress"],
         sources=ANSWER["sources"],
         example_data=True,
     )
@@ -235,3 +242,54 @@ def test_soil_loss_means_of_a_run_without_result_are_missing_with_its_reason():
         assert mean.value is None
         assert mean.reason == "MISSING_INPUT"
         assert MISSING_DETAIL in mean.detail
+
+
+# --- the seam refuses misuse (code review of S-030) ------------------------------
+
+
+def test_a_run_with_neither_result_nor_result_missing_is_a_value_error():
+    with pytest.raises(ValueError, match="neither a result nor result_missing"):
+        plant.soil_loss_means(_Run(None, None), plant.Classified({}, True))
+
+
+def test_classify_years_refuses_record_years_in_the_wrong_order():
+    request = _request()
+    first, last = _record_years()
+    assert first < last
+    with pytest.raises(ValueError, match="first agricultural year is after"):
+        plant.classify_years(
+            load_record(),
+            (last, first),
+            WHY,
+            request.rotations[0].ag_year_start.month,
+            request.rotations,
+        )
+
+
+def test_classify_years_records_its_start_month_and_positional_build_works():
+    request = _request()
+    month = request.rotations[0].ag_year_start.month
+    classified = plant.classify_years(
+        load_record(), _record_years(), WHY, month, request.rotations
+    )
+    assert classified.start_month == month
+    assert plant.Classified({}, True).start_month is None
+
+
+def test_assemble_answer_refuses_years_classified_with_another_start_month():
+    request = _request()
+    month = request.rotations[0].ag_year_start.month
+    classified = plant.classify_years(
+        load_record(), _record_years(), WHY, month, request.rotations
+    )
+    other = dataclasses.replace(classified, start_month=month % 12 + 1)
+    with pytest.raises(ValueError, match="another start month"):
+        plant.assemble_answer(
+            request,
+            [NO_RESULT for _ in request.rotations],
+            classified=other,
+            record=load_record(),
+            rain_stress=ANSWER["rain_stress"],
+            sources=ANSWER["sources"],
+            example_data=True,
+        )

@@ -81,14 +81,7 @@ from contracts.rotation_definition import RotationDefinition
 # Moved to economics.plant (S-030): the names the route uses, and the names
 # imported back so that ``from api.plant import ...`` keeps working.
 from economics.plant import (  # noqa: F401
-    EROSIVITY,
-    IGNORED_YEARS,
-    INDICATOR,
-    NO_SOIL_LOSS,
-    NO_YEAR_READ,
-    YEAR_NOT_OF_THE_RECORD,
     Classified,
-    CycleYears,
     _todays_price,
     assemble_answer,
     cycle_years,
@@ -410,7 +403,7 @@ def make_plant_router(
                 runs,
                 classified=classified,
                 record=kinds_of_year_record,
-                rain_stress=None if run.echo is None else plain(run.echo),
+                rain_stress=plain(run.echo),
                 sources=sources,
                 example_data=example_data,
             )
