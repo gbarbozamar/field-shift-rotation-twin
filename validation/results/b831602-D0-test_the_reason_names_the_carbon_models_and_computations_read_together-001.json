@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "b831602-D0-test_the_reason_names_the_carbon_models_and_computations_read_together-001",
+  "run_id": "run-20261115T100532Z-b831602",
+  "test_code": "D0",
+  "expected": {
+    "missing_reason": "the entry D0 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for validation/test_trivial_comparator.py::test_the_reason_names_the_carbon_models_and_computations_read_together"
+  },
+  "notes": "Test validation/test_trivial_comparator.py::test_the_reason_names_the_carbon_models_and_computations_read_together. Placed under D0: the trivial comparator of the decision, entry D0 of docs/VALIDATION.md (validation/README.md); under its heading '(d) what entry D0 does not say: no order, with the reason'. The entry's acceptance by a science reviewer is pending."
+}
