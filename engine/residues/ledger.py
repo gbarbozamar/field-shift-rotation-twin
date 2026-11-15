@@ -46,12 +46,21 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from contracts.carbon_forcing.models import AnnualCarbonInputSeries, AnnualValue
+from contracts.carbon_forcing.models import (
+    AnnualCarbonInputSeries,
+    AnnualValue,
+    CarbonInputSeries,
+)
 from contracts.inputs.common import DateValue, Missing, Value
 from contracts.inputs.rotation_calendar import RotationCalendar
-from contracts.inputs.site_climate import SiteClimate
+from contracts.inputs.site_climate import MonthlyValue, SiteClimate, YearMonth
 from contracts.residue_ledger import LedgerComponent, NotGiven, ResidueLedger
-from contracts.residue_ledger.models import series_origin
+from contracts.residue_ledger.models import (
+    MONTHS_IN_A_YEAR,
+    ORIGIN_GROUP_OF_PART,
+    monthly_quantity,
+    series_origin,
+)
 from contracts.rotation_definition import (
     MissingManagementField,
     RotationComponent,
@@ -510,6 +519,150 @@ def _series(
     return result
 
 
+# --- the monthly series (D221) ----------------------------------------------------------
+
+
+def _months(first_ag_year: int, last_ag_year: int, start_month: int) -> list[YearMonth]:
+    """Every calendar month of the agricultural years, in order (C5.1, C5.3)."""
+    first = first_ag_year * MONTHS_IN_A_YEAR + (start_month - 1)
+    count = (last_ag_year - first_ag_year + 1) * MONTHS_IN_A_YEAR
+    return [
+        YearMonth(year=index // MONTHS_IN_A_YEAR, month=index % MONTHS_IN_A_YEAR + 1)
+        for index in range(first, first + count)
+    ]
+
+
+def _month_index(day: dt.date) -> int:
+    return day.year * MONTHS_IN_A_YEAR + (day.month - 1)
+
+
+def _month_value(
+    month: YearMonth,
+    parts: tuple[str, ...],
+    group: list[tuple[LedgerComponent, RepeatedComponent]],
+    blockers: list[str],
+    infeasible: Missing | None,
+    described_from: dt.date,
+) -> MonthlyValue:
+    """D221: the carbon of every component of ``group`` harvested in this
+    calendar month, the parts of one origin summed; zero when none is
+    harvested in it; missing, never zero, when one may be or cannot be read."""
+    here = month.year * MONTHS_IN_A_YEAR + (month.month - 1)
+    label = f"{month.year}-{month.month:02d}"
+    if infeasible is not None:
+        return MonthlyValue(
+            year=month.year, month=month.month, value=None, missing=infeasible
+        )
+    problems = list(blockers)
+    start = _month_index(described_from)
+    if here < start or (here == start and described_from.day > 1):
+        problems.append(
+            f"the days of {label} before {described_from.isoformat()}: {LEAD_IN}"
+        )
+    total = 0.0
+    for entry, repeated in group:
+        who = f"component {entry.component_id!r} cycle {entry.cycle}"
+        harvest = entry.harvest.date
+        if harvest is None:
+            earliest = repeated.start or repeated.calendar_start
+            if _month_index(earliest) <= here <= _month_index(repeated.cycle_last_day):
+                gone = entry.harvest.missing
+                problems.append(
+                    f"the harvest date of {who} is missing ({gone.reason}: "  # type: ignore[union-attr]
+                    f"{gone.detail}), so it may fall in {label}"  # type: ignore[union-attr]
+                )
+            continue
+        if _month_index(harvest) != here:
+            continue
+        for part in parts:
+            item: Value = getattr(entry, part)
+            if item.value is None:
+                problems.append(
+                    f"{part} of {who} is missing "
+                    f"({item.missing.reason}: {item.missing.detail})"  # type: ignore[union-attr]
+                )
+            else:
+                total += item.value
+    if problems:
+        return MonthlyValue(
+            year=month.year,
+            month=month.month,
+            value=None,
+            missing=Missing(
+                reason="MISSING_INPUT",
+                detail=f"the carbon input of {label} is not computed: "
+                + "; ".join(problems),
+            ),
+        )
+    # D147: the sum is in CARBON_UNIT (kg C ha-1); the series is in
+    # CARBON_INPUT_UNIT (t C ha-1), by the SI definition 1 t = 1000 kg.
+    return MonthlyValue(year=month.year, month=month.month, value=total / KG_PER_TONNE)
+
+
+def _monthly_series(
+    entries: list[tuple[LedgerComponent, RepeatedComponent]],
+    years: tuple[int, int],
+    infeasible: Missing | None,
+    described_from: dt.date,
+    start_month: int,
+) -> list[CarbonInputSeries]:
+    """D221 of #77: one monthly series per origin of D194, over every month of
+    the agricultural years of the ledger. All the carbon of a component
+    (retained aboveground, roots, rhizodeposits) enters in the calendar month
+    of its harvest; every other month is an explicit zero. The parts of one
+    origin are summed (``ORIGIN_GROUP_OF_PART``), and so are the purposes of
+    one crop, as the origin names the crop only."""
+    blockers = [
+        f"component {entry.component_id!r} cycle {entry.cycle} has no component in "
+        "the rotation definition, so the crop it carries carbon for is not known"
+        for entry, _ in entries
+        if isinstance(entry.purpose, NotGiven)
+    ]
+    crops: dict[str, list[tuple[LedgerComponent, RepeatedComponent]]] = {}
+    for entry, repeated in entries:
+        if isinstance(entry.purpose, NotGiven) or not _IDENTIFIER.match(entry.crop_id):
+            continue
+        crops.setdefault(entry.crop_id, []).append((entry, repeated))
+    groups: dict[str, tuple[str, ...]] = {}
+    for part, origin_group in ORIGIN_GROUP_OF_PART.items():
+        groups[origin_group] = (*groups.get(origin_group, ()), part)
+    months = _months(years[0], years[1], start_month)
+    result: list[CarbonInputSeries] = []
+    for crop, group in crops.items():
+        for origin_group, parts in groups.items():
+            origin = f"{crop}_{origin_group}"
+            values = [
+                _month_value(month, parts, group, blockers, infeasible, described_from)
+                for month in months
+            ]
+            header: dict[str, object] = {}
+            if any(item.value is not None for item in values):
+                header = {
+                    "provenance": DERIVED,
+                    "source": (
+                        f"{FUNCTION}: sum of {' and '.join(parts)} over the "
+                        f"components of crop {crop!r} harvested in the calendar "
+                        "month; a month without such a harvest is zero (D221 of "
+                        "#77); converted from "
+                        f"{CARBON_UNIT!r} to {CARBON_INPUT_UNIT!r} by "
+                        f"1 t = {KG_PER_TONNE} kg (D147)"
+                    ),
+                    "range_missing": NO_RANGE,
+                }
+            result.append(
+                CarbonInputSeries(
+                    quantity=monthly_quantity(origin),
+                    unit=CARBON_INPUT_UNIT,
+                    origin=origin,
+                    start=months[0],
+                    end=months[-1],
+                    months=values,
+                    **header,
+                )
+            )
+    return result
+
+
 # --- the entry point -----------------------------------------------------------------
 
 
@@ -574,6 +727,7 @@ def _no_years(
         years_missing=why,
         components=[],
         annual_carbon_inputs=[],
+        monthly_carbon_inputs=[],
     )
 
 
@@ -665,6 +819,9 @@ def build_residue_ledger(
         last_ag_year=years[1],
         components=[entry for entry, _ in entries],
         annual_carbon_inputs=_series(
+            entries, years, infeasible, repeated.described_from, start_month
+        ),
+        monthly_carbon_inputs=_monthly_series(
             entries, years, infeasible, repeated.described_from, start_month
         ),
     )

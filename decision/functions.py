@@ -734,8 +734,9 @@ def _pair_state_in_one_scenario(
             identical_rows=False,
             indicators_not_resolved=(),
         )
-    # D165, follow-up: "indicators_not_resolved names only indicators with a
-    # blocking cell".
+    # Brief #304 (unit l2/decision-rule-d165-d176): "`indicators_not_resolved`
+    # names only indicators with a blocking cell". Which cell blocks is D165;
+    # the naming rule is the brief's, not a decision of #77.
     indicators_not_resolved = tuple(
         sorted(
             {difference.indicator for difference in computed if _blocks(difference)}
@@ -783,7 +784,8 @@ def pair_state(
 
     An indicator is named in ``indicators_not_resolved`` when the pair
     holds at least one computed difference of that indicator that blocks
-    a robust preference (D165); over several scenarios, when it is named
+    a robust preference (the rule of brief #304; which cell blocks is
+    D165); over several scenarios, when it is named
     in at least one member. An indicator with no computed difference for
     the pair is never named: it was not evaluated, and what was not
     evaluated does not enter the state (D6).

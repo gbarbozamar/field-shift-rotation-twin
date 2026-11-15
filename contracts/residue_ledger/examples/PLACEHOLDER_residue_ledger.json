@@ -404,5 +404,755 @@
         }
       ]
     }
+  ],
+  "monthly_carbon_inputs": [
+    {
+      "quantity": "placeholder_crop_a_aboveground_carbon_input",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "origin": "placeholder_crop_a_aboveground",
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2002,
+        "month": 12
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": 1.0
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 1,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 2,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 3,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 4,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 5,
+          "value": 1.0
+        },
+        {
+          "year": 2002,
+          "month": 6,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 7,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 8,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 9,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 10,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 11,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 12,
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_a_belowground_carbon_input",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "provenance": "DERIVED",
+      "source": "PLACEHOLDER: example data, no real source",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: the example carries no uncertainty range"
+      },
+      "origin": "placeholder_crop_a_belowground",
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2002,
+        "month": 12
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": 0.75
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": 0.0
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 1,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 2,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 3,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 4,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 5,
+          "value": null,
+          "missing": {
+            "reason": "MISSING_INPUT",
+            "detail": "PLACEHOLDER: root_carbon of component 'c1' cycle 1 is missing"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 6,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 7,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 8,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 9,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 10,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 11,
+          "value": 0.0
+        },
+        {
+          "year": 2002,
+          "month": 12,
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_b_aboveground_carbon_input",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_b_aboveground",
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2002,
+        "month": 12
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 1,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 2,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 3,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 4,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 5,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 6,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 7,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 8,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 9,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 10,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 11,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 12,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        }
+      ]
+    },
+    {
+      "quantity": "placeholder_crop_b_belowground_carbon_input",
+      "unit": "PLACEHOLDER_carbon_input_unit",
+      "origin": "placeholder_crop_b_belowground",
+      "start": {
+        "year": 2001,
+        "month": 1
+      },
+      "end": {
+        "year": 2002,
+        "month": 12
+      },
+      "months": [
+        {
+          "year": 2001,
+          "month": 1,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 2,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 3,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 4,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 5,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 6,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 7,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 8,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 9,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 10,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 11,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2001,
+          "month": 12,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 1,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 2,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 3,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 4,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 5,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 6,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 7,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 8,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 9,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 10,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 11,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        },
+        {
+          "year": 2002,
+          "month": 12,
+          "value": null,
+          "missing": {
+            "reason": "NOT_COMPUTABLE",
+            "detail": "PLACEHOLDER: the method does not cover this component"
+          }
+        }
+      ]
+    }
   ]
 }

@@ -27,17 +27,21 @@ calendar on the day, and not a day of the tail after maturity, D105, D106,
 D136); the stage lengths it needs come from the catalogue, and no public
 function of ``engine/`` returns the flags. So this module reads, for each
 rotation and scenario, a flag per day: ``True`` when a living crop is on the
-field, ``False`` when none is, or a ``Missing`` with its reason. It decides no
-day itself.
+field, ``False`` when none is, or a ``Missing`` with its reason (the
+``Missing`` of the results contract or of the inputs contract, as the engine
+accepts either). It decides no day itself. Any other flag (``None``, the
+integers 0 and 1, text) is a defect of the caller and raises ``TypeError``:
+it is never counted as a day with or without a crop.
 
 Rules of the order, as entry D0 has them (D211: "A tie, a missing year and a
 single rotation give no order, with the reason; nothing is filled and nothing
 is read as zero"): each scenario on its own (D166); an agricultural year whose
 share cannot be computed for a rotation (a day without a flag, a ``Missing``
 flag, or the fractions missing) is a missing year, and that scenario gets no
-order; two equal means, or a single rotation, give no order. The means are
-compared exactly, as rational numbers built from the stored values (OPEN 7 of
-the D0 comparator applies here too).
+order; two equal means, or a single rotation, give no order; a scenario whose
+rotations all have empty flags reads no agricultural year and gives no order.
+The means are compared exactly, as rational numbers built from the stored
+values (OPEN 7 of the D0 comparator applies here too).
 
 Pure functions: no file, no clock, no network. The module holds no value of
 the method and no threshold: the fractions come from the erosivity the caller
@@ -57,6 +61,11 @@ OPEN, for the lead developer:
 3. A scenario that the flags hold and the table does not, or the reverse,
    gives no order on the missing side, with its reason. Options: (a) as built;
    (b) refuse the inputs.
+4. A scenario whose rotations differ between the flags and the table
+   (``compare_with_soil_loss``) raises ``ValueError``: an order is compared
+   only over the same rotations. Options: (a) as built, the inputs refused;
+   (b) no order on both sides, with the reason; (c) compare over the
+   rotations both sides hold.
 """
 
 from __future__ import annotations
@@ -69,12 +78,18 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Literal
 
+from contracts.inputs.common import Missing as InputMissing
 from contracts.results.models import Missing, ResultsTable
 from engine.erosion.r_factor import climatological_monthly_fractions
 from engine.erosion.r_factor._checks import ag_year_of, months_of_ag_year
 from validation.trivial_comparator import TrivialOrder, trivial_orders
 
 SOIL_LOSS = "soil_loss"
+
+# A flag that is missing: the ``Missing`` of either contract, as the engine
+# accepts either (``engine/rothc/_numbers.py``, ``MISSING_SHAPES``).
+MISSING_FLAGS = (Missing, InputMissing)
+Flag = bool | Missing | InputMissing
 
 Outcome = Literal[
     "equal",
@@ -128,7 +143,7 @@ class ErosionComparison:
 
 
 def _month_share_without_crop(
-    flags: Mapping[dt.date, bool | Missing], year: int, month: int
+    flags: Mapping[dt.date, Flag], year: int, month: int
 ) -> Fraction | Missing:
     """The share of the days of one calendar month with no living crop."""
     days = [
@@ -145,7 +160,7 @@ def _month_share_without_crop(
             ),
         )
     for day in days:
-        if isinstance(flags[day], Missing):
+        if isinstance(flags[day], MISSING_FLAGS):
             given = flags[day]
             return Missing(
                 reason=given.reason,
@@ -159,7 +174,7 @@ def _month_share_without_crop(
 
 
 def _year_share(
-    flags: Mapping[dt.date, bool | Missing],
+    flags: Mapping[dt.date, Flag],
     fractions: Mapping[int, float] | Missing,
     ag_year: int,
     start_month: int,
@@ -186,21 +201,46 @@ def _fractions(
     return climatological_monthly_fractions(monthly_erosivity=monthly_erosivity)
 
 
-def _ag_years(flags: Mapping[dt.date, bool | Missing], start_month: int) -> set[int]:
+def _ag_years(flags: Mapping[dt.date, Flag], start_month: int) -> set[int]:
     return {ag_year_of((day.year, day.month), start_month) for day in flags}
 
 
-def _exact_shares(
-    living: Mapping[tuple[str, str], Mapping[dt.date, bool | Missing]],
-    monthly_erosivity: Mapping[int, float | Missing],
-    start_month: int,
-) -> dict[tuple[str, str, int], Fraction | Missing]:
-    fractions = _fractions(monthly_erosivity)
+def _check_flags(living: Mapping[tuple[str, str], Mapping[dt.date, Flag]]) -> None:
+    """Every flag is ``True``, ``False`` or a ``Missing`` of either contract.
+
+    Anything else (``None``, the integers 0 and 1, text) is a defect of the
+    caller: ``TypeError``, never a day counted with or without a crop.
+    """
+    for (rotation_id, scenario_id), flags in living.items():
+        for day, flag in flags.items():
+            if isinstance(flag, bool) or isinstance(flag, MISSING_FLAGS):
+                continue
+            raise TypeError(
+                f"the flag of rotation '{rotation_id}', scenario '{scenario_id}' "
+                f"on {day} is {type(flag).__name__}: a flag of a living crop is "
+                "True, False or a Missing with its reason (a missing flag is never "
+                "None, and an integer is not a flag)"
+            )
+
+
+def _rotations_by_scenario(
+    living: Mapping[tuple[str, str], Mapping[dt.date, Flag]],
+) -> dict[str, list[str]]:
     by_scenario: dict[str, list[str]] = {}
     for rotation_id, scenario_id in living:
         by_scenario.setdefault(scenario_id, []).append(rotation_id)
+    return by_scenario
+
+
+def _exact_shares(
+    living: Mapping[tuple[str, str], Mapping[dt.date, Flag]],
+    monthly_erosivity: Mapping[int, float | Missing],
+    start_month: int,
+) -> dict[tuple[str, str, int], Fraction | Missing]:
+    _check_flags(living)
+    fractions = _fractions(monthly_erosivity)
     shares: dict[tuple[str, str, int], Fraction | Missing] = {}
-    for scenario_id, rotations in by_scenario.items():
+    for scenario_id, rotations in _rotations_by_scenario(living).items():
         years = set().union(
             *(_ag_years(living[(r, scenario_id)], start_month) for r in rotations)
         )
@@ -214,7 +254,7 @@ def _exact_shares(
 
 
 def year_shares(
-    living: Mapping[tuple[str, str], Mapping[dt.date, bool | Missing]],
+    living: Mapping[tuple[str, str], Mapping[dt.date, Flag]],
     monthly_erosivity: Mapping[int, float | Missing],
     *,
     start_month: int,
@@ -239,14 +279,16 @@ def year_shares(
 
 def _order_scenario(
     scenario_id: str,
+    rotations: list[str],
     shares: dict[tuple[str, str, int], Fraction | Missing],
 ) -> ErosionOrder:
+    """The order of one scenario. ``rotations``: those the flags hold for it."""
     of_scenario = {
         (rotation_id, ag_year): share
         for (rotation_id, scenario, ag_year), share in shares.items()
         if scenario == scenario_id
     }
-    rotations = sorted({rotation_id for rotation_id, _ in of_scenario})
+    rotations = sorted(rotations)
     if len(rotations) < 2:
         return ErosionOrder(
             scenario_id,
@@ -254,6 +296,15 @@ def _order_scenario(
             None,
             f"the scenario holds one rotation ('{rotations[0]}'): as in entry D0, a "
             "single rotation gives no order (OPEN of D0)",
+        )
+    if not of_scenario:
+        listed = ", ".join(f"'{rotation_id}'" for rotation_id in rotations)
+        return ErosionOrder(
+            scenario_id,
+            None,
+            None,
+            f"the flags of {listed} are empty: no agricultural year is read, so "
+            "there is no share to order",
         )
     missing = sorted(
         (rotation_id, ag_year, share.reason)
@@ -301,7 +352,7 @@ def _order_scenario(
 
 
 def erosion_orders(
-    living: Mapping[tuple[str, str], Mapping[dt.date, bool | Missing]],
+    living: Mapping[tuple[str, str], Mapping[dt.date, Flag]],
     monthly_erosivity: Mapping[int, float | Missing],
     *,
     start_month: int,
@@ -311,12 +362,15 @@ def erosion_orders(
     share of the year without a living crop, lowest first; or no order, with
     the reason."""
     shares = _exact_shares(living, monthly_erosivity, start_month)
-    scenarios = sorted({scenario_id for _, scenario_id in living})
-    return tuple(_order_scenario(scenario_id, shares) for scenario_id in scenarios)
+    by_scenario = _rotations_by_scenario(living)
+    return tuple(
+        _order_scenario(scenario_id, by_scenario[scenario_id], shares)
+        for scenario_id in sorted(by_scenario)
+    )
 
 
 def compare_with_soil_loss(
-    living: Mapping[tuple[str, str], Mapping[dt.date, bool | Missing]],
+    living: Mapping[tuple[str, str], Mapping[dt.date, Flag]],
     monthly_erosivity: Mapping[int, float | Missing],
     table: ResultsTable,
     *,
