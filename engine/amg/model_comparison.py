@@ -31,6 +31,7 @@ no environment variables, no mutable global state, and inputs are never mutated.
 
 from __future__ import annotations
 
+import calendar
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -88,7 +89,7 @@ _C_INPUT_FLOW_QUANTITIES: frozenset[str] = frozenset(
         "humified_input",
     }
 )
-_MONTHS_PER_YEAR = 12
+_MONTHS_PER_YEAR = len(calendar.month_name[1:])
 
 
 def _is_missing(value: object) -> bool:
@@ -183,26 +184,26 @@ class HomologyProtocol:
         _require_non_empty_str("initialization_protocol", self.initialization_protocol)
 
     def matches(
-        self, other: HomologyProtocol, *, depth_tolerance: float = 1e-9
+        self, other: HomologyProtocol, *, depth_tolerance: float | None = None
     ) -> bool:
         """Return True when all four homology dimensions match."""
-        return (
-            math.isclose(
-                self.depth_cm, other.depth_cm, rel_tol=0.0, abs_tol=depth_tolerance
-            )
-            and self.bulk_density_basis == other.bulk_density_basis
-            and self.boundary_condition == other.boundary_condition
-            and self.initialization_protocol == other.initialization_protocol
-        )
+        return not self.mismatch_fields(other, depth_tolerance=depth_tolerance)
 
     def mismatch_fields(
-        self, other: HomologyProtocol, *, depth_tolerance: float = 1e-9
+        self, other: HomologyProtocol, *, depth_tolerance: float | None = None
     ) -> tuple[str, ...]:
         """Return the tuple of homology field names that differ from ``other``."""
         mismatches: list[str] = []
-        if not math.isclose(
-            self.depth_cm, other.depth_cm, rel_tol=0.0, abs_tol=depth_tolerance
-        ):
+        if depth_tolerance is None:
+            depth_ok = math.isclose(self.depth_cm, other.depth_cm)
+        else:
+            tol = _require_finite_float("depth_tolerance", depth_tolerance)
+            if tol < 0.0:
+                raise ValueError("depth_tolerance: must be non-negative")
+            depth_ok = math.isclose(
+                self.depth_cm, other.depth_cm, rel_tol=0.0, abs_tol=tol
+            )
+        if not depth_ok:
             mismatches.append("depth_cm")
         if self.bulk_density_basis != other.bulk_density_basis:
             mismatches.append("bulk_density_basis")
@@ -676,7 +677,7 @@ def validate_ensemble_weights(
     homology_verified: bool = False,
     independent_validation_proven: bool = False,
     homology_protocols: Mapping[str, HomologyProtocol] | None = None,
-    weight_sum_tolerance: float = 1e-6,
+    weight_sum_tolerance: float | None = None,
 ) -> EnsembleWeightValidation:
     """Validate Rev13 §5 / §13 ensemble weighting rules across AMG-A, AMG-M, and RothC.
 
@@ -696,9 +697,11 @@ def validate_ensemble_weights(
     indep_proven = _require_strict_bool(
         "independent_validation_proven", independent_validation_proven
     )
-    sum_tol = _require_finite_float("weight_sum_tolerance", weight_sum_tolerance)
-    if sum_tol < 0.0:
-        raise ValueError("weight_sum_tolerance: must be non-negative")
+    sum_tol: float | None = None
+    if weight_sum_tolerance is not None:
+        sum_tol = _require_finite_float("weight_sum_tolerance", weight_sum_tolerance)
+        if sum_tol < 0.0:
+            raise ValueError("weight_sum_tolerance: must be non-negative")
 
     numeric_weights: dict[str, float] = {}
     for model_id, raw_weight in weights.items():
@@ -754,9 +757,15 @@ def validate_ensemble_weights(
         raise ValueError(f"homology_mismatch: {homology_error}")
 
     total_weight = sum(numeric_weights.values())
-    if not math.isclose(total_weight, 1.0, rel_tol=0.0, abs_tol=sum_tol):
+    if sum_tol is None:
+        sum_ok = math.isclose(total_weight, 1.0)
+        tol_desc = "default precision"
+    else:
+        sum_ok = math.isclose(total_weight, 1.0, rel_tol=0.0, abs_tol=sum_tol)
+        tol_desc = str(sum_tol)
+    if not sum_ok:
         raise ValueError(
-            f"weights: active ensemble weights must sum to 1.0 (within {sum_tol}); "
+            f"weights: active ensemble weights must sum to 1.0 (within {tol_desc}); "
             f"got {total_weight}"
         )
 
@@ -815,10 +824,16 @@ def _collect_missing_fields(periods: Sequence[StockPeriod]) -> list[MissingPerio
     return missing
 
 
+def _within_tolerance(a: float, b: float, tolerance: float | None) -> bool:
+    if tolerance is None:
+        return math.isclose(a, b)
+    return abs(a - b) <= tolerance
+
+
 def _check_sequence_continuity(
     periods: Sequence[StockPeriod],
     *,
-    tolerance: float,
+    tolerance: float | None,
     scale: str,
 ) -> tuple[
     list[StockContinuityBreak],
@@ -866,7 +881,7 @@ def _check_sequence_continuity(
         assert isinstance(after.start_stock, float)
         checked += 1
         diff = after.start_stock - before.end_stock
-        if abs(diff) > tolerance:
+        if not _within_tolerance(before.end_stock, after.start_stock, tolerance):
             breaks.append(
                 StockContinuityBreak(
                     index_from=idx,
@@ -991,7 +1006,7 @@ def _check_cross_scale_alignment(
     parent_periods: Sequence[StockPeriod],
     child_periods: Sequence[StockPeriod],
     *,
-    tolerance: float,
+    tolerance: float | None,
     scale_label: str,
 ) -> tuple[list[StockContinuityBreak], list[DuplicateCInput], int]:
     breaks: list[StockContinuityBreak] = []
@@ -1021,7 +1036,9 @@ def _check_cross_scale_alignment(
             assert isinstance(first_child.start_stock, float)
             checked += 1
             diff = parent.start_stock - first_child.start_stock
-            if abs(diff) > tolerance:
+            if not _within_tolerance(
+                first_child.start_stock, parent.start_stock, tolerance
+            ):
                 breaks.append(
                     StockContinuityBreak(
                         index_from=p_idx,
@@ -1044,7 +1061,7 @@ def _check_cross_scale_alignment(
             assert isinstance(last_child.end_stock, float)
             checked += 1
             diff = parent.end_stock - last_child.end_stock
-            if abs(diff) > tolerance:
+            if not _within_tolerance(last_child.end_stock, parent.end_stock, tolerance):
                 breaks.append(
                     StockContinuityBreak(
                         index_from=len(children) - 1,
@@ -1077,7 +1094,7 @@ def _check_cross_scale_alignment(
         ):
             child_sum = sum(float(c.c_input) for c in children if c.c_input is not None)
             parent_input = float(parent.c_input)
-            if abs(child_sum - parent_input) > tolerance:
+            if not _within_tolerance(child_sum, parent_input, tolerance):
                 duplicates.append(
                     DuplicateCInput(
                         detail=(
@@ -1114,7 +1131,7 @@ def check_stock_continuity(
     annual_periods: Sequence[StockPeriod] | None = None,
     cycle_periods: Sequence[StockPeriod] | None = None,
     c_input_records: Sequence[CarbonInputRecord] | None = None,
-    tolerance: float = 1e-6,
+    tolerance: float | None = None,
     raise_on_violation: bool = False,
 ) -> StockContinuityResult:
     """Verify monthly–annual–cycle stock continuity and detect double-counted C inputs.
@@ -1124,9 +1141,11 @@ def check_stock_continuity(
     and double-counted C inputs (``duplicate_c_input``). Missing periods preserve
     typed ``Missing`` and are never defaulted to ``0``.
     """
-    tol = _require_finite_float("tolerance", tolerance)
-    if tol < 0.0:
-        raise ValueError("tolerance: must be non-negative")
+    tol: float | None = None
+    if tolerance is not None:
+        tol = _require_finite_float("tolerance", tolerance)
+        if tol < 0.0:
+            raise ValueError("tolerance: must be non-negative")
     do_raise = _require_strict_bool("raise_on_violation", raise_on_violation)
 
     if isinstance(periods, (CarbonBalance, CarbonTrajectorySummary)):
@@ -1330,8 +1349,8 @@ def compare_carbon_trajectories(
     homology_verified: bool = False,
     independent_validation_proven: bool = False,
     homology_protocols: Mapping[str, HomologyProtocol] | None = None,
-    continuity_tolerance: float = 1e-6,
-    weight_sum_tolerance: float = 1e-6,
+    continuity_tolerance: float | None = None,
+    weight_sum_tolerance: float | None = None,
 ) -> CarbonComparisonResult:
     """Compare AMG-A, AMG-M, and RothC trajectories under Rev13 §5 / §13 laws.
 

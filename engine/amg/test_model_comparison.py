@@ -931,6 +931,7 @@ def test_module_imports_only_stdlib_and_contracts() -> None:
 
     allowed_stdlib = {
         "__future__",
+        "calendar",
         "collections",
         "dataclasses",
         "math",
