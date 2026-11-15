@@ -41,6 +41,7 @@ from contracts.results.models import (
     ResultsTableRow,
 )
 from decision.functions import (
+    BY_POINT_VALUE,
     IDENTICAL,
     NOT_ROBUST_ACROSS_SCENARIOS,
     NOT_SEPARATED_UNCERTAINTY_MISSING,
@@ -52,6 +53,7 @@ from decision.functions import (
     PointSignCounts,
     RangeClassCounts,
     UncertainInput,
+    dominance,
     indicator_ranking,
     limit_counts,
     measurement_consistency,
@@ -994,3 +996,337 @@ def test_t4_a_value_above_the_bracket_gives_the_state_of_that_side():
         sweep_table(T1_VALUES), U1, measured_u1(8.5, 8.3, 8.7)
     )
     assert consistency.priority == measurement_priority(recomputed, "A", "B", (U1,))
+
+
+# --- D165 to D176 of #77 (unit l2/decision-rule-d165-d176) ------------------------
+#
+# EXAMPLE DATA written by hand for these tests. The numbers mean nothing and
+# describe no real place, field, crop or producer; each range is chosen only
+# so that the range of a difference (D92: [b_low - a_high, b_high - a_low],
+# second minus first) lands where the decision under test reads it. The
+# fixed cells are those of the v2.1 case above: A2020 8.2 [7.8, 8.6], A2021
+# 7.4 [7.0, 7.8], B2020 6.1 [5.8, 6.5], so B2020 - A2020 = [-2.8, -1.3], a
+# strict improvement for B.
+
+PLACEHOLDER_LEVEL = "PLACEHOLDER_level"
+
+
+def two_cells(scenario_id, b_2021):
+    """A2020, A2021, B2020 fixed, and B2021 as given, in one scenario."""
+    return [
+        v21_soil_row("A", scenario_id, 2020, A_2020),
+        v21_soil_row("A", scenario_id, 2021, A_2021),
+        v21_soil_row("B", scenario_id, 2020, B_2020),
+        v21_soil_row("B", scenario_id, 2021, b_2021),
+    ]
+
+
+def ranged_carbon(
+    rotation_id, scenario_id, entry, *, model="amg", computation="end_minus_start"
+):
+    value, low, high = entry
+    return ResultsTableRow(
+        rotation_id=rotation_id,
+        scenario_id=scenario_id,
+        time_basis="rotation",
+        indicator="soil_carbon_trend",
+        direction="higher_is_better",
+        value=value,
+        unit=models.UNIT_SOIL_CARBON_TREND,
+        carbon_model=model,
+        computation=computation,
+        range=Range(low=low, high=high, kind=V21_RANGE_KIND),
+        provenance="SIMULATED",
+        source=CARBON_SOURCE,
+    )
+
+
+def soil_missing(rotation_id, scenario_id, ag_year):
+    return ResultsTableRow(
+        rotation_id=rotation_id,
+        scenario_id=scenario_id,
+        time_basis="ag_year",
+        ag_year=ag_year,
+        indicator="soil_loss",
+        direction="lower_is_better",
+        value=None,
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        missing=NO_COVERAGE,
+    )
+
+
+def hand_table(rows):
+    return ResultsTable(case_id=CASE_ID, field_id=FIELD_ID, rows=rows)
+
+
+# D165: "No. It is non-deteriorating and it is not a strict improvement."
+
+
+def test_d165_a_range_touching_zero_on_the_side_not_worse_does_not_block():
+    # B2021 6.9 [6.8, 7.0]: B2021 - A2021 = [6.8 - 7.8, 7.0 - 7.0] = [-1.0, 0.0].
+    table = hand_table(two_cells("s1", (6.9, 6.8, 7.0)))
+    touching = v21_difference(table, "s1", 2021)
+    assert touching.range.high == 0.0
+    state = pair_state(table, "A", "B")
+    assert state.state == ROBUST_PREFERENCE
+    assert state.indicators_not_resolved == ()
+    # The count by range keeps the three classes of D99 (D167): the cell is
+    # "not separated" in the sense of D93 although it does not block.
+    (counts,) = pair_counts(table, "A", "B", equal_tolerance=TOLERANCE)
+    assert counts.by_range == RangeClassCounts(
+        strict_improvement=1, deterioration=0, not_separated=1
+    )
+
+
+def test_d165_a_range_touching_zero_on_the_worse_side_blocks():
+    # B2021 8.0 [7.8, 8.2]: [7.8 - 7.8, 8.2 - 7.0] = [0.0, 1.2]: it is not
+    # non-deteriorating (D98), so it blocks (D165).
+    state = pair_state(hand_table(two_cells("s1", (8.0, 7.8, 8.2))), "A", "B")
+    assert state.state == NOT_SEPARATED_WITHIN_UNCERTAINTY
+    assert state.indicators_not_resolved == ("soil_loss",)
+
+
+def test_d165_a_touching_cell_alone_gives_no_strict_improvement():
+    # Only the cell [-1.0, 0.0]: nothing blocks, but no cell is a strict
+    # improvement (D93, D153), so the pair is not a robust preference; it
+    # takes the name of D97 ("touches or crosses zero"). No indicator has a
+    # blocking cell, so none is named (D165, follow-up).
+    rows = [
+        v21_soil_row("A", "s1", 2021, A_2021),
+        v21_soil_row("B", "s1", 2021, (6.9, 6.8, 7.0)),
+    ]
+    state = pair_state(hand_table(rows), "A", "B")
+    assert state.state == NOT_SEPARATED_WITHIN_UNCERTAINTY
+    assert state.indicators_not_resolved == ()
+
+
+def test_d165_a_carbon_range_touching_zero_from_the_better_side_does_not_block():
+    # Carbon, higher is better: A 0.3 [0.2, 0.4], B 0.5 [0.4, 0.6] give
+    # [0.4 - 0.4, 0.6 - 0.2] = [0.0, 0.4]; soil loss B2020 - A2020 strict.
+    rows = [
+        v21_soil_row("A", "s1", 2020, A_2020),
+        v21_soil_row("B", "s1", 2020, B_2020),
+        ranged_carbon("A", "s1", (0.3, 0.2, 0.4)),
+        ranged_carbon("B", "s1", (0.5, 0.4, 0.6)),
+    ]
+    assert pair_state(hand_table(rows), "A", "B").state == ROBUST_PREFERENCE
+
+
+# D166: "The state is read in each single scenario, in the order of D152.
+# Over a set, the pair is a robust preference only if it is one in every
+# member; otherwise it is "Not robust across scenarios" ... The cells of
+# different scenarios are never read as one scenario."
+
+
+def test_d166_a_set_with_one_robust_scenario_and_one_crossing_zero_is_not_robust():
+    # s1: B2021 5.5 [5.3, 5.7] -> [-2.5, -1.3], strict. s2: B2021 7.3
+    # [7.1, 7.5] -> [-0.7, 0.5], crossing zero.
+    table = hand_table(
+        two_cells("s1", (5.5, 5.3, 5.7)) + two_cells("s2", (7.3, 7.1, 7.5))
+    )
+    state = pair_state(table, "A", "B")
+    assert state.state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert state.by_scenario == (
+        ("s1", ROBUST_PREFERENCE),
+        ("s2", NOT_SEPARATED_WITHIN_UNCERTAINTY),
+    )
+    assert state.indicators_not_resolved == ("soil_loss",)
+    # D103 (2): the base state of D4 is the state over the whole set.
+    u1 = UncertainInput(
+        name="u1",
+        unit=models.UNIT_SOIL_LOSS_ANNUAL,
+        cell=("B", "soil_loss", "ag_year", 2021, None, None),
+        values=((5.5, "s1"), (7.3, "s2")),
+    )
+    priority = measurement_priority(table, "A", "B", (u1,))
+    assert priority.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert [item.rank for item in priority.items] == [1]
+
+
+def test_d166_a_set_whose_members_are_all_identical_is_not_robust():
+    # D166: "This holds even when every member has the same state that is
+    # not a robust preference." A and B hold the same values and ranges.
+    rows = []
+    for scenario_id in ("s1", "s2"):
+        rows.append(v21_soil_row("A", scenario_id, 2020, B_2020))
+        rows.append(v21_soil_row("B", scenario_id, 2020, B_2020))
+    state = pair_state(hand_table(rows), "A", "B")
+    assert state.state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert state.by_scenario == (("s1", IDENTICAL), ("s2", IDENTICAL))
+    assert state.identical_rows is True
+
+
+def test_d166_a_set_robust_in_every_scenario_is_a_robust_preference():
+    table = hand_table(
+        two_cells("s1", (5.5, 5.3, 5.7)) + two_cells("s2", (5.0, 4.8, 5.2))
+    )
+    state = pair_state(table, "A", "B")
+    assert state.state == ROBUST_PREFERENCE
+    assert state.by_scenario == (
+        ("s1", ROBUST_PREFERENCE),
+        ("s2", ROBUST_PREFERENCE),
+    )
+
+
+# D175: "A member without a state is not a robust preference and holds no
+# strictly improving cell, so the set is "Not robust across scenarios"."
+
+
+def test_d175_a_set_with_one_scenario_not_evaluated_is_not_robust():
+    rows = [
+        v21_soil_row("A", "s1", 2020, A_2020),
+        v21_soil_row("B", "s1", 2020, B_2020),
+        v21_soil_row("A", "s2", 2020, A_2020),
+        soil_missing("B", "s2", 2020),
+    ]
+    state = pair_state(hand_table(rows), "A", "B")
+    assert state.state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert state.by_scenario == (("s1", ROBUST_PREFERENCE), ("s2", None))
+
+
+def test_d175_a_set_with_no_value_in_any_scenario_has_no_state():
+    rows = []
+    for scenario_id in ("s1", "s2"):
+        rows.append(v21_soil_row("A", scenario_id, 2020, A_2020))
+        rows.append(soil_missing("B", scenario_id, 2020))
+    state = pair_state(hand_table(rows), "A", "B")
+    assert state.state is None  # D85: not evaluated, with no state
+    assert state.by_scenario == (("s1", None), ("s2", None))
+
+
+# D117: "The state at a value of the input is the state over all the phases
+# at that value, read as D74 reads a set of scenarios".
+
+
+def test_d117_the_phases_nested_in_a_value_give_the_state_at_that_value():
+    # Value 1: phase p1 strict (B2021 5.5), phase p2 crossing (B2021 7.3);
+    # value 2: both phases strict (B2021 5.0 and 5.5).
+    spec = {
+        ("v1", "p1"): (5.5, 5.3, 5.7),
+        ("v1", "p2"): (7.3, 7.1, 7.5),
+        ("v2", "p1"): (5.0, 4.8, 5.2),
+        ("v2", "p2"): (5.5, 5.3, 5.7),
+    }
+    rows = []
+    for (value, phase), b_2021 in spec.items():
+        rows += two_cells(f"{value}|{phase}", b_2021)
+    table = hand_table(rows)
+    nested = UncertainInput(
+        name="u",
+        unit=PLACEHOLDER_LEVEL,
+        cell=("B", "soil_loss", "ag_year", 2021, None, None),
+        values=((1.0, ("v1|p1", "v1|p2")), (2.0, ("v2|p1", "v2|p2"))),
+    )
+    point = tipping_point(table, "A", "B", nested)
+    assert point.states == (
+        (1.0, NOT_ROBUST_ACROSS_SCENARIOS),
+        (2.0, ROBUST_PREFERENCE),
+    )
+    assert point.bracket == (1.0, 2.0)
+    # Naming one phase per value reads that phase only: no tipping point.
+    one_phase = UncertainInput(
+        name="u",
+        unit=PLACEHOLDER_LEVEL,
+        cell=("B", "soil_loss", "ag_year", 2021, None, None),
+        values=((1.0, "v1|p1"), (2.0, "v2|p1")),
+    )
+    assert tipping_point(table, "A", "B", one_phase).bracket is None
+    # D117: a phase is not an uncertain input; the priority list ranks the
+    # input by its state at each value, over its phases.
+    priority = measurement_priority(table, "A", "B", (nested,))
+    assert priority.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert [(item.input_name, item.rank) for item in priority.items] == [("u", 1)]
+
+
+def test_d117_a_value_that_names_no_scenario_is_refused():
+    table = hand_table(two_cells("s1", (5.5, 5.3, 5.7)))
+    empty = UncertainInput(
+        name="u",
+        unit=PLACEHOLDER_LEVEL,
+        cell=("B", "soil_loss", "ag_year", 2021, None, None),
+        values=((1.0, ()),),
+    )
+    with pytest.raises(ValueError, match="names no scenario"):
+        tipping_point(table, "A", "B", empty)
+
+
+# D173: "The one used to compare rotations: the one the user chose, and
+# end_minus_start when the user has not chosen ... The other two are shown
+# and counted (D99, by computation, D169) and do not enter the state."
+
+
+def three_computations_table():
+    # Soil loss strict; AMG end_minus_start [0.1, 0.5] strict, fitted_slope
+    # [-0.1, 0.2] crossing zero, mean_over_cycles [0.1, 0.5] strict.
+    rows = [
+        v21_soil_row("A", "s1", 2020, A_2020),
+        v21_soil_row("B", "s1", 2020, B_2020),
+    ]
+    for computation, a, b in (
+        ("end_minus_start", (0.0, -0.1, 0.1), (0.3, 0.2, 0.4)),
+        ("fitted_slope", (0.1, 0.0, 0.2), (0.15, 0.1, 0.2)),
+        ("mean_over_cycles", (0.1, 0.0, 0.2), (0.4, 0.3, 0.5)),
+    ):
+        rows.append(ranged_carbon("A", "s1", a, computation=computation))
+        rows.append(ranged_carbon("B", "s1", b, computation=computation))
+    return hand_table(rows)
+
+
+def test_d173_only_the_computation_used_to_compare_enters_the_state():
+    table = three_computations_table()
+    # The user has not chosen: end_minus_start (C1.6).
+    assert pair_state(table, "A", "B").state == ROBUST_PREFERENCE
+    chosen = pair_state(table, "A", "B", trend_computation="fitted_slope")
+    assert chosen.state == NOT_SEPARATED_WITHIN_UNCERTAINTY
+    assert chosen.indicators_not_resolved == ("soil_carbon_trend",)
+    with pytest.raises(ValueError, match="not a computation"):
+        pair_state(table, "A", "B", trend_computation="PLACEHOLDER_computation")
+
+
+# D169: "One count per pair, scenario, indicator, carbon model and
+# computation".
+
+
+def test_d169_the_counts_are_split_by_carbon_model_and_computation():
+    counts = {
+        (item.indicator, item.carbon_model, item.computation): item
+        for item in pair_counts(
+            three_computations_table(), "A", "B", equal_tolerance=TOLERANCE
+        )
+    }
+    assert set(counts) == {
+        ("soil_loss", None, None),
+        ("soil_carbon_trend", "amg", "end_minus_start"),
+        ("soil_carbon_trend", "amg", "fitted_slope"),
+        ("soil_carbon_trend", "amg", "mean_over_cycles"),
+    }
+    assert counts[
+        ("soil_carbon_trend", "amg", "fitted_slope")
+    ].by_range == RangeClassCounts(strict_improvement=0, deterioration=0, not_separated=1)
+    rows = [
+        v21_soil_row("A", "s1", 2020, A_2020),
+        v21_soil_row("B", "s1", 2020, B_2020),
+    ]
+    for model in ("amg", "rothc"):
+        rows.append(ranged_carbon("A", "s1", (0.0, -0.1, 0.1), model=model))
+        rows.append(ranged_carbon("B", "s1", (0.3, 0.2, 0.4), model=model))
+    by_model = [
+        (item.carbon_model, item.cells_of_the_pair)
+        for item in pair_counts(hand_table(rows), "A", "B", equal_tolerance=TOLERANCE)
+        if item.indicator == "soil_carbon_trend"
+    ]
+    assert by_model == [("amg", 1), ("rothc", 1)]
+
+
+# D174: dominance "returns its basis ("by point value") with the coverage
+# "k of N" of D91".
+
+
+def test_d174_dominance_carries_its_basis_and_its_coverage():
+    table = example_table()
+    record = dominance(table, "A", "B")
+    assert record.basis == BY_POINT_VALUE == "by point value"
+    assert record.never_preferred_less is never_preferred_less(table, "A", "B")
+    counts = pair_counts(table, "A", "B", equal_tolerance=TOLERANCE)
+    assert record.cells_compared == sum(item.cells_compared for item in counts)
+    assert record.cells_of_the_pair == sum(item.cells_of_the_pair for item in counts)
