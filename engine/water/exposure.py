@@ -22,7 +22,12 @@ the four FAO-56 growth stages inside each crop period of the calendar from
 stage lengths read by crop (``engine/water/stages.py``), and takes the basal
 crop coefficient and the root depth of each crop day from its stage (D78); a
 crop period whose stage lengths are missing keeps the behaviour of D79: its
-days are missing with the reason. The daily chain is
+days are missing with the reason. Unit ``l1/water-fallow-residue`` (issue
+#217) builds the fallow day of decisions D110, D111, D115 and D116: on a day
+with no crop the fallow is weed-free (no crop reaches the balance), the
+surface layer takes the cover and wetted fractions of a day with no crop, and
+its total evaporable water is reduced by the residue cover of the fallow,
+read by the crop sown after it (``engine/water/fallow.py``). The daily chain is
 then reduced to one ``WaterDeficitExposure`` per agricultural year of the
 record (D47). The definition of the indicator is incomplete (convention
 C1.4), so no year carries a number: a year whose daily balance was computed
@@ -58,7 +63,7 @@ from contracts.results.models import (
     ReasonCode,
     WaterDeficitExposure,
 )
-from engine.water import balance, evaporation
+from engine.water import balance, evaporation, fallow
 from engine.water._parameters import Catalogue, Scope, check_parameters
 from engine.water.et0 import Et0Bounds, Et0Constants, PointUnits
 from engine.water.et0 import (
@@ -204,8 +209,10 @@ STAGE_KEY = "stage"
 STAGES: tuple[str, ...] = ("initial", "mid", "end")
 # Per crop, and per day with no crop.
 CROP_HEIGHT = "crop_height"
-COVER_FRACTION_EXPONENT = "cover_fraction_exponent"
 CURVE_NUMBER = "curve_number"
+# Per crop only since unit #217: on a day with no crop the cover fraction is
+# read, not computed from the basal coefficient (D110).
+COVER_FRACTION_EXPONENT = "cover_fraction_exponent"
 # Per crop only: the crop of a balance day (CropDay). The root depth of a
 # crop day grows by stage (engine/water/stages.py, ``by_stage``) from the
 # initial root depth to the maximum root depth (D78, provisional curves of
@@ -236,17 +243,46 @@ STAGE_PARAMETERS: tuple[str, ...] = (BASAL_CROP_COEFFICIENT,)
 # Looked up with the crop of the day, or with NO_CROP on a day with no crop.
 DAY_PARAMETERS: tuple[str, ...] = (
     CROP_HEIGHT,
-    COVER_FRACTION_EXPONENT,
     CURVE_NUMBER,
 )
-# Looked up with the crop of the day only: the crop of the balance, the
-# initial root depth and the length of each growth stage (issue #206).
+# Looked up with the crop of the day only: the exponent of the cover fraction,
+# the crop of the balance, the initial root depth and the length of each
+# growth stage (issue #206).
 CROP_PARAMETERS: tuple[str, ...] = (
+    COVER_FRACTION_EXPONENT,
     ROOT_DEPTH,
     READILY_AVAILABLE_FRACTION,
     INITIAL_ROOT_DEPTH,
     *STAGE_LENGTH_PARAMETERS.values(),
 )
+
+# --- a day with no crop: the fallow of D110, D111, D115, D116 (unit #217) ------
+#
+# Looked up with NO_CROP: the cover fraction and the wetted fraction of the
+# surface layer on a fallow day (D110 gives `fc = 0` and `fw = 1`; the values
+# are records, PROPOSED identifiers). The wetted fraction of a day with a crop
+# keeps the record of the site.
+COVER_FRACTION = "cover_fraction"
+WETTED_FRACTION = "wetted_fraction"
+FALLOW_PARAMETERS: tuple[str, ...] = (COVER_FRACTION, WETTED_FRACTION)
+# Looked up with the empty scope on the first fallow day: the two constants of
+# the reduction of the total evaporable water by an organic mulch (D110,
+# FAO-56 chapter 11: "5 % for each 10 %" of the surface covered). PROPOSED.
+MULCH_REDUCTION = "mulch_total_evaporable_water_reduction"
+MULCH_COVER_INCREMENT = "mulch_cover_increment"
+FALLOW_SITE_PARAMETERS: tuple[str, ...] = (MULCH_REDUCTION, MULCH_COVER_INCREMENT)
+# Looked up with NO_CROP and the crop that follows the fallow: the surface
+# residue cover of the fallow, one value per fallow (D110, D115), the one
+# record both engines read (D116). PROPOSED: the identifier is the name of the
+# argument of the surface-cover sub-factor of engine/erosion/c_factor/.
+SURFACE_RESIDUE_COVER = "surface_residue_cover"
+FALLOW_COVER_PARAMETERS: tuple[str, ...] = (SURFACE_RESIDUE_COVER,)
+
+
+def fallow_scope(following: str) -> Scope:
+    """The scope of the cover of a fallow: no crop, and the crop sown after it."""
+    return (*NO_CROP, (CROP_KEY, following))
+
 
 # Day and month arithmetic (C5.1, C5.3): months and days counted from one.
 _FIRST = 1
@@ -301,6 +337,14 @@ STAGE_UNKNOWN = (
 CROPS_OVERLAP = (
     "two components of the calendar cover the day, and the water chain takes "
     "one crop per day"
+)
+FALLOW_DEPLETION_ABOVE = (
+    "the depletion of the surface layer at the start of a day with no crop is "
+    "greater than the total evaporable water of that day, reduced by the residue "
+    "cover of the fallow (decision D110 of issue #77). The surface-layer balance "
+    "holds the depletion within the total evaporable water, and how a depletion "
+    "carried from a day with a larger total is brought within the reduced one is "
+    "not decided (OPEN 30 of engine/water/EXPOSURE.md), so no rule is applied"
 )
 
 
@@ -695,6 +739,58 @@ def _total_evaporable_water(
     return value
 
 
+@dataclass(frozen=True)
+class FallowSurface:
+    """What the surface layer takes on a fallow day (D110), each a number or missing."""
+
+    cover_fraction: float | Missing
+    wetted_fraction: float | Missing
+    total_evaporable_water: float | Missing
+    readily_evaporable_water: float | Missing
+
+
+def _fallow_surface(
+    catalogue: Catalogue,
+    notes: _Notes,
+    day: dt.date,
+    following: str | Missing,
+    total_evaporable_water: float | Missing,
+    readily_evaporable_water: float | Missing,
+) -> FallowSurface:
+    """The cover fraction, wetted fraction and evaporable waters of a fallow day.
+
+    PROPOSED (unit #217, choices 18 to 21 of EXPOSURE.md). D110: on a fallow
+    day ``fc`` and ``fw`` are the records of a day with no crop; the total
+    evaporable water is reduced by the surface residue cover of the fallow
+    (``fallow.mulched_total_evaporable_water``), read by the crop that
+    follows the fallow; the readily evaporable water is not above it. A
+    missing record is named by the catalogue (D56); a fallow with no crop
+    after it, or a reduction the method does not compute, is a ``chain``
+    item.
+    """
+    if isinstance(following, Missing):
+        notes.note(following, day)
+        cover: float | Missing = following
+    else:
+        cover = catalogue.value(SURFACE_RESIDUE_COVER, fallow_scope(following), day)
+    total = fallow.mulched_total_evaporable_water(
+        total_evaporable_water,
+        cover,
+        reduction_per_increment=_site(catalogue, MULCH_REDUCTION, day),
+        cover_increment=_site(catalogue, MULCH_COVER_INCREMENT, day),
+    )
+    if isinstance(total, Missing) and total.reason == "NOT_COMPUTABLE":
+        notes.note(total, day)
+    return FallowSurface(
+        cover_fraction=catalogue.value(COVER_FRACTION, NO_CROP, day),
+        wetted_fraction=catalogue.value(WETTED_FRACTION, NO_CROP, day),
+        total_evaporable_water=total,
+        readily_evaporable_water=fallow.readily_evaporable_water_not_above(
+            readily_evaporable_water, total
+        ),
+    )
+
+
 def _run_chain(
     calendar: RotationCalendar,
     climate: SiteClimate,
@@ -772,6 +868,7 @@ def _run_chain(
     wind_values = _series_values(by_quantity.get(WIND_SPEED_2M))
     crop_of = _crop_of_day(calendar)
     growth_of = _growth_of_day(calendar, catalogue)
+    following_of = fallow.following_crop(calendar)
 
     chain: list[ChainDay] = []
     for day in days:
@@ -788,18 +885,32 @@ def _run_chain(
         # The crop of the day and its parameters.
         crop = crop_of(day)
         crop_day: balance.CropDay | None | Missing
+        fallow_surface: FallowSurface | None = None
         if isinstance(crop, Missing):
             notes.note(crop, day)
             kcb = height = exponent = curve_number = crop_day = crop
         else:
             scope: Scope = NO_CROP if crop is None else ((CROP_KEY, crop),)
             height = catalogue.value(CROP_HEIGHT, scope, day)
-            exponent = catalogue.value(COVER_FRACTION_EXPONENT, scope, day)
             curve_number = catalogue.value(CURVE_NUMBER, scope, day)
             if crop is None:
+                # A fallow day (unit #217). Weed-free (D111): no crop reaches
+                # the balance, so nothing is transpired. The surface layer
+                # takes the cover, the wetting and the evaporable waters of
+                # D110.
                 kcb = catalogue.value(BASAL_CROP_COEFFICIENT, scope, day)
                 crop_day = None
+                exponent = None
+                fallow_surface = _fallow_surface(
+                    catalogue,
+                    notes,
+                    day,
+                    following_of(day),
+                    surface_constants[TOTAL_EVAPORABLE_WATER],
+                    surface_constants["readily_evaporable_water"],
+                )
             else:
+                exponent = catalogue.value(COVER_FRACTION_EXPONENT, scope, day)
                 # Every record of the crop is read, so that one that is
                 # missing is named (D56).
                 for stage in STAGES:
@@ -856,42 +967,66 @@ def _run_chain(
             height,
             constants=upper_limit_constants,
         )
-        upper_limit = _guarded(
-            "the upper limit of the crop coefficient",
-            notes,
-            day,
-            evaporation.upper_limit_of_crop_coefficient,
-            kcb,
-            climate_term,
-            margin_above_basal=surface_constants["margin_above_basal"],
-        )
-        cover_fraction = _guarded(
-            "the cover fraction",
-            notes,
-            day,
-            evaporation.cover_fraction_from_basal_coefficient,
-            kcb,
-            minimum_crop_coefficient=minimum_crop_coefficient,
-            upper_limit=upper_limit,
-            exponent=exponent,
-        )
-        surface = _guarded(
-            "the surface-layer balance",
-            notes,
-            day,
-            evaporation.step,
-            depletion.value,
-            evaporation.DayInput(
-                date=day,
-                precipitation=precipitation,
-                runoff=runoff.runoff,
-                reference_evapotranspiration=et0,
-                basal_crop_coefficient=kcb,
-                cover_fraction=cover_fraction,
-                climate_adjusted_upper_limit=climate_term,
-            ),
-            **surface_constants,
-        )
+        day_constants = surface_constants
+        surface: object = None
+        if fallow_surface is None:
+            upper_limit = _guarded(
+                "the upper limit of the crop coefficient",
+                notes,
+                day,
+                evaporation.upper_limit_of_crop_coefficient,
+                kcb,
+                climate_term,
+                margin_above_basal=surface_constants["margin_above_basal"],
+            )
+            cover_fraction = _guarded(
+                "the cover fraction",
+                notes,
+                day,
+                evaporation.cover_fraction_from_basal_coefficient,
+                kcb,
+                minimum_crop_coefficient=minimum_crop_coefficient,
+                upper_limit=upper_limit,
+                exponent=exponent,
+            )
+        else:
+            # D110: fc and fw of a day with no crop, and the reduced
+            # evaporable waters, in place of those of a day with a crop.
+            cover_fraction = fallow_surface.cover_fraction
+            day_constants = {
+                **surface_constants,
+                TOTAL_EVAPORABLE_WATER: fallow_surface.total_evaporable_water,
+                "readily_evaporable_water": fallow_surface.readily_evaporable_water,
+                "wetted_fraction": fallow_surface.wetted_fraction,
+            }
+            reduced = fallow_surface.total_evaporable_water
+            if (
+                not isinstance(depletion.value, Missing)
+                and not isinstance(reduced, Missing)
+                and depletion.value > reduced
+            ):
+                surface = Missing(
+                    reason="NOT_COMPUTABLE", detail=FALLOW_DEPLETION_ABOVE
+                )
+                notes.note(surface, day)
+        if surface is None:
+            surface = _guarded(
+                "the surface-layer balance",
+                notes,
+                day,
+                evaporation.step,
+                depletion.value,
+                evaporation.DayInput(
+                    date=day,
+                    precipitation=precipitation,
+                    runoff=runoff.runoff,
+                    reference_evapotranspiration=et0,
+                    basal_crop_coefficient=kcb,
+                    cover_fraction=cover_fraction,
+                    climate_adjusted_upper_limit=climate_term,
+                ),
+                **day_constants,
+            )
         if isinstance(surface, Missing):
             surface = _missing_result(
                 evaporation.DayResult, evaporation.RESULT_QUANTITIES, day, surface

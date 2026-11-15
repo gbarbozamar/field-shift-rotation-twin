@@ -1,6 +1,8 @@
 """Acceptance test of units l1/water-ep3-parameters (issue #153),
-l1/water-ep3-identifiers (issue #191) and l1/water-crop-stages (issue #206;
-the stages themselves are checked in ``test_stages.py``).
+l1/water-ep3-identifiers (issue #191), l1/water-crop-stages (issue #206;
+the stages themselves are checked in ``test_stages.py``) and
+l1/water-fallow-residue (issue #217; ``fallow.py`` alone is checked in
+``test_fallow.py``).
 
 The cases are PROPOSED (blueprint section 3.7) and are listed in
 ``EXPOSURE.md`` under "PROPOSED cases"; a test checks that the two lists
@@ -121,17 +123,30 @@ PLACEHOLDER_SITE = {
     "column_capacity": 22.2,
     "column_depth": 2.22,
     "initial_storage": 11.1,
+    # The two constants of the reduction of the total evaporable water on a
+    # fallow day (D110), plainly not the "5 % for each 10 %" of the method.
+    "mulch_total_evaporable_water_reduction": 0.0333,
+    "mulch_cover_increment": 0.111,
 }
 PLACEHOLDER_DAY = {
     # On a day with a crop the basal crop coefficient is read by crop and
     # stage (PLACEHOLDER_STAGE); here, the one of a day with no crop.
     "basal_crop_coefficient": {"no_crop": 0.333},
     "crop_height": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 0.111},
-    "cover_fraction_exponent": {"crop-a": 1.11, "crop-b": 2.22, "no_crop": 1.11},
     "curve_number": {"crop-a": 1.11, "crop-b": 0.555, "no_crop": 1.11},
 }
+# Read by crop only: on a day with no crop the cover fraction is a record
+# (PLACEHOLDER_FALLOW), not computed from the basal coefficient (D110).
+PLACEHOLDER_EXPONENT = {"crop-a": 1.11, "crop-b": 2.22}
+# The cover fraction and the wetted fraction of the surface layer on a day
+# with no crop, plainly not the fc = 0 and fw = 1 of D110.
+PLACEHOLDER_FALLOW = {"cover_fraction": 0.111, "wetted_fraction": 0.888}
+# The surface residue cover of a fallow, by the crop sown after it (D110,
+# D115): a fraction of the soil surface.
+PLACEHOLDER_RESIDUE_COVER = {"crop-a": 0.444, "crop-b": 0.222}
 # The root depths lie above zero and not deeper than the column (column_depth).
 PLACEHOLDER_CROP = {
+    "cover_fraction_exponent": PLACEHOLDER_EXPONENT,
     "maximum_root_depth": {"crop-a": 1.11, "crop-b": 2.22},
     "initial_root_depth": {"crop-a": 0.111, "crop-b": 0.222},
     "readily_available_fraction": {"crop-a": 0.444, "crop-b": 0.888},
@@ -301,9 +316,12 @@ def crop_word(crop: str) -> str:
 
 
 def scope_of(label: str) -> dict:
-    """The scope of a label: ``no_crop``, a crop, or ``<crop>:<stage>``."""
+    """The scope of a label: ``no_crop``, ``fallow:<crop>`` (a day with no crop
+    before that crop), a crop, or ``<crop>:<stage>``."""
     if label == "no_crop":
         return {"management": "no_crop"}
+    if label.startswith("fallow:"):
+        return {"crop": crop_word(label.split(":", 1)[1]), "management": "no_crop"}
     crop, _, stage = label.partition(":")
     if stage:
         return {"crop": crop_word(crop), "stage": stage}
@@ -314,6 +332,8 @@ def label_of(scope: dict) -> str | None:
     """The label of a scope of the test catalogue; ``None`` for the empty scope."""
     if not scope:
         return None
+    if "management" in scope and "crop" in scope:
+        return f"fallow:{scope['crop'].split('-', 1)[1]}"
     if "management" in scope:
         return "no_crop"
     crop = scope["crop"].split("-", 1)[1]
@@ -344,9 +364,17 @@ def placeholder_stage_lengths(crop: str) -> dict[str, float]:
 def marked_catalogue() -> dict[str, dict]:
     """Every parameter the chain reads, keyed as load_folder keys a record."""
     records = []
-    for parameter_id in module.SITE_PARAMETERS:
+    for parameter_id in (*module.SITE_PARAMETERS, *module.FALLOW_SITE_PARAMETERS):
         value = PLACEHOLDER_SITE.get(parameter_id, 1.0)
         records.append(placeholder_record(parameter_id, value, {}))
+    for parameter_id, value in PLACEHOLDER_FALLOW.items():
+        records.append(placeholder_record(parameter_id, value, scope_of("no_crop")))
+    for crop, value in PLACEHOLDER_RESIDUE_COVER.items():
+        records.append(
+            placeholder_record(
+                module.SURFACE_RESIDUE_COVER, value, scope_of(f"fallow:{crop}")
+            )
+        )
     for parameter_id, by_crop in (*PLACEHOLDER_DAY.items(), *PLACEHOLDER_CROP.items()):
         for crop, value in by_crop.items():
             records.append(placeholder_record(parameter_id, value, scope_of(crop)))
@@ -527,6 +555,32 @@ def calendar() -> RotationCalendar:
     return RotationCalendar.model_validate(calendar_document())
 
 
+# The days between the last day of the record and the sowing of the component
+# that follows it in the test calendars (``after_the_record``).
+DAYS_TO_SOWING_AFTER_THE_RECORD = 31
+
+
+def after_the_record(document: dict[str, Any]) -> dict[str, Any]:
+    """A component of crop-a sown after the last day of the record.
+
+    It is copied from the first component of the example calendar. No day of
+    the record has its crop, so none of its crop parameters is read; it gives
+    the fallow at the end of the record a crop that follows it, which names
+    the record of its surface residue cover (D110, D115; OPEN 31). The end
+    date of the calendar is moved to its last day.
+    """
+    _, last = several_full_years()
+    added = copy.deepcopy(calendar_document()["components"][0])
+    added["component_id"] = "PLACEHOLDER-component-after-the-record"
+    sowing = last + ONE_DAY * DAYS_TO_SOWING_AFTER_THE_RECORD
+    added["start"]["date"] = sowing.isoformat()
+    end = sowing + ONE_DAY * (period_days("crop-a") - 1)
+    added["end"]["date"] = end.isoformat()
+    added["periods"] = []
+    document["end_date"] = end.isoformat()
+    return added
+
+
 def chain_calendar_document(*, fill_periods: bool = True) -> dict[str, Any]:
     """The example calendar over the three years of ``several_full_years``.
 
@@ -536,6 +590,8 @@ def chain_calendar_document(*, fill_periods: bool = True) -> dict[str, Any]:
     of a crop holds the days of its first one (``period_days``), which the
     four PLACEHOLDER stage lengths of the crop fill; without it, the third and
     fourth periods are each one day off from the first period of their crop.
+    A last component is sown after the record (``after_the_record``), so that
+    every day of the record with no crop has a crop that follows it.
     """
     document = calendar_document()
     first, last = several_full_years()
@@ -548,6 +604,7 @@ def chain_calendar_document(*, fill_periods: bool = True) -> dict[str, Any]:
     ).isoformat()
     added["end"]["date"] = (last - dt.timedelta(days=91)).isoformat()
     document["components"].append(added)
+    document["components"].append(after_the_record(document))
     for component in document["components"]:
         if fill_periods:
             crop = component["crop_id"].split("-", 1)[1]
@@ -563,13 +620,16 @@ def chain_calendar() -> RotationCalendar:
 
 
 def bare_calendar() -> RotationCalendar:
-    """The calendar of ``chain_calendar`` with no component: no day has a crop.
+    """The calendar of ``chain_calendar`` with only the component sown after
+    the record: no day of the record has a crop.
 
-    The cases that check the chain itself and the parameters of the site run
-    on this calendar, so that no crop parameter is needed.
+    Every day of the record is a day of one fallow, before crop-a (D110). The
+    cases that check the chain itself and the parameters of the site run on
+    this calendar, so that no crop parameter is needed.
     """
     document = chain_calendar_document()
-    document["components"] = []
+    *_, after = document["components"]
+    document["components"] = [after]
     return RotationCalendar.model_validate(document)
 
 
@@ -925,7 +985,7 @@ def test_stage_lengths_that_do_not_fill_the_period_leave_it_missing_naming_open_
     calendar_ = RotationCalendar.model_validate(
         chain_calendar_document(fill_periods=False)
     )
-    first, _, third, _ = calendar_.components
+    first, _, third, *_ = calendar_.components
     assert first.crop_id == third.crop_id
     assert (third.end.date - third.start.date) != (first.end.date - first.start.date)
     days = chain(calendar_)
@@ -1014,11 +1074,22 @@ def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by
         assert item.missing.reason == "MISSING_INPUT"
         detail = item.missing.detail
         site = no_record_item(detail, "{}")
-        for parameter_id in module.SITE_PARAMETERS:
+        for parameter_id in (*module.SITE_PARAMETERS, *module.FALLOW_SITE_PARAMETERS):
             assert f"'{parameter_id}'" in site
         no_crop = no_record_item(detail, NO_CROP_SCOPE)
-        for parameter_id in (*module.DAY_PARAMETERS, *module.STAGE_PARAMETERS):
+        for parameter_id in (
+            *module.DAY_PARAMETERS,
+            *module.STAGE_PARAMETERS,
+            *module.FALLOW_PARAMETERS,
+        ):
             assert f"'{parameter_id}'" in no_crop
+        # The cover of the first fallow, read by the crop sown after it.
+        first_crop = calendar_.components[0].crop_id
+        fallow = no_record_item(
+            detail, json.dumps({"crop": first_crop, "management": "no_crop"})
+        )
+        for parameter_id in module.FALLOW_COVER_PARAMETERS:
+            assert f"'{parameter_id}'" in fallow
         for parameter_id in module.CROP_PARAMETERS:
             assert f"'{parameter_id}'" not in no_crop
         last = last_day_of(item.ag_year)
@@ -1046,6 +1117,12 @@ def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by
         assert "C1.4" in detail
 
 
+# Parameters of the site that only a day with a crop uses since unit #217: on
+# a fallow day the cover fraction and the wetted fraction are records of a day
+# with no crop (D110).
+CROP_DAY_SITE = ("wetted_fraction", "minimum_crop_coefficient")
+
+
 @pytest.mark.parametrize(
     "key",
     [(name, None) for name in module.SITE_PARAMETERS]
@@ -1057,15 +1134,26 @@ def test_empty_catalogue_makes_every_year_missing_input_naming_each_parameter_by
         for crop in CROPS
         for stage in module.STAGES
     ]
-    + [(name, crop) for name in module.CROP_PARAMETERS for crop in CROPS],
+    + [(name, crop) for name in module.CROP_PARAMETERS for crop in CROPS]
+    + [(name, None) for name in module.FALLOW_SITE_PARAMETERS]
+    + [(name, "no_crop") for name in module.FALLOW_PARAMETERS]
+    + [
+        (name, f"fallow:{crop}")
+        for name in module.FALLOW_COVER_PARAMETERS
+        for crop in CROPS
+    ],
 )
 def test_parameter_with_no_record_is_missing_input_naming_it_and_no_other(key):
     parameter_id, label = key
     # A parameter of the site or of a day with no crop is checked on the
     # calendar with no crop, on which every year is computed with the whole
-    # catalogue; a parameter of a crop on the calendar with crops, on which
-    # every year is computed too with the whole catalogue (issue #206).
-    with_crops = label not in (None, "no_crop")
+    # catalogue; a parameter of a crop, a parameter of the site that only a
+    # day with a crop uses (CROP_DAY_SITE) and the cover of a fallow on the
+    # calendar with crops, on which every year is computed too with the whole
+    # catalogue (issues #206, #217).
+    with_crops = label not in (None, "no_crop") or (
+        label is None and parameter_id in CROP_DAY_SITE
+    )
     calendar_ = chain_calendar() if with_crops else bare_calendar()
     result = run(calendar_=calendar_, parameters=catalogue_with({key: None}))
     scope = "{}" if label is None else json.dumps(unmarked(scope_of(label)))
@@ -1196,18 +1284,49 @@ def drafted_key(parameter_id: str, scope: dict) -> tuple[str, str]:
 
 
 def drafted_calendar() -> RotationCalendar:
-    """The calendar of ``chain_calendar``, one component per crop of the drafts."""
+    """The calendar of ``chain_calendar``, one component per crop of the drafts
+    in the record; the component sown after the record takes the first crop."""
     document = chain_calendar_document()
-    assert len(document["components"]) == len(DRAFTED_CROPS)
-    for component, crop in zip(document["components"], DRAFTED_CROPS, strict=True):
+    *in_the_record, after = document["components"]
+    assert len(in_the_record) == len(DRAFTED_CROPS)
+    for component, crop in zip(in_the_record, DRAFTED_CROPS, strict=True):
         component["crop_id"] = crop
+    after["crop_id"] = DRAFTED_CROPS[0]
     return RotationCalendar.model_validate(document)
 
 
-def read_by_ep3(crops: tuple[str, ...]) -> set[tuple[str, str]]:
-    """Every (id, scope) EP3 reads for a calendar with these crops and days with none."""
+def crops_after_a_fallow(calendar_: RotationCalendar) -> set[str]:
+    """The crop sown after each day of the record that no component covers."""
+    first, last = several_full_years()
+    sowings = sorted((c.start.date, c.crop_id) for c in calendar_.components)
+    crops = set()
+    day = first
+    while day <= last:
+        if not any(c.start.date <= day <= c.end.date for c in calendar_.components):
+            crops.add(next(crop for start, crop in sowings if start > day))
+        day += ONE_DAY
+    return crops
+
+
+def read_by_ep3(
+    crops: tuple[str, ...], following: set[str] | None = None
+) -> set[tuple[str, str]]:
+    """Every (id, scope) EP3 reads for a calendar with these crops and days
+    with none, the days with none lying before the crops of ``following``
+    (by default the crops of ``drafted_calendar``)."""
+    if following is None:
+        following = crops_after_a_fallow(drafted_calendar())
     no_crop = scope_of("no_crop")
-    read = {drafted_key(name, {}) for name in module.SITE_PARAMETERS}
+    read = {
+        drafted_key(name, {})
+        for name in (*module.SITE_PARAMETERS, *module.FALLOW_SITE_PARAMETERS)
+    }
+    read |= {drafted_key(name, no_crop) for name in module.FALLOW_PARAMETERS}
+    read |= {
+        drafted_key(name, {"crop": crop, "management": "no_crop"})
+        for name in module.FALLOW_COVER_PARAMETERS
+        for crop in following
+    }
     read |= {
         drafted_key(name, scope)
         for name in module.DAY_PARAMETERS
@@ -1254,6 +1373,10 @@ def drafted_catalogue(leave_out: tuple[str, str] | None = None) -> dict[str, dic
         scope = json.loads(scope_text)
         if not scope:
             value = PLACEHOLDER_SITE.get(parameter_id, 1.0)
+        elif "management" in scope and "crop" in scope:
+            value = PLACEHOLDER_RESIDUE_COVER["crop-a"]
+        elif parameter_id in PLACEHOLDER_FALLOW:
+            value = PLACEHOLDER_FALLOW[parameter_id]
         elif "management" in scope:
             value = PLACEHOLDER_DAY[parameter_id]["no_crop"]
         else:
@@ -1313,6 +1436,403 @@ def test_drafted_record_removed_makes_the_result_missing_naming_it(drafted):
     for item in naming:
         assert item.missing.reason == "MISSING_INPUT"
         assert item.missing.detail.count("parameters with no record") == 1
+
+
+# --- the cases of #217: the fallow day (D110, D111, D115, D116) ----------------
+
+# The total evaporable water of the test catalogue, written out from its
+# PLACEHOLDER operands (a unit factor, a wilting-point weight and a layer
+# depth of one): field capacity less wilting point.
+PLACEHOLDER_TEW = (
+    PLACEHOLDER_SITE["field_capacity_water_content"]
+    - PLACEHOLDER_SITE["wilting_point_water_content"]
+)
+
+
+def mulched(cover: float, reduction: float | None = None) -> float:
+    """The total evaporable water of a fallow day, written out here from the
+    PROPOSED form of D110 (choice 20), independently of ``fallow.py``."""
+    if reduction is None:
+        reduction = PLACEHOLDER_SITE["mulch_total_evaporable_water_reduction"]
+    increment = PLACEHOLDER_SITE["mulch_cover_increment"]
+    return PLACEHOLDER_TEW * (1 - reduction * cover / increment)
+
+
+def fallow_record(crop: str, value: float) -> dict:
+    return unmarked(
+        placeholder_record(
+            module.SURFACE_RESIDUE_COVER, value, scope_of(f"fallow:{crop}")
+        )
+    )
+
+
+def site_record(parameter_id: str, value: float) -> dict:
+    return unmarked(placeholder_record(parameter_id, value, {}))
+
+
+def spy_surface_layer(monkeypatch) -> dict[dt.date, tuple[Any, Any, dict]]:
+    """Wrap the daily step of the surface layer; keep what each day is given."""
+    given: dict[dt.date, tuple[Any, Any, dict]] = {}
+    step = module.evaporation.step
+
+    def spy(depletion_start, day, **kwargs):
+        given[day.date] = (depletion_start, day, kwargs)
+        return step(depletion_start, day, **kwargs)
+
+    monkeypatch.setattr(module.evaporation, "step", spy)
+    return given
+
+
+def fallow_cover_scope(crop: str) -> str:
+    return json.dumps(unmarked(scope_of(f"fallow:{crop}")))
+
+
+def test_fallow_day_takes_the_records_of_a_day_with_no_crop_and_the_mulched_evaporable_water(
+    monkeypatch,
+):
+    given = spy_surface_layer(monkeypatch)
+    days = chain()  # every day of the record is a day of one fallow, before crop-a
+    expected_tew = mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"])
+    assert expected_tew < PLACEHOLDER_TEW
+    for day in days:
+        _, day_input, constants = given[day.date]
+        # D110: fc and fw are the records of a day with no crop.
+        assert day_input.cover_fraction == PLACEHOLDER_FALLOW["cover_fraction"]
+        assert constants["wetted_fraction"] == PLACEHOLDER_FALLOW["wetted_fraction"]
+        # D110: the total evaporable water reduced by the cover of the fallow.
+        assert constants["total_evaporable_water"] == pytest.approx(expected_tew)
+        assert constants["readily_evaporable_water"] == pytest.approx(
+            min(PLACEHOLDER_SITE["readily_evaporable_water"], expected_tew)
+        )
+        assert day.surface_layer.exposed_and_wetted_fraction == pytest.approx(
+            min(
+                1 - PLACEHOLDER_FALLOW["cover_fraction"],
+                PLACEHOLDER_FALLOW["wetted_fraction"],
+            )
+        )
+
+
+# A precipitation cycle with long dry spells (PLACEHOLDER), so that the
+# surface layer dries into stage 2 and to its total evaporable water.
+DRY_SPELLS = [14.44] + [0.0] * 59  # zero: a dry day
+
+
+def climate_with_dry_spells() -> SiteClimate:
+    first, last = several_full_years()
+    series = [daily_series(name, first, last) for name in DAILY_INPUTS]
+    (precipitation,) = [item for item in series if item["quantity"] == PRECIPITATION]
+    for position, day in enumerate(precipitation["days"]):
+        day["value"] = DRY_SPELLS[position % len(DRY_SPELLS)]
+    return climate_with(series)
+
+
+def test_residue_cover_reduces_soil_evaporation_on_fallow_days():
+    dry = climate_with_dry_spells()
+    covered = chain(climate_=dry)
+    bare = chain(
+        climate_=dry,
+        parameters=catalogue_with(
+            {("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", 0.0)}
+        ),
+    )
+    assert all(is_number(day.balance.storage_end) for day in [*covered, *bare])
+    reduced = mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"])
+    rew = PLACEHOLDER_SITE["readily_evaporable_water"]
+    # The depletion of the surface layer dries into stage 2 and never passes
+    # the reduced total, while the bare soil dries further.
+    deepest = max(day.surface_layer.depletion_end for day in covered)
+    assert rew < deepest <= reduced
+    assert max(day.surface_layer.depletion_end for day in bare) > reduced
+    # With no cover the total evaporable water is the one of a day with a crop.
+    assert max(day.surface_layer.depletion_end for day in bare) <= PLACEHOLDER_TEW
+    # Stage 2 of drying follows the reduced total.
+    stage_two = 0
+    for day in covered:
+        layer = day.surface_layer
+        if layer.depletion_start > rew:
+            stage_two += 1
+            assert layer.reduction_coefficient == pytest.approx(
+                (reduced - layer.depletion_start) / (reduced - rew)
+            )
+    assert stage_two > 0
+    # Over the record, the covered fallow evaporates less than the bare one.
+    assert sum(day.surface_layer.evaporation for day in covered) < sum(
+        day.surface_layer.evaporation for day in bare
+    )
+    assert sum(day.balance.evaporation for day in covered) < sum(
+        day.balance.evaporation for day in bare
+    )
+
+
+def test_readily_evaporable_water_of_a_fallow_day_is_not_above_its_total(
+    monkeypatch,
+):
+    # A larger reduction (still PLACEHOLDER) and a full cover leave a total
+    # evaporable water below the readily evaporable water of the site.
+    reduction = 0.0777
+    full = 1.0  # one, structurally: the whole surface is covered
+    expected_tew = mulched(full, reduction)
+    assert expected_tew < PLACEHOLDER_SITE["readily_evaporable_water"]
+    parameters = catalogue_with(
+        {
+            ("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", full),
+            ("mulch_total_evaporable_water_reduction", None): site_record(
+                "mulch_total_evaporable_water_reduction", reduction
+            ),
+        }
+    )
+    given = spy_surface_layer(monkeypatch)
+    days = chain(parameters=parameters)
+    for day in days:
+        _, _, constants = given[day.date]
+        assert constants["total_evaporable_water"] == pytest.approx(expected_tew)
+        assert constants["readily_evaporable_water"] == pytest.approx(expected_tew)
+        assert is_number(day.balance.storage_end)
+        # REW equal to TEW: the layer dries in stage 1 until it is empty.
+        assert day.surface_layer.reduction_coefficient == 1.0
+
+
+def test_weed_free_fallow_transpires_nothing(monkeypatch):
+    crops_given: dict[dt.date, Any] = {}
+    step = module.balance.step
+
+    def spy(storage, day, **kwargs):
+        crops_given[day.date] = day.crop
+        return step(storage, day, **kwargs)
+
+    monkeypatch.setattr(module.balance, "step", spy)
+    calendar_ = chain_calendar()
+    days = chain(calendar_)
+    fallow_days = [day for day in days if crop_period_of(calendar_, day.date) is None]
+    assert fallow_days and len(fallow_days) < len(days)
+    for day in fallow_days:
+        # D111: no crop reaches the balance, so nothing is transpired.
+        assert crops_given[day.date] is None
+        assert day.balance.transpiration == 0
+        assert day.balance.transpiration_demanded.reason == "NOT_APPLICABLE"
+        assert day.balance.transpiration_shortfall.reason == "NOT_APPLICABLE"
+
+
+def test_fallow_and_crop_days_close_their_mass():
+    calendar_ = chain_calendar()
+    days = chain(calendar_)
+    kinds = {"fallow": 0, "crop": 0}
+    for day in days:
+        kinds["crop" if crop_period_of(calendar_, day.date) else "fallow"] += 1
+        layer = day.surface_layer
+        terms = (
+            layer.depletion_start,
+            layer.depletion_end,
+            layer.infiltration,
+            layer.deep_percolation,
+            layer.evaporation_from_exposed_fraction,
+        )
+        assert all(is_number(term) and term >= 0 for term in terms)
+        change = layer.depletion_end - layer.depletion_start
+        flows = (
+            -layer.infiltration
+            + layer.deep_percolation
+            + layer.evaporation_from_exposed_fraction
+        )
+        scale = max(abs(term) for term in terms)
+        assert abs(change - flows) <= 64 * sys.float_info.epsilon * max(scale, 1.0)
+        b = day.balance
+        terms = (b.precipitation, b.runoff, b.evaporation, b.transpiration, b.drainage)
+        balance = (
+            b.precipitation - b.runoff - b.evaporation - b.transpiration - b.drainage
+        )
+        scale = max(abs(term) for term in (b.storage_start, b.storage_end, *terms))
+        assert abs(b.storage_end - b.storage_start - balance) <= (
+            64 * sys.float_info.epsilon * max(scale, 1.0)
+        )
+    assert all(count > 0 for count in kinds.values()), kinds
+
+
+def test_crop_days_are_computed_as_before_the_fallow_rules(monkeypatch):
+    # On a day with a crop the surface layer is given what unit #206 gave it:
+    # the total and readily evaporable water and the wetted fraction of the
+    # site, and the cover fraction computed from the basal coefficient.
+    given = spy_surface_layer(monkeypatch)
+    calendar_ = chain_calendar()
+    days = chain(calendar_)
+    evaporation = module.evaporation
+    crop_days = 0
+    for day in days:
+        period = crop_period_of(calendar_, day.date)
+        if period is None:
+            continue
+        crop_days += 1
+        crop, _ = period
+        depletion_start, day_input, constants = given[day.date]
+        assert constants == {
+            "total_evaporable_water": pytest.approx(PLACEHOLDER_TEW),
+            "readily_evaporable_water": PLACEHOLDER_SITE["readily_evaporable_water"],
+            "wetted_fraction": PLACEHOLDER_SITE["wetted_fraction"],
+            "margin_above_basal": PLACEHOLDER_SITE["margin_above_basal"],
+        }
+        upper_limit = evaporation.upper_limit_of_crop_coefficient(
+            day_input.basal_crop_coefficient,
+            day_input.climate_adjusted_upper_limit,
+            margin_above_basal=PLACEHOLDER_SITE["margin_above_basal"],
+        )
+        cover = evaporation.cover_fraction_from_basal_coefficient(
+            day_input.basal_crop_coefficient,
+            minimum_crop_coefficient=PLACEHOLDER_SITE["minimum_crop_coefficient"],
+            upper_limit=upper_limit,
+            exponent=PLACEHOLDER_EXPONENT[crop],
+        )
+        assert day_input.cover_fraction == cover
+        assert depletion_start <= PLACEHOLDER_TEW
+    assert crop_days > 0
+
+
+def test_missing_cover_record_names_itself():
+    calendar_ = chain_calendar()
+    first_b = min(
+        c.start.date for c in calendar_.components if c.crop_id.endswith("crop-b")
+    )
+    # The first day of the fallow before crop-b: the day after the component
+    # before it ends.
+    first_needed = (
+        max(c.end.date for c in calendar_.components if c.end.date < first_b) + ONE_DAY
+    )
+    assert first_needed < first_b
+    result = run(
+        calendar_=calendar_,
+        parameters=catalogue_with({("surface_residue_cover", "fallow:crop-b"): None}),
+    )
+    assert_loads(result)
+    named_years = 0
+    for item in result:
+        if last_day_of(item.ag_year) < first_needed:
+            assert_definition_incomplete(item)
+            continue
+        named_years += 1
+        assert item.missing.reason == "MISSING_INPUT"
+        named = no_record_item(item.missing.detail, fallow_cover_scope("crop-b"))
+        assert named.endswith(": 'surface_residue_cover'")
+        assert item.missing.detail.count("parameters with no record") == 1
+    assert named_years > 0
+
+
+def test_cover_record_without_value_repeats_its_reason():
+    # D115: where the table gives no cap, the upper level is missing with its
+    # reason (the reason here is PLACEHOLDER).
+    record = placeholder_record(
+        module.SURFACE_RESIDUE_COVER, 1.0, scope_of("fallow:crop-a")
+    )
+    record.update(
+        value=None,
+        value_missing_reason="PLACEHOLDER reason: no cap is recorded for this fallow",
+        range=None,
+        range_missing_reason="PLACEHOLDER reason: no range is recorded",
+        citation=None,
+    )
+    assert check_record(record) == []
+    parameters = catalogue_with(
+        {("surface_residue_cover", "fallow:crop-a"): unmarked(record)}
+    )
+    assert check_catalogue(parameters) == []
+    result = run(parameters=parameters)
+    assert_loads(result)
+    scope = fallow_cover_scope("crop-a")
+    for item in result:
+        assert item.missing.reason == "MISSING_INPUT"
+        assert (
+            f"parameter 'surface_residue_cover' with scope {scope}: the record holds "
+            "no value: UNMARKED_TEST_ONLY reason: no cap is recorded for this fallow"
+        ) in item.missing.detail
+        assert "parameters with no record" not in item.missing.detail
+
+
+def test_fallow_with_no_crop_after_it_is_missing_naming_open_31():
+    document = chain_calendar_document()
+    *in_the_record, _ = document["components"]
+    document["components"] = in_the_record
+    _, last = several_full_years()
+    document["end_date"] = last.isoformat()
+    calendar_ = RotationCalendar.model_validate(document)
+    last_crop_day = max(c.end.date for c in calendar_.components)
+    assert last_crop_day < last
+    result = run(calendar_=calendar_)
+    assert_loads(result)
+    *before, final = result
+    for item in before:
+        assert_definition_incomplete(item)
+    assert final.missing.reason == "MISSING_INPUT"
+    assert f"chain MISSING_INPUT: {module.fallow.NO_FOLLOWING_CROP}" in items_of(
+        final.missing.detail
+    )
+    assert "OPEN 31" in final.missing.detail
+    first_missing = (last_crop_day + ONE_DAY).isoformat()
+    assert f"the first on {first_missing}" in final.missing.detail
+
+
+def test_depletion_above_the_reduced_evaporable_water_is_not_computable_naming_open_30():
+    # An initial depletion within the total evaporable water of a day with a
+    # crop and above the one of the fallow (both PLACEHOLDER).
+    start = 4.22
+    assert mulched(PLACEHOLDER_RESIDUE_COVER["crop-a"]) < start < PLACEHOLDER_TEW
+    above = {("initial_depletion", None): site_record("initial_depletion", start)}
+    result = run(parameters=catalogue_with(above))
+    assert_loads(result)
+    for item in result:
+        # The surface layer is NOT_COMPUTABLE; the balance that reads its Ke
+        # is missing with that input, as after any refused value upstream.
+        assert item.missing.reason != "NOT_AVAILABLE"
+        assert f"chain NOT_COMPUTABLE: {module.FALLOW_DEPLETION_ABOVE}" in items_of(
+            item.missing.detail
+        )
+        assert "OPEN 30" in item.missing.detail
+    # With no cover the same depletion lies within the total, and is computed.
+    bare = run(
+        parameters=catalogue_with(
+            above
+            | {("surface_residue_cover", "fallow:crop-a"): fallow_record("crop-a", 0.0)}
+        )
+    )
+    for item in bare:
+        assert_definition_incomplete(item)
+
+
+@pytest.mark.parametrize(
+    ("label", "value", "why"),
+    [
+        ("cover", 1.11, "outside zero to one"),
+        ("cover", -0.111, "outside zero to one"),
+        ("increment", 0.0, "cover increment of the mulch reduction is not above zero"),
+        ("reduction", -0.0333, "per increment of cover is below zero"),
+        ("reduction", 0.444, "leaves no evaporable water"),
+    ],
+)
+def test_mulch_values_outside_what_the_method_computes_are_not_computable(
+    label, value, why
+):
+    key, record = {
+        "cover": (
+            ("surface_residue_cover", "fallow:crop-a"),
+            fallow_record("crop-a", value),
+        ),
+        "increment": (
+            ("mulch_cover_increment", None),
+            site_record("mulch_cover_increment", value),
+        ),
+        "reduction": (
+            ("mulch_total_evaporable_water_reduction", None),
+            site_record("mulch_total_evaporable_water_reduction", value),
+        ),
+    }[label]
+    result = run(parameters=catalogue_with({key: record}))
+    assert_loads(result)
+    for item in result:
+        assert item.missing.reason != "NOT_AVAILABLE"
+        (entry,) = [
+            entry
+            for entry in items_of(item.missing.detail)
+            if entry.startswith("chain NOT_COMPUTABLE: ")
+        ]
+        assert why in entry
+        assert repr(value) not in entry  # no value is repeated
 
 
 # --- the cases of #135, with the catalogue ------------------------------------
@@ -1698,7 +2218,7 @@ def test_arguments_unchanged_and_second_call_equal():
 
 
 @pytest.mark.parametrize(
-    ("file_name", "allowed"),
+    ("file_name", "allowed", "allowed_numbers"),
     [
         (
             "exposure.py",
@@ -1715,16 +2235,27 @@ def test_arguments_unchanged_and_second_call_equal():
                     "engine.water.stages",
                 )
             ),
+            {1},
         ),
-        ("stages.py", lambda name: name == "contracts.results.models"),
+        ("stages.py", lambda name: name == "contracts.results.models", {1}),
         (
             "_parameters.py",
             lambda name: name in ("contracts.results.models", "params.catalogue"),
+            {1},
+        ),
+        # The bounds of a fraction and the whole of the total evaporable water.
+        (
+            "fallow.py",
+            lambda name: (
+                name
+                in ("contracts.inputs.rotation_calendar", "contracts.results.models")
+            ),
+            {0, 1},
         ),
     ],
 )
 def test_modules_import_only_allowed_modules_and_hold_only_the_integer_one(
-    file_name, allowed
+    file_name, allowed, allowed_numbers
 ):
     source = (HERE / file_name).read_text("utf-8")
     tree = ast.parse(source)
@@ -1755,7 +2286,7 @@ def test_modules_import_only_allowed_modules_and_hold_only_the_integer_one(
         and isinstance(node.value, (int, float, complex))
         and not isinstance(node.value, bool)
     }
-    assert numbers <= {1}
+    assert numbers <= allowed_numbers
     format_specs = [
         node
         for node in ast.walk(tree)
@@ -1780,9 +2311,17 @@ def test_parameter_identifiers_are_well_formed_and_unique():
         *module.STAGE_PARAMETERS,
         *module.DAY_PARAMETERS,
         *module.CROP_PARAMETERS,
+        *module.FALLOW_SITE_PARAMETERS,
+        *module.FALLOW_COVER_PARAMETERS,
     ]
     assert len(names) == len(set(names))
-    for name in names:
+    # The two records of a fallow day are read with the scope of a day with
+    # no crop; the wetted fraction keeps its identifier, read with the empty
+    # scope on a day with a crop (D110).
+    fallow = list(module.FALLOW_PARAMETERS)
+    assert len(fallow) == len(set(fallow))
+    assert set(fallow) & set(names) == {"wetted_fraction"}
+    for name in [*names, *fallow]:
         assert re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name), name
     readme = (HERE / "et0" / "README.md").read_text("utf-8")
     for group, fields_ in module.ET0_PARAMETERS.items():
@@ -1816,9 +2355,19 @@ def test_parameter_table_matches_exposure_md():
         "crop",
         "crop and stage, or no crop",
         "crop or no crop",
+        "no crop",
+        "no crop, by the crop that follows",
         "site",
+        "site, on a day with no crop",
     ]
     assert sorted(by_scope["site"]) == sorted(module.SITE_PARAMETERS)
+    assert sorted(by_scope["site, on a day with no crop"]) == sorted(
+        module.FALLOW_SITE_PARAMETERS
+    )
+    assert sorted(by_scope["no crop"]) == sorted(module.FALLOW_PARAMETERS)
+    assert sorted(by_scope["no crop, by the crop that follows"]) == sorted(
+        module.FALLOW_COVER_PARAMETERS
+    )
     assert sorted(by_scope["crop and stage, or no crop"]) == sorted(
         module.STAGE_PARAMETERS
     )
