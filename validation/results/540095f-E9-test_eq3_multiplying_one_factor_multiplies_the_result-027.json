@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "540095f-E9-test_eq3_multiplying_one_factor_multiplies_the_result-027",
+  "run_id": "run-20261115T194950Z-540095f",
+  "test_code": "E9",
+  "expected": {
+    "missing_reason": "the entry E9 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_equation.py::test_eq3_multiplying_one_factor_multiplies_the_result[numbers1-3.0-k]"
+  },
+  "notes": "Test engine/erosion/test_equation.py::test_eq3_multiplying_one_factor_multiplies_the_result[numbers1-3.0-k]. Placed under E9: listed by name on the 'Test' line of entry E9 of docs/VALIDATION.md."
+}
