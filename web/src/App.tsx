@@ -9,7 +9,7 @@ import PlantScreen from './plant/PlantScreen'
 export default function App() {
   const route = useHashRoute()
   // The entry screen opens the case as the default view at "/"; the fields
-  // screen (map above the list) follows at "/fields"; "What should I plant?"
+  // screen (map above the list) follows at "/fields"; the plant screen
   // is at "/plant" (S-019, PROPOSED). Other routes keep the placeholder page.
 
   return (

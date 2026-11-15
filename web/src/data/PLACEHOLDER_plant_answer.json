@@ -10,7 +10,8 @@
     "soybean_price_range": {
       "low": 200.0,
       "high": 600.0,
-      "unit": "USD t-1"
+      "unit": "USD t-1",
+      "provenance": "DECLARED"
     },
     "margin_of": "average",
     "rain_stress_factor": {
@@ -38,25 +39,49 @@
           "value": 312.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "el_nino": {
           "value": 440.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "neutral": {
           "value": 600.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "la_nina": {
           "value": 40.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         }
       },
       "soil_loss": {
@@ -81,7 +106,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "el_nino": {
           "value": 14.0,
@@ -98,7 +128,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "neutral": {
           "value": 11.0,
@@ -113,7 +148,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "la_nina": {
           "value": 8.0,
@@ -130,11 +170,24 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         }
       },
       "limit": {
-        "limit": 6.0,
+        "limit": {
+          "value": 6.0,
+          "unit": "t ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
         "unit": "t ha-1 yr-1",
         "on_average": {
           "verdict": "does_not_meet",
@@ -185,25 +238,49 @@
           "value": 222.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "el_nino": {
           "value": 350.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "neutral": {
           "value": 510.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "la_nina": {
           "value": -50.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         }
       },
       "soil_loss": {
@@ -228,7 +305,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "el_nino": {
           "value": 6.5,
@@ -245,7 +327,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "neutral": {
           "value": 5.0,
@@ -260,7 +347,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "la_nina": {
           "value": 4.0,
@@ -277,11 +369,24 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         }
       },
       "limit": {
-        "limit": 6.0,
+        "limit": {
+          "value": 6.0,
+          "unit": "t ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
         "unit": "t ha-1 yr-1",
         "on_average": {
           "verdict": "meets",
@@ -330,25 +435,49 @@
           "value": 193.8,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "el_nino": {
           "value": 274.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "neutral": {
           "value": 345.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         },
         "la_nina": {
           "value": 38.0,
           "unit": "USD ha-1 yr-1",
           "reason": null,
-          "detail": null
+          "detail": null,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          },
+          "source": "computed from the declared economic facts"
         }
       },
       "soil_loss": {
@@ -389,7 +518,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "neutral": {
           "value": 3.0,
@@ -404,7 +538,12 @@
           "sources": [
             "PLACEHOLDER: example data, not computed by an engine"
           ],
-          "assumption": false
+          "assumption": false,
+          "provenance": "DERIVED",
+          "range_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": "PLACEHOLDER: example data, no range is computed for this number"
+          }
         },
         "la_nina": {
           "value": null,
@@ -424,7 +563,15 @@
         }
       },
       "limit": {
-        "limit": 6.0,
+        "limit": {
+          "value": 6.0,
+          "unit": "t ha-1 yr-1",
+          "provenance": "DECLARED",
+          "source": "user",
+          "range_missing": {
+            "reason": "NOT_DECLARED"
+          }
+        },
         "unit": "t ha-1 yr-1",
         "on_average": {
           "verdict": "not_resolved",
@@ -472,7 +619,12 @@
     "costs_nothing": false,
     "reason": null,
     "detail": null,
-    "unit": "USD ha-1 yr-1"
+    "unit": "USD ha-1 yr-1",
+    "provenance": "DERIVED",
+    "range_missing": {
+      "reason": "NOT_AVAILABLE",
+      "detail": "PLACEHOLDER: example data, no range is computed for this number"
+    }
   },
   "tipping_price": {
     "today": 400.0,
@@ -480,7 +632,8 @@
     "price_range": {
       "low": 200.0,
       "high": 600.0,
-      "unit": "USD t-1"
+      "unit": "USD t-1",
+      "provenance": "DECLARED"
     },
     "up": {
       "direction": "up",
@@ -500,10 +653,24 @@
       "distance_percent": -6.1842105263157805,
       "reason": null,
       "detail": null,
-      "unit": "USD t-1"
+      "unit": "USD t-1",
+      "provenance": "DERIVED",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: example data, no range is computed for this number"
+      },
+      "distance_provenance": "DERIVED",
+      "distance_range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "PLACEHOLDER: example data, no range is computed for this number"
+      }
     },
     "reason": null,
-    "detail": null
+    "detail": null,
+    "provenance": "DECLARED",
+    "range_missing": {
+      "reason": "NOT_DECLARED"
+    }
   },
   "rain_stress": {
     "factor": 1.2,
@@ -627,13 +794,17 @@
     {
       "id": "oni_v6",
       "contract": "kinds_of_year_record",
-      "state": "transcribed",
+      "state": "cached",
       "retrieved_at": null,
       "time_zone": null,
       "request": null,
-      "attribution": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+      "attribution": "NOAA Climate Prediction Center. Oceanic Niño Index (ONI), based on ERSST version 6: \"Oceanic Niño Index (ONI): Historical El Niño / La Niña episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
       "missing_reason": null,
-      "detail": "transcribed record oni_v6, read on 2026-11-15"
+      "detail": "transcribed record kinds_of_year/records/oni_v6.json, read on 2026-11-15"
     }
+  ],
+  "scope": "the most margin within the limit you declared; water and soil carbon are not part of this answer",
+  "declared_limits": [
+    "phase 1 only: only the first phase of each rotation enters this answer, a limit of this release (D250)"
   ]
 }

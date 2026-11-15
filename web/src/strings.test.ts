@@ -165,7 +165,10 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.strict.on_average': 'Meet the limit on average',
   'plant.strict.every_kind': 'Meet the limit in every kind of year',
   'plant.answer.heading': 'The answer at the price of today',
-  'plant.answer.chosen': 'Plant this rotation',
+  // Wording of D245 (issue #77), in place of "Plant this rotation".
+  'plant.answer.chosen': 'The most margin within the limit you declared; water and soil carbon are not part of this answer',
+  // D250 (#77): each limit of this release the answer declares, as given.
+  'plant.declared_limit': 'Limit of this release: {limit}',
   'plant.answer.none_meets': 'None of the rotations meets the soil-loss limit',
   'plant.answer.not_resolved': 'Not resolved: the data cannot pick one rotation',
   'plant.answer.why': 'Why',
@@ -262,10 +265,17 @@ const WORDING_SHEET: Record<string, string> = {
   // "What should I plant?": where the answer comes from, the pending line, the
   // error panel (one text per error code of api/errors.py, plus UNEXPECTED),
   // the factor heavier rain sends, and the rain-stress part of the answer.
-  'plant.service.origin_example': 'Saved example answers, no service called',
+  // D251 (#77): without a configured service the screen says so and shows
+  // no example values in place of an answer.
+  'plant.service.not_available': 'The service is not available: no answer can be shown.',
   'plant.service.origin_service': 'Answer from the service at {api}',
   'plant.service.ask': 'Ask the service',
-  'plant.service.back': 'Back to the saved example',
+  'plant.service.back': 'Back to the questions',
+  // D251 (#77), read strictly: no sample answer values are shown, with or
+  // without the service. The questions start from the example request.
+  'plant.service.not_asked': 'No answer yet: ask the service for the answer to these questions.',
+  'plant.q.example_inputs':
+    'These questions start from the example request (PLACEHOLDER inputs, declared by the user): change them to your own before asking the service.',
   'plant.service.pending': 'Asking the service for the answer to these questions',
   'plant.service.error_heading': 'The service did not answer',
   'plant.service.error.MALFORMED_JSON': 'The service could not read the request as JSON.',
@@ -283,9 +293,9 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.service.rain_not_applied': 'Heavier rain, {label}, not applied: {detail}',
   // PROPOSED (fix round 1 of S-021): heavier rain with a backend in example
   // mode, and a request that cannot be read.
-  'plant.service.rain_next_answer': 'Applies to the next answer from the service; the saved example answers have no stress test.',
+  'plant.service.rain_next_answer': 'Applies to the next answer from the service.',
   'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
-  // PROPOSED (S-031): the service's plant layer is not built.
+  // PROPOSED (S-031, R28 of S-035): the service's plant layer is not built.
   'plant.service.not_built_heading': 'The service has no plant answer yet',
   'plant.service.not_built_what': 'Answer from the service',
 }

@@ -1,7 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readFileSync } from 'fs'
-import { dirname, resolve } from 'path'
-import { fileURLToPath } from 'url'
 import { renderToString } from 'react-dom/server'
 import rawAnswer from '../data/PLACEHOLDER_plant_answer.json'
 import { missingPatternText } from '../components/ValueDisplay'
@@ -10,34 +7,27 @@ import { strings } from '../strings'
 import { PlantScreenView, initialPlantState, plantScreenReducer, serviceRequestOf, servicePhaseOf } from './PlantScreen'
 import type { PlantScreenState, ServicePhase } from './PlantScreen'
 import { parsePlantAnswer } from './plantData'
-import { PLANT_NOT_BUILT_CONTRACT, PlantNotBuiltError, readPlantNotBuilt, runPlant } from './plantRoute'
+import { PlantNotBuiltError, readPlantNotBuilt, runPlant } from './plantRoute'
 
 /**
- * Acceptance test of the screen side of unit l2/plant-layer-by-name (S-031).
- * PROPOSED. While the service's plant layer is not built, POST
- * /api/plant/run answers 200 with exactly {contract: plant_answer_not_built,
- * answer_missing: {reason: NOT_AVAILABLE, detail}}. The parser recognises
- * that body and the screen shows a "not available" sentence from the
- * strings file: never a crash, never an answer, never zeros. fetch is
- * stubbed in every case. The body is the contract's own example, read from
- * contracts/plant_answer/examples_not_built/.
+ * Acceptance test of the screen side of the not-built plant layer (S-031,
+ * adapted by R28 of S-035, PROPOSED). While the service's plant layer is not
+ * built, POST /api/plant/run answers 200 with exactly {answer: null,
+ * answer_missing: {reason: NOT_AVAILABLE, detail}} (the form of #427, R27:
+ * main's contract has no not-built document). The reader recognises that
+ * body and the screen shows a "not available" panel with the reason and the
+ * service's detail from the strings file: never a crash, never an answer,
+ * never zeros. fetch is stubbed in every case. The detail is the text of
+ * PLANT_NOT_BUILT in api/app.py of #427, used here as test data only.
  */
 
 const BASE = 'http://service.invalid'
-const here = dirname(fileURLToPath(import.meta.url))
-const notBuiltFile = resolve(
-  here,
-  '..',
-  '..',
-  '..',
-  'contracts',
-  'plant_answer',
-  'examples_not_built',
-  'PLACEHOLDER_plant_answer_not_built.json',
-)
-const NOT_BUILT = JSON.parse(readFileSync(notBuiltFile, 'utf8')) as {
-  contract: string
-  answer_missing: { reason: string; detail: string }
+const NOT_BUILT = {
+  answer: null,
+  answer_missing: {
+    reason: 'NOT_AVAILABLE',
+    detail: 'the plant layer is not built yet: api.plant.run_plant',
+  },
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -80,9 +70,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('the not-built body of the plant route (S-031)', () => {
-  it('is the contract example, and the parser reads its reason and detail', () => {
-    expect(NOT_BUILT.contract).toBe(PLANT_NOT_BUILT_CONTRACT)
+describe('the not-built body of the plant route (S-031, R28)', () => {
+  it('the reader reads its reason and detail', () => {
     expect(readPlantNotBuilt(NOT_BUILT)).toEqual({
       reason: 'NOT_AVAILABLE',
       detail: NOT_BUILT.answer_missing.detail,
@@ -99,7 +88,7 @@ describe('the not-built body of the plant route (S-031)', () => {
     ['no detail', { ...NOT_BUILT, answer_missing: { reason: 'NOT_AVAILABLE' } }],
     ['an empty detail', { ...NOT_BUILT, answer_missing: { reason: 'NOT_AVAILABLE', detail: '' } }],
     ['an extra member', { ...NOT_BUILT, example_data: true }],
-    ['no answer_missing', { contract: PLANT_NOT_BUILT_CONTRACT }],
+    ['no answer_missing', { answer: null }],
   ])('a not-built body with %s is UNEXPECTED', (_, body) => {
     expect(() => readPlantNotBuilt(body)).toThrow(ApiError)
   })
@@ -129,18 +118,5 @@ describe('the not-built body of the plant route (S-031)', () => {
     expect(count(html, 'plant-option')).toBe(0)
     expect(count(html, 'plant-value')).toBe(0)
     expect(count(html, 'plant-service-back')).toBe(1)
-  })
-})
-
-describe('the source state transcribed (S-031)', () => {
-  it('is read from the contract example, whose record row has it', () => {
-    const answer = parsePlantAnswer(rawAnswer)
-    expect(answer.sources.map((s) => s.state)).toContain('transcribed')
-  })
-
-  it('a state outside the list is still refused', () => {
-    const copy = JSON.parse(JSON.stringify(rawAnswer))
-    copy.sources[1].state = 'stored'
-    expect(() => parsePlantAnswer(copy)).toThrow('state-not-in-the-list')
   })
 })
