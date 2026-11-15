@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "9410a92-H8-test_a_missing_input_gives_missing_outputs_that_day_and_after-004",
+  "run_id": "run-20261115T122846Z-9410a92",
+  "test_code": "H8",
+  "expected": {
+    "missing_reason": "the entry H8 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/water/balance/test_bucket.py::test_a_missing_input_gives_missing_outputs_that_day_and_after[missing-ke]"
+  },
+  "notes": "Test engine/water/balance/test_bucket.py::test_a_missing_input_gives_missing_outputs_that_day_and_after[missing-ke]. Placed under H8: listed by name on the 'Test' line of entry H8 of docs/VALIDATION.md."
+}
