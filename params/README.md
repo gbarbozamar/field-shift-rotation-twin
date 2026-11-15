@@ -2,7 +2,7 @@
 
 Where crop and rotation parameters are stored, each with its unit, its uncertainty range, its citation, who transcribed it and the person who checked it.
 
-It holds the layout, the record format, the check that rejects a malformed record, and in `records/` the first parameters: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), checked by the lead developer under D34 and D66.
+It holds the layout, the record format, the check that rejects a malformed record, and in `records/` the first parameters: 93 records, all checked or declared by the lead developer under D34 and D66: the 26 records of the soil-loss value at the demonstration point La Estanzuela (unit l0/first-number), and in `records/computed_c/` the 67 records of the computed `C` (unit l0/c-records; D129, D131, D142 to D145).
 
 > **Status: PROPOSED.** The record format, the scope keys and the test cases below were written by a builder session (blueprint section 3.7). They take effect only when a person approves the pull request. Items marked `OPEN` need an answer from a person.
 

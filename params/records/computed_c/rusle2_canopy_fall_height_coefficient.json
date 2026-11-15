@@ -1,0 +1,16 @@
+{
+  "id": "rusle2_canopy_fall_height_coefficient",
+  "scope": {},
+  "value": 0.1,
+  "unit": "ft-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "USDA Agricultural Research Service (2013). Science Documentation: Revised Universal Soil Loss Equation Version 2 (RUSLE2). Washington, D.C.",
+    "locator": "Section 6.1 Canopy subfactor, Eq. 6.2, p. 138 (PDF p. 163)",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/RUSLE2_Science_Doc.pdf#page=163"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Verbatim: «c_c = 1 − f_ec exp(−0.1 h_f)» with «h_f = daily effective fall height (ft)». D144 of issue #77. Checked by the lead developer (gbarbozamar) in the session chat on 2026-11-15 against the page image (D34, D66)."
+}

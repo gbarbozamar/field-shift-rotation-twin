@@ -1,0 +1,16 @@
+{
+  "id": "rusle2_surface_cover_b_per_percent",
+  "scope": {},
+  "value": 0.04,
+  "unit": "percent-1",
+  "range": null,
+  "range_missing_reason": "A declared choice among printed values; no uncertainty range.",
+  "citation": {
+    "reference": "USDA Agricultural Research Service (2013). Science Documentation: Revised Universal Soil Loss Equation Version 2 (RUSLE2). Washington, D.C.",
+    "locator": "Section 6.2, pp. 141-142 (PDF pp. 166-167): b of Eq. 6.6",
+    "url": "https://www.ars.usda.gov/ARSUserFiles/60600505/RUSLE/RUSLE2_Science_Doc.pdf#page=167"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DECLARED by the lead developer (gbarbozamar) in the session chat on 2026-11-15 (D144 of issue #77), chosen among printed candidates (AH703 p. 159: 0.035 'for typical cropland erosion conditions'; S1: 0.031 mulch till, 0.04 no-till, 0.058 net). Verbatim S1 pp. 141-142: «the b values used in equation 6.6 as used in RUSLE1 were 0.031 for the mulch till systems and 0.04 for the no-till systems». S1 p. 141 defines b as «a coefficient (percent-1)». PC-1."
+}
