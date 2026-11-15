@@ -40,7 +40,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 | `contract` | `"plant_request"` | |
 | `example_data` | bool | |
 | `site` | `SiteReference`: `case_id`, `field_id`, `latitude` (-90 to 90), `longitude` (-180 to 180) | Copied as a contract model from `api/rotations.py` |
-| `rotations` | 3 to 5 `RotationDefinition` | Distinct `rotation_id`; each of the field of the site (PROPOSED); every crop a rotation sows is declared in `economic_facts` (PROPOSED) |
+| `rotations` | 3 to 5 `RotationDefinition` | Distinct `rotation_id`; each of the field of the site (PROPOSED); every crop a rotation sows is declared in `economic_facts` (PROPOSED); every rotation has the same `ag_year_start.month`, so the answer holds one kinds-of-year record (PROPOSED) |
 | `economic_facts` | `EconomicFacts` | Its `case_id` and `field_id` are those of the site |
 | `soil_loss_limit` | `Value` in `t ha-1 yr-1` | `DECLARED` when present, not negative; may be missing with its reason |
 | `questions` | `Questions` | See below |
@@ -49,7 +49,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 
 | Field | Type | Rule |
 |---|---|---|
-| `soybean_crop_ids` | list of text | Not empty, distinct; in the request each is a grain crop of the facts and is sown by at least one rotation (PROPOSED) |
+| `soybean_crop_ids` | list of text | Not empty, distinct; in the request each is a grain crop of the facts and is sown by at least one rotation (PROPOSED); the named crops do not carry different declared prices, as `find_tipping_price` refuses that, while a missing price is allowed and gives a tipping price missing `MISSING_INPUT` (PROPOSED) |
 | `soybean_price_range` | `low`, `high`, `unit` | `unit` is `USD t-1`; `0 <= low < high` |
 | `margin_of` | `"average"`, `"el_nino"`, `"neutral"`, `"la_nina"` | `MARGINS_OF` of `economics/tipping.py`: the kind-of-year question |
 | `rain_stress_factor` | `Value` in `dimensionless`, or null | null: no stress test. `DECLARED` and above zero when present; may be missing with its reason |
@@ -83,13 +83,13 @@ Rain stress, applied form: `factor`, `declared` (the declared `Value`, unchanged
 
 Kinds of year: `source` (the record id, `oni_v6`), `start_month`, `years` (each `ag_year`, `kind`, `missing_reason`, `detail`, `season`, `season_year`), `counts` (`el_nino`, `neutral`, `la_nina`: every count, or every count null when a year has no kind).
 
-A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its unit, or null with a reason code and a detail; never both, and never a zero standing for missing. The answer does not reuse `Value` for these items because the dataclasses it mirrors carry no provenance label or range (PROPOSED).
+A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its unit, or null with a reason code; never both, and never a zero standing for missing. Whether a `detail` must come with the reason follows the dataclass mirrored (PROPOSED, fix round 2): a margin (`MarginResult`) and a kind of year (`KindOfYear`) may carry a reason without a detail, and carry no detail when present; `KindMean` sets no rule on its detail; a limit check, a limit cost and a tipping point carry the reason and the detail together, as their dataclasses do. The answer does not reuse `Value` for these items because the dataclasses it mirrors carry no provenance label or range (PROPOSED).
 
 **Soil loss needs a source or the mark (PROPOSED).** A present soil-loss mean (`SoilLossOut`) with an empty `sources` list and `assumption` false is refused (C4.2). This is stricter than `KindMean`, which allows it, so the route must give every present soil-loss mean its sources or the assumption mark.
 
 ### Rules of the answer (model validators)
 
-- An item holds a value or a reason, never both; a missing value carries its reason and its detail.
+- An item holds a value or a reason, never both; a missing value carries its reason (the detail as its dataclass has it, above).
 - `chosen` is set exactly when the answer is `chosen`; `reason` and `detail` exactly when it is not; `tied` only when it is `not_resolved`.
 - Option ids are distinct; `chosen` and `tied` name options; the state `chosen` is on the chosen rotation and on no other.
 - Every option is judged against one limit; its `limit_check` is the check of `questions.strictness`; a state other than `chosen` is the verdict of that check; the chosen rotation meets the limit.
@@ -97,8 +97,12 @@ A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its u
 - `tipping_price.price_range` is the question's range; `takes_over` names an option.
 - `rain_stress` is null exactly when no factor was asked, the missing form when the factor is missing (same `missing` part), and the applied form carrying the declared factor otherwise.
 - The kind counts are the years of each kind, or all null when a year has no kind.
+- As `choose_rotation` (PROPOSED, fix round 2): `none_meets` only when every option is in state `does_not_meet`; `tied`, when not empty, holds at least two distinct options, each in state `meets`.
+- As `assess_limit` (PROPOSED, fix round 2): `kinds_not_met` is exactly the kinds in the record (not in `kinds_not_in_record`) whose `by_kind` check is `does_not_meet`, and `kinds_not_resolved` those whose check is `not_resolved`, so the three lists are disjoint; the check of a kind not in the record is `not_resolved`; with `limit` null no check is resolved; `every_kind` is `does_not_meet` when a kind in the record does not meet, else `not_resolved` when one is not resolved or no kind is in the record, else `meets`.
+- As `find_tipping_price` (PROPOSED, fix round 2): a shared `reason` (with its `detail`) is on both points, which have no price; with no shared reason `today` is present and inside `price_range`; a present tipping price is inside `price_range`; `up.price` is at or above `today` and `down.price` at or below it; `distance_percent` is not negative up and not positive down (0 allowed).
+- `sources`: the text fields are plain text, as in `SourceOut` of `api/rotations.py`, and `retrieved_at` is written in UTC as `YYYY-MM-DDTHH:MM:SSZ`, as that model writes it (PROPOSED, fix round 2).
 
-`check_answer_against_request(request, answer)` (PROPOSED) holds the checks that need both: the same field, the same questions, one option per rotation in request order, and every option judged against the declared limit. It raises `ValueError`.
+`check_answer_against_request(request, answer)` (PROPOSED) holds the checks that need both: the same field, the same questions, one option per rotation in request order, and every option judged against the declared limit; and (PROPOSED, fix round 2) `example_data` true when the request's is, `tipping_price.today` equal to the declared price of the soybean crops (null when one of them has no price, as `find_tipping_price` reads it), and `kinds_of_year.start_month` equal to the rotations' `ag_year_start.month`. It raises `ValueError`.
 
 ## PROPOSED cases
 
@@ -126,6 +130,8 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `request-soil-loss-limit-not-declared` | The limit is labelled `OBSERVED` |
 | `request-rain-stress-factor-zero` | The factor is zero |
 | `request-rain-stress-factor-with-a-unit` | The factor is in `mm` |
+| `request-soybean-crops-with-different-prices` | Two named soybean crops carry the prices 400 and 410 (example numbers) |
+| `request-rotations-with-different-start-months` | One rotation starts its agricultural year in month 8, the others in month 7 |
 
 ### Rejected: the answer
 
@@ -153,6 +159,21 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `answer-kind-counts-not-the-years` | A count is not the number of years of that kind |
 | `answer-soil-loss-n-years-not-the-years` | `n_years` is not the number of `ag_years` |
 | `answer-limit-kind-not-in-the-list` | `kinds_not_met` names `"dry"` |
+| `answer-tied-with-one-rotation` | Not resolved with one tied rotation |
+| `answer-tied-rotation-not-in-state-meets` | A tied rotation is in state `not_resolved` |
+| `answer-none-meets-with-an-option-that-meets` | `none_meets` while an option is in state `meets` |
+| `answer-kind-of-year-present-with-a-detail` | A year with a kind carries a missing detail |
+| `answer-present-margin-with-a-detail` | A present margin carries a missing detail |
+| `answer-tipping-up-below-today` | The up tipping price is below today's price |
+| `answer-tipping-price-outside-the-range` | The down tipping price is below the low end of the range |
+| `answer-tipping-distance-sign-not-the-direction` | The down distance is positive |
+| `answer-tipping-today-missing-without-a-reason` | Today's price is null with no shared reason |
+| `answer-tipping-shared-reason-not-on-both-points` | A shared reason while the down point has a price |
+| `answer-limit-kinds-not-met-not-the-checks` | `kinds_not_met` leaves out a kind whose check does not meet |
+| `answer-limit-kind-not-in-the-record-and-not-met` | A kind is both in `kinds_not_in_record` and in `kinds_not_met` |
+| `answer-limit-kind-not-in-the-record-with-a-resolved-check` | A kind not in the record has a resolved check |
+| `answer-limit-missing-with-a-resolved-check` | The limit is null and checks are resolved |
+| `answer-limit-every-kind-not-the-kinds` | `every_kind` meets while a kind does not meet |
 
 ### Rejected: an answer to another request (`check_answer_against_request`)
 
@@ -161,6 +182,9 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `answer-options-not-in-request-order` | The options are in reverse order |
 | `answer-of-another-field` | The answer is of another field |
 | `answer-questions-not-those-of-the-request` | The echoed `margin_of` differs from the request |
+| `answer-not-example-data-to-an-example-request` | The answer to an example request says `example_data` false |
+| `answer-tipping-today-not-the-declared-price` | `tipping_price.today` is not the declared soybean price |
+| `answer-start-month-not-the-rotations` | `kinds_of_year.start_month` is not the rotations' start month |
 
 ### Accepted
 
@@ -168,7 +192,11 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 |---|---|
 | `accepted-request-with-five-rotations` | Five rotations |
 | `accepted-request-soil-loss-limit-missing` | The limit is missing `NOT_DECLARED` |
-| `accepted-answer-not-resolved-with-tied` | Not resolved with two tied rotations and a missing limit cost |
+| `accepted-answer-not-resolved-with-tied` | Not resolved with two tied rotations, both in state `meets`, and a missing limit cost |
+| `accepted-answer-none-meets` | `none_meets` with every option in state `does_not_meet` |
+| `accepted-answer-margin-missing-without-a-detail` | A margin missing `MISSING_INPUT` with no detail, as `MarginResult` allows |
+| `accepted-answer-kind-of-year-missing-without-a-detail` | A year missing `NO_COVERAGE` with no detail, as `KindOfYear` allows; every count null |
+| `accepted-request-soybean-price-missing` | The soybean price is missing `NOT_DECLARED` |
 | `accepted-answer-without-a-rain-stress-test` | No factor asked, no echo |
 | `accepted-answer-rain-stress-factor-missing` | The factor is missing `NOT_DECLARED`, echoed in the missing form |
 | `accepted-answer-not-example-data` | `example_data` is false (a real answer) |
@@ -177,7 +205,8 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 
 - Both examples load, dump and load back unchanged, and the answer example answers the request example.
 - Both examples say `example_data: true`; a test shows the check refuses `false`.
-- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`).
+- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`; `SiteReference` that of `api/rotations.py`).
+- `retrieved_at` is written in UTC with a `Z`, exactly as `SourceOut` of `api/rotations.py` writes it, and reads back.
 - The answer example shows one chosen rotation, one that does not meet the limit, a missing value and a tipping price.
 
 ## OPEN

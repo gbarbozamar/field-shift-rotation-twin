@@ -193,9 +193,159 @@ INVALID_REQUEST: list[tuple[str, Mutation, str]] = [
         put(["questions", "rain_stress_factor", "unit"], "mm"),
         "dimensionless",
     ),
+    (
+        "request-soybean-crops-with-different-prices",
+        both(
+            lambda d: d["economic_facts"]["crops"].append(
+                {
+                    **copy.deepcopy(d["economic_facts"]["crops"][0]),
+                    "crop_id": "PLACEHOLDER_soybean_2",
+                }
+            ),
+            put(["economic_facts", "crops", 3, "price", "value"], 410.0),
+            put(
+                ["questions", "soybean_crop_ids"],
+                ["PLACEHOLDER_soybean", "PLACEHOLDER_soybean_2"],
+            ),
+        ),
+        "these carry different prices",
+    ),
+    (
+        "request-rotations-with-different-start-months",
+        put(["rotations", 2, "ag_year_start", "month"], 8),
+        "the same ag_year_start month",
+    ),
 ]
 
+MISSING_COST = {
+    "value": None,
+    "against": None,
+    "costs_nothing": False,
+    "reason": "NOT_COMPUTABLE",
+    "detail": "example detail: no rotation is chosen",
+    "unit": "USD ha-1 yr-1",
+}
+MEETS = {"verdict": "meets", "reason": None, "detail": None}
+
+# Nothing chosen: the answer is not resolved, the chosen option only meets.
+NOTHING_CHOSEN = both(
+    put(["answer"], "not_resolved"),
+    put(["chosen"], None),
+    put(["reason"], "NOT_COMPUTABLE"),
+    put(["detail"], "example detail: the data cannot separate these"),
+    put([*CHOSEN, "state"], "meets"),
+    put(["limit_cost"], MISSING_COST),
+)
+# The option not resolved meets the limit on average instead, so it can tie.
+UNRESOLVED_MEETS = both(
+    put([*UNRESOLVED, "limit", "on_average"], MEETS),
+    put([*UNRESOLVED, "limit_check"], MEETS),
+    put([*UNRESOLVED, "state"], "meets"),
+)
+BOTH_THAT_MEET = [
+    "example-rotation-soybean-cover",
+    "example-rotation-soybean-cover-pasture",
+]
+TIPPING_UP_AT = {
+    "direction": "up",
+    "price": 300.0,
+    "takes_over": None,
+    "answer_after": "not_resolved",
+    "distance_percent": 5.0,
+    "reason": None,
+    "detail": None,
+    "unit": "USD t-1",
+}
+
 INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
+    (
+        "answer-tied-with-one-rotation",
+        both(NOTHING_CHOSEN, put(["tied"], ["example-rotation-soybean-cover"])),
+        "at least two rotations",
+    ),
+    (
+        "answer-tied-rotation-not-in-state-meets",
+        both(NOTHING_CHOSEN, put(["tied"], BOTH_THAT_MEET)),
+        "every tied rotation is an option in state meets",
+    ),
+    (
+        "answer-none-meets-with-an-option-that-meets",
+        both(
+            NOTHING_CHOSEN,
+            put(["answer"], "none_meets"),
+            put(["reason"], "NOT_APPLICABLE"),
+        ),
+        "every option is in state does_not_meet",
+    ),
+    (
+        "answer-kind-of-year-present-with-a-detail",
+        put(["kinds_of_year", "years", 0, "detail"], "example detail"),
+        "a present kind carries no missing detail",
+    ),
+    (
+        "answer-present-margin-with-a-detail",
+        put([*CHOSEN, "margin", "average", "detail"], "example detail"),
+        "a present margin carries no missing detail",
+    ),
+    (
+        "answer-tipping-up-below-today",
+        put(["tipping_price", "up"], TIPPING_UP_AT),
+        "up.price is at or above today",
+    ),
+    (
+        "answer-tipping-price-outside-the-range",
+        both(
+            put(["tipping_price", "down", "price"], 150.0),
+            put(["tipping_price", "down", "distance_percent"], -62.5),
+        ),
+        "a tipping price is inside the range",
+    ),
+    (
+        "answer-tipping-distance-sign-not-the-direction",
+        put(["tipping_price", "down", "distance_percent"], 6.0),
+        "not negative up and not positive down",
+    ),
+    (
+        "answer-tipping-today-missing-without-a-reason",
+        put(["tipping_price", "today"], None),
+        "a missing today's price carries a reason and a detail",
+    ),
+    (
+        "answer-tipping-shared-reason-not-on-both-points",
+        both(
+            put(["tipping_price", "reason"], "MISSING_INPUT"),
+            put(["tipping_price", "detail"], "example detail"),
+        ),
+        "a shared reason is on both points",
+    ),
+    (
+        "answer-limit-kinds-not-met-not-the-checks",
+        put([*NOT_MET, "limit", "kinds_not_met"], ["el_nino", "neutral"]),
+        "kinds_not_met are the kinds in the record",
+    ),
+    (
+        "answer-limit-kind-not-in-the-record-and-not-met",
+        put([*NOT_MET, "limit", "kinds_not_in_record"], ["la_nina"]),
+        "kinds_not_met are the kinds in the record",
+    ),
+    (
+        "answer-limit-kind-not-in-the-record-with-a-resolved-check",
+        both(
+            put([*NOT_MET, "limit", "kinds_not_in_record"], ["la_nina"]),
+            put([*NOT_MET, "limit", "kinds_not_met"], ["el_nino", "neutral"]),
+        ),
+        "the check of a kind not in the record is not resolved",
+    ),
+    (
+        "answer-limit-missing-with-a-resolved-check",
+        put([*NOT_MET, "limit", "limit"], None),
+        "with no limit, no check is resolved",
+    ),
+    (
+        "answer-limit-every-kind-not-the-kinds",
+        put([*CHOSEN, "limit", "every_kind"], MEETS),
+        "every_kind is does_not_meet when a kind",
+    ),
     (
         "answer-missing-margin-written-as-zero-with-a-reason",
         both(
@@ -318,26 +468,39 @@ INVALID_ANSWER: list[tuple[str, Mutation, str]] = [
 VALID_ANSWER: list[tuple[str, Mutation]] = [
     (
         "accepted-answer-not-resolved-with-tied",
+        both(NOTHING_CHOSEN, UNRESOLVED_MEETS, put(["tied"], BOTH_THAT_MEET)),
+    ),
+    (
+        "accepted-answer-none-meets",
         both(
-            put(["answer"], "not_resolved"),
-            put(["chosen"], None),
-            put(["reason"], "NOT_COMPUTABLE"),
-            put(["detail"], "example detail: the data cannot separate these"),
+            NOTHING_CHOSEN,
+            put(["answer"], "none_meets"),
+            put(["reason"], "NOT_APPLICABLE"),
+            put([*CHOSEN, "limit", "on_average", "verdict"], "does_not_meet"),
+            put([*CHOSEN, "limit_check", "verdict"], "does_not_meet"),
+            put([*CHOSEN, "state"], "does_not_meet"),
+            put([*UNRESOLVED, "limit", "on_average"], MEETS),
+            put([*UNRESOLVED, "limit", "on_average", "verdict"], "does_not_meet"),
+            put([*UNRESOLVED, "limit_check"], MEETS),
+            put([*UNRESOLVED, "limit_check", "verdict"], "does_not_meet"),
+            put([*UNRESOLVED, "state"], "does_not_meet"),
+        ),
+    ),
+    (
+        "accepted-answer-margin-missing-without-a-detail",
+        both(
+            put([*UNRESOLVED, "margin", "la_nina", "value"], None),
+            put([*UNRESOLVED, "margin", "la_nina", "reason"], "MISSING_INPUT"),
+        ),
+    ),
+    (
+        "accepted-answer-kind-of-year-missing-without-a-detail",
+        both(
+            put(["kinds_of_year", "years", -1, "kind"], None),
+            put(["kinds_of_year", "years", -1, "missing_reason"], "NO_COVERAGE"),
             put(
-                ["tied"],
-                ["example-rotation-soybean-cover", "example-rotation-soybean"],
-            ),
-            put([*CHOSEN, "state"], "meets"),
-            put(
-                ["limit_cost"],
-                {
-                    "value": None,
-                    "against": None,
-                    "costs_nothing": False,
-                    "reason": "NOT_COMPUTABLE",
-                    "detail": "example detail: no rotation is chosen",
-                    "unit": "USD ha-1 yr-1",
-                },
+                ["kinds_of_year", "counts"],
+                {"el_nino": None, "neutral": None, "la_nina": None},
             ),
         ),
     ),
@@ -385,6 +548,13 @@ VALID_REQUEST: list[tuple[str, Mutation]] = [
                 "unit": "t ha-1 yr-1",
                 "missing": {"reason": "NOT_DECLARED"},
             },
+        ),
+    ),
+    (
+        "accepted-request-soybean-price-missing",
+        put(
+            ["economic_facts", "crops", 0, "price"],
+            {"value": None, "unit": "USD t-1", "missing": {"reason": "NOT_DECLARED"}},
         ),
     ),
 ]
@@ -521,6 +691,33 @@ def test_answer_fields_mirror_the_dataclasses() -> None:
     assert set(m.RainStressMissingOut.model_fields) == names(RainStressMissing)
     assert set(m.SourceOut.model_fields) == set(SourceOut.model_fields)
 
+    from api.rotations import SiteReference
+
+    assert set(m.SiteReference.model_fields) == set(SiteReference.model_fields)
+
+
+def test_retrieved_at_is_written_in_utc_as_api_writes_it() -> None:
+    from api.rotations import SourceOut as ApiSourceOut
+
+    from .plant_answer import SourceOut
+
+    row = {
+        "id": "example_source",
+        "contract": "results",
+        "state": "cached",
+        "retrieved_at": "2026-11-15T10:30:00+02:00",
+        "time_zone": None,
+        "request": None,
+        "attribution": None,
+        "missing_reason": None,
+        "detail": None,
+    }
+    ours = SourceOut.model_validate(row).model_dump(mode="json")
+    assert ours["retrieved_at"] == "2026-11-15T08:30:00Z"
+    assert ours == ApiSourceOut.model_validate(row).model_dump(mode="json")
+    # What it writes reads back into an equal row.
+    assert SourceOut.model_validate(ours) == SourceOut.model_validate(row)
+
 
 # --- Invalid and valid variants ----------------------------------------------
 
@@ -592,6 +789,21 @@ AGAINST_REQUEST: list[tuple[str, Mutation, str]] = [
         "answer-questions-not-those-of-the-request",
         put(["questions", "margin_of"], "la_nina"),
         "the questions of the request",
+    ),
+    (
+        "answer-not-example-data-to-an-example-request",
+        put(["example_data"], False),
+        "example_data is true when the request's is",
+    ),
+    (
+        "answer-tipping-today-not-the-declared-price",
+        put(["tipping_price", "today"], 390.0),
+        "the declared soybean price",
+    ),
+    (
+        "answer-start-month-not-the-rotations",
+        put(["kinds_of_year", "start_month"], 8),
+        "the rotations' ag_year_start month",
     ),
 ]
 

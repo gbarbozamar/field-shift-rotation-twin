@@ -26,7 +26,13 @@ import datetime as dt
 from collections.abc import Callable
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import AfterValidator, Field, FiniteFloat, model_validator
+from pydantic import (
+    AfterValidator,
+    Field,
+    FiniteFloat,
+    field_serializer,
+    model_validator,
+)
 
 from contracts.economic_facts import (
     KINDS_OF_YEAR,
@@ -214,6 +220,28 @@ class PlantRequest(ContractModel):
                     "questions.soybean_crop_ids: each is a grain crop of the "
                     "economic facts"
                 )
+        # PROPOSED (fix round 2): find_tipping_price refuses soybean crops
+        # whose declared prices differ (one soybean price is asked). A missing
+        # price is allowed: the tipping price is then missing MISSING_INPUT.
+        prices = {
+            crop.price.value
+            for crop in self.economic_facts.crops
+            if crop.crop_id in self.questions.soybean_crop_ids
+            and isinstance(crop, GrainCrop)
+            and crop.price.value is not None
+        }
+        if len(prices) > 1:
+            raise ValueError(
+                "questions.soybean_crop_ids: the named crops carry one declared "
+                "price; these carry different prices"
+            )
+        # PROPOSED (fix round 2): one start month of the agricultural year for
+        # every rotation, so the answer holds one kinds_of_year record.
+        months = {rotation.ag_year_start.month for rotation in self.rotations}
+        if len(months) > 1:
+            raise ValueError(
+                "rotations: every rotation has the same ag_year_start month"
+            )
         # PROPOSED (fix round 1): every crop a rotation sows has its economic
         # facts, else its margin could only be missing.
         declared = {crop.crop_id for crop in self.economic_facts.crops}
@@ -242,14 +270,12 @@ class PlantRequest(ContractModel):
 # --- Value-or-missing items of the answer ----------------------------------------
 
 
-def _one_of(value: object, reason: object, detail: object, what: str) -> None:
-    """C3.1: a value, or null with a reason and a detail; never both."""
+def _one_of(value: object, reason: object, what: str) -> None:
+    """C3.1: a value, or null with a reason; never both, never neither."""
     if value is not None and reason is not None:
         raise ValueError(f"{what}: a value or a reason, never both (C3.1)")
     if value is None and reason is None:
         raise ValueError(f"{what}: a missing value carries its reason (C3.1)")
-    if (reason is None) != (detail is None):
-        raise ValueError(f"{what}: a reason travels with its detail, and only then")
 
 
 class MarginOut(ContractModel):
@@ -264,7 +290,11 @@ class MarginOut(ContractModel):
     def _rules(self) -> Self:
         if self.unit != MARGIN_UNIT:
             raise ValueError(f"margin: the unit is {MARGIN_UNIT!r} (C1.1)")
-        _one_of(self.value, self.reason, self.detail, "margin")
+        # As MarginResult: a reason may come without a detail; a detail only
+        # with a reason.
+        _one_of(self.value, self.reason, "margin")
+        if self.reason is None and self.detail is not None:
+            raise ValueError("margin: a present margin carries no missing detail")
         return self
 
 
@@ -291,7 +321,8 @@ class SoilLossOut(ContractModel):
     def _rules(self) -> Self:
         if self.unit != UNIT_SOIL_LOSS_ANNUAL:
             raise ValueError(f"soil loss: the unit is {UNIT_SOIL_LOSS_ANNUAL!r} (C1.2)")
-        _one_of(self.value, self.reason, self.detail, "soil loss")
+        # As KindMean: a value or a reason; KindMean sets no rule on detail.
+        _one_of(self.value, self.reason, "soil loss")
         if self.ag_years != sorted(set(self.ag_years)):
             raise ValueError("soil loss: ag_years are sorted and unique")
         if self.n_years != len(self.ag_years):
@@ -368,6 +399,47 @@ class LimitAssessmentOut(ContractModel):
             raise ValueError(f"limit: the unit is {UNIT_SOIL_LOSS_ANNUAL!r} (C1.2)")
         for name in ("kinds_not_met", "kinds_not_resolved", "kinds_not_in_record"):
             _kinds(getattr(self, name), name)
+        # PROPOSED (fix round 2): the lists are what assess_limit gives from
+        # by_kind: the kinds in the record whose check does not meet, and
+        # those not resolved; a kind not in the record is in neither, and
+        # its check is not resolved (its level has no value).
+        verdict = {k: getattr(self.by_kind, k).verdict for k in KINDS_OF_YEAR}
+        out = self.kinds_not_in_record
+        in_record = [k for k in KINDS_OF_YEAR if k not in out]
+        not_met = [k for k in in_record if verdict[k] == "does_not_meet"]
+        unresolved = [k for k in in_record if verdict[k] == "not_resolved"]
+        if self.kinds_not_met != not_met:
+            raise ValueError(
+                "limit: kinds_not_met are the kinds in the record whose check "
+                "does not meet"
+            )
+        if self.kinds_not_resolved != unresolved:
+            raise ValueError(
+                "limit: kinds_not_resolved are the kinds in the record whose "
+                "check is not resolved"
+            )
+        if any(verdict[k] != "not_resolved" for k in out):
+            raise ValueError(
+                "limit: the check of a kind not in the record is not resolved"
+            )
+        if self.limit is None and (
+            self.on_average.verdict != "not_resolved"
+            or self.every_kind.verdict != "not_resolved"
+            or any(v != "not_resolved" for v in verdict.values())
+        ):
+            raise ValueError("limit: with no limit, no check is resolved")
+        if not_met:
+            expected = "does_not_meet"
+        elif unresolved or not in_record:
+            expected = "not_resolved"
+        else:
+            expected = "meets"
+        if self.every_kind.verdict != expected:
+            raise ValueError(
+                "limit: every_kind is does_not_meet when a kind in the record does "
+                "not meet, else not_resolved when one is not resolved or none is "
+                "in the record, else meets"
+            )
         return self
 
 
@@ -474,6 +546,41 @@ class TippingPriceOut(ContractModel):
             raise ValueError("tipping price: a reason travels with its detail")
         if self.up.direction != "up" or self.down.direction != "down":
             raise ValueError("tipping price: up looks up and down looks down")
+        # PROPOSED (fix round 2), as find_tipping_price builds it.
+        if self.reason is not None:
+            # A shared cause: both points missing with it.
+            for point in (self.up, self.down):
+                if point.price is not None or (point.reason, point.detail) != (
+                    self.reason,
+                    self.detail,
+                ):
+                    raise ValueError(
+                        "tipping price: a shared reason is on both points, which "
+                        "have no price"
+                    )
+        elif self.today is None:
+            raise ValueError(
+                "tipping price: a missing today's price carries a reason and a detail"
+            )
+        elif not self.price_range.low <= self.today <= self.price_range.high:
+            raise ValueError(
+                "tipping price: today's price outside the range carries a reason"
+            )
+        for point in (self.up, self.down):
+            if point.price is not None and not (
+                self.price_range.low <= point.price <= self.price_range.high
+            ):
+                raise ValueError("tipping price: a tipping price is inside the range")
+        if self.today is not None:
+            if self.up.price is not None and self.up.price < self.today:
+                raise ValueError("tipping price: up.price is at or above today")
+            if self.down.price is not None and self.down.price > self.today:
+                raise ValueError("tipping price: down.price is at or below today")
+        up, down = self.up.distance_percent, self.down.distance_percent
+        if (up is not None and up < 0) or (down is not None and down > 0):
+            raise ValueError(
+                "tipping price: the distance is not negative up and not positive down"
+            )
         return self
 
 
@@ -525,8 +632,9 @@ class YearKind(ContractModel):
             raise ValueError("kind of year: a kind or a missing_reason, never both")
         if self.kind is not None and self.kind not in KINDS_OF_YEAR:
             raise ValueError(f"kind of year: one of KINDS_OF_YEAR {KINDS_OF_YEAR}")
-        if (self.missing_reason is None) != (self.detail is None):
-            raise ValueError("kind of year: a detail exactly with a missing_reason")
+        # As KindOfYear: a missing kind may come without a detail.
+        if self.kind is not None and self.detail is not None:
+            raise ValueError("kind of year: a present kind carries no missing detail")
         return self
 
 
@@ -573,16 +681,17 @@ class KindsOfYearRecord(ContractModel):
 class SourceOut(ContractModel):
     """One source of the answer, the shape of ``SourceOut`` of api/rotations.py."""
 
-    id: NonEmptyStr
-    contract: NonEmptyStr
+    # PROPOSED (fix round 2): the text fields are plain text, as in api/.
+    id: str
+    contract: str
     state: Literal["fresh", "cached", "unavailable", "example"]
     # strict=False: a JSON text is read as a date and time.
     retrieved_at: Annotated[dt.datetime, Field(strict=False)] | None
-    time_zone: NonEmptyStr | None
+    time_zone: str | None
     request: dict[str, Any] | None
-    attribution: NonEmptyStr | None
+    attribution: str | None
     missing_reason: ReasonCode | None
-    detail: NonEmptyStr | None
+    detail: str | None
 
     @model_validator(mode="after")
     def _rules(self) -> Self:
@@ -591,6 +700,13 @@ class SourceOut(ContractModel):
         if self.retrieved_at is not None and self.retrieved_at.utcoffset() is None:
             raise ValueError(f"source {self.id!r}: retrieved_at has no time zone")
         return self
+
+    @field_serializer("retrieved_at")
+    def _utc(self, value: dt.datetime | None) -> str | None:
+        """As ``SourceOut`` of api/rotations.py: UTC, ``YYYY-MM-DDTHH:MM:SSZ``."""
+        if value is None:
+            return None
+        return value.astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # --- The answer ------------------------------------------------------------------
@@ -645,6 +761,22 @@ class PlantAnswer(ContractModel):
             )
         if self.tied and self.answer != "not_resolved":
             raise ValueError("tied rotations only when the answer is not resolved")
+        # PROPOSED (fix round 2), as choose_rotation: none_meets only when
+        # every option does not meet the limit.
+        if self.answer == "none_meets" and any(
+            option.state != "does_not_meet" for option in self.options
+        ):
+            raise ValueError("none_meets: every option is in state does_not_meet")
+        # As choose_rotation: tied rotations are at least two, and meet the
+        # limit with the same margin.
+        if self.tied:
+            if len(self.tied) < 2:
+                raise ValueError("tied: at least two rotations")
+            states = {option.rotation_id: option.state for option in self.options}
+            if any(states.get(rotation_id) != "meets" for rotation_id in self.tied):
+                raise ValueError(
+                    "tied: every tied rotation is an option in state meets"
+                )
         return self
 
     @model_validator(mode="after")
@@ -721,8 +853,9 @@ class PlantAnswer(ContractModel):
 def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> None:
     """The answer is an answer to this request. PROPOSED.
 
-    Raises ``ValueError`` when the field, the questions or the options (one per
-    rotation, in request order) differ. Checks that need both, so no model
+    Raises ``ValueError`` when the field, the questions, the options (one per
+    rotation, in request order), the limit, the example mark, today's price or
+    the start month differ. Checks that need both, so no model
     validator can hold them.
     """
     if (answer.case_id, answer.field_id) != (
@@ -739,3 +872,25 @@ def check_answer_against_request(request: PlantRequest, answer: PlantAnswer) -> 
     limit = request.soil_loss_limit.value
     if any(option.limit.limit != limit for option in answer.options):
         raise ValueError("answer: every option is judged against the declared limit")
+    # PROPOSED (fix round 2): an answer to example data is example data.
+    if request.example_data and not answer.example_data:
+        raise ValueError("answer: example_data is true when the request's is")
+    # PROPOSED (fix round 2): today's price is the declared soybean price, or
+    # null when one named crop has no price (as find_tipping_price reads it).
+    prices = [
+        crop.price.value
+        for crop in request.economic_facts.crops
+        if crop.crop_id in request.questions.soybean_crop_ids
+        and isinstance(crop, GrainCrop)
+    ]
+    today = None if None in prices else prices[0]
+    if answer.tipping_price.today != today:
+        raise ValueError(
+            "answer: tipping_price.today is the declared soybean price, or null "
+            "when it is missing"
+        )
+    months = {rotation.ag_year_start.month for rotation in request.rotations}
+    if {answer.kinds_of_year.start_month} != months:
+        raise ValueError(
+            "answer: kinds_of_year.start_month is the rotations' ag_year_start month"
+        )
