@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderToString } from 'react-dom/server'
 import App from './App'
 import { exampleCase } from './identity/exampleCase'
@@ -16,7 +17,13 @@ vi.mock('./map/FieldsMap', () => ({
 /** Render the app shell at the given URL hash (stubbed, node has no window). */
 function renderAppAtHash(hash: string): string {
   vi.stubGlobal('window', { location: { hash } })
-  return renderToString(<App />)
+  // The query client comes from the shell in main.tsx; this standalone
+  // render provides one, as the app does, for the screens that use it.
+  return renderToString(
+    <QueryClientProvider client={new QueryClient()}>
+      <App />
+    </QueryClientProvider>,
+  )
 }
 
 describe('App routing', () => {

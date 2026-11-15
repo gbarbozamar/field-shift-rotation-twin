@@ -27,6 +27,7 @@
  *                clock, water clock, year columns), Block 2 addendum
  * - cards.*      the results cards (title, rotation heading, availability
  *                heading, carbon model and computation labels)
+ * - seam.*       the platform-route seam (live-data label), Block 4 addendum
  *
  * Values are supplied wording; they are not to be changed here.
  * Placeholders in braces ({source}, {route}, {reason phrase}, ...) are filled
@@ -116,6 +117,7 @@ export const strings = {
   'clocks.water': 'The water clock',
   'clocks.years_hint': 'Each column is one agricultural year',
   'clocks.example_note': 'Example data — real years arrive with the seam',
+  'seam.with_real_data': 'Live data — NASA POWER through the platform route',
 } as const
 
 /**
