@@ -29,12 +29,24 @@
     {
       "rotation_id": "PLACEHOLDER_rotation_a",
       "scenario_id": "PLACEHOLDER_scenario_one",
-      "time_basis": "rotation",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
       "indicator": "water_deficit_exposure",
       "direction": "higher_is_better",
       "value": null,
       "unit": "dimensionless",
-      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"}
+      "missing": {"reason": "MISSING_INPUT", "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2001, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_a",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "ag_year",
+      "ag_year": 2002,
+      "indicator": "water_deficit_exposure",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "dimensionless",
+      "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does, so the daily water balance does not cover it; coverage is checked before any missing parameter"}
     },
     {
       "rotation_id": "PLACEHOLDER_rotation_a",
@@ -89,12 +101,24 @@
     {
       "rotation_id": "PLACEHOLDER_rotation_b",
       "scenario_id": "PLACEHOLDER_scenario_one",
-      "time_basis": "rotation",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
       "indicator": "water_deficit_exposure",
       "direction": "higher_is_better",
       "value": null,
       "unit": "dimensionless",
-      "missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"}
+      "missing": {"reason": "MISSING_INPUT", "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2001, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"}
+    },
+    {
+      "rotation_id": "PLACEHOLDER_rotation_b",
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "time_basis": "ag_year",
+      "ag_year": 2002,
+      "indicator": "water_deficit_exposure",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "dimensionless",
+      "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER detail: the example series ends before this agricultural year does, so the daily water balance does not cover it; coverage is checked before any missing parameter"}
     },
     {
       "rotation_id": "PLACEHOLDER_rotation_b",
