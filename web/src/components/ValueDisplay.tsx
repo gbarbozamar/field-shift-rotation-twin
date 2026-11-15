@@ -154,7 +154,7 @@ export function missingPattern(what: string, missing: MissingPart): string {
  * (D80): the value that travels is never rounded — the exact number stays
  * in the item and in the element, for inspection.
  */
-function displayNumber(value: number): string {
+export function displayNumber(value: number): string {
   return value
     .toFixed(3)
     .replace(/(\.\d*?)0+$/, '$1')
