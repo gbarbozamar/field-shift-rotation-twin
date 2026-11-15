@@ -10,6 +10,14 @@ crops and the month and day of the two rotations of the demonstration (D128,
 row USER-AP of D72), on PLACEHOLDER years. The catalogue is the one of the
 repository (``params/records/``). No number is asserted.
 
+The test of the wind bound of D82 (PC-4) uses a PLACEHOLDER test catalogue:
+the repository's, with the record of ``penman_monteith_minimum_wind_speed``
+replaced by a test record marked PLACEHOLDER whose value is not the one of
+FAO-56. The readers of ``params.catalogue`` refuse a record with that word,
+so the test passes the in-memory copy in which it is replaced by
+``UNMARKED_TEST_ONLY``, as ``engine/water/test_exposure.py`` does (question
+12 of ``params/README.md``). No constant of the method is written here.
+
 Run from the repository root: ``python -m pytest engine/water/test_reference_et0.py``.
 """
 
@@ -32,6 +40,8 @@ from engine.water import (
     daily_reference_evapotranspiration,
 )
 from engine.water import exposure as ep3
+from engine.water import reference_et0 as public_module
+from engine.water.et0.daily import WIND_SPEED_BOUND
 from params.catalogue import load_folder
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -174,6 +184,127 @@ def test_an_empty_catalogue_names_the_records_as_ep3_does(monkeypatch):
         monkeypatch, calendar("wheat-soybean-maize", climate_), climate_, {}
     )
     assert_same(daily_reference_evapotranspiration(climate_, parameters={}), of_ep3)
+
+
+# --- the wind bound of D82 (PC-4), on a PLACEHOLDER test catalogue ----------
+
+MARK = "PLACEHOLDER"
+UNMARKED = "UNMARKED_TEST_ONLY"
+WIND_BOUND_RECORD = ep3.ET0_BOUND_PARAMETERS["wind_speed_bound"]["lower_bound"]
+
+
+def example_winds(climate_: SiteClimate) -> list[float]:
+    """The numbers of the wind series of the example climate."""
+    (series,) = [s for s in climate_.daily_series if s.quantity == "wind_speed_2m"]
+    return [day.value for day in series.days if day.missing is None]
+
+
+def unmarked(item: Any) -> Any:
+    """The in-memory copy in which the word PLACEHOLDER is replaced."""
+    return json.loads(json.dumps(item).replace(MARK, UNMARKED))
+
+
+def catalogue_with_wind_bound(value: float) -> dict[str, dict]:
+    """The repository's catalogue, its wind-bound record replaced by a test record.
+
+    ``value`` is a test placeholder, never the value of FAO-56; the record
+    says so with the word PLACEHOLDER, and the unmarked copy is returned.
+    """
+    records = {
+        key: record
+        for key, record in repository_catalogue().items()
+        if record.get("id") != WIND_BOUND_RECORD
+    }
+    assert len(records) == len(repository_catalogue()) - 1
+    test_record = {
+        "id": WIND_BOUND_RECORD,
+        "scope": {},
+        "value": value,
+        "unit": "m s-1",
+        "range": None,
+        "range_missing_reason": "PLACEHOLDER: a test record has no range",
+        "citation": {
+            "reference": "PLACEHOLDER reference. This is not a publication.",
+            "locator": "PLACEHOLDER locator",
+        },
+        "transcribed_by": "PLACEHOLDER_person_one",
+        "checked_by": "PLACEHOLDER_person_two",
+        "note": "PLACEHOLDER test value of the wind bound, not the value of FAO-56",
+    }
+    records[f"{MARK}/{WIND_BOUND_RECORD}.json"] = test_record
+    return unmarked(records)
+
+
+def public_days(monkeypatch, climate_: SiteClimate, parameters: dict) -> dict:
+    """The public series, with the steps of each day, read where it calls et0/."""
+    seen: list[Any] = []
+    real = public_module.reference_evapotranspiration_from_climate_with_bounds
+
+    def recording(*args: Any, **kwargs: Any) -> Any:
+        days = real(*args, **kwargs)
+        seen.append(days)
+        return days
+
+    monkeypatch.setattr(
+        public_module,
+        "reference_evapotranspiration_from_climate_with_bounds",
+        recording,
+    )
+    public = daily_reference_evapotranspiration(climate_, parameters=parameters)
+    monkeypatch.undo()
+    assert len(seen) == 1
+    steps = {item.date: item.steps for item in seen[0]}
+    assert list(public) == list(steps)
+    for day, value in public.items():
+        assert value == steps[day].reference_evapotranspiration, day
+    return {day: (public[day], steps[day]) for day in public}
+
+
+def test_a_wind_bound_above_the_example_wind_changes_the_wind_and_the_et0(
+    monkeypatch,
+):
+    """D82 (PC-4): a lower bound above the day's wind replaces it in Eq. 6.
+
+    With the test bound above every wind of the example, every day whose wind
+    is a number reports that the bound changed it (``bounds_changed``), and
+    its ET0 differs from the one with the bound at 0.0, which changes no wind
+    of the example. EP3 gives the same series with the same test catalogue.
+    The mutant "bound set to 0.0" fails it.
+    """
+    climate_ = climate()
+    winds = example_winds(climate_)
+    assert winds and min(winds) >= 0.0, "the example has winds, none below zero"
+    # PLACEHOLDER test values, not values of the method: twice the largest
+    # wind of the example, so the bound lies above every day's wind; and
+    # 0.0, the lower bound that leaves a wind of zero or more unchanged.
+    above = 2 * max(winds)
+    assert above > max(winds)
+    at_zero = 0.0
+    bounded = public_days(monkeypatch, climate_, catalogue_with_wind_bound(above))
+    unbounded = public_days(monkeypatch, climate_, catalogue_with_wind_bound(at_zero))
+    assert list(bounded) == list(unbounded)
+    compared = 0
+    for day, (value, steps) in bounded.items():
+        value_at_zero, steps_at_zero = unbounded[day]
+        assert WIND_SPEED_BOUND not in steps_at_zero.bounds_changed, day
+        if isinstance(steps_at_zero.wind_speed_2m, Missing):
+            continue
+        assert WIND_SPEED_BOUND in steps.bounds_changed, day
+        assert steps.wind_speed_2m == above, day
+        assert steps_at_zero.wind_speed_2m < above, day
+        if isinstance(value, float) and isinstance(value_at_zero, float):
+            assert value != value_at_zero, day
+            compared += 1
+    assert compared > 0, "the comparison needs days with an ET0"
+    assert_same(
+        {day: value for day, (value, _) in bounded.items()},
+        ep3_series(
+            monkeypatch,
+            calendar("soybean-winter-fallow", climate_),
+            climate_,
+            catalogue_with_wind_bound(above),
+        ),
+    )
 
 
 def test_wrong_types_raise_type_error():
