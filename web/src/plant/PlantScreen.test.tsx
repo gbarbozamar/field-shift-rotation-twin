@@ -376,3 +376,17 @@ describe('PlantScreen: example data (6)', () => {
     expect(visibleText(html)).toContain(strings['disclaimer.full'])
   })
 })
+
+describe('PlantScreen: the declared limits of the answer (D250)', () => {
+  it('shows every declared limit of the answer, the phase-1 limit included, for every answer', () => {
+    for (const answer of plantExamples.answers) {
+      const card = visibleText(
+        section(render(plantExamples, answer.strictness, answer.margin_of), 'plant-card'),
+      )
+      expect(answer.declared_limits.some((limit) => limit.startsWith('phase 1 only'))).toBe(true)
+      for (const limit of answer.declared_limits) {
+        expect(card).toContain(formatString(strings['plant.declared_limit'], { limit }))
+      }
+    }
+  })
+})

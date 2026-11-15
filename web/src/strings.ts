@@ -175,6 +175,8 @@ export const strings = {
   'plant.answer.heading': 'The answer at the price of today',
   // Wording of D245 (issue #77), in place of "Plant this rotation".
   'plant.answer.chosen': 'The most margin within the limit you declared; water and soil carbon are not part of this answer',
+  // D250 (#77): each limit of this release the answer declares, as given.
+  'plant.declared_limit': 'Limit of this release: {limit}',
   'plant.answer.none_meets': 'None of the rotations meets the soil-loss limit',
   'plant.answer.not_resolved': 'Not resolved: the data cannot pick one rotation',
   'plant.answer.why': 'Why',

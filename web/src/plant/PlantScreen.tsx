@@ -317,6 +317,11 @@ function AnswerCard({ answer }: { answer: PlantAnswer }) {
       className="rounded-lg border-2 border-teal-700 bg-white px-4 py-3"
     >
       <h3 className="text-xs font-semibold uppercase text-slate-500">{strings['plant.answer.heading']}</h3>
+      {answer.declared_limits.map((limit) => (
+        <p key={limit} data-testid="plant-declared-limit" className="text-sm text-slate-600">
+          {formatString(strings['plant.declared_limit'], { limit })}
+        </p>
+      ))}
       {chosen !== null ? (
         <div>
           <p className="text-sm text-slate-600">{strings['plant.answer.chosen']}</p>
