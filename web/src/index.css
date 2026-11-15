@@ -1,1 +1,93 @@
 @import "tailwindcss";
+
+/* Self-hosted fonts (issue #430). The two families ship as local woff2
+   files under src/assets/fonts with their SIL OFL 1.1 licence texts next
+   to them; nothing is loaded from an external host. */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./assets/fonts/dm-sans-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./assets/fonts/space-grotesk-latin.woff2') format('woff2');
+}
+
+:root {
+  /* Design tokens, transcribed verbatim from the approved design handoff
+     of the interface unit l3/design-tokens (issue #430). Do not reformat
+     the values: the tests compare them character by character. */
+  --fs-bg: hsl(140 18% 96%);
+  --fs-surface: #fff;
+  --fs-text: hsl(165 18% 15%);
+  --fs-muted: hsl(165 7% 40%);
+  --fs-border: hsl(140 10% 89%);
+  --fs-brand: hsl(105 43% 45%);
+  --fs-primary: hsl(105 45% 33%);
+  --fs-info: hsl(201 70% 32%);
+  --fs-warning: #885400;
+  --fs-warning-bg: #fff7e8;
+  --fs-error: #ad3325;
+  --fs-error-bg: #fff0ed;
+  --fs-selection-bg: #eaf3e7;
+  --fs-font-body: 'DM Sans', system-ui, sans-serif;
+  --fs-font-heading: 'Space Grotesk', system-ui, sans-serif;
+  --fs-radius: 8px;
+  --fs-control-min: 44px;
+  --fs-motion: 160ms;
+}
+
+/* Tailwind 4 theme bridge: registers the tokens as utilities for later
+   units (bg-fs-bg, text-fs-text, border-fs-border, font-fs-heading, ...). */
+@theme {
+  --color-fs-bg: var(--fs-bg);
+  --color-fs-surface: var(--fs-surface);
+  --color-fs-text: var(--fs-text);
+  --color-fs-muted: var(--fs-muted);
+  --color-fs-border: var(--fs-border);
+  --color-fs-brand: var(--fs-brand);
+  --color-fs-primary: var(--fs-primary);
+  --color-fs-info: var(--fs-info);
+  --color-fs-warning: var(--fs-warning);
+  --color-fs-error: var(--fs-error);
+  --font-fs-body: var(--fs-font-body);
+  --font-fs-heading: var(--fs-font-heading);
+}
+
+body {
+  background: var(--fs-bg);
+  color: var(--fs-text);
+  font-family: var(--fs-font-body);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--fs-font-heading);
+}
+
+:focus-visible {
+  outline: 3px solid var(--fs-info);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--fs-selection-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
