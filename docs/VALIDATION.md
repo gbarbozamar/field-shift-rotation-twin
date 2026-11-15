@@ -71,18 +71,22 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 ### E0
 
 - What it checks (blueprint wording): "trivial comparators [E0, H0, D0]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the trivial comparator of the soil loss, and the statement of whether it gives the same order of the rotations as the full soil loss. PROPOSED by a research AI session; DECIDED under D161 by [D211](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6891173855), 15 November 2026
 - Lane: L0 Core
 - Block: "Block 4 — Sunday until CP4"
 - Unit it gates: "trivial comparators [E0, H0, D0]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
+- Definition (PROPOSED by a research AI session; logic DECIDED under D161 by [D211](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6891173855)): Input: the daily flags of a living crop of each rotation and scenario (built in the test from a hand-made rotation calendar over a hand-made record), twelve hand-made monthly erosivity values, and a hand-made `ResultsTable` of `soil_loss`; all labelled example data. For each rotation, scenario (each phase is a scenario, D109, D166) and agricultural year, the trivial comparator computes the erosivity-weighted share of the year without a living crop: the sum over the months of the climatological fraction of the month (M1.2, D69, D84; `climatological_monthly_fractions` of `engine/erosion/r_factor/`, called) times the share of the days of that month on which no living crop is on the field. Lower is better. It orders the rotations by the mean of that share over agricultural years. Why `C` alone: R, K and LS do not change with the rotation and P is one (M1.1, M1.6), so the order of the soil loss is the order of `C`. The share is the weighting of AH537 with a soil-loss ratio of one on a day with no crop (the continuous-fallow reference of factor C) and zero on a day with a crop; that ratio is a modelling choice, not stated by a source. The test checks that (a) on the hand-made inputs the comparator returns the order counted by hand, and (b) the report states, per scenario, whether that order equals the order of the full `soil_loss` values by their mean over agricultural years, read in the direction of the row (C1.1), ignoring ranges (the reading of D0, `trivial_orders` of `validation/trivial_comparator.py`). Ties, missing years and a single rotation give no order, with the reason, as in D0; nothing is filled and nothing is read as zero. The report also states how many rotations each side ordered. Pass: (a) and (b) hold.
+- What it does not do: it is not a soil loss and is never shown as one; it reads none of the records of the computed `C` withdrawn by D148 and D158; it validates neither method.
+- Known limit: with the single declared `C` of D125 the full method gives the same value to every rotation (D158), so until a `C` by rotation exists the report can only state that the full method gives no order. With two rotations an order has two outcomes, so the same order happens by chance half of the time (D211).
+- OPEN, for the lead developer (listed with their options in `validation/trivial_comparator_erosion.py`): which days carry a living crop is an input of the comparator, because no public function of `engine/` gives the days EP3 counts for the window of D157 (D105, D106, D136); which agricultural years are read when the flags cover a year only in part; a scenario held on one side only.
+- Test: `validation/test_trivial_comparator_erosion.py`, on example data written by hand: the order counted by hand; the weighting by erosivity changing the order against an even spread; a part of a month counted by its days; an equal and a different outcome; the tie of the full method (every rotation the same `soil_loss`); a day without a flag, a missing flag and a missing monthly erosivity, each a missing year; a tie of two mean shares; a single rotation; each scenario read on its own.
+- Expected value: the outcome stated as logic in the definition. Any order that a test compares is read off the hand-made inputs by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: orders and counts are compared exactly.
+- Source: Wischmeier and Smith (1978), USDA Agriculture Handbook 537, p. 17 (factor C relative to clean-tilled, continuous fallow) and pp. 20-21 (soil-loss ratios combined with the erosion-index distribution), as read by AI sessions
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED under D161 (D211); acceptance by a science reviewer pending
 
 ### E1a
 
@@ -199,18 +203,18 @@ Text in quotation marks is copied from section 8 of the blueprint without change
 ### H0
 
 - What it checks (blueprint wording): "trivial comparators [E0, H0, D0]"
-- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: OPEN
+- Shared wording: the blueprint gives this wording to more than one code. What this code covers on its own: the trivial comparator of the water-deficit exposure, and the statement of whether it gives the same order as the full `water_deficit_exposure`. PROPOSED by a research AI session; DECIDED under D161 (D212 of issue #77, 15 November 2026)
 - Lane: L0 Core
 - Block: "Block 4 — Sunday until CP4"
 - Unit it gates: "trivial comparators [E0, H0, D0]"
 - Class (blueprint section 3.6): Science — PROPOSED
-- Definition: OPEN
-- Expected value: OPEN
-- Tolerance: OPEN
-- Source: CITATION NEEDED
+- Definition (PROPOSED by a research AI session; logic DECIDED under D161, D212 of issue #77, 15 November 2026): Input: hand-made daily series of precipitation and of demanded transpiration (the basal crop coefficient times the reference evapotranspiration, the denominator of D157), the days of living crop of a hand-made rotation calendar (D105, D106, D136), given as a demanded transpiration that is `NOT_APPLICABLE` on every other day, as the daily balance of EP3 gives it, and a hand-made `ResultsTable` of `water_deficit_exposure`; all labelled example data. For each rotation, scenario, phase and agricultural year, the trivial comparator computes the sum of precipitation over the sum of demanded transpiration, both over the same days with a living crop that D157 uses: a day counts when its demanded transpiration is a number, and a day with no crop or of the tail after maturity (demanded transpiration `NOT_APPLICABLE`) is left out, as EP3 does. It is not bounded at one. Higher is better. A year with no day with a living crop is `NOT_APPLICABLE` and a year whose demanded sum is not above zero is `NOT_COMPUTABLE`, as EP3 gives the full indicator; a missing precipitation or demand on a counted day makes the year missing with its reason, and nothing is filled or read as zero. It orders the rotations by the mean of that ratio over agricultural years. It keeps the window and the denominator of D157 and removes the daily soil water balance (storage carried between crops, runoff, soil evaporation and the stress coefficient): a different order says that the balance changes the order. Using precipitation as the supply is a modelling choice, not stated by a source. The test checks that (a) on the hand-made inputs the comparator returns the order counted by hand, and (b) the report states, per scenario and phase, whether that order equals the order of the full `water_deficit_exposure` values by their mean over agricultural years, read in the direction of the row (C1.1), ignoring ranges (the reading of D0, taken from `validation/trivial_comparator.py`). Ties, missing years, `NOT_APPLICABLE` years and a single rotation give no order, with the reason, as in D0. The report also states how many rotations were ordered. Pass: (a) and (b) hold. What it does not do: it is not a water-deficit exposure and is never shown as one; it carries the label "whole cycle, not critical period" (D157, D162) wherever it is reported; it validates neither method. Known limit: D212 was taken before any water value existed; the comparator reports nothing on real data until EP3 gives numbers with the signed water records and a run on real climate. With two rotations the same order happens by chance half of the time: a different order is informative, the same order is weak evidence (D212). OPEN for the lead developer, in `validation/trivial_comparator_water.py`: how a phase reaches the inputs (a `ResultsTableRow` has no field for it; a phase is read as its own `scenario_id`); a year the comparator computes and EP3 does not; two sides that order different sets of rotations.
+- Expected value: the outcome stated as logic in the definition. Any ratio, mean or order that a test compares is read off the hand-made inputs by the person who designs the case; this file writes no expected value of the science.
+- Tolerance: not applicable to the logic: states and ranks are compared exactly; the means are compared as the stored values, as in D0.
+- Source: D157 for the window and the denominator (decision of issue #77), as read by AI sessions
 - Transcribed by: OPEN
 - Checked by: OPEN
-- Status: not defined
+- Status: logic DECIDED under D161 (D212); acceptance by a science reviewer pending
 
 ### H1
 
