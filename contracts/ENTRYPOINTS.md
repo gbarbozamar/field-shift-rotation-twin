@@ -266,6 +266,8 @@ run_amg(
 ) -> CarbonBalance
 ```
 
+The `*` is the signature as built in `engine/amg/entry.py`. EP1, EP3 and EP6 are written here without it; the route passes every argument by name (G3), so both forms accept the same call.
+
 **Status of the function.** `engine.amg.run_amg` exists (#199, #205; `engine/amg/README.md`, section "EP5 run_amg"). It runs **AMG-A only**, the annual reference that takes part in the selection (D80 of issue #77), with `carbon_model` `amg` (D1) and `variant` `amg_a` (the label is PROPOSED: `contracts/carbon_balance/README.md`, OPEN 2). AMG-M, the monthly variant, is experimental under D80 and is not built. The runner in `api/engines.py` does not call EP5 yet: that is a change of lane L2a (Q15).
 
 **Arguments decided** (decided by the lead developer on 14 November 2026, issue #77, D65): EP5 and EP6 keep the same arguments, and both take `parameters`, as EP1 and EP3 do (D46, D56). The monthly soil-cover series and the starting state travel inside `"CarbonForcing"`, not as separate arguments. G1, G3 and the two rows of G4 for a parameter apply to `parameters` here as they do for EP1 and EP3. The fields that carry the two inputs are PROPOSED in `contracts/carbon_forcing/` (`soil_cover`, `starting_state`); which quantities, pools and units they hold stays `OPEN` there.
@@ -298,7 +300,7 @@ run_rothc(
 
 **Arguments decided** (issue #77, D65), as for EP5: EP5 and EP6 have the same arguments, so that both carbon models receive the same inputs (blueprint section 5) and the route calls them in the same way. The soil-cover series and the starting state that the RothC brief (#176) proposed as two further arguments of this entry travel inside `"CarbonForcing"` instead.
 
-Return type, PROPOSED: `CarbonBalance`, the same as EP5, so that the runner reads both in the same way (`contracts/carbon_balance/README.md`). A model of RothC steps by month; the contract takes a step list that may be annual or monthly, and `test_monthly_steps_load_for_the_other_carbon_model` in `contracts/carbon_balance/` shows that shape loading.
+Return type, PROPOSED: `CarbonBalance`, the same as EP5, so that the runner reads both in the same way (`contracts/carbon_balance/README.md`). The contract takes a step list that may be annual or monthly, and `test_monthly_steps_load_for_the_other_carbon_model` in `contracts/carbon_balance/` shows that shape loading.
 
 Why it is still `OPEN`: `engine.rothc.run_rothc` does not exist, and its pools, flows, identifiers, units and the label of its `variant` (for example standard RothC, the reference of D80) are not proposed (`contracts/carbon_balance/README.md`, OPEN 2 and 3). The return type and the signature are a candidate, for the interface developer, who owns this folder, to accept or correct together with OPEN 1 of that file.
 
