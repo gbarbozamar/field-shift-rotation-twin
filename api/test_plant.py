@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 
 from api.config import PARAMETERS_FOLDER, load_parameters
 from api.main import create_app
-from api.plant import EXTRA_KEY_SEGMENT, NO_FACTORY, REDACTED_MESSAGE
+from api.plant import EXTRA_KEY_SEGMENT, NO_FACTORY, RECORD_STATE, REDACTED_MESSAGE
 from api.ports import EnginesResult, ErrorDetail, Missing, ModuleStatus, RunSettings
 from api.rain_stress import R_ID, rain_stress, scale_erosivity
 from api.test_rotations import FakeClimate, FakeSoilSlope
@@ -221,11 +221,9 @@ CATALOGUE = load_parameters(PARAMETERS_FOLDER)
 
 def client(**kwargs: Any) -> TestClient:
     kwargs.setdefault("settings", PERIOD)
+    kwargs.setdefault("kinds_of_year_record", load_record())
     kwargs.setdefault("climate", FakeClimate())
     kwargs.setdefault("soil_slope", FakeSoilSlope())
-    # S-031: create_app no longer loads the committed ONI record; the tests
-    # that relied on it inject it here.
-    kwargs.setdefault("kinds_of_year_record", load_record())
     # S-032: every test here expects the factor path of the request to run, so
     # it is switched on; the off default is tested in
     # api/test_rain_stress_switch.py.
@@ -291,8 +289,11 @@ def test_the_example_request_gives_the_example_answer():
         "oni_v6",
     ]
     # The record is the PLACEHOLDER record of economics/test_plant.py.
-    for key in ("id", "contract", "state"):
+    for key in ("id", "contract"):
         assert data["sources"][2][key] == ANSWER["sources"][1][key]
+    # Not ``cached`` (nothing is fetched or reused): the state the API gives a
+    # file a person configured. The example answer (lane L0) still says cached.
+    assert data["sources"][2]["state"] == RECORD_STATE == "fresh"
     assert data["sources"][2]["attribution"] == load_record()["reference"]
     # One climate request, one soil request, each rotation run once on them.
     assert len(climate.requests) == 1
@@ -831,8 +832,7 @@ def test_engines_that_answer_for_another_rotation_answer_500():
 def test_the_default_app_answers_the_example_request():
     """The engines of the repository, the stand-in sources and no period: a
     200 with every soil-loss mean missing and the stress applied through the
-    default factory on the catalogue. Switched on (S-032); the off default is
-    tested in api/test_rain_stress_switch.py."""
+    default factory on the catalogue."""
     app = create_app([], parameters=CATALOGUE, rain_stress_switched_on=True)
     data = answered(TestClient(app).post(ROUTE, json=REQUEST))
     checked(REQUEST, data)
@@ -1373,3 +1373,90 @@ def test_f3_the_period_reason_is_the_one_of_the_climate_source_row():
     site = SiteReference.model_validate(REQUEST["site"])
     result = get_climate(FakeClimate(), site, RunSettings())
     assert result.source.missing_reason == PERIOD_REASON
+
+
+# --- review of #310: no record, plant layer by name, nothing at start-up ----------
+
+
+def test_without_a_record_every_kind_of_year_is_missing_with_its_reason():
+    """No ONI record configured: the route answers, and no kind is made up."""
+    response = client(kinds_of_year_record=None).post(ROUTE, json=REQUEST)
+    assert response.status_code == 200
+    data = response.json()
+    years = data["kinds_of_year"]["years"]
+    assert years
+    assert all(y["kind"] is None for y in years)
+    assert {y["missing_reason"] for y in years} == {"NOT_AVAILABLE"}
+    assert all("KINDS_OF_YEAR_RECORD_FILE" in y["detail"] for y in years)
+    assert set(data["kinds_of_year"]["counts"].values()) == {None}
+    record_row = data["sources"][-1]
+    assert record_row["state"] == "unavailable"
+    assert record_row["missing_reason"] == "NOT_AVAILABLE"
+    PlantAnswer.model_validate(data)
+
+
+def test_the_plant_layer_is_looked_up_by_name_on_each_request(monkeypatch):
+    """Not there: 200 with the answer null and NOT_AVAILABLE; other routes unaffected."""
+    import api.app as app_module
+
+    monkeypatch.setattr(app_module, "PLANT_MODULE", "api.plant_layer_not_built")
+    test_client = client()
+    response = test_client.post(ROUTE, json=REQUEST)
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": None,
+        "answer_missing": {
+            "reason": "NOT_AVAILABLE",
+            "detail": app_module.PLANT_NOT_BUILT,
+        },
+    }
+    assert test_client.get("/health").status_code == 200
+
+
+def test_an_injected_plant_layer_answers_the_route():
+    calls = []
+
+    def layer(body, **kwargs):
+        calls.append((body, kwargs))
+        return {"answer": "PLACEHOLDER"}
+
+    response = client(plant_layer=layer).post(ROUTE, json=REQUEST)
+    assert response.json() == {"answer": "PLACEHOLDER"}
+    assert calls[0][0] == REQUEST
+    assert calls[0][1]["kinds_of_year_record"] == load_record()
+
+
+def test_building_the_app_imports_no_plant_layer_and_reads_no_record():
+    import subprocess
+    import sys
+
+    code = (
+        "import sys; from api.main import create_app; create_app([]); "
+        "assert 'api.plant' not in sys.modules, 'api.plant'; "
+        "assert 'economics.plant' not in sys.modules, 'economics.plant'; "
+        "assert 'kinds_of_year' not in sys.modules, 'kinds_of_year'"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_record_is_read_only_from_the_variable_that_names_it(tmp_path):
+    from api.config import KINDS_OF_YEAR_RECORD_FILE, ConfigError, load_config
+
+    assert load_config({}).kinds_of_year_record is None
+    path = tmp_path / "PLACEHOLDER_record.json"
+    path.write_text(json.dumps(load_record()), encoding="utf-8")
+    config = load_config({KINDS_OF_YEAR_RECORD_FILE: str(path)})
+    assert config.kinds_of_year_record == load_record()
+    wrong = tmp_path / "PLACEHOLDER_not_a_record.json"
+    wrong.write_text("[]", encoding="utf-8")
+    with pytest.raises(ConfigError, match=KINDS_OF_YEAR_RECORD_FILE):
+        load_config({KINDS_OF_YEAR_RECORD_FILE: str(wrong)})
+    with pytest.raises(ConfigError, match=KINDS_OF_YEAR_RECORD_FILE):
+        load_config({KINDS_OF_YEAR_RECORD_FILE: str(tmp_path / "absent.json")})

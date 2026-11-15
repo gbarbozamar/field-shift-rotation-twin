@@ -3,10 +3,8 @@
 Unit ``l2/plant-rules-to-economics`` (brief S-030; point 2 of the platform
 review of PR 310): the rules that decide which crops and years count in each
 margin and mean live here, not in ``api/``. The route ``api/plant.py`` gathers
-the request and the engine runs and hands them to ``answer_plant``, the one
-entry function of this module, which the platform finds by name on each
-request (S-031, ``api/plant_layer.py``): it calls ``classify_years`` and then
-``assemble_answer``.
+the request and the engine runs and hands them to ``assemble_answer``, the one
+entry function of this module.
 
 Steps 4 to 6 of ``api/plant.py`` happen here. ``classify_years`` classifies
 the whole agricultural years of the record (computed by the caller) on the
@@ -95,23 +93,6 @@ NO_YEAR_READ = (
 # result does not list (its reason is NO_COVERAGE, C3.2: no data for this
 # period). mean_by_kind writes the year itself before it.
 ABSENT_YEAR = "the soil-loss result lists no value for this year of the record"
-# PROPOSED (S-031, fix round 1 F6): the detail of each kind of year when no
-# record is given. It never names how the platform is configured; the source
-# row the platform writes for the record says that.
-RECORD_NOT_CONFIGURED = (
-    "no kinds-of-year record is configured, so no agricultural year is "
-    "classified as a kind of year"
-)
-# PROPOSED (S-031, fix round 1 F2): the id that names the record when the
-# record itself carries no ``id``. The same text as ``api.plant.NO_RECORD_ID``
-# (the record's source row), which api/test_plant_layer.py checks.
-NO_RECORD_ID = "kinds_of_year_record"
-
-
-def record_id(record: Mapping[str, Any]) -> str:
-    """The id of the record: its ``id`` as text, or ``NO_RECORD_ID``. PROPOSED (F2)."""
-    value = record.get("id")
-    return NO_RECORD_ID if value is None else str(value)
 
 
 # --- what a run is ------------------------------------------------------------
@@ -156,17 +137,6 @@ def _ag_year_of(day: dt.date, start_month: int) -> int:
     return day.year if day.month >= start_month else day.year - 1
 
 
-def _missing_kind(detail: str) -> KindOfYear:
-    """A kind of year missing ``NOT_AVAILABLE`` with ``detail``."""
-    return KindOfYear(
-        kind=None,
-        missing_reason="NOT_AVAILABLE",
-        detail=detail,
-        season=None,
-        season_year=None,
-    )
-
-
 # --- years of the record and of the rotation ----------------------------------
 
 
@@ -199,7 +169,7 @@ class Classified:
 
 
 def classify_years(
-    record: Mapping[str, Any] | None,
+    record: Mapping[str, Any],
     record_years: tuple[int, int] | None,
     why: str,
     start_month: int,
@@ -230,14 +200,6 @@ def classify_years(
     with ``record_years`` ``None`` it is kept in the ``Classified`` with
     ``why``, so the soil-loss means carry it. Given with ``record_years`` it
     is a ``ValueError`` (years of the record have no reason to be missing).
-
-    PROPOSED (S-031, fix round 1 F6): ``record`` ``None`` means no record is
-    configured. Known years are still years of the record period
-    (``of_record`` true), each missing ``NOT_AVAILABLE`` with
-    ``RECORD_NOT_CONFIGURED``, so the soil-loss mean of the period is kept and
-    each kind of year is missing, as for any year without a kind. Unknown
-    years are the declared years below, with ``RECORD_NOT_CONFIGURED`` before
-    their detail.
     """
     if record_years is not None:
         if reason is not None:
@@ -248,15 +210,6 @@ def classify_years(
         if first > last:
             raise ValueError(
                 "record_years: the first agricultural year is after the last"
-            )
-        if record is None:
-            return Classified(
-                {
-                    year: _missing_kind(RECORD_NOT_CONFIGURED)
-                    for year in range(first, last + 1)
-                },
-                True,
-                start_month,
             )
         return Classified(
             classify_agricultural_years(record, first, last, start_month),
@@ -275,10 +228,17 @@ def classify_years(
     # Never empty: D21 of issue #77 (RotationDefinition) refuses a rotation
     # without any sowing or harvest date, so PlantRequest is 422 before this.
     detail = YEAR_NOT_OF_THE_RECORD.format(why=why)
-    if record is None:
-        detail = f"{RECORD_NOT_CONFIGURED}; {detail}"
     return Classified(
-        {year: _missing_kind(detail) for year in declared},
+        {
+            year: KindOfYear(
+                kind=None,
+                missing_reason="NOT_AVAILABLE",
+                detail=detail,
+                season=None,
+                season_year=None,
+            )
+            for year in declared
+        },
         False,
         start_month,
         reason,
@@ -579,6 +539,8 @@ NO_RANGE_EXAMPLE = {
     "reason": "NOT_AVAILABLE",
     "detail": "PLACEHOLDER: example data, no range is computed for this number",
 }
+# PROPOSED: the source of the kinds of year when no ONI record is configured.
+NO_RECORD_SOURCE = "no ONI record configured"
 
 
 def _d249(
@@ -651,11 +613,7 @@ def assemble_answer(
 
     ``runs`` holds one run per rotation of the request, in its order.
     ``record`` is the ONI record ``classified`` was read on (its ``id`` names
-    the source of the kinds of year). PROPOSED (S-031): ``None`` when no
-    record is configured; the source of the kinds of year is then
-    ``NO_RECORD_ID``, the id of the record's source row the route writes
-    (main's contract requires a source text, #424; PROPOSED, R27), and every
-    year is missing. ``rain_stress`` is the rain-stress echo
+    the source of the kinds of year). ``rain_stress`` is the rain-stress echo
     already as JSON-ready data, or ``None`` when no factor was asked; it is
     copied into the answer unchanged. ``sources`` are the source rows of the
     answer, as JSON-ready data, copied unchanged. A ``classified`` whose
@@ -847,7 +805,7 @@ def assemble_answer(
         "rain_stress": rain_stress,
         "erosivity": EROSIVITY,
         "kinds_of_year": {
-            "source": NO_RECORD_ID if record is None else record_id(record),
+            "source": NO_RECORD_SOURCE if record is None else record["id"],
             "start_month": start_month,
             "years": [_year_kind(year, kinds[year]) for year in sorted(kinds)],
             "counts": counts,
@@ -859,53 +817,3 @@ def assemble_answer(
     answer = PlantAnswer.model_validate_json(json.dumps(document))
     check_answer_against_request(request, answer)
     return answer
-
-
-# --- the entry function -------------------------------------------------------
-
-
-def answer_plant(
-    request: PlantRequest,
-    runs: Sequence[EngineRun],
-    *,
-    record_years: tuple[int, int] | None,
-    why: str,
-    reason: str | None,
-    record: Mapping[str, Any] | None,
-    rain_stress: Any,
-    sources: list[dict[str, Any]],
-    example_data: bool,
-) -> PlantAnswer:
-    """The answer to "What should I plant?". PROPOSED (S-031, decision R24).
-
-    The one entry function the platform finds by name
-    (``api/plant_layer.py``). It does what the route did after the engines
-    ran: ``classify_years`` on the given years, then ``assemble_answer``.
-
-    ``record_years``, ``why`` and ``reason`` are what ``classify_years``
-    takes: the whole agricultural years of the record period (first and
-    last), or ``None`` with the text of why they are not known and its reason
-    code (or ``None``). ``record`` is the ONI record, or ``None`` when no
-    record is configured: every kind of year is then missing
-    ``NOT_AVAILABLE`` with ``RECORD_NOT_CONFIGURED`` (fix round 1, F6).
-    ``rain_stress`` is the rain-stress echo (a dataclass, a mapping or
-    ``None``), written into the answer through ``plain``; ``sources`` and
-    ``example_data`` are copied.
-    """
-    classified = classify_years(
-        record,
-        record_years,
-        why,
-        request.rotations[0].ag_year_start.month,
-        request.rotations,
-        reason=reason,
-    )
-    return assemble_answer(
-        request,
-        runs,
-        classified=classified,
-        record=record,
-        rain_stress=plain(rain_stress),
-        sources=sources,
-        example_data=example_data,
-    )

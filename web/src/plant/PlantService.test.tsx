@@ -293,25 +293,6 @@ describe('the service answers 200 with the contract example answer (3)', () => {
     expect(visibleText(rain)).toContain(strings['plant.declared'])
     expect(visibleText(section(html, 'plant-rain-stress'))).toContain(rawAnswer.rain_stress.detail)
   })
-
-  it('heavier rain not switched on in the service (S-032, R28): the echo says not applied, with its detail as data', async () => {
-    // PROPOSED (R28 of S-035). The service echoes applied false with the text
-    // NOT_SWITCHED_ON of api/plant.py in its detail (api/rain_stress.py
-    // not_applied_detail); it is a detail, not a reason code. Test data only.
-    const detail =
-      'rain erosivity not multiplied by 1.2: heavier rain is not switched on in this service, so the stress test of heavier rain was not applied; not a forecast'
-    const body = structuredClone(rawAnswer)
-    body.rain_stress.applied = false
-    body.rain_stress.detail = detail
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, body)))
-    const state = serviceState()
-    const answered = await runPlant(BASE, serviceRequestOf(state)!)
-    const html = view(state, { phase: 'answered', answer: answered })
-    expect(visibleText(section(html, 'plant-rain-stress'))).toContain(
-      formatString(strings['plant.service.rain_not_applied'], { label: body.rain_stress.label, detail }),
-    )
-    expect(count(html, 'plant-card')).toBe(1)
-  })
 })
 
 describe('the service fails', () => {

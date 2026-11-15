@@ -6,7 +6,6 @@ import { ApiError } from '../seam/runRotationApi'
 import type { ApiErrorCode } from '../seam/runRotationApi'
 import type { ProvenanceLabel } from '../components/ValueDisplay'
 import {
-  PlantNotBuiltError,
   configuredApiBase,
   plantRequestFor,
   plantScreenQueryOptions,
@@ -84,11 +83,7 @@ import type {
  * rain-stress part is shown. While the call is on its way a pending line, and when it
  * fails an error panel with its code in plain words, are shown in place of an
  * answer: no example answer is rendered then. "Back to the saved example"
- * goes back. A line says where the answer shown comes from. PROPOSED
- * (S-031, adapted to the not-built form of #427 by R28 of S-035): when the
- * service answers that its plant layer is not built ({answer: null,
- * answer_missing}), a panel says the answer is not available, with the
- * reason and the service's detail; no answer and no number.
+ * goes back. A line says where the answer shown comes from.
  *
  * Each option is a row (S-020, PROPOSED): its rotation label from the
  * definition in the request, the strip of its crops year by year
@@ -698,15 +693,11 @@ export type AnswerOrigin = { kind: 'example' } | { kind: 'service'; api: string 
 
 const ORIGIN_EXAMPLE: AnswerOrigin = { kind: 'example' }
 
-/**
- * A service call without an answer to show. PROPOSED (S-031): not_built, the
- * service said its plant layer is not built, with the reason and its detail.
- */
+/** A service call without an answer to show. */
 export type ServiceStatus =
   | { kind: 'not_asked' }
   | { kind: 'pending' }
   | { kind: 'failed'; code: ApiErrorCode }
-  | { kind: 'not_built'; missing: MissingPart }
 
 function ignore() {}
 
@@ -765,14 +756,6 @@ function StatusPanel({ status }: { status: ServiceStatus }) {
       <p data-testid="plant-service-pending" className="text-sm text-slate-500">
         {strings['plant.service.pending']}
       </p>
-    )
-  }
-  if (status.kind === 'not_built') {
-    return (
-      <div data-testid="plant-service-not-built" className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-700">{strings['plant.service.not_built_heading']}</h3>
-        <MissingLine what={strings['plant.service.not_built_what']} missing={status.missing} />
-      </div>
     )
   }
   return (
@@ -1217,23 +1200,15 @@ function rainControlOf(
 export type ServicePhase =
   | { phase: 'pending' }
   | { phase: 'failed'; code: ApiErrorCode }
-  | { phase: 'not_built'; missing: MissingPart }
   | { phase: 'answered'; answer: PlantServiceAnswer }
 
-/**
- * The phase of the call, from the query. A PlantNotBuiltError (S-031,
- * PROPOSED) is not_built with its reason; any other error that is not an
- * ApiError is UNEXPECTED.
- */
+/** The phase of the call, from the query. An error that is not an ApiError is UNEXPECTED. */
 export function servicePhaseOf(query: {
   isPending: boolean
   isError: boolean
   error: unknown
   data: PlantServiceAnswer | undefined
 }): ServicePhase {
-  if (query.isError && query.error instanceof PlantNotBuiltError) {
-    return { phase: 'not_built', missing: query.error.missing }
-  }
   if (query.isError) {
     return { phase: 'failed', code: query.error instanceof ApiError ? query.error.code : 'UNEXPECTED' }
   }
@@ -1322,11 +1297,7 @@ export function PlantScreenView({
     // No answer to show: the request itself says whether it is example data.
     const set: PlantAnswerSet = { example_data: rawPlantRequest.example_data, answers: [] }
     const status: ServiceStatus =
-      service.phase === 'pending'
-        ? { kind: 'pending' }
-        : service.phase === 'not_built'
-          ? { kind: 'not_built', missing: service.missing }
-          : { kind: 'failed', code: service.code }
+      service.phase === 'pending' ? { kind: 'pending' } : { kind: 'failed', code: service.code }
     return (
       <PlantView set={set} price={null} status={status} {...common} />
     )

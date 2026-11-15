@@ -15,7 +15,7 @@ under [Decided](#decided), with its decision number of issue #77.
 | `GET /health` | Liveness. Unchanged, at the root |
 | `POST /api/rotations/run` | One rotation for one field, end to end. Synchronous, JSON in and JSON out |
 | `POST /api/decisions/run` | Two rotations of one field and the decision output of the pair (#268). Synchronous, JSON in and JSON out. **PROPOSED** |
-| `POST /api/plant/run` | "What should I plant?": one field, three to five rotations, a `PlantRequest` in and a `PlantAnswer` out (`contracts/plant_answer/`). Synchronous. **PROPOSED** |
+| `POST /api/plant/run` | "What should I plant?": one field, three to five rotations, a `PlantAnswer` (`contracts/plant_answer/`). Synchronous. **PROPOSED** (`api/plant.py`) |
 
 Every product route lives under `/api`.
 
@@ -271,141 +271,34 @@ measured (OPEN below).
 
 ## `POST /api/plant/run` (PROPOSED, unit `l2/plant-route`)
 
-"What should I plant?" for one field and three to five rotations (R4, R10,
-R13, R15 of the loop decisions). Module `api/plant.py`; acceptance test
-`api/test_plant.py` (`uv run pytest api/test_plant.py`). The body is a
-`PlantRequest` and a `200` is a `PlantAnswer` of `contracts/plant_answer/`,
-written with every null kept (`model_dump(mode="json")`). Every number of the
-answer comes from a function of `economics/` or `kinds_of_year/`, or is
-copied from an engine result or from the request; the route computes none.
+The steps are in the docstring of `api/plant.py`. `api/app.py` finds
+`api.plant.run_plant` by name on each request; absent, the route answers
+`answer: null` with `answer_missing` `NOT_AVAILABLE`. Two points of the
+platform review:
 
-In order:
-
-0. **The plant layer, by name** (PROPOSED, unit `l2/plant-layer-by-name`,
-   S-031, decision R24). `api/plant_layer.py` (`DiscoveredPlantLayer`, the
-   default of `create_app(..., plant_layer=None)`) finds `PlantRequest` and
-   `PlantAnswer` of `contracts.plant_answer`, then
-   `economics.plant.answer_plant`, on each request, never at start-up, as
-   `api/decision_layer.py` finds the decision function. Only an absent
-   module (or a package above it) or an absent name is "not built": `200`
-   with exactly `{"answer": null, "answer_missing": {"reason":
-   "NOT_AVAILABLE", "detail": "<what is absent>"}}` (written as a dict, the
-   form of #427, R27 PROPOSED; main's contract has no model of it), and no source or
-   engine is called. Any other import error, or an answer that is not a
-   `PlantAnswer`, is `500` `INTERNAL_ERROR` on this route; `/health` and the
-   other routes are untouched, since `api/app.py` imports nothing of
-   `economics/`, `kinds_of_year/` or `contracts.plant_answer`.
-1. **Request.** The body is loaded into `PlantRequest` (as JSON). A body that
-   fails is `422` in the one error shape: `ROTATION_INVALID` when every
-   problem lies inside one rotation item (`rotations.<i>.…`), `SITE_INVALID`
-   when every problem lies inside `site`, `INVALID_REQUEST` otherwise (a wrong
-   number of rotations, a rule of the whole request, problems in several
-   rotation items; PROPOSED). Then each rotation goes through the
-   `RotationValidator`; its problems are written under `rotations.<i>`,
-   `ROTATION_INVALID` when they lie in one item and `INVALID_REQUEST` when
-   they lie in several (PROPOSED). A message that repeats a submitted text (three characters
-   or more, as `api/rotation_validator.py` looks for) is replaced by a fixed
-   text. Nothing is called before that. Malformed JSON is `400`.
-2. **Sources.** Climate and soil and slope are asked for once for the site,
-   as `POST /api/decisions/run` does. `sources` lists them, then the ONI
-   record (PROPOSED: state `cached`, as OPEN 5 of main's contract lists
-   the record (#424, R27), detail
-   `transcribed record <id>, read on <date_read>` with no path, the date
-   left out when the record has none, fix round 1 F7; with no record
-   configured, state `unavailable`, `NOT_AVAILABLE`, detail `NO_RECORD` of
-   `api/plant.py`, which names `KINDS_OF_YEAR_RECORD_FILE`).
-3. **Engines.** Each rotation runs once through the `RotationEngines`, with
-   its request item unchanged. **Phase 1 is enough for the answer**: the
-   top-level result of the run (`EnginesResult.result`) is read, the other
-   phases are not. A result for another `rotation_id` is a defect (`500`).
-4. **Kinds of year.** The whole agricultural years of the configured climate
-   period (`api.carbon_forcing.whole_ag_years`, by the rotations' shared
-   start month) are classified with `classify_agricultural_years` on the ONI
-   record, by `economics.plant.answer_plant` (S-031). The record is the one
-   `KINDS_OF_YEAR_RECORD_FILE` names, read and checked once at start-up
-   (`api/config.py`) and passed to `create_app(..., kinds_of_year_record=)`;
-   `None` now means **no record** (PROPOSED, S-031), never the committed one:
-   every year is then missing `NOT_AVAILABLE` with the not-configured detail,
-   `kinds_of_year.source` is `NO_RECORD_ID`, the id of the record's source
-   row (main's contract requires a source text, #424; R27 PROPOSED), every count is null, and the means and
-   margins of each kind follow through `economics/` as for any year without
-   a kind (with a period, the years are still those of the period, so the
-   soil-loss mean of the period is kept). The years come
-   from the settings period, not from the calendar. Without a period, or with
-   a period that holds no whole agricultural year, the record's years are not
-   known: the contract still asks for at least one year, so the answer lists
-   the agricultural years of the declared dates of the rotations, each missing
-   `NOT_AVAILABLE` with a detail saying it is not a year of the record; every
-   count is null and the margins get `year_counts=None` (average missing
-   `NOT_AVAILABLE`).
-5. **Soil loss.** The annual values of the phase-1 result
-   (`kinds_of_year.series_from_results`) are averaged with `mean_by_kind`;
-   `average` is the record mean. No result (no period, an input absent,
-   calendar not built) or a soil-loss part not built gives every mean missing
-   with the engine's reason and detail, never zero. PROPOSED: only the years
-   of the classified list are read, and only when they are years of the
-   record; a year of the result outside them is ignored and named in a note
-   added to the detail of every mean. No year left (the period holds no whole
-   agricultural year, or no year of the result is in the list) gives every
-   mean missing `NO_COVERAGE`.
-6. **Limit.** `assess_limit(limit, average, by_kind, kinds_in_record=...)`:
-   the kinds with at least one year in the record when every year is
-   classified (R13); `None` (every kind kept) when a year has no kind or the
-   years are not the record's. A missing declared limit gives every check not
-   resolved, as `assess_limit` does.
-7. **Margins.** `compute_rotation_margin(years, facts, year_counts)`, with
-   `year_counts` from `count_kinds`. `years` is read from the
-   `RotationDefinition` (PROPOSED, not the calendar): each component counts in
-   the agricultural year of its sowing date, in position order, from the first
-   such year to the last. A declared-margin crop (margin per hectare and
-   agricultural year) with a harvest date in a later agricultural year counts
-   in each year from its sowing through its harvest, such as a pasture kept
-   several years (PROPOSED). A grain or cover crop counts only in its sowing
-   year (its yield and cost are of one season), and so does a declared-margin
-   crop with no harvest date: the limit is that a pasture kept several years
-   needs its harvest (end) date declared, or the years after the first have
-   no crop and the margins are `NOT_COMPUTABLE`. A missing sowing date (`MISSING_INPUT`), a year of
-   the cycle without a crop, or a declared-margin crop sharing its year
-   (both `NOT_COMPUTABLE`) give that rotation's margins missing with the
-   reason. The margin the ranking reads is `questions.margin_of`.
-8. **Decision and tipping price.** `choose_rotation(options, strictness)`;
-   `find_tipping_price(..., price_range, strictness, margin_of)` for the
-   tipping field (its own `decision` is the answer and is not repeated). When
-   one rotation has no years, the tipping price is missing on both sides with
-   `MISSING_INPUT`, naming it.
-9. **Rain stress (R10).** No factor: `rain_stress` null, one plain run. A
-   missing factor: the missing echo, one plain run. A factor: the engines are
-   rebuilt by `engines_factory(scale_erosivity(parameters, stress))` and the
-   echo is `applied_echo(parameters, stress)`. `engines_factory` is a
-   `create_app` keyword used only by this route; with the default engines it
-   defaults to `EntryPointEngines` on the same engine functions. With
-   `engines` given and no factory, the run is not stressed and the echo says
-   `applied: false` with the reason in its detail; never a silent run. With
-   `engines` and a factory both given, the catalogue of the injected engines
-   is not known: the factory is not called and the echo says `applied: false`
-   with that reason (PROPOSED).
-
-   **The switch (PROPOSED, S-032, decision R25).** The stress test is off
-   unless a person sets `RAIN_STRESS_TEST=on` (`create_app(...,
-   rain_stress_switched_on=True)` in tests). Switched off, a declared factor
-   is echoed `applied: false` with `api.plant.NOT_SWITCHED_ON` in its detail,
-   the engines run unchanged and `engines_factory` is never called; no factor
-   and a missing factor are answered as above. Why: how rain enters erosion
-   and how its uncertainty scales is a science choice (review point 3 of PR
-   310), to be proposed to the erosion lane as an option of EP1; until it is
-   one, `api/` never applies it silently.
-10. `erosivity` is `"mean_annual"` (S-026 may add `"per_year"`).
-11. `example_data` is true when the request says so, when a rotation, the
-    climate or the soil and slope carries the mark
-    (`api.decisions.example_data_of`), or when a source has state `example`.
-12. The answer is checked with `check_answer_against_request`; a failure is a
-    defect of the route. What an engine raises is not caught by the engines:
-    the route answers `500` `INTERNAL_ERROR` with no exception text.
-
-**OPEN for this route:** per-year erosivity (S-026); a margin range; the
-years of the record when no period is configured (the contract requires at
-least one year in `kinds_of_year`); whether the other phases of a rotation
-should enter the answer.
+- **Heavier rain is off unless a person switches it on** (S-032, decision
+  R25; review of #427 and point 3 of the review of #310). How rain enters
+  erosion and how its uncertainty scales is a science choice, to be proposed
+  to the erosion lane as an option of EP1; until it is one, `api/` never
+  applies it silently. `create_app(..., rain_stress_switched_on=False)` is the
+  default; `api.config` sets it from `RAIN_STRESS_TEST=on`. Below
+  `create_app` (`run_plant`, `make_plant_router`, `stressed_run`) the switch
+  is a required keyword. Switched off, a declared `rain_stress_factor` is
+  echoed `applied: false` with `api.plant.NOT_SWITCHED_ON` in its detail (a
+  sentence that names no server variable), the engines run unchanged and
+  `engines_factory` (given or the default) is never called. No factor gives no
+  echo; a missing factor gives its missing echo, switched on or off. Switched
+  on, the engines are rebuilt on the catalogue whose erosivity
+  `api/rain_stress.py` scales, as `stressed_run` describes.
+- **The source row of the ONI record** has state `fresh`: the record is a
+  file a person configured (`KINDS_OF_YEAR_RECORD_FILE`), read once at
+  start-up, never fetched and no stored response reused, so not `cached`.
+  `fresh` is the state the API already gives a file a person supplies
+  (`adapters.soil_tables`); `retrieved_at` is null (no read time is kept).
+  The record format has no example-data mark, so `example` is never inferred
+  for it. No record configured: the row is `unavailable`, `NOT_AVAILABLE`.
+  The example answer and OPEN 5 of `contracts/plant_answer/README.md` (lane
+  L0) still write `cached`.
 
 ## Errors (`api/errors.py`)
 
@@ -479,8 +372,8 @@ only its path and the reason.
 | `SOIL_SLOPE_EXAMPLE_FILE` | Path of the accepted soil-and-slope contract example, served by `ExampleSoilSlopeSource` with state `example`, for any field: under the `case_id` and `field_id` of the request (D38) | The soil-and-slope source is the stand-in |
 | `SOIL_TABLE_FILES` | Comma-separated paths of soil tables (soil properties by soil group, D48, D49), in order; served with `SOIL_GROUPS_FILE` by `adapters.soil_tables.SoilTableSource`. Template: `adapters/examples/PLACEHOLDER_soil_table.json` | Required with `SOIL_GROUPS_FILE`; together unset, no soil-table source |
 | `SOIL_GROUPS_FILE` | Path of the soil-groups declaration: the soil group of each field of a case (`DECLARED`). Template: `adapters/examples/PLACEHOLDER_soil_groups.json` | Required with `SOIL_TABLE_FILES` |
-| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED (S-031). Path of the ONI record the plant route classifies the kinds of year on (none is in the repository until a person signs one, D240 (5), R26); read once at start-up (parsed with `json.loads`, then classified once by `kinds_of_year.classify_agricultural_years` as a check) and passed to `create_app`. `compose.yaml` does not set it (R26, PROPOSED) | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE`, and `kinds_of_year` is not imported |
-| `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` sets it to `on` for the local stack only (`${RAIN_STRESS_TEST-on}`; start with `RAIN_STRESS_TEST=` to switch it off). The detail shown to users (`NOT_SWITCHED_ON`) names no variable | Off: a declared rain-stress factor is echoed `applied: false` with the reason `NOT_SWITCHED_ON`, and the engines run unchanged |
+| `KINDS_OF_YEAR_RECORD_FILE` | PROPOSED. Path of the ONI record `POST /api/plant/run` classifies the kinds of year on; read once at start-up (a JSON object with an `id` and `seasons`) and passed to `create_app` | No record: every kind of year of a plant answer is missing `NOT_AVAILABLE` |
+| `RAIN_STRESS_TEST` | PROPOSED (S-032, R25). Exactly `on` (after stripping spaces) switches the heavier-rain stress test of `POST /api/plant/run` on; any other non-blank value is a `ConfigError` naming the variable (never repeating the value). `compose.yaml` does not set it | Off: a declared rain-stress factor is echoed `applied: false` with `NOT_SWITCHED_ON`, and the engines run unchanged |
 
 Relative paths are resolved against the working directory of the server.
 
@@ -513,17 +406,8 @@ on `httpx.MockTransport`.
   give the same quantity for one soil group. The source still answers
   `unavailable` for a file that breaks after start-up. PROPOSED.
 - `KINDS_OF_YEAR_RECORD_FILE` set and the file does not exist, cannot be
-  read, is not JSON (line and column given), is not a JSON object, lacks one
-  of the fields the plant layer reads (`id`, `reference`, `date_read`,
-  `threshold`, `min_consecutive_seasons`, `seasons`: `RECORD_FIELDS`), has
-  `id`, `reference` or `date_read` that is not a non-blank text, or has
-  `seasons` that is not a non-empty list, or is refused by
-  `kinds_of_year.classify_agricultural_years` run once over every
-  agricultural year its seasons name (a threshold or run length of the wrong
-  type, a season row that is not a row, an unknown season, a duplicated
-  row; fix round 1, F3), or `kinds_of_year` cannot be imported (F4, the
-  cause chained). Checked once, here, never per request (F9 of
-  review-whole-4). PROPOSED.
+  read, is not JSON, or is not a JSON object with an `id` and `seasons`.
+  PROPOSED.
 - `RAIN_STRESS_TEST` set to anything but `on` (after stripping spaces; `ON`,
   `yes`, `true` and `1` included); the message names the variable and never
   repeats the value. PROPOSED (S-032).
@@ -549,7 +433,7 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
 | `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
-| `KINDS_OF_YEAR_RECORD_FILE` | Unset until a person signs a record (D240 (5)); then the path of that record | S-031 (PROPOSED) |
+| `KINDS_OF_YEAR_RECORD_FILE` | Unset until a person signs the ONI record (D34, D66) | PROPOSED |
 | `RAIN_STRESS_TEST` | Unset (off) unless a person decides to switch the heavier-rain stress test on; then `on` | S-032 (PROPOSED) |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.
@@ -564,14 +448,13 @@ SOIL_SLOPE_EXAMPLE_FILE=<the soil-and-slope example> \
 uv run uvicorn api.main:app --reload
 ```
 
-**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on; `KINDS_OF_YEAR_RECORD_FILE` is not set either, since no record is shipped (D240 (5), R26, PROPOSED).
+**This calls the real service** on the first request of a case. A session never does that; a person does. For a test without the network, copy `adapters/examples/PLACEHOLDER_power_settings.json`: started with it unchanged, the server starts but every climate request fails (`https://power.invalid/` never resolves). `compose.yaml` lists the variables as comments; none is switched on.
 
 ## Interfaces and their implementations
 
 The route depends only on these interfaces. `create_app(cors_origins, *,
 climate=None, soil_slope=None, engines=None, rotation_validator=None,
-settings=None, parameters=None, decision_layer=None, kinds_of_year_record=None,
-engines_factory=None, plant_layer=None)` receives the
+settings=None, parameters=None, decision_layer=None)` receives the
 implementations; `None` means the default.
 
 | Interface | Defined in | Default | Default behaviour | Still to come |
@@ -581,7 +464,6 @@ implementations; `None` means the default.
 | `RotationEngines` | `api/ports.py` | **Real:** `EntryPointEngines(discover_engine_functions(), carbon_models=DEFAULT_CARBON_MODELS)` (`api/engines.py`) | Calls the engine functions found; a soil-loss or water engine that is not found gives its part in the not-built form (D12) | Nothing in `api/`: each engine is picked up when its lane lands it |
 | `RotationValidator` | `api/ports.py` | **Real:** `RotationDefinitionValidator` (`api/rotation_validator.py`) | Loads `rotation` into `RotationDefinition`, one `ErrorDetail` per error | — |
 | `DecisionLayer` (PROPOSED) | `api/ports.py` | `DiscoveredDecisionLayer()` (`api/decision_layer.py`) | Looks `decision.output.assemble_decision_output` up on each request, calls it and checks what it returns; when it is absent or fails, a typed absence, `NOT_AVAILABLE` | Built in sub-lane L2b: `decision/output.py` (PROPOSED). Its counts name their carbon model and computation (D169, #331) |
-| `PlantLayer` (PROPOSED, S-031) | `api/ports.py` | `DiscoveredPlantLayer()` (`api/plant_layer.py`) | Finds `contracts.plant_answer` (`PlantRequest`, `PlantAnswer`) and `economics.plant.answer_plant` by name on each request and gives them as `PlantParts`; absent, `Missing` `NOT_AVAILABLE` and the plant route answers the not-built body | Nothing in `api/` |
 
 The engine stand-in `EnginesNotBuilt` and the validator stand-in
 `AcceptAnyRotation` are **removed**: no test needs them. The runner reports an
