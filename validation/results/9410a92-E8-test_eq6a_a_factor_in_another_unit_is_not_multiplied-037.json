@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "9410a92-E8-test_eq6a_a_factor_in_another_unit_is_not_multiplied-037",
+  "run_id": "run-20261115T122846Z-9410a92",
+  "test_code": "E8",
+  "expected": {
+    "missing_reason": "the entry E8 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_equation.py::test_eq6a_a_factor_in_another_unit_is_not_multiplied[NOT_APPLICABLE-k]"
+  },
+  "notes": "Test engine/erosion/test_equation.py::test_eq6a_a_factor_in_another_unit_is_not_multiplied[NOT_APPLICABLE-k]. Placed under E8: listed by name on the 'Test' line of entry E8 of docs/VALIDATION.md."
+}
