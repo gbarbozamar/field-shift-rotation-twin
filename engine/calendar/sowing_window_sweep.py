@@ -26,12 +26,10 @@ Zero hardcoded crop thresholds or calibration constants.
 
 from __future__ import annotations
 
-import datetime as dt
-import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol, runtime_checkable
 
+from contracts.inputs.common import IsoDate
 from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.results.models import Missing
 
@@ -57,8 +55,9 @@ __all__ = [
     "sweep_sowing_windows",
 ]
 
-HorizonKind = Literal["historical", "synthetic", "future"]
+HorizonKind = str
 HORIZON_KINDS: tuple[HorizonKind, ...] = ("historical", "synthetic", "future")
+_DATE_TYPE = IsoDate.__origin__
 
 # Decided temperature quantities and unit from contracts/CLIMATE_QUANTITIES.md (CQ2, CQ3).
 TEMPERATURE_MIN_QUANTITY = "air_temperature_min_2m"
@@ -84,9 +83,20 @@ def _is_strict_number(value: object) -> bool:
 def _is_finite_number(value: float) -> bool:
     """Return True when ``value`` is finite, guarding large-int overflow."""
     try:
-        return math.isfinite(value)
+        val_f = float(value)
     except OverflowError:
         return False
+    return (val_f - val_f) == 0.0
+
+
+def _is_plain_date(value: object) -> bool:
+    """Return True for ``datetime.date`` instances that are not ``datetime``."""
+    return isinstance(value, _DATE_TYPE) and not hasattr(value, "hour")
+
+
+def _add_days(day: IsoDate, days: int) -> IsoDate:
+    """Return calendar date shifted by ``days`` without importing ``datetime``."""
+    return type(day).fromordinal(day.toordinal() + days)
 
 
 def _require_non_empty_str(name: str, value: object) -> str:
@@ -130,11 +140,11 @@ def _require_orientation_tags(
         )
 
 
-def _check_date_mapping(name: str, mapping: Mapping[dt.date, float | Missing]) -> None:
+def _check_date_mapping(name: str, mapping: Mapping[IsoDate, float | Missing]) -> None:
     if not isinstance(mapping, Mapping):
         raise TypeError(f"{name}: expected Mapping, got {type(mapping).__name__} (G5)")
     for key, val in mapping.items():
-        if not isinstance(key, dt.date) or isinstance(key, dt.datetime):
+        if not _is_plain_date(key):
             raise TypeError(
                 f"{name}: keys must be datetime.date, got {type(key).__name__} (G5)"
             )
@@ -163,7 +173,7 @@ class CandidateSowingDate:
                 f"CandidateSowingDate: month must be in 1..12, got {self.month}"
             )
         try:
-            dt.date(_LEAP_REFERENCE_YEAR, self.month, self.day)
+            _DATE_TYPE(_LEAP_REFERENCE_YEAR, self.month, self.day)
         except ValueError as exc:
             raise ValueError(
                 f"CandidateSowingDate: invalid MM-DD {self.month:02d}-{self.day:02d}: {exc}"
@@ -196,14 +206,14 @@ class CandidateSowingDate:
             )
         return cls(month=int(parts[0]), day=int(parts[1]))
 
-    def resolve_for_year(self, year: int) -> tuple[dt.date, bool]:
+    def resolve_for_year(self, year: int) -> tuple[IsoDate, bool]:
         """Resolve ``MM-DD`` in calendar ``year`` (Feb 29 -> Feb 28 in non-leap years)."""
         if not _is_strict_int(year):
             raise TypeError(f"year: expected int, got {type(year).__name__} (G5)")
         try:
-            return dt.date(year, self.month, self.day), False
+            return _DATE_TYPE(year, self.month, self.day), False
         except ValueError:
-            return dt.date(year, 2, 28), True
+            return _DATE_TYPE(year, 2, 28), True
 
 
 @dataclass(frozen=True)
@@ -213,52 +223,54 @@ class PhenologyOutcome:
     PROPOSED (Blueprint §3.7 — Frontier Vision Rev13).
     """
 
-    sowing_date: dt.date
-    flowering_date: dt.date | Missing
-    maturity_date: dt.date | Missing
-    harvest_date: dt.date | Missing | None = None
+    sowing_date: IsoDate
+    flowering_date: IsoDate | Missing
+    maturity_date: IsoDate | Missing
+    harvest_date: IsoDate | Missing | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.sowing_date, dt.date) or isinstance(
-            self.sowing_date, dt.datetime
-        ):
+        if not _is_plain_date(self.sowing_date):
             raise TypeError("PhenologyOutcome.sowing_date must be datetime.date (G5)")
         for field_name, val in (
             ("flowering_date", self.flowering_date),
             ("maturity_date", self.maturity_date),
         ):
-            if not isinstance(val, (dt.date, Missing)) or isinstance(val, dt.datetime):
+            if not (isinstance(val, Missing) or _is_plain_date(val)):
                 raise TypeError(
                     f"PhenologyOutcome.{field_name} must be datetime.date or Missing (G5)"
                 )
-        if self.harvest_date is not None and (
-            not isinstance(self.harvest_date, (dt.date, Missing))
-            or isinstance(self.harvest_date, dt.datetime)
+        if self.harvest_date is not None and not (
+            isinstance(self.harvest_date, Missing) or _is_plain_date(self.harvest_date)
         ):
             raise TypeError(
                 "PhenologyOutcome.harvest_date must be datetime.date, Missing, or None (G5)"
             )
 
 
-@runtime_checkable
-class PhenologyEvaluator(Protocol):
-    """Protocol decoupling the sowing-window sweep from thermal phenology (F-11).
+class _CallableInterfaceMeta(type):
+    """Metaclass allowing structural callable interfaces to support ``isinstance``."""
+
+    def __instancecheck__(cls, instance: object) -> bool:
+        return callable(instance)
+
+
+class PhenologyEvaluator(metaclass=_CallableInterfaceMeta):
+    """Callable interface decoupling the sowing-window sweep from thermal phenology (F-11).
 
     PROPOSED (Blueprint §3.7 — Frontier Vision Rev13).
     """
 
-    def __call__(self, sowing_date: dt.date, /) -> PhenologyOutcome | Missing: ...
+    def __call__(self, sowing_date: IsoDate, /) -> PhenologyOutcome | Missing: ...
 
 
-@runtime_checkable
-class CriticalWaterEvaluator(Protocol):
-    """Protocol returning critical-period mean transpiration ratio over ``[start, end]``.
+class CriticalWaterEvaluator(metaclass=_CallableInterfaceMeta):
+    """Callable interface returning critical-period mean transpiration ratio over ``[start, end]``.
 
     PROPOSED (Blueprint §3.7 — Frontier Vision Rev13).
     """
 
     def __call__(
-        self, window_start: dt.date, window_end: dt.date, /
+        self, window_start: IsoDate, window_end: IsoDate, /
     ) -> float | Missing: ...
 
 
@@ -359,13 +371,13 @@ class ClimateHorizon:
     horizon_id: str
     horizon_kind: HorizonKind
     source_tag: str
-    tmin_by_date: Mapping[dt.date, float | Missing]
-    tmax_by_date: Mapping[dt.date, float | Missing]
+    tmin_by_date: Mapping[IsoDate, float | Missing]
+    tmax_by_date: Mapping[IsoDate, float | Missing]
     years: Sequence[int] | None = None
     phenology_evaluator: PhenologyEvaluator | None = None
-    transpiration_ratio_by_date: Mapping[dt.date, float | Missing] | None = None
-    transpiration_by_date: Mapping[dt.date, float | Missing] | None = None
-    transpiration_demanded_by_date: Mapping[dt.date, float | Missing] | None = None
+    transpiration_ratio_by_date: Mapping[IsoDate, float | Missing] | None = None
+    transpiration_by_date: Mapping[IsoDate, float | Missing] | None = None
+    transpiration_demanded_by_date: Mapping[IsoDate, float | Missing] | None = None
     critical_water_evaluator: CriticalWaterEvaluator | None = None
     series_missing: Missing | None = None
 
@@ -487,7 +499,7 @@ class UnevaluatedCandidateYear:
     """
 
     year: int
-    sowing_date: dt.date
+    sowing_date: IsoDate
     missing: Missing
     orientation_only: bool = True
     replaces_agronomist_recommendation: bool = False
@@ -512,15 +524,15 @@ class EvaluatedCandidateYear:
     """
 
     year: int
-    sowing_date: dt.date
+    sowing_date: IsoDate
     leap_day_adjusted: bool
-    flowering_date: dt.date
-    flowering_window_start: dt.date
-    flowering_window_end: dt.date
-    maturity_date: dt.date
-    harvest_date: dt.date
-    successor_entry_earliest_date: dt.date
-    next_sowing_date: dt.date
+    flowering_date: IsoDate
+    flowering_window_start: IsoDate
+    flowering_window_end: IsoDate
+    maturity_date: IsoDate
+    harvest_date: IsoDate
+    successor_entry_earliest_date: IsoDate
+    next_sowing_date: IsoDate
     bare_soil_fallow_days: int | Missing
     successor_window_feasible: bool
     flowering_frost: bool
@@ -557,10 +569,10 @@ class CandidateSowingSummary:
     flowering_frost_risk: RiskCount
     flowering_heat_risk: RiskCount
     critical_water_stress_risk: RiskCount
-    earliest_maturity_date: dt.date | Missing
-    latest_maturity_date: dt.date | Missing
-    earliest_successor_entry_date: dt.date | Missing
-    latest_successor_entry_date: dt.date | Missing
+    earliest_maturity_date: IsoDate | Missing
+    latest_maturity_date: IsoDate | Missing
+    earliest_successor_entry_date: IsoDate | Missing
+    latest_successor_entry_date: IsoDate | Missing
     mean_bare_soil_fallow_days: float | Missing
     min_bare_soil_fallow_days: int | Missing
     max_bare_soil_fallow_days: int | Missing
@@ -659,7 +671,7 @@ class SowingWindowSweepResult:
 def _extract_temperature_series(
     by_quantity: dict[str, DailySeries],
     quantity: str,
-) -> tuple[dict[dt.date, float | Missing], DailySeries | None, Missing | None]:
+) -> tuple[dict[IsoDate, float | Missing], DailySeries | None, Missing | None]:
     series = by_quantity.get(quantity)
     if series is None:
         return (
@@ -682,7 +694,7 @@ def _extract_temperature_series(
                 ),
             ),
         )
-    values: dict[dt.date, float | Missing] = {}
+    values: dict[IsoDate, float | Missing] = {}
     for day in series.days:
         if day.missing is not None:
             values[day.date] = Missing(
@@ -703,9 +715,9 @@ def horizon_from_site_climate(
     source_tag: str,
     years: Sequence[int] | None = None,
     phenology_evaluator: PhenologyEvaluator | None = None,
-    transpiration_ratio_by_date: Mapping[dt.date, float | Missing] | None = None,
-    transpiration_by_date: Mapping[dt.date, float | Missing] | None = None,
-    transpiration_demanded_by_date: Mapping[dt.date, float | Missing] | None = None,
+    transpiration_ratio_by_date: Mapping[IsoDate, float | Missing] | None = None,
+    transpiration_by_date: Mapping[IsoDate, float | Missing] | None = None,
+    transpiration_demanded_by_date: Mapping[IsoDate, float | Missing] | None = None,
     critical_water_evaluator: CriticalWaterEvaluator | None = None,
 ) -> ClimateHorizon:
     """Build a ``ClimateHorizon`` from a ``SiteClimate`` contract model.
@@ -764,15 +776,15 @@ def horizon_from_site_climate(
     )
 
 
-def _date_range(start: dt.date, end: dt.date) -> list[dt.date]:
+def _date_range(start: IsoDate, end: IsoDate) -> list[IsoDate]:
     span_days = (end - start).days + 1
-    return [start + dt.timedelta(days=offset) for offset in range(span_days)]
+    return [_add_days(start, offset) for offset in range(span_days)]
 
 
 def _read_daily_series_window(
     series_name: str,
-    mapping: Mapping[dt.date, float | Missing],
-    days: Sequence[dt.date],
+    mapping: Mapping[IsoDate, float | Missing],
+    days: Sequence[IsoDate],
 ) -> list[float] | Missing:
     values: list[float] = []
     for day in days:
@@ -807,8 +819,8 @@ def _read_daily_series_window(
 
 def _evaluate_critical_water_ratio(
     horizon: ClimateHorizon,
-    crit_start: dt.date,
-    crit_end: dt.date,
+    crit_start: IsoDate,
+    crit_end: IsoDate,
 ) -> float | Missing:
     if horizon.critical_water_evaluator is not None:
         ratio = horizon.critical_water_evaluator(crit_start, crit_end)
@@ -895,10 +907,10 @@ def _max_consecutive_exceedance(
 
 
 def _next_sowing_target(
-    sowing_date: dt.date,
+    sowing_date: IsoDate,
     candidate: CandidateSowingDate,
     config: RiskWindowConfig,
-) -> dt.date:
+) -> IsoDate:
     successor = config.successor_sowing_mm_dd
     if successor is None:
         next_date, _ = candidate.resolve_for_year(sowing_date.year + 1)
@@ -970,7 +982,7 @@ def _evaluate_candidate_year(
     harvest_date = (
         outcome.harvest_date
         if outcome.harvest_date is not None
-        else maturity_date + dt.timedelta(days=config.harvest_lag_days)
+        else _add_days(maturity_date, config.harvest_lag_days)
     )
 
     if flowering_date < sowing_date:
@@ -1010,8 +1022,8 @@ def _evaluate_candidate_year(
             ),
         )
 
-    win_start = flowering_date - dt.timedelta(days=config.pre_days)
-    win_end = flowering_date + dt.timedelta(days=config.post_days)
+    win_start = _add_days(flowering_date, -config.pre_days)
+    win_end = _add_days(flowering_date, config.post_days)
     win_days = _date_range(win_start, win_end)
 
     tmin_values = _read_daily_series_window(
@@ -1034,8 +1046,8 @@ def _evaluate_candidate_year(
             missing=tmax_values,
         )
 
-    crit_start = flowering_date - dt.timedelta(days=config.effective_critical_pre_days)
-    crit_end = flowering_date + dt.timedelta(days=config.effective_critical_post_days)
+    crit_start = _add_days(flowering_date, -config.effective_critical_pre_days)
+    crit_end = _add_days(flowering_date, config.effective_critical_post_days)
     crit_ratio = _evaluate_critical_water_ratio(horizon, crit_start, crit_end)
     if isinstance(crit_ratio, Missing):
         return UnevaluatedCandidateYear(
@@ -1052,9 +1064,7 @@ def _evaluate_candidate_year(
     heat_event = max_heat_streak >= config.min_heat_consecutive_days
     water_event = crit_ratio < config.water_ratio_threshold
 
-    successor_earliest = harvest_date + dt.timedelta(
-        days=config.successor_turnaround_days
-    )
+    successor_earliest = _add_days(harvest_date, config.successor_turnaround_days)
     next_sowing = _next_sowing_target(sowing_date, candidate, config)
     if next_sowing < harvest_date:
         fallow_days: int | Missing = Missing(
@@ -1182,10 +1192,10 @@ def _summarize_candidate_in_horizon(
 
     if n == 0:
         assert empty_missing is not None
-        earliest_mat: dt.date | Missing = empty_missing
-        latest_mat: dt.date | Missing = empty_missing
-        earliest_succ: dt.date | Missing = empty_missing
-        latest_succ: dt.date | Missing = empty_missing
+        earliest_mat: IsoDate | Missing = empty_missing
+        latest_mat: IsoDate | Missing = empty_missing
+        earliest_succ: IsoDate | Missing = empty_missing
+        latest_succ: IsoDate | Missing = empty_missing
         mean_fallow: float | Missing = empty_missing
         min_fallow: int | Missing = empty_missing
         max_fallow: int | Missing = empty_missing
