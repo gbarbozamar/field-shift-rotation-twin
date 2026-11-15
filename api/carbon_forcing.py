@@ -2,13 +2,21 @@
 
 ``build_carbon_forcing(calendar, climate, soil_slope)`` builds the one forcing
 of one rotation from what the runner already holds: the ``RotationCalendar``
-of EP2, the ``SiteClimate`` and the ``SiteSoilSlope``. The runner gives it to
-EP5 ``engine.amg.run_amg`` (and, once it exists, to EP6).
+of EP2, the ``SiteClimate`` and the ``SiteSoilSlope``, and the daily FAO-56
+reference evapotranspiration of D44 that the runner computes
+(``reference_evapotranspiration``). The runner gives it to EP5
+``engine.amg.run_amg`` and EP6 ``engine.rothc.run_rothc``.
 
-It converts no unit and fills no gap. The one value it computes is the one
-a decision fixes: the yearly ``mean_temperature`` of D118 of #77, the
+It converts no unit and fills no gap. The values it computes are those
+decisions fix: the yearly ``mean_temperature`` of D118 of #77, the
 arithmetic mean over each agricultural year of the daily mean of D30 (from
-the daily maximum and minimum). Soil properties and the starting carbon are
+the daily maximum and minimum); and the monthly ``climate`` of RothC of D220:
+``rainfall``, the sum over the calendar month of the daily ``precipitation``;
+``potential_evapotranspiration``, the sum over the month of the daily
+reference evapotranspiration, which stands in for the potential
+evapotranspiration (D80); and ``mean_temperature``, the mean over the month
+of the daily means of D30. A month with any day missing is missing with its
+reason (C3.3, C3.4). ``soil_depth`` is the 20 cm of D180. Soil properties and the starting carbon are
 copied unchanged from ``SiteSoilSlope`` when present (D120, D121). Every
 quantity whose definition, aggregation or source is not decided, or not yet
 usable, is written missing with its reason, never zero (C3.1). The identifiers of the quantities
@@ -36,22 +44,25 @@ Pure: no file, no network, no clock; no argument is changed.
 from __future__ import annotations
 
 import datetime as dt
+import math
 import re
 import statistics
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from contracts.carbon_forcing import (
     AnnualCarbonInputSeries,
     AnnualSeries,
     AnnualValue,
     CarbonForcing,
+    CarbonInputSeries,
+    ClimateSeries,
     ForcingHorizon,
     StartingStateValue,
 )
 from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
 from contracts.inputs.common import Missing as InputMissing
 from contracts.inputs.common import Value
-from contracts.inputs.site_climate import YearMonth
+from contracts.inputs.site_climate import DailySeries, MonthlyValue, YearMonth
 from contracts.inputs.site_soil_slope import SoilProperty
 from contracts.results.models import UNIT_SOIL_CARBON_TREND
 from contracts.results.models import Missing as ResultsMissing
@@ -68,6 +79,13 @@ SOIL_PROPERTIES: tuple[str, ...] = (
     SOIL_CN_RATIO,
 )
 STARTING_CARBON = "soil_organic_carbon"  # starting_state
+# The monthly climate of RothC (D220), as engine/rothc/entry.py reads it
+# (FORCING_QUANTITIES). No ``open_pan_evaporation`` series is written: EP6 then
+# divides the potential evapotranspiration by the pan factor (D220).
+RAINFALL = "rainfall"  # climate
+POTENTIAL_EVAPOTRANSPIRATION = "potential_evapotranspiration"  # climate
+# ``mean_temperature`` of the monthly climate is MEAN_TEMPERATURE, the same
+# identifier as the yearly series of annual_climate, in another part.
 
 # --- units ----------------------------------------------------------------------
 
@@ -78,12 +96,31 @@ UNIT_OPEN = "OPEN"
 # inputs (its ``STOCK_UNIT``, engine/amg/README.md "EP5 run_amg"): the unit of
 # C1.5 without "per year". Derived here the same way, from the contract constant.
 STOCK_UNIT = UNIT_SOIL_CARBON_TREND.removesuffix(" yr-1")
+# The daily depth of water of the precipitation series (CQ1 of
+# contracts/CLIMATE_QUANTITIES.md) and of the FAO-56 reference
+# evapotranspiration (eq. 6), and the depth of a month: a month's sum of daily
+# depths, mm day-1 times days. A definition, not a value of the method.
+DAILY_DEPTH_UNIT = "mm day-1"
+MONTHLY_DEPTH_UNIT = "mm"
+
+# --- D180: the soil depth --------------------------------------------------------
+
+# D180 of #77: "`soil_depth` = 20 cm, the carbon benchmark depth of D71,
+# written in `cm` because RothC compares it with the unit of
+# `rothc_tsmd_reference_depth` (AMG copies it without using it)." The value
+# of a decision, written as decided.
+SOIL_DEPTH_D180 = 20.0
+SOIL_DEPTH_UNIT = "cm"
+SOIL_DEPTH_SOURCE = (
+    "D180 of #77: the carbon benchmark depth of D71 (0-20 cm), written in cm "
+    "because RothC compares it with the unit of rothc_tsmd_reference_depth"
+)
 
 # --- the detail texts (PROPOSED; English for developers, never shown to users) --
 
-SOIL_DEPTH_OPEN = (
-    "the soil depth and its unit are OPEN (C1.6 of contracts/CONVENTIONS.md, "
-    "for the science reviewers)"
+PET_NOT_PASSED = (
+    "potential_evapotranspiration (D220 of #77) is the monthly sum of the daily "
+    "FAO-56 reference evapotranspiration of D44, which the runner did not pass"
 )
 WATER_BALANCE_OPEN = (
     "water_balance (D119 of #77: precipitation minus the FAO-56 reference "
@@ -117,6 +154,10 @@ STARTING_CARBON_OPEN = (
 # contracts/CLIMATE_QUANTITIES.md (CQ2, CQ3), never by position.
 TEMPERATURE_MAX = "air_temperature_max_2m"
 TEMPERATURE_MIN = "air_temperature_min_2m"
+
+# The daily series of CQ1 (D23), by identifier, never by position. Never the
+# control series ``precipitation_reanalysis`` (CQ1b, D24).
+PRECIPITATION = "precipitation"
 
 # The pattern of ``QuantityId`` of contracts/inputs/common.py, which ``origin``
 # and ``quantity`` of a carbon-input series must follow.
@@ -338,6 +379,317 @@ def _annual_mean_temperature(
     )
 
 
+# --- D220: the monthly climate of RothC --------------------------------------------
+
+# One day of a daily series: a number, or why it is missing.
+DayValue = float | InputMissing
+# What the runner passes as the daily reference evapotranspiration (see
+# ``build_carbon_forcing``): a mapping, a single Missing, or None.
+ReferenceEvapotranspiration = (
+    Mapping[dt.date, float | InputMissing | ResultsMissing]
+    | InputMissing
+    | ResultsMissing
+    | None
+)
+
+
+def _months(horizon: ForcingHorizon) -> list[tuple[int, int]]:
+    """The calendar months of the horizon, in order."""
+    months = []
+    year, month = horizon.start.year, horizon.start.month
+    while (year, month) <= (horizon.end.year, horizon.end.month):
+        months.append((year, month))
+        year, month = (year, month + 1) if month < 12 else (year + 1, 1)
+    return months
+
+
+def _days_of(year: int, month: int) -> list[dt.date]:
+    first = dt.date(year, month, 1)
+    after = dt.date(year + 1, 1, 1) if month == 12 else dt.date(year, month + 1, 1)
+    return [first + dt.timedelta(days=n) for n in range((after - first).days)]
+
+
+def _span(months: list[tuple[int, int]]) -> dict:
+    return {
+        "start": YearMonth(year=months[0][0], month=months[0][1]),
+        "end": YearMonth(year=months[-1][0], month=months[-1][1]),
+    }
+
+
+def _by_month(
+    quantity: str,
+    unit: str,
+    months: list[tuple[int, int]],
+    by_day: Mapping[dt.date, DayValue],
+    what: str,
+    combine: Callable[[list[float]], float],
+    header: dict,
+) -> ClimateSeries:
+    """One monthly series: ``combine`` over the days of each month, or why not.
+
+    A day with no item is ``NO_COVERAGE`` and a day held missing keeps its
+    reason; either makes its month missing, never filled or partly combined
+    (C3.3, C3.4). The ``header`` (provenance, source, range_missing,
+    assumption) is written only when at least one month holds a value.
+    """
+    items: list[MonthlyValue] = []
+    for year, month in months:
+        values: list[float] = []
+        gap: InputMissing | None = None
+        for day in _days_of(year, month):
+            value = by_day.get(day)
+            if value is None:
+                gap = _missing(
+                    "NO_COVERAGE",
+                    f"{quantity} (D220): {what} has no item for {day.isoformat()}",
+                )
+                break
+            if isinstance(value, InputMissing):
+                gap = _missing(
+                    value.reason,
+                    f"{quantity} (D220): {what} is missing on {day.isoformat()}"
+                    + (f" ({value.detail})" if value.detail else "")
+                    + "; a month with a missing day is not filled (C3.3, C3.4)",
+                )
+                break
+            values.append(value)
+        if gap is not None:
+            items.append(MonthlyValue(year=year, month=month, value=None, missing=gap))
+        else:
+            items.append(MonthlyValue(year=year, month=month, value=combine(values)))
+    present = any(item.value is not None for item in items)
+    return ClimateSeries(
+        quantity=quantity,
+        unit=unit,
+        months=items,
+        **_span(months),
+        **(header if present else {}),
+    )
+
+
+def _every_month_missing(
+    quantity: str, unit: str, months: list[tuple[int, int]], missing: InputMissing
+) -> ClimateSeries:
+    return ClimateSeries(
+        quantity=quantity,
+        unit=unit,
+        months=[
+            MonthlyValue(year=year, month=month, value=None, missing=missing)
+            for year, month in months
+        ],
+        **_span(months),
+    )
+
+
+def _range_missing(series: Sequence[DailySeries]) -> InputMissing:
+    reasons = {item.range_missing.reason for item in series if item.range_missing}
+    return _missing(
+        reasons.pop() if len(reasons) == 1 else "NOT_AVAILABLE",
+        "the input series carry no range, and none is derived (C2.2)",
+    )
+
+
+def _daily_values(series: DailySeries) -> dict[dt.date, DayValue]:
+    """The days of a daily series: the number, or why it is missing."""
+    values: dict[dt.date, DayValue] = {}
+    for day in series.days:
+        if day.value is not None:
+            values[day.date] = day.value
+            continue
+        assert day.missing is not None
+        values[day.date] = _missing(
+            day.missing.reason,
+            f"{series.quantity!r} holds it missing, reason {day.missing.reason}"
+            + (f": {day.missing.detail}" if day.missing.detail else ""),
+        )
+    return values
+
+
+def _monthly_rainfall(
+    climate: SiteClimate, months: list[tuple[int, int]]
+) -> ClimateSeries:
+    """D220: the sum over each calendar month of the daily ``precipitation``, in mm."""
+    found = {series.quantity: series for series in climate.daily_series}
+    series = found.get(PRECIPITATION)
+    if series is None:
+        return _every_month_missing(
+            RAINFALL,
+            MONTHLY_DEPTH_UNIT,
+            months,
+            _missing(
+                "MISSING_INPUT",
+                f"rainfall (D220) needs the daily series {PRECIPITATION!r} of site "
+                "data: climate, which it does not carry",
+            ),
+        )
+    if series.unit != DAILY_DEPTH_UNIT:
+        return _every_month_missing(
+            RAINFALL,
+            MONTHLY_DEPTH_UNIT,
+            months,
+            _missing(
+                "NOT_COMPUTABLE",
+                f"rainfall (D220): the daily series {PRECIPITATION!r} is in "
+                f"{series.unit!r}, not {DAILY_DEPTH_UNIT!r}; nothing is converted",
+            ),
+        )
+    return _by_month(
+        RAINFALL,
+        MONTHLY_DEPTH_UNIT,
+        months,
+        _daily_values(series),
+        f"the daily series {PRECIPITATION!r}",
+        math.fsum,
+        {
+            "provenance": "DERIVED",
+            "source": (
+                "derived by api.carbon_forcing: sum over the calendar month (D220 "
+                f"of #77) of the daily {PRECIPITATION} (CQ1, D23)"
+                + (f"; input series: {series.source}" if series.source else "")
+            ),
+            "assumption": series.assumption,
+            "range_missing": _range_missing([series]),
+        },
+    )
+
+
+def _monthly_potential_evapotranspiration(
+    reference_evapotranspiration: ReferenceEvapotranspiration,
+    months: list[tuple[int, int]],
+) -> ClimateSeries:
+    """D220: the sum over each calendar month of the daily FAO-56 reference
+    evapotranspiration of D44, in mm, standing in for the potential
+    evapotranspiration of RothC (D80)."""
+    if reference_evapotranspiration is None:
+        return _every_month_missing(
+            POTENTIAL_EVAPOTRANSPIRATION,
+            MONTHLY_DEPTH_UNIT,
+            months,
+            _missing("NOT_AVAILABLE", PET_NOT_PASSED),
+        )
+    if isinstance(reference_evapotranspiration, InputMissing | ResultsMissing):
+        given = reference_evapotranspiration
+        return _every_month_missing(
+            POTENTIAL_EVAPOTRANSPIRATION,
+            MONTHLY_DEPTH_UNIT,
+            months,
+            _missing(
+                given.reason,
+                "potential_evapotranspiration (D220): the daily FAO-56 reference "
+                "evapotranspiration of D44 could not be computed"
+                + (f": {given.detail}" if given.detail else ""),
+            ),
+        )
+    by_day: dict[dt.date, DayValue] = {}
+    for day, value in reference_evapotranspiration.items():
+        if isinstance(value, InputMissing | ResultsMissing):
+            by_day[day] = _missing(
+                value.reason,
+                "the reference evapotranspiration of the day is missing"
+                + (f": {value.detail}" if value.detail else ""),
+            )
+        else:
+            by_day[day] = float(value)
+    return _by_month(
+        POTENTIAL_EVAPOTRANSPIRATION,
+        MONTHLY_DEPTH_UNIT,
+        months,
+        by_day,
+        "the daily FAO-56 reference evapotranspiration (D44)",
+        math.fsum,
+        {
+            "provenance": "DERIVED",
+            "source": (
+                "derived by api.carbon_forcing: sum over the calendar month (D220 "
+                "of #77) of the daily FAO-56 Penman-Monteith reference "
+                "evapotranspiration of D44 (eq. 6), which stands in for the "
+                "potential evapotranspiration of RothC (D80): an adaptation"
+            ),
+            "range_missing": _missing(
+                "NOT_AVAILABLE",
+                "no range is derived for the reference evapotranspiration (C2.2)",
+            ),
+        },
+    )
+
+
+def _monthly_mean_temperature(
+    climate: SiteClimate, months: list[tuple[int, int]]
+) -> ClimateSeries:
+    """D220: the mean over each calendar month of the daily means of D30, in
+    the unit of the daily series."""
+    found = {series.quantity: series for series in climate.daily_series}
+    absent = [q for q in (TEMPERATURE_MAX, TEMPERATURE_MIN) if q not in found]
+    if absent:
+        return _every_month_missing(
+            MEAN_TEMPERATURE,
+            UNIT_OPEN,
+            months,
+            _missing(
+                "MISSING_INPUT",
+                "mean_temperature (D220, D30) needs the daily series "
+                + " and ".join(repr(q) for q in absent)
+                + " of site data: climate, which it does not carry",
+            ),
+        )
+    high, low = found[TEMPERATURE_MAX], found[TEMPERATURE_MIN]
+    if high.unit != low.unit:
+        return _every_month_missing(
+            MEAN_TEMPERATURE,
+            UNIT_OPEN,
+            months,
+            _missing(
+                "NOT_COMPUTABLE",
+                f"mean_temperature (D220, D30): the daily series {TEMPERATURE_MAX!r} "
+                f"and {TEMPERATURE_MIN!r} are in different units; nothing is converted",
+            ),
+        )
+    highs, lows = _daily_values(high), _daily_values(low)
+    by_day: dict[dt.date, DayValue] = {}
+    for day in highs.keys() & lows.keys():
+        high_value, low_value = highs[day], lows[day]
+        if isinstance(high_value, InputMissing):
+            by_day[day] = high_value
+        elif isinstance(low_value, InputMissing):
+            by_day[day] = low_value
+        else:
+            by_day[day] = daily_mean_temperature(high_value, low_value)
+    return _by_month(
+        MEAN_TEMPERATURE,
+        high.unit,
+        months,
+        by_day,
+        f"the daily series {TEMPERATURE_MAX!r} and {TEMPERATURE_MIN!r}",
+        statistics.fmean,
+        {
+            "provenance": "DERIVED",
+            "source": (
+                "derived by api.carbon_forcing: arithmetic mean over the calendar "
+                "month (D220 of #77) of the daily mean of "
+                f"{TEMPERATURE_MAX} and {TEMPERATURE_MIN} (D30 of #77)"
+            ),
+            "assumption": high.assumption or low.assumption,
+            "range_missing": _range_missing([high, low]),
+        },
+    )
+
+
+def monthly_climate(
+    climate: SiteClimate,
+    horizon: ForcingHorizon,
+    reference_evapotranspiration: ReferenceEvapotranspiration,
+) -> list[ClimateSeries]:
+    """The monthly ``climate`` of the forcing for RothC (D220): ``rainfall``,
+    ``potential_evapotranspiration`` and ``mean_temperature``, over the months
+    of the horizon. No ``open_pan_evaporation`` series."""
+    months = _months(horizon)
+    return [
+        _monthly_rainfall(climate, months),
+        _monthly_potential_evapotranspiration(reference_evapotranspiration, months),
+        _monthly_mean_temperature(climate, months),
+    ]
+
+
 def _starting_carbon(soil_slope: SiteSoilSlope) -> StartingStateValue:
     """D121 (PROPOSED source): the soil item ``soil_organic_carbon`` in the stock unit.
 
@@ -435,12 +787,53 @@ def carbon_input_series(
     return copied
 
 
+def monthly_carbon_input_series(
+    horizon: ForcingHorizon,
+    monthly_carbon_inputs: Sequence[CarbonInputSeries] | None,
+) -> list[CarbonInputSeries]:
+    """``carbon_inputs`` of the forcing (D221 of #77). PROPOSED.
+
+    - ``None`` (EP4 not built, or a ledger without years): no series. EP6 then
+      finds no carbon input and says so; nothing is written as zero.
+    - A sequence (the ``monthly_carbon_inputs`` of a residue ledger): copied
+      unchanged, the same objects in the same order (D221: "the platform copies
+      it into ``carbon_inputs`` unchanged"; D147: no arithmetic, no unit
+      converted). A series that is not a ``CarbonInputSeries``, or that does not
+      run over the months of the horizon, is a defect of the producer:
+      ``TypeError``, as for the annual series.
+    """
+    if monthly_carbon_inputs is None:
+        return []
+    if isinstance(monthly_carbon_inputs, str | bytes) or not isinstance(
+        monthly_carbon_inputs, Sequence
+    ):
+        raise TypeError(
+            "monthly_carbon_inputs: expected a sequence of CarbonInputSeries"
+        )
+    copied: list[CarbonInputSeries] = []
+    for series in monthly_carbon_inputs:
+        if not isinstance(series, CarbonInputSeries):
+            raise TypeError(
+                f"monthly_carbon_inputs: expected CarbonInputSeries, not "
+                f"{type(series).__name__}"
+            )
+        if (series.start, series.end) != (horizon.start, horizon.end):
+            raise TypeError(
+                "monthly_carbon_inputs: a series of the residue ledger does not run "
+                "over the months of the forcing horizon"
+            )
+        copied.append(series)
+    return copied
+
+
 def build_carbon_forcing(
     calendar: RotationCalendar,
     climate: SiteClimate,
     soil_slope: SiteSoilSlope,
     *,
     carbon_inputs: Sequence[AnnualCarbonInputSeries] | InputMissing | None = None,
+    reference_evapotranspiration: ReferenceEvapotranspiration = None,
+    monthly_carbon_inputs: Sequence[CarbonInputSeries] | None = None,
 ) -> CarbonForcing | ResultsMissing:
     """The ``CarbonForcing`` of one rotation, or why it cannot be laid out.
 
@@ -448,6 +841,14 @@ def build_carbon_forcing(
     calendar's ``case_id`` and ``field_id`` (D14). ``carbon_inputs`` is what
     the residue ledger (EP4) gives for ``annual_carbon_inputs``, or ``None``
     when EP4 is not built (``carbon_input_series``).
+    ``reference_evapotranspiration`` is the daily FAO-56 reference
+    evapotranspiration of D44 the runner computes: a mapping from the day to
+    a number in mm day-1 (FAO-56 eq. 6) or a ``Missing`` of either contract
+    shape; a single ``Missing`` when it could not be computed at all; ``None``
+    when the runner passed none. It is plain data: this module imports nothing
+    of ``engine/``. ``monthly_carbon_inputs`` is the ``monthly_carbon_inputs``
+    of the residue ledger, copied into ``carbon_inputs`` unchanged (D221), or
+    ``None`` (``monthly_carbon_input_series``).
     """
     for name, given, model in (
         ("calendar", calendar, RotationCalendar),
@@ -488,6 +889,7 @@ def build_carbon_forcing(
         )
 
     annual_carbon_inputs = carbon_input_series(calendar, years, carbon_inputs)
+    horizon = horizon_of(start.month, years)
     return CarbonForcing(
         contract="carbon_forcing",
         example_data=(
@@ -496,14 +898,18 @@ def build_carbon_forcing(
         case_id=calendar.case_id,
         field_id=calendar.field_id,
         rotation_id=calendar.rotation_id,
-        horizon=horizon_of(start.month, years),
+        horizon=horizon,
         soil_depth=Value(
-            value=None,
-            unit=UNIT_OPEN,
-            missing=_missing("NOT_AVAILABLE", SOIL_DEPTH_OPEN),
+            value=SOIL_DEPTH_D180,
+            unit=SOIL_DEPTH_UNIT,
+            provenance="DECLARED",
+            source=SOIL_DEPTH_SOURCE,
+            range_missing=_missing(
+                "NOT_AVAILABLE", "D180 of #77 states the depth without a range"
+            ),
         ),
-        climate=[],
-        carbon_inputs=[],
+        climate=monthly_climate(climate, horizon, reference_evapotranspiration),
+        carbon_inputs=monthly_carbon_input_series(horizon, monthly_carbon_inputs),
         annual_climate=[
             _annual_mean_temperature(climate, start.month, years),
             AnnualSeries(

@@ -158,17 +158,24 @@ def test_the_horizon_is_the_whole_agricultural_years_of_the_record():
         assert (series.first_ag_year, series.last_ag_year) == years
 
 
-def test_every_value_but_mean_temperature_is_missing_with_its_reason():
+def test_every_value_but_the_decided_ones_is_missing_with_its_reason():
+    # The decided values: the yearly mean temperature (D118), the soil depth
+    # of D180, and the monthly rainfall and mean temperature of D220. The
+    # monthly potential evapotranspiration is missing here: no daily
+    # reference evapotranspiration is passed.
     forcing = chain_forcing()
     dumped = forcing.model_dump(mode="json")
     dumped["annual_climate"] = [
         s for s in dumped["annual_climate"] if s["quantity"] != "mean_temperature"
     ]
+    dumped["climate"] = [
+        s
+        for s in dumped["climate"]
+        if s["quantity"] not in ("rainfall", "mean_temperature")
+    ]
+    dumped.pop("soil_depth")
     assert values_in(dumped) == []  # no number at all, zero included
-    assert forcing.soil_depth.value is None
-    assert forcing.soil_depth.missing.reason == "NOT_AVAILABLE"
-    assert "C1.6" in forcing.soil_depth.missing.detail
-    assert forcing.soil_depth.unit == UNIT_OPEN
+    assert (forcing.soil_depth.value, forcing.soil_depth.unit) == (20.0, "cm")
     climate = {series.quantity: series for series in forcing.annual_climate}
     assert set(climate) == {producer.MEAN_TEMPERATURE, producer.WATER_BALANCE}
     assert "D119" in climate["water_balance"].years[0].missing.detail
@@ -202,8 +209,14 @@ def test_every_value_but_mean_temperature_is_missing_with_its_reason():
         "ph",
         "soil_cn_ratio",
     ]
-    # Monthly parts: run_amg reads annual series only.
-    assert (forcing.climate, forcing.carbon_inputs, forcing.soil_cover) == ([], [], [])
+    # Monthly parts: the climate of RothC (D220); the monthly carbon inputs
+    # (D221) and the cover (D222) are not written by this producer yet.
+    assert [series.quantity for series in forcing.climate] == [
+        "rainfall",
+        "potential_evapotranspiration",
+        "mean_temperature",
+    ]
+    assert (forcing.carbon_inputs, forcing.soil_cover) == ([], [])
 
 
 def test_one_carbon_input_series_per_crop_with_the_crop_as_origin():
@@ -541,3 +554,218 @@ def test_d121_absent_is_missing_naming_d121():
     (state,) = chain_forcing().starting_state
     assert state.missing.reason == "NOT_AVAILABLE"
     assert "D121" in state.missing.detail
+
+
+# --- D220: the monthly climate of RothC; D180: the soil depth ----------------------
+#
+# The chain climate example holds one agricultural year, 2001-07-01 to
+# 2002-06-30, every value 1234.5 (PLACEHOLDER). The hand counts below use
+# that, or a copy of it with some days changed; the numbers mean nothing.
+
+
+def with_days(quantity: str, changes: dict[str, dict[str, Any]]) -> SiteClimate:
+    climate = json.loads(json.dumps(CHAIN_CLIMATE))
+    for series in climate["daily_series"]:
+        if series["quantity"] == quantity:
+            series["days"] = [
+                {"date": day["date"], **changes[day["date"]]}
+                if day["date"] in changes
+                else day
+                for day in series["days"]
+            ]
+    return SiteClimate.model_validate(climate)
+
+
+def monthly(forcing: CarbonForcing, quantity: str):
+    (series,) = [item for item in forcing.climate if item.quantity == quantity]
+    return series, {(item.year, item.month): item for item in series.months}
+
+
+def forcing_with(climate: SiteClimate | None = None, **kwargs: Any) -> CarbonForcing:
+    built = build_carbon_forcing(
+        chain_calendar(), climate or chain_climate(), chain_soil_slope(), **kwargs
+    )
+    assert isinstance(built, CarbonForcing), built
+    return built
+
+
+def every_day_of_the_record() -> list[dt.date]:
+    first, last = the_period()
+    return [first + dt.timedelta(days=n) for n in range((last - first).days + 1)]
+
+
+def test_d180_the_soil_depth_is_20_cm_with_its_source():
+    depth = chain_forcing().soil_depth
+    assert (depth.value, depth.unit, depth.provenance) == (20.0, "cm", "DECLARED")
+    assert "D180" in depth.source
+    assert depth.missing is None
+    assert depth.range_missing.reason == "NOT_AVAILABLE"
+
+
+def test_d220_the_months_follow_the_horizon_and_no_pan_series_is_written():
+    forcing = chain_forcing()
+    assert [series.quantity for series in forcing.climate] == [
+        "rainfall",
+        "potential_evapotranspiration",
+        "mean_temperature",
+    ]
+    for series in forcing.climate:
+        assert (series.start, series.end) == (
+            forcing.horizon.start,
+            forcing.horizon.end,
+        )
+        assert len(series.months) == 12
+    assert "open_pan_evaporation" not in {s.quantity for s in forcing.climate}
+
+
+def test_d220_rainfall_is_the_sum_of_the_days_of_each_month_in_mm():
+    # July 2001: 31 days of 1234.5 = 38269.5. February 2002: 28 days, of which
+    # 2002-02-10 is changed to 0.5: 27 x 1234.5 + 0.5 = 33331.5 + 0.5 = 33332.0.
+    climate = with_days("precipitation", {"2002-02-10": {"value": 0.5}})
+    series, by_month = monthly(forcing_with(climate), "rainfall")
+    assert series.unit == "mm"
+    assert by_month[(2001, 7)].value == 38269.5
+    assert by_month[(2002, 2)].value == 33332.0
+    assert series.provenance == "DERIVED"
+    assert "D220" in series.source and "precipitation" in series.source
+
+
+def test_d220_a_month_with_a_missing_day_is_missing_and_never_filled():
+    climate = with_days(
+        "precipitation",
+        {
+            "2001-09-15": {
+                "value": None,
+                "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+            }
+        },
+    )
+    _, by_month = monthly(forcing_with(climate), "rainfall")
+    september = by_month[(2001, 9)]
+    assert september.value is None
+    assert september.missing.reason == "NO_COVERAGE"
+    assert "2001-09-15" in september.missing.detail
+    assert by_month[(2001, 8)].value == 31 * 1234.5  # the other months stay
+    assert by_month[(2001, 10)].value == 31 * 1234.5
+
+
+def test_d220_rainfall_in_another_unit_is_not_computable():
+    climate = json.loads(json.dumps(CHAIN_CLIMATE))
+    for series in climate["daily_series"]:
+        if series["quantity"] == "precipitation":
+            series["unit"] = "PLACEHOLDER_unit"
+    _, by_month = monthly(forcing_with(SiteClimate.model_validate(climate)), "rainfall")
+    assert all(item.value is None for item in by_month.values())
+    assert {item.missing.reason for item in by_month.values()} == {"NOT_COMPUTABLE"}
+
+
+def test_d220_potential_evapotranspiration_is_the_sum_of_the_daily_et0():
+    # 2.0 every day, except 2001-11-03 at 0.25: November 30 x 2.0 - 2.0 + 0.25
+    # = 58.25; December 31 x 2.0 = 62.0.
+    et0 = {day: 2.0 for day in every_day_of_the_record()}
+    et0[dt.date(2001, 11, 3)] = 0.25
+    series, by_month = monthly(
+        forcing_with(reference_evapotranspiration=et0), "potential_evapotranspiration"
+    )
+    assert series.unit == "mm"
+    assert by_month[(2001, 11)].value == 58.25
+    assert by_month[(2001, 12)].value == 62.0
+    assert series.provenance == "DERIVED"
+    # FAO-56 ET0 stands in for the PET of RothC (D80, D220).
+    assert "D80" in series.source and "D220" in series.source
+    assert "stands in" in series.source and "D44" in series.source
+
+
+def test_d220_a_day_of_et0_missing_or_absent_makes_its_month_missing():
+    et0 = {day: 2.0 for day in every_day_of_the_record()}
+    et0[dt.date(2002, 1, 5)] = Missing(
+        reason="MISSING_INPUT", detail="PLACEHOLDER: a record"
+    )
+    del et0[dt.date(2002, 3, 9)]
+    _, by_month = monthly(
+        forcing_with(reference_evapotranspiration=et0), "potential_evapotranspiration"
+    )
+    assert by_month[(2002, 1)].value is None
+    assert by_month[(2002, 1)].missing.reason == "MISSING_INPUT"
+    assert "2002-01-05" in by_month[(2002, 1)].missing.detail
+    assert by_month[(2002, 3)].missing.reason == "NO_COVERAGE"
+    assert by_month[(2002, 2)].value == 28 * 2.0
+
+
+def test_d220_without_et0_every_month_is_missing_with_its_reason():
+    series, by_month = monthly(chain_forcing(), "potential_evapotranspiration")
+    assert series.unit == "mm"
+    assert {item.missing.reason for item in by_month.values()} == {"NOT_AVAILABLE"}
+    assert "did not pass" in by_month[(2001, 7)].missing.detail
+    assert (series.provenance, series.source, series.range_missing) == (
+        None,
+        None,
+        None,
+    )
+    not_computed = Missing(reason="MISSING_INPUT", detail="PLACEHOLDER: no record")
+    _, by_month = monthly(
+        forcing_with(reference_evapotranspiration=not_computed),
+        "potential_evapotranspiration",
+    )
+    assert {item.missing.reason for item in by_month.values()} == {"MISSING_INPUT"}
+    assert "PLACEHOLDER: no record" in by_month[(2001, 7)].missing.detail
+
+
+def test_d220_mean_temperature_is_the_mean_of_the_daily_means_in_their_unit():
+    # Maximum 1234.5 and minimum 1234.5 every day, except 2001-07-10 with a
+    # maximum of 1240.5: that day's mean is 1237.5, so July is
+    # (30 x 1234.5 + 1237.5) / 31 = 1234.5 + 3 / 31.
+    climate = with_days("air_temperature_max_2m", {"2001-07-10": {"value": 1240.5}})
+    series, by_month = monthly(forcing_with(climate), "mean_temperature")
+    assert series.unit == "degC"
+    assert by_month[(2001, 7)].value == pytest.approx(1234.5 + 3 / 31)
+    assert by_month[(2001, 8)].value == 1234.5
+    assert "D30" in series.source and "D220" in series.source
+
+
+# --- D221: the monthly carbon inputs, copied unchanged ------------------------------
+
+
+def a_monthly_series(horizon, origin: str = "placeholder_crop_aboveground"):
+    from contracts.carbon_forcing import CarbonInputSeries
+
+    months = []
+    year, month = horizon.start.year, horizon.start.month
+    while (year, month) <= (horizon.end.year, horizon.end.month):
+        months.append({"year": year, "month": month, "value": 1234.5})
+        year, month = (year, month + 1) if month < 12 else (year + 1, 1)
+    return CarbonInputSeries.model_validate(
+        {
+            "origin": origin,
+            "quantity": f"{origin}_carbon_input",
+            "unit": STOCK_UNIT,
+            "provenance": "SIMULATED",
+            "source": "PLACEHOLDER",
+            "range_missing": {"reason": "NOT_AVAILABLE", "detail": "PLACEHOLDER"},
+            "start": horizon.start.model_dump(),
+            "end": horizon.end.model_dump(),
+            "months": months,
+        }
+    )
+
+
+def test_d221_the_monthly_carbon_inputs_are_copied_unchanged():
+    horizon = chain_forcing().horizon
+    monthly = [
+        a_monthly_series(horizon),
+        a_monthly_series(horizon, "placeholder_crop_belowground"),
+    ]
+    forcing = forcing_with(monthly_carbon_inputs=monthly)
+    assert forcing.carbon_inputs == monthly
+    assert all(a is b for a, b in zip(forcing.carbon_inputs, monthly))
+
+
+def test_d221_a_monthly_series_over_other_months_is_a_defect():
+    horizon = chain_forcing().horizon
+    other = horizon.model_copy(
+        update={
+            "start": YearMonth(year=horizon.start.year - 1, month=horizon.start.month)
+        }
+    )
+    with pytest.raises(TypeError, match="months of the forcing horizon"):
+        forcing_with(monthly_carbon_inputs=[a_monthly_series(other)])

@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "b831602-E3-test_e3_slope_length_and_steepness_against_published_values-001",
+  "run_id": "run-20261115T100532Z-b831602",
+  "test_code": "E3",
+  "expected": {
+    "missing_reason": "the expected values of this check are in the signed fixture validation/fixtures/e3_ah703_tables.json, which the test reads; this store holds no expected-value record for it (validation/README.md, OPEN 21)"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values"
+  },
+  "notes": "Test engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values. Placed under E3: E3: named as the test of the entry in docs/VALIDATION.md, entry E3."
+}

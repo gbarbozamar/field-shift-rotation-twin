@@ -55,13 +55,18 @@ reference evapotranspiration), each summed over the days of the year with a
 living crop (D105, D106, D136). Its ``source`` starts with the label "whole
 cycle, not critical period" (D105, D162). A year with no day with a living
 crop is ``NOT_APPLICABLE``; any other year is missing with the reason that
-applies. See EXPOSURE.md in this folder.
+applies. Unit ``l1/water-decisions-d186-d217`` (issue #333) cites decisions
+D214 to D217 of issue #77 where #264 left them PROPOSED (a demanded sum that
+is not above zero, D214; the provenance label and the source, D215; the
+reason of the missing range, D216; one value per agricultural year, D217),
+and ends the ``source`` of every value with the clause of method facts of
+D215 (``METHOD_FACTS``). See EXPOSURE.md in this folder.
 
 Status: PROPOSED (blueprint section 3.7): the order of the checks, the
 reason of each item, the identifier and scope of each parameter, how the
-crop of a day is read from the calendar, the provenance label, the source
-text and the reason of the missing range of a value, and the format of every
-``detail``.
+crop of a day is read from the calendar, and the format of every ``detail``.
+The provenance label, the source text and the reason of the missing range of
+a value are decided (D215, D216).
 
 Pure function (G1): no file, no network, no clock, no environment variable,
 and the arguments are not changed. The only numbers are the one of month and
@@ -357,14 +362,16 @@ DEFINITION_INCOMPLETE = (
 # The label of the window (D105), written verbatim at the start of the
 # ``source`` of every value (D162): the results contract has no field for it.
 WINDOW_LABEL = "whole cycle, not critical period"
-# PROPOSED (C4.1, C4.3): the ratio is read from a daily balance that is run
-# through time steps, so it carries the label of a simulated value.
+# Decision D215 of issue #77 (C4.1, C4.3): the ratio is read from a daily
+# balance that is run through time steps, so it carries the label of a
+# simulated value.
 PROVENANCE = "SIMULATED"
-# PROPOSED: the reason of the missing range, as EP1 gives it for its value.
+# Decision D216 of issue #77: the missing range carries NOT_AVAILABLE, as every
+# engine writes it; this is its detail.
 RANGE_NOT_BUILT = (
     "no uncertainty range is computed: one call is one scenario, and how a range "
     "passes through the daily water balance is not built (C2.3, Q6 of "
-    "contracts/ENTRYPOINTS.md, OPEN 44 of engine/water/EXPOSURE.md)"
+    "contracts/ENTRYPOINTS.md, decision D216 of issue #77)"
 )
 # The reason the daily balance gives a crop quantity on a day with no crop.
 NO_CROP_ON_THE_DAY = "NOT_APPLICABLE"
@@ -1474,7 +1481,7 @@ def _nothing_demanded(ag_year: int, days: int) -> Missing:
             "demanded (the basal crop coefficient times the reference "
             f"evapotranspiration), summed over its {days} day(s) with a living crop, "
             "is not above zero, so the ratio of decision D157 of issue #77 has no "
-            "denominator (reason code PROPOSED, OPEN 43 of engine/water/EXPOSURE.md)"
+            "denominator (reason code: decision D214 of issue #77)"
         ),
     )
 
@@ -1492,9 +1499,27 @@ def _not_a_number(ag_year: int, what: str, day: dt.date, missing: Missing) -> Mi
     )
 
 
+# Decision D215 of issue #77, option S-b: one clause of method facts at the end
+# of the source of every value. Each fact is written only because the code of
+# this module guarantees it (EXPOSURE.md, choice 23, names the lines).
+METHOD_FACTS = (
+    "method facts of this engine: on a day with no crop and on a day of the "
+    "tail after maturity no crop reaches the balance, so the fallow is weed-free "
+    "and transpires nothing (decisions D111 and D136); the stage lengths are "
+    "read by crop from the parameter catalogue and placed from the sowing with "
+    "those lengths, never stretched to the crop period (decisions D135 and "
+    "D137); the basal crop coefficients of the mid and end stages are those of "
+    "the catalogue, not adjusted for climate (FAO-56 Eq. 70 is not applied); "
+    "the balance starts from the declared site states initial_storage and "
+    "initial_depletion (decision D189)"
+)
+
+
 def _source(ag_year: int, living: list[ChainDay]) -> str:
-    """The source of a value. PROPOSED (D162 gives the label and its place; the
-    rest says what the value is computed from, as EP1 does for soil loss)."""
+    """The source of a value (decision D215 of issue #77; D162 gives the label
+    and its place). The label first and verbatim, then what the value is
+    computed from and over which days, as EP1 does for soil loss, then the
+    clause of method facts of D215 (option S-b, ``METHOD_FACTS``)."""
     first, *_ = living
     *_, last = living
     return (
@@ -1508,7 +1533,7 @@ def _source(ag_year: int, living: list[ChainDay]) -> str:
         "with no crop and the tail after maturity are left out (D106, D136); the "
         "daily balance runs on the daily series of the climate record, on the "
         "rotation calendar repeated over the record (D47) and on the parameter "
-        "records listed in engine/water/EXPOSURE.md"
+        f"records listed in engine/water/EXPOSURE.md; {METHOD_FACTS}"
     )
 
 
@@ -1528,7 +1553,7 @@ def _computed(ag_year: int, year: list[ChainDay]) -> WaterDeficitExposure:
     The value is the sum of the first over the sum of the second. Not a
     number, and never zero in its place: a year with no day with a living
     crop is ``NOT_APPLICABLE`` (D157); a demanded sum that is not above zero
-    is ``NOT_COMPUTABLE`` (PROPOSED), as is a ratio that is not finite.
+    is ``NOT_COMPUTABLE`` (D214), as is a ratio that is not finite.
     """
     living: list[ChainDay] = []
     for day in year:
