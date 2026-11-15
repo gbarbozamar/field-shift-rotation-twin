@@ -211,13 +211,14 @@ def live_crop_days_of_crop(
 _FIRST = 1
 
 CROP_UNKNOWN = (
-    "the crop of the day is not known: the day lies before the first cycle of "
-    "the rotation repeated over the agricultural years of the climate record "
-    "(decisions D47 and D109 of issue #77, engine/calendar/repeat.py), and no "
-    "component of the cycle before it has an end date inside the record "
-    "(decision D141), so the calendar does not describe the day: nothing is "
-    "laid out before the first cycle (point 6 of engine/calendar/repeat.py, "
-    "OPEN 5 of engine/water/EXPOSURE.md)"
+    "the crop of the day is not known: the day lies before the described "
+    "period, the first day the rotation repeated over the agricultural years "
+    "of the climate record describes (decisions D47 and D109 of issue #77, "
+    "engine/calendar/repeat.py), which is the start of the cycle laid out "
+    "ahead of the first when the first cycle starts late (points 6 and 13 of "
+    "engine/calendar/repeat.py, decision D188 of issue #77, part (2), #403), "
+    "so the calendar does not describe the day; since D188 (2) no day of the "
+    "record's years lies there (OPEN 5 of engine/water/EXPOSURE.md)"
 )
 CROP_DATES_MISSING = (
     "the crop of the day is not known: a component of the calendar has a "
@@ -329,8 +330,10 @@ def component_of_day(
     that starts before the record and ends inside it is one of them, with its
     declared dates (the lead-in of ``repeat_over_record``, D141), so it is
     present from the first day of the record. No component when none can
-    cover the day. Not known (``MISSING_INPUT``) for a day before the first
-    cycle that the lead-in does not describe, and for a day a component with
+    cover the day. Not known (``MISSING_INPUT``) for a day before the
+    described period (``described_from``: the lead-in is laid out whenever
+    the first cycle starts late, D188 part (2), #403, so no day of the
+    record's years lies there), and for a day a component with
     a missing date could cover, within its cycle (the detail names the
     component and repeats the reason the calendar gives for the date, so a
     crossing component ``phase_calendar`` could not place names D141). Two

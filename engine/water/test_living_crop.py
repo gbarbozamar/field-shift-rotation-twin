@@ -14,7 +14,7 @@ import datetime as dt
 import pytest
 
 from contracts.results.models import Missing
-from engine.calendar.repeat import repeat_over_record
+from engine.calendar.repeat import RepeatedRotation, repeat_over_record
 from engine.water import exposure as ep3
 from engine.water import living_crop as module
 from engine.water import test_exposure as ep3_tests
@@ -316,13 +316,29 @@ def test_stages_longer_than_the_period_are_cut_at_the_harvest_and_the_day_after_
     assert flags[d("2002-05-26")] is False
 
 
-def test_a_day_before_the_described_period_is_not_known():
-    # The calendar starts on its first sowing (10 August) and no component of
-    # the cycle before it reaches the record: the days from 1 July to 9 August
-    # 2001 are not described (D141; point 6 of engine/calendar/repeat.py).
-    flags = by_day(ep3_tests.two_year_calendar(start="2031-08-10"))
+def test_a_day_before_the_described_period_is_not_known(monkeypatch):
+    # The calendar starts on its first sowing (10 August). Since D188 part (2)
+    # of #77 (#403) the cycle before the first is laid out whenever the first
+    # cycle starts late (points 6 and 13 of engine/calendar/repeat.py), so the
+    # days from 1 July to 9 August 2001 are described, days with no crop, and
+    # no day of the record's years comes before the described period.
+    calendar = ep3_tests.two_year_calendar(start="2031-08-10")
+    first, last = ep3_tests.literal_record()
+    assert repeat_over_record(calendar, first, last).described_from < first
+    late = every_day(d("2001-07-01"), d("2001-08-09"))
+    flags = by_day(calendar)
+    assert all(flags[day] is False for day in late)
+    # The rule for a day before the described period is still the one
+    # live_crop_by_day applies to whatever day the repetition describes from,
+    # so the first described day is set here (as engine/residues/
+    # test_ledger_lead_in_day.py does): 10 August 2001, the start of the first
+    # cycle. The forty days before it are not known, never days with no crop.
+    monkeypatch.setattr(
+        RepeatedRotation, "described_from", property(lambda self: d("2001-08-10"))
+    )
+    flags = by_day(calendar)
     unknown = Missing(reason="MISSING_INPUT", detail=module.CROP_UNKNOWN)
-    for day in every_day(d("2001-07-01"), d("2001-08-09")):
+    for day in late:
         assert flags[day] == unknown
     assert flags[d("2001-08-10")] is True
 
