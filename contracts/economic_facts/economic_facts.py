@@ -160,7 +160,9 @@ class EconomicFacts(ContractModel):
 
     @model_validator(mode="after")
     def _unique_crop_ids(self) -> EconomicFacts:
-        ids = [crop.crop_id.strip() for crop in self.crops]
+        # CropId already refuses leading or trailing white space, so the ids
+        # are compared as they are.
+        ids = [crop.crop_id for crop in self.crops]
         if len(ids) != len(set(ids)):
             raise ValueError("crops: two crops share one crop_id")
         return self

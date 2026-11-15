@@ -265,6 +265,88 @@ def test_structural_misuse_raises(years, counts):
         compute_rotation_margin(years, _facts(), counts)
 
 
+def test_all_none_counts_give_average_no_coverage():
+    # S-027 F1 and R1 (PROPOSED): what count_kinds gives when a year has no
+    # kind. Not NOT_AVAILABLE: the years were classified, one has no coverage.
+    counts = {kind: None for kind in KINDS_OF_YEAR}
+    margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), counts)
+    reference = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), None)
+    _assert_missing(margin.average, "NO_COVERAGE")
+    assert "no kind of year" in margin.average.detail
+    assert "not classified" not in margin.average.detail
+    # year_counts=None keeps NOT_AVAILABLE and its detail.
+    _assert_missing(reference.average, "NOT_AVAILABLE")
+    assert "not classified" in reference.average.detail
+    for kind in KINDS_OF_YEAR:
+        assert margin.by_kind[kind] == reference.by_kind[kind]
+
+
+def test_some_none_counts_are_refused():
+    # S-027 F1 and R3 (PROPOSED): some None and some integers is structural
+    # misuse, with its own message.
+    counts = {"el_nino": 3, "neutral": None, "la_nina": 2}  # invented test data
+    with pytest.raises(
+        ValueError, match="year_counts: counts are either all known or all None"
+    ):
+        compute_rotation_margin([[GRAIN_A]], _facts(), counts)
+
+
+def test_all_none_counts_still_check_the_keys():
+    # S-027 R3 (PROPOSED): the key checks come first.
+    with pytest.raises(ValueError, match="no count for"):
+        compute_rotation_margin(
+            [[GRAIN_A]], _facts(), {"el_nino": None, "neutral": None}
+        )
+
+
+def test_count_kinds_with_a_missing_year_feeds_the_margin():
+    # S-027 F1, R1 and R4 (PROPOSED): the seam between kinds_of_year and
+    # economics. The rule (threshold, run length) is the committed record's;
+    # the seasons are synthetic, every one of 2013..2014 at 0.0 (not the real
+    # anomalies). The agricultural year 2014 with start month 7 is decided by
+    # DJF 2015, which is not in them, so that year is missing NO_COVERAGE.
+    from kinds_of_year import (
+        SEASONS,
+        classify_agricultural_years,
+        count_kinds,
+        load_record,
+    )
+
+    committed = load_record()
+    record = {
+        "threshold": committed["threshold"],
+        "min_consecutive_seasons": committed["min_consecutive_seasons"],
+        "seasons": [
+            {"season": name, "year": year, "anom": 0.0}
+            for year in (2013, 2014)
+            for name in SEASONS
+        ],
+    }
+    classified = classify_agricultural_years(record, 2013, 2014, 7)
+    assert classified[2014].missing_reason == "NO_COVERAGE"
+    counts = count_kinds(classified)
+    margin = compute_rotation_margin([[GRAIN_A, COVER]], _facts(), counts)
+    _assert_missing(margin.average, "NO_COVERAGE")
+    # The same expected values as test 1.
+    _assert_present(margin.by_kind["el_nino"], 300 * 3.0 - 500 - 90)
+    _assert_present(margin.by_kind["neutral"], 300 * 2.5 - 500 - 90)
+    _assert_present(margin.by_kind["la_nina"], 300 * 1.5 - 500 - 90)
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        pytest.param(7, id="int"),
+        pytest.param(None, id="none"),
+        pytest.param([], id="list"),
+    ],
+)
+def test_a_crop_id_that_is_not_a_text_is_refused(item):
+    # S-027 F4 (PROPOSED).
+    with pytest.raises(ValueError, match=r"years\[0\]\[1\]"):
+        compute_rotation_margin([[GRAIN_A, item]], _facts(), COUNTS)
+
+
 class _IntegralStandIn:
     """A stand-in for an integral number that is not a Python int (such as numpy's)."""
 

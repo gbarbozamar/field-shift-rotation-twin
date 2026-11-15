@@ -301,6 +301,117 @@ def test_duplicated_season_row_is_rejected(record):
         classify_agricultural_years(rec, 2011, 2011, 7)
 
 
+# 8. S-027 (PROPOSED): record rows, years and the KindOfYear invariant -------
+
+
+def _small_record(record):
+    """A small hand-made record: the real rule, every season of 2010..2014 at 0.0."""
+    return synthetic(record, {})
+
+
+def test_record_without_a_seasons_list_is_rejected(record):
+    rec = _small_record(record)
+    del rec["seasons"]
+    with pytest.raises(ValueError, match="seasons"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+    rec["seasons"] = {"season": "DJF", "year": 2012, "anom": 0.0}
+    with pytest.raises(ValueError, match="seasons"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+@pytest.mark.parametrize("field", ["season", "year", "anom"])
+def test_row_lacking_a_field_is_rejected(record, field):
+    rec = _small_record(record)
+    del rec["seasons"][4][field]
+    with pytest.raises(ValueError, match=f"row 4: field '{field}'"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+@pytest.mark.parametrize("bad", ["djf", 1, None])
+def test_row_with_a_season_not_in_seasons_is_rejected(record, bad):
+    rec = _small_record(record)
+    rec["seasons"][2]["season"] = bad
+    with pytest.raises(ValueError, match="row 2: unknown season"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+@pytest.mark.parametrize("bad", [True, 2010.0, "2010", None])
+def test_row_with_a_year_that_is_not_an_int_is_rejected(record, bad):
+    rec = _small_record(record)
+    rec["seasons"][5]["year"] = bad
+    with pytest.raises(ValueError, match="row 5: field 'year'"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+@pytest.mark.parametrize(
+    "bad", [True, None, "0.0", float("nan"), float("inf"), float("-inf")]
+)
+def test_row_with_an_anom_that_is_not_a_finite_number_is_rejected(record, bad):
+    rec = _small_record(record)
+    rec["seasons"][6]["anom"] = bad
+    with pytest.raises(ValueError, match="row 6: field 'anom'"):
+        classify_agricultural_years(rec, 2011, 2011, 7)
+
+
+@pytest.mark.parametrize("bad", [True, False, 2011.0, "2011", None])
+def test_years_that_are_not_ints_are_rejected(record, bad):
+    with pytest.raises(ValueError, match="first_year"):
+        classify_agricultural_years(record, bad, 2011, 7)
+    with pytest.raises(ValueError, match="last_year"):
+        classify_agricultural_years(record, 2011, bad, 7)
+
+
+@pytest.mark.parametrize(
+    ("kind", "reason"),
+    [(EL_NINO, "NO_COVERAGE"), (None, None)],
+    ids=["both", "neither"],
+)
+def test_kind_of_year_holds_a_kind_or_a_reason(kind, reason):
+    with pytest.raises(ValueError, match="kind"):
+        KindOfYear(
+            kind=kind,
+            missing_reason=reason,
+            detail=None,
+            season="DJF",
+            season_year=2012,
+        )
+
+
+@pytest.mark.parametrize("bad", ["dry", "El_Nino", ""])
+def test_kind_of_year_refuses_a_kind_not_in_kinds_of_year(bad):
+    # S-027 R2 (PROPOSED).
+    with pytest.raises(ValueError, match="KINDS_OF_YEAR"):
+        KindOfYear(
+            kind=bad, missing_reason=None, detail=None, season="DJF", season_year=2012
+        )
+
+
+def test_kind_of_year_refuses_a_detail_on_a_present_kind():
+    # S-027 R2 (PROPOSED): classify_agricultural_years sets no detail on a
+    # present kind, so one is refused.
+    with pytest.raises(ValueError, match="no missing detail"):
+        KindOfYear(
+            kind=NEUTRAL,
+            missing_reason=None,
+            detail="some text",
+            season="DJF",
+            season_year=2012,
+        )
+
+
+def test_every_classified_year_satisfies_the_invariant(record):
+    # S-027 R2: the real record over a period that holds present and missing
+    # years builds every KindOfYear without a ValueError.
+    classified = classify_agricultural_years(record, 2020, 2026, 7)
+    for item in classified.values():
+        if item.kind is not None:
+            assert item.kind in KINDS_OF_YEAR
+            assert item.detail is None
+        else:
+            assert item.missing_reason == "NO_COVERAGE"
+            assert item.detail
+
+
 def test_unknown_season_name_is_rejected(record):
     rec = synthetic(record, {})
     rec["seasons"][3] = {"season": "XYZ", "year": 2010, "anom": 0.0}

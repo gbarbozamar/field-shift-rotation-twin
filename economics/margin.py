@@ -168,6 +168,14 @@ def _check_years(years: Sequence[Sequence[str]], crops: Mapping[str, object]) ->
             raise ValueError(
                 f"years[{index}]: an agricultural year holds at least one crop_id"
             )
+        # PROPOSED (S-027 F4): every item of an entry is a crop_id text; an
+        # int, None or list is refused before it is looked up in the facts.
+        for position, crop_id in enumerate(entry):
+            if not isinstance(crop_id, str):
+                raise ValueError(  # noqa: TRY004
+                    f"years[{index}][{position}]: a crop_id is a text, not "
+                    f"{type(crop_id).__name__}"
+                )
         # PROPOSED: a declared margin covers a whole agricultural year, so it
         # does not share its year with another crop (README.md, OPEN).
         if len(entry) > 1 and any(
@@ -179,8 +187,14 @@ def _check_years(years: Sequence[Sequence[str]], crops: Mapping[str, object]) ->
             )
 
 
-def _check_year_counts(year_counts: Mapping[str, int]) -> dict[str, int]:
-    """Check ``year_counts`` and give it back as plain integers."""
+def _check_year_counts(year_counts: Mapping[str, int | None]) -> dict[str, int] | None:
+    """Check ``year_counts`` and give it back as plain integers.
+
+    None when every count is None: that is what
+    ``kinds_of_year.count_kinds`` gives when a year of the record has no kind,
+    so the counts are not known (PROPOSED, S-027 F1 and R1). Some counts None
+    and some integers is a ValueError of its own (S-027 R3).
+    """
     unknown = sorted(set(year_counts) - set(KINDS_OF_YEAR))
     if unknown:
         raise ValueError(
@@ -189,6 +203,11 @@ def _check_year_counts(year_counts: Mapping[str, int]) -> dict[str, int]:
     absent = [kind for kind in KINDS_OF_YEAR if kind not in year_counts]
     if absent:
         raise ValueError(f"year_counts: no count for {absent}")
+    unknown_counts = [year_counts[kind] is None for kind in KINDS_OF_YEAR]
+    if all(unknown_counts):
+        return None
+    if any(unknown_counts):
+        raise ValueError("year_counts: counts are either all known or all None")
     counts: dict[str, int] = {}
     for kind in KINDS_OF_YEAR:
         count = year_counts[kind]
@@ -209,6 +228,7 @@ def _check_year_counts(year_counts: Mapping[str, int]) -> dict[str, int]:
 def _average(
     by_kind: Mapping[str, MarginResult], year_counts: Mapping[str, int] | None
 ) -> MarginResult:
+    """The weighted average; ``year_counts`` None means not classified."""
     if year_counts is None:
         return _missing(
             "NOT_AVAILABLE",
@@ -234,20 +254,33 @@ def _average(
 def compute_rotation_margin(
     years: Sequence[Sequence[str]],
     facts: EconomicFacts,
-    year_counts: Mapping[str, int] | None,
+    year_counts: Mapping[str, int | None] | None,
 ) -> RotationMargin:
     """The simple margin per hectare and agricultural year of one rotation. PROPOSED.
 
     ``years`` holds one entry per agricultural year of one cycle of the
     rotation, each entry the crop_ids sown in that year. ``year_counts`` is
     how many agricultural years of the record fall in each kind of year, or
-    None when that is not known. Raises ``ValueError`` on structural misuse
-    (see README.md); a missing fact is never an exception but a missing
-    margin with its reason.
+    None when the kinds of year are not classified (average missing
+    ``NOT_AVAILABLE``). A mapping whose every count is None, as
+    ``kinds_of_year.count_kinds`` gives it when a year has no kind, gives the
+    average missing ``NO_COVERAGE``. Raises ``ValueError`` on structural
+    misuse (see README.md); a missing fact is never an exception but a
+    missing margin with its reason.
     """
     crops = {crop.crop_id: crop for crop in facts.crops}
     _check_years(years, crops)
-    if year_counts is not None:
-        year_counts = _check_year_counts(year_counts)
+    counts = None if year_counts is None else _check_year_counts(year_counts)
     by_kind = {kind: _margin_in_kind(years, crops, kind) for kind in KINDS_OF_YEAR}
-    return RotationMargin(by_kind=by_kind, average=_average(by_kind, year_counts))
+    if year_counts is not None and counts is None:
+        # PROPOSED (S-027 R1): every count None is what count_kinds gives when
+        # at least one classified year is missing, and the classification's
+        # only missing reason is NO_COVERAGE (C3.2).
+        average = _missing(
+            "NO_COVERAGE",
+            "at least one agricultural year of the record has no kind of year, "
+            "so the years of each kind are not counted",
+        )
+    else:
+        average = _average(by_kind, counts)
+    return RotationMargin(by_kind=by_kind, average=average)
