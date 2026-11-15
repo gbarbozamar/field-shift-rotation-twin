@@ -42,9 +42,9 @@ from contracts.inputs.site_climate import DailySeries, SiteClimate
 from contracts.results.models import Missing
 
 __all__ = [
-    "PairedWetnessDay",
     "ROOT_ZONE_WETNESS",
     "ROOT_ZONE_WETNESS_UNIT",
+    "PairedWetnessDay",
     "WetnessPairing",
     "compute_daily_relative_wetness",
     "compute_day_relative_wetness",
@@ -85,7 +85,7 @@ def _is_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _is_finite(value: int | float) -> bool:
+def _is_finite(value: float) -> bool:
     try:
         return math.isfinite(value)
     except OverflowError:
@@ -123,9 +123,9 @@ def _validate_capacity(capacity_mm: object) -> float | Missing:
 
 
 def compute_day_relative_wetness(
-    storage_mm: float | int | Missing,
+    storage_mm: float | Missing,
     *,
-    capacity_mm: float | int | Missing,
+    capacity_mm: float | Missing,
 ) -> float | Missing:
     """Compute relative root-zone wetness ``storage_mm / capacity_mm`` for one day.
 
@@ -162,7 +162,7 @@ def compute_day_relative_wetness(
 def compute_daily_relative_wetness(
     storage_by_day: Mapping[dt.date, float | int | Missing],
     *,
-    capacity_mm: float | int | Missing,
+    capacity_mm: float | Missing,
 ) -> dict[dt.date, float | Missing]:
     """Compute daily relative root-zone wetness over an explicit storage series.
 
@@ -274,7 +274,7 @@ def pair_root_zone_wetness(
     storage_by_day: Mapping[dt.date, float | int | Missing],
     climate: SiteClimate,
     *,
-    capacity_mm: float | int | Missing,
+    capacity_mm: float | Missing,
 ) -> WetnessPairing:
     """Pair daily modelled relative wetness against ``SiteClimate`` CQ7."""
     modelled = compute_daily_relative_wetness(storage_by_day, capacity_mm=capacity_mm)

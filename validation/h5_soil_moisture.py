@@ -41,8 +41,8 @@ from engine.water.root_zone_contrast import (
 )
 
 __all__ = [
-    "H5ContrastReport",
     "H5_STATUS",
+    "H5ContrastReport",
     "build_h5_contrast_report",
     "contrast_report_from_pairing",
 ]
@@ -200,7 +200,7 @@ def build_h5_contrast_report(
     storage_by_day: Mapping[dt.date, float | int | Missing],
     climate: SiteClimate,
     *,
-    capacity_mm: float | int | Missing,
+    capacity_mm: float | Missing,
 ) -> H5ContrastReport:
     """Build the descriptive [H5] contrast report from daily storage and climate.
 
