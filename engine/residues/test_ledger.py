@@ -895,6 +895,31 @@ def test_missing_component_gives_missing_months_never_zero():
     )
 
 
+def test_months_before_a_late_first_cycle_are_missing_never_zero():
+    """The lead-in rule of the months (``_month_value``): the first cycle is
+    laid out from a day after the start of the first agricultural year, so a
+    harvest in the months before that day, or in its own month before it, is
+    not known. Those months are missing, never zero; the months after are
+    computed. Without the rule they would read as months without a harvest."""
+    for first_day, unknown in (
+        ("2001-09-20", [(2001, 7), (2001, 8), (2001, 9)]),
+        ("2001-09-01", [(2001, 7), (2001, 8)]),  # the month of a first day is known
+    ):
+        late = calendar_data(start_date=first_day, end_date="2002-09-19")
+        late["components"][0]["start"] = date_value("2001-09-25")
+        ledger = run(calendar=late)
+        assert ledger.first_ag_year == YEARS[0]
+        for found in ledger.monthly_carbon_inputs:
+            for item in found.months:
+                if (item.year, item.month) in unknown:
+                    assert item.value is None, (found.origin, item)
+                    assert item.missing.reason == "MISSING_INPUT"
+                    assert f"before {first_day}" in item.missing.detail
+                    assert "before the first cycle" in item.missing.detail
+                else:
+                    assert item.value is not None, (found.origin, item)
+
+
 def test_monthly_sum_equals_the_annual_series():
     """For each origin and agricultural year, the sum of the twelve months
     equals the sum of the annual series of that origin in that year (D221)."""
