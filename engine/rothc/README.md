@@ -131,12 +131,26 @@ Not constants of the method, and so not in this table: the horizon, the soil dep
 
 In this order; the first that applies is returned. Nothing is clipped, filled, normalised or replaced by zero.
 
-1. **`MISSING_INPUT`**: an argument is missing. The detail names every missing argument with its own reason code and detail (C3.3). For `input_additions`, an input without a composition is missing and named.
+1. **`MISSING_INPUT`**: an argument is missing. The detail names every missing argument with its reason code and detail (C3.3; G4 of `contracts/ENTRYPOINTS.md`): one by one, or, for arguments that share a reason and a detail, as one group written once ("How missing arguments are written", below). For `input_additions`, an input without a composition is missing and named.
 2. **`NOT_COMPUTABLE`**: an argument that is not a finite number; then a value outside what the quantity can be (a negative stock, input, rate constant, rate modifier, rainfall, pan evaporation or clay content; a depth that is not positive; a fraction outside zero to one; a partition ratio that is not positive; a maximum deficit that is not negative; a deficit outside the maximum deficit and field capacity; a cover state that is neither zero nor one); then unit strings that differ; then a form that gives no finite real number. An empty `carbon_inputs` of a month is `NOT_COMPUTABLE`: a month without input is written as an input at zero, never by omission (as `engine/amg` chooses; D122).
 3. **A run**: once a month is missing, every later month is `MISSING_INPUT`, and its detail names the first missing month (counted from zero) with its reason. When the initial state is missing, every month is `MISSING_INPUT` naming it.
 4. **A trend measure** needs only the points it uses: `end_minus_start` the first and the last, `fitted_slope` every point, `mean_over_cycles` the points at the cycle boundaries. One of those that is missing gives `MISSING_INPUT` naming it. `NOT_COMPUTABLE` for: fewer than two points; times at the points used that do not rise strictly; fewer than two cycle boundaries, a boundary outside the series or not after the one before; a value that is not finite.
 
 A `TypeError` is raised for an argument of another type (`None`, text, a boolean, a list in place of a number; a state that is not a `PoolState`; a month that is not a `MonthInput`; `rate_constants` without exactly the four active pools). A `ValueError` is raised when `stocks` and `times` differ in length.
+
+### How missing arguments are written
+
+PROPOSED. The detail of a `MISSING_INPUT` puts the missing arguments of one call in groups (`_absent_detail` of `_numbers.py`). Only the text of `detail` follows this rule: no value, reason code or state does.
+
+- **One group** holds the arguments with the same reason code and the same detail, or with details that differ only in the month they name at their opening. `run` opens the detail of a month that is not computed with `month <position>: `; nothing else of a detail is read.
+- **A group of one** is written as it always was: `<name> is missing, reason <code>: <detail>`.
+- **A group of more than one** is written once: `<count> arguments are missing (<runs>), reason <code>: <detail>`. When the months differ, the lowest and the highest stand for them and the rest of the detail follows: `…, reason <code>, each detail naming a month from <lowest> to <highest> and otherwise the same: <the detail after the month>`.
+- **Runs.** An argument named `<series>[<index>]` is written with its neighbours of the same series at consecutive indexes: `from stocks[3] to stocks[7]` stands for `stocks[3]`, `stocks[4]`, `stocks[5]`, `stocks[6]` and `stocks[7]`, every one of them missing in that group. An index that is not in the group ends the run. So a run never spans an argument that is present, and a missing argument without a missing neighbour is written alone. An argument without an index is always written by its name, never as part of "from X to Y".
+- The groups follow one another in the order of their first argument, joined by `; `.
+
+So the length of the detail follows the number of groups and of runs, not the number of arguments, and every missing argument can still be found in it. When no two arguments share a group, the detail is the enumeration of before, character for character.
+
+The case it was written for: the forcing the service builds names no starting pool, so over 276 months `fitted_slope` gets 553 missing arguments (277 stocks and 276 times). `stocks[0]` carries the reason the initial state is missing; the other 552 carry one reason and details that differ only by their month. The detail is `stocks[0] is missing, reason MISSING_INPUT: <why the initial state is missing>; 552 arguments are missing (from stocks[1] to stocks[276], from times[1] to times[276]), reason MISSING_INPUT, each detail naming a month from 0 to 275 and otherwise the same: the state at its start is missing; the initial state is missing, reason MISSING_INPUT: <the same>`: 2,010 characters, where the enumeration was 550,085.
 
 ## PROPOSED cases
 
@@ -216,9 +230,13 @@ Each case is a test function of `test_rothc.py`; a test checks that this list an
 | `test_every_argument_is_passed_by_name_and_none_has_a_default` | Every public function takes keyword arguments only, without a default; no field of a result type has a default |
 | `test_the_modules_hold_no_number_but_zero_and_one` | The modules of this folder write no number but zero and one |
 | `test_entry_point_is_run_rothc_of_entry_module` | `engine.rothc.run_rothc` is the function of `entry.py`; the runner's `EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")` resolves to it |
+| `test_a_uniform_run_of_missing_arguments_is_summarized_not_enumerated` | 277 missing stocks that share one reason and one PLACEHOLDER detail are written once: their count, their run by its first and last name, the reason and the detail; two arguments with different reasons keep the enumeration |
+| `test_missing_arguments_with_a_gap_are_named_as_separate_runs` | Stocks 0 to 49 and 200 to 276 missing with the 150 between them present: two runs, neither spanning a present stock; a present stock inside a run ends it, and a missing stock without a missing neighbour is written alone |
+| `test_missing_pools_around_a_present_one_are_each_named` | Three pools missing with one reason and a present one between them, then all five missing: each is written by its name, never as "from X to Y" |
+| `test_details_that_differ_only_by_their_month_are_one_group` | Details that differ only by the month at their opening are one group, written once with the lowest and the highest month; another reason, another text after the month, a month that is not a number or not at the opening keep arguments apart, and the detail is then the enumeration, character for character |
+| `test_trend_detail_of_a_run_stopped_at_a_month_does_not_grow_with_the_months` | A run stopped at month 1: `fitted_slope` writes two groups, the same text up to its digits for 12 months and for 240 |
 | `test_readme_lists_the_cases_of_this_file` | This list and `test_rothc.py` name the same cases |
 
-| `test_a_uniform_run_of_missing_arguments_is_summarized_not_enumerated` | A uniform run of hundreds of missing monthly stocks is summarized (count, first, last, reason) instead of enumerated — the enumerated form of 277 stocks measured ~550k characters; mixed reasons keep the enumeration |
 ## The reference case of section 2.2 (D64, D104 as amended by D130)
 
 `test_reference_case.py` holds the acceptance case the persons chose and transcribed (issue #176; the worked example of section 2.2 of the February 2024 Model Description, pp. 20–22): Hoosfield, January 1852, the month after a 10 000-year equilibrium run, no plant input in January, the combined rate modifying factor **abc = 0.3561 an exact input** (D104: the individual `a`, `b`, `c` are not compared against the document). The expected pools are compared at the person-set tolerance **5 × 10⁻⁵ absolute** (the case designer, 14 November 2026: half of the last printed digit). The parameters are the transcribed values of the table above, as in-memory records.
@@ -320,6 +338,8 @@ Each case is a test function of `test_entry.py`; a test checks that this list an
 | `test_run_rothc_is_pure` | The same arguments give the same result; neither argument is changed |
 | `test_signature_of_the_entry_point` | `forcing` then `parameters`, the second keyword-only, no default |
 | `test_entry_holds_no_value_of_the_method` | `entry.py` writes no number but zero and one |
+| `test_fitted_slope_detail_does_not_grow_with_the_months_of_the_record` | On the forcing the service builds (`api.carbon_forcing.build_carbon_forcing` on the PLACEHOLDER chain inputs, the daily climate extended to 2 and to 23 years by repeating the example year), the detail of `fitted_slope` is the same text up to the digits of its counts and bounds: `stocks[0]` alone, then the other 552 arguments as one group of two runs |
+| `test_starting_pools_missing_around_a_present_one_are_each_named` | `dpm`, `bio` and `hum` missing with one reason and `rpm` present between them: the initial state names the three, and every trend value repeats it |
 | `test_readme_lists_the_cases_of_this_file` | This list and `test_entry.py` name the same cases |
 
 ## OPEN
@@ -336,6 +356,7 @@ Each item is a question a person answers; the role that answers it is named. Non
 8. **The record files.** `params/records/` holds no RothC record; the persons write them from the table above (D34: the table's values are transcribed and checked). Whether the split of the plant materials by land use is one record per origin or needs another scope key is for the person who writes them.
 9. **The runner.** `api/engines.py` holds `EntryPoint("EP6", "rothc", "engine.rothc", "run_rothc")` but does not discover it; wiring the runner to call EP6 is a change of lane L2a, and the response of the running app does not change with this unit.
 10. **RESOLVED by the case designer (15 November 2026): the pool tolerance is 1e-4.** The printed table displays `start − truncated difference` (the arithmetic is in `test_reference_case.py`), so a printed end value carries up to 5e-5 of the document's truncated intermediate plus 5e-5 of its own rounding — 1e-4 is the exact bound of the printed arithmetic. All four pools now compare as plain asserts (faithful gaps: DPM 6.29e-05, RPM 5.23e-05, BIO 5.3e-06, HUM 5.0e-06).
+11. **How missing arguments are written** (the rule above, PROPOSED; brief #293). Three choices are open. The wording of the summary. That the month each argument names is not written, only the lowest and the highest of the group. And that `_numbers.py` reads the opening `month <position>: ` that `run` of `pools.py` writes: a change of that wording in `pools.py` stops the grouping by month, and `test_fitted_slope_detail_does_not_grow_with_the_months_of_the_record` then fails. For the owner of this folder.
 
 ## Not verified
 

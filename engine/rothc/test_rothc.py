@@ -896,10 +896,10 @@ def test_readme_lists_the_cases_of_this_file():
 
 
 def test_a_uniform_run_of_missing_arguments_is_summarized_not_enumerated():
-    # The lead coordinator's request: hundreds of missing monthly stocks name
-    # their count, first and last, and the reason — not each one by name (the
-    # enumerated form of 277 stocks measured ~550k characters and travelled
-    # twice in the route's response). Mixed reasons keep the enumeration.
+    # Missing arguments that share one reason and one detail are written
+    # once: how many they are, their run by its first and its last name, the
+    # reason and the detail. Here 277 stocks share one PLACEHOLDER detail.
+    # Arguments that share nothing keep the enumeration, one by one.
     one_reason = InputMissing(reason="NOT_AVAILABLE", detail="the month is missing")
     many = {f"stocks[{i}]": one_reason for i in range(277)}
     many.update({f"times[{i}]": float(i) for i in range(277)})
@@ -915,4 +915,118 @@ def test_a_uniform_run_of_missing_arguments_is_summarized_not_enumerated():
     assert enumerated.detail == (
         "a is missing, reason NOT_AVAILABLE: the month is missing; "
         "b is missing, reason NOT_DECLARED"
+    )
+
+
+def test_missing_arguments_with_a_gap_are_named_as_separate_runs():
+    # Stocks 0 to 49 and 200 to 276 are missing and the 150 between them are
+    # present: two runs. No run spans an argument that is present.
+    gone = InputMissing(reason="NOT_AVAILABLE", detail="the month is missing")
+    stocks = [gone if i < 50 or i >= 200 else float(i) for i in range(277)]
+    result = fitted_slope(stocks=stocks, times=[float(i) for i in range(277)])
+    assert result.reason == "MISSING_INPUT"
+    assert result.detail == (
+        "127 arguments are missing (from stocks[0] to stocks[49], "
+        "from stocks[200] to stocks[276]), reason NOT_AVAILABLE: the month is missing"
+    )
+    # A stock that is present inside a run ends it, and a missing stock with
+    # no missing neighbour is named alone.
+    stocks = [gone, gone, 2.2, gone, 4.4, gone, gone, gone]
+    result = fitted_slope(stocks=stocks, times=[float(i) for i in range(len(stocks))])
+    assert result.detail == (
+        "6 arguments are missing (from stocks[0] to stocks[1], stocks[3], "
+        "from stocks[5] to stocks[7]), reason NOT_AVAILABLE: the month is missing"
+    )
+
+
+def test_missing_pools_around_a_present_one_are_each_named():
+    # Arguments without an index are never written "from X to Y": a reader
+    # does not know which names lie between two of them, so each is named.
+    gone = InputMissing(reason="NOT_AVAILABLE", detail="placeholder detail")
+    result = initial_state(dpm=gone, rpm=22.2, bio=gone, hum=gone, iom=55.5)
+    assert result.reason == "MISSING_INPUT"
+    assert result.detail == (
+        "3 arguments are missing (dpm, bio, hum), reason NOT_AVAILABLE: "
+        "placeholder detail"
+    )
+    result = initial_state(dpm=gone, rpm=gone, bio=gone, hum=gone, iom=gone)
+    assert result.detail == (
+        "5 arguments are missing (dpm, rpm, bio, hum, iom), reason NOT_AVAILABLE: "
+        "placeholder detail"
+    )
+
+
+def test_details_that_differ_only_by_their_month_are_one_group():
+    # The form run() gives a month that is not computed: "month <position>: …".
+    def gone(detail, reason="MISSING_INPUT"):
+        return ResultMissing(reason=reason, detail=detail)
+
+    after = "the state at its start is missing"
+    numbers = {
+        "stocks[0]": gone("the initial state is missing"),
+        "times[0]": 0.0,
+        "stocks[1]": gone(f"month 0: {after}"),
+        "times[1]": gone(f"month 0: {after}"),
+        "stocks[2]": gone(f"month 1: {after}"),
+        "times[2]": gone(f"month 0: {after}"),
+        "stocks[3]": gone(f"month 2: {after}"),
+        "times[3]": gone(f"month 0: {after}"),
+    }
+    assert numbers_or_missing(numbers).detail == (
+        "stocks[0] is missing, reason MISSING_INPUT: the initial state is missing; "
+        "6 arguments are missing (from stocks[1] to stocks[3], from times[1] to "
+        "times[3]), reason MISSING_INPUT, each detail naming a month from 0 to 2 "
+        f"and otherwise the same: {after}"
+    )
+    # The same month in every detail: the detail is written as it is.
+    same = {"a": gone("month 4: one text"), "b": gone("month 4: one text")}
+    assert numbers_or_missing(same).detail == (
+        "2 arguments are missing (a, b), reason MISSING_INPUT: month 4: one text"
+    )
+    # Not one group: another reason, another text after the month, a month
+    # that is not a number, a month that is not at the opening. With no two
+    # arguments in one group the detail is the enumeration of before.
+    apart = {
+        "a": gone("month 0: one text"),
+        "b": gone("month 1: one text", reason="NOT_COMPUTABLE"),
+        "c": gone("month 2: another text"),
+        "d": gone("month x: one text"),
+        "e": gone("one text, at month 3: one text"),
+    }
+    assert numbers_or_missing(apart).detail == "; ".join(
+        f"{name} is missing, reason {item.reason}: {item.detail}"
+        for name, item in apart.items()
+    )
+
+
+def test_trend_detail_of_a_run_stopped_at_a_month_does_not_grow_with_the_months():
+    # run() stops at month 1: the stock and the times after it carry that
+    # month, and every later stock names its own month. Two groups, whatever
+    # the number of months.
+    def detail_of(count):
+        months = [a_month() for _ in range(count)]
+        months[1] = MonthInput(
+            additions=a_month().additions, rate_modifying_factor=ABSENT_RESULT
+        )
+        the_run = a_run(months)
+        result = fitted_slope(
+            stocks=list(the_run.total_stocks()), times=list(the_run.elapsed_times())
+        )
+        assert result.reason == "MISSING_INPUT"
+        return result.detail
+
+    short, long = detail_of(12), detail_of(240)
+    assert re.sub(r"\d+", "N", short) == re.sub(r"\d+", "N", long)
+    stopped = (
+        "month 1: rate_modifying_factor is missing, reason NO_COVERAGE: "
+        "placeholder detail"
+    )
+    assert long == (
+        "240 arguments are missing (stocks[2], from times[2] to times[240]), "
+        f"reason MISSING_INPUT: {stopped}; "
+        "238 arguments are missing (from stocks[3] to stocks[240]), reason "
+        "MISSING_INPUT, each detail naming a month from 2 to 239 and otherwise "
+        "the same: the state at its start is missing; month 1 is missing, reason "
+        "MISSING_INPUT: rate_modifying_factor is missing, reason NO_COVERAGE: "
+        "placeholder detail"
     )

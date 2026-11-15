@@ -82,25 +82,118 @@ def finite(item: Number) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _absent_detail(missing_items: list[tuple[str, InputMissing | ResultMissing]]) -> str:
-    """The detail of a missing-input refusal, per the lead coordinator's request.
+# How ``run`` of pools.py opens the detail of a month that is not computed:
+# "month <position>: <the rest>". The summary below reads that opening and
+# nothing else of a detail.
+_MONTH_OPENING = "month "
+_MONTH_CLOSING = ": "
 
-    Every absent argument named with its reason while they differ; when they
-    all carry one reason and one detail, the count with the first and the last
-    name instead — a series of hundreds of missing points says how many it is
-    missing, not each one by name. No reason and no value changes.
+
+def _month_and_rest(detail: str | None) -> tuple[int | None, str | None]:
+    """The month a detail names at its opening, and the detail after it.
+
+    ``(None, detail)`` for a detail that does not open with "month <digits>: ".
     """
-    reasons = {item.reason for _, item in missing_items}
-    details = {item.detail for _, item in missing_items}
-    if len(reasons) == 1 and len(details) == 1 and len(missing_items) > 1:
-        first = missing_items[0][0]
-        last = missing_items[-1][0]
-        summary = f"{len(missing_items)} arguments are missing (from {first} to {last}), reason {reasons.pop()}"
-        detail = details.pop()
-        if detail is not None:
-            summary += f": {detail}"
-        return summary
-    return "; ".join(describe_missing(name, item) for name, item in missing_items)
+    if detail is None or not detail.startswith(_MONTH_OPENING):
+        return None, detail
+    head, closing, rest = detail.partition(_MONTH_CLOSING)
+    position = head[len(_MONTH_OPENING) :]
+    if not closing or not position.isdecimal():
+        return None, detail
+    return int(position), rest
+
+
+def _series_and_index(name: str) -> tuple[str, int] | None:
+    """``("stocks", 3)`` for the argument name "stocks[3]"; ``None`` without an index."""
+    series, opening, index = name.rpartition("[")
+    if not opening or not series or not index.endswith("]"):
+        return None
+    index = index[:-1]
+    return (series, int(index)) if index.isdecimal() else None
+
+
+def _runs(names: list[str]) -> list[str]:
+    """The names as runs, in the order in which each run starts.
+
+    A run is one series at consecutive indexes: "from stocks[3] to stocks[7]"
+    stands for stocks[3], stocks[4], … stocks[7], every one of them in
+    ``names``. An index that is not in ``names`` ends the run, so a run never
+    spans an argument that is present. A name without an index is a run of its
+    own and is written as it is: the names between two of them are not known
+    to a reader, so none is left out.
+    """
+    runs: list[list[str]] = []
+    # Per series: the index of its last name so far, and the run that holds it.
+    latest: dict[str, tuple[int, list[str]]] = {}
+    for name in names:
+        found = _series_and_index(name)
+        if found is None:
+            runs.append([name])
+            continue
+        series, index = found
+        previous = latest.get(series)
+        if previous is not None and index == previous[0] + 1:
+            run = previous[1]
+            run.append(name)
+        else:
+            run = [name]
+            runs.append(run)
+        latest[series] = (index, run)
+    return [
+        f"from {run[0]} to {run[-1]}" if len(run) > 1 else run[0] for run in runs
+    ]
+
+
+def _group_detail(
+    members: list[tuple[str, InputMissing | ResultMissing]],
+) -> str:
+    """The detail of one group: one argument as it always was, several as a summary."""
+    if len(members) == 1:
+        return describe_missing(*members[0])
+    names = [name for name, _ in members]
+    shared = members[0][1]
+    summary = (
+        f"{len(members)} arguments are missing ({', '.join(_runs(names))}), "
+        f"reason {shared.reason}"
+    )
+    months = [_month_and_rest(item.detail)[0] for _, item in members]
+    if months[0] is not None and min(months) != max(months):
+        rest = _month_and_rest(shared.detail)[1]
+        return (
+            f"{summary}, each detail naming a month from {min(months)} to "
+            f"{max(months)} and otherwise the same: {rest}"
+        )
+    if shared.detail is not None:
+        summary += f": {shared.detail}"
+    return summary
+
+
+def _absent_detail(missing_items: list[tuple[str, InputMissing | ResultMissing]]) -> str:
+    """The detail of a missing-input refusal: every missing argument, once.
+
+    The missing arguments are put in groups. Two belong to one group when
+    they carry the same reason and the same detail, or details that differ
+    only in the month they name at their opening ("month <position>: …", as
+    ``run`` of pools.py writes it). A group of one is written as it always
+    was: its name, its reason, its detail. A group of more than one is
+    written once: how many they are, which they are (``_runs``), the reason,
+    and the detail they share; when their months differ, the lowest and the
+    highest month named stand for them. The groups follow one another in the
+    order of their first argument.
+
+    So the length of the detail follows the number of groups and of runs,
+    not the number of arguments, and every missing argument can still be
+    found in it (G4 of contracts/ENTRYPOINTS.md). No reason and no value
+    changes; when no two arguments share a group the detail is the one of
+    before, character for character.
+    """
+    groups: dict[tuple, list[tuple[str, InputMissing | ResultMissing]]] = {}
+    for name, item in missing_items:
+        month, rest = _month_and_rest(item.detail)
+        groups.setdefault((item.reason, month is not None, rest), []).append(
+            (name, item)
+        )
+    return "; ".join(_group_detail(members) for members in groups.values())
 
 
 def numbers_or_missing(
@@ -108,9 +201,11 @@ def numbers_or_missing(
 ) -> dict[str, float] | ResultMissing:
     """Every argument as a finite float, or the reason why nothing is computed.
 
-    A missing argument comes first (C3.3): ``MISSING_INPUT``, the detail names
-    every missing argument with its own reason. Then an argument that is not
-    a finite number: ``NOT_COMPUTABLE``, named likewise.
+    A missing argument comes first (C3.3): ``MISSING_INPUT``. The detail
+    names every missing argument with its reason: one by one, or, for
+    arguments that share a reason and a detail, as one group written once
+    (``_absent_detail``). Then an argument that is not a finite number:
+    ``NOT_COMPUTABLE``, each named.
     """
     missing_items = [(name, item) for name, item in numbers.items() if is_missing(item)]
     if missing_items:

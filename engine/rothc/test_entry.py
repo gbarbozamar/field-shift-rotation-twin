@@ -928,6 +928,117 @@ def test_entry_holds_no_value_of_the_method():
     assert numbers <= {0, 1, 0.0, 1.0}, numbers
 
 
+# --- the detail of a trend value that is missing ----------------------------------------
+
+
+def service_forcing(years: int) -> CarbonForcing:
+    """The forcing the service builds, on the PLACEHOLDER chain inputs.
+
+    ``api.carbon_forcing.build_carbon_forcing``, the function the runner
+    calls, on the calendar example of contracts/inputs/ (under the case and
+    the field of the chain examples, its crops two test identifiers), the
+    chain soil and slope and the chain climate. The chain climate covers one
+    agricultural year. Each of its daily series is extended to ``years``
+    years: a day of a later year takes the value of the same month and day
+    of the example year, and a 29 February that of 28 February. PLACEHOLDER
+    numbers; only the number of months matters here.
+    """
+    import datetime as dt
+
+    from api.carbon_forcing import build_carbon_forcing
+    from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
+
+    examples = ROOT / "contracts" / "inputs" / "examples"
+
+    def document(name: str) -> dict:
+        return json.loads((examples / name).read_text(encoding="utf-8"))
+
+    climate = document("PLACEHOLDER_chain_site_climate.json")
+    calendar = document("PLACEHOLDER_rotation_calendar.json")
+    for field in ("case_id", "field_id"):
+        calendar[field] = climate[field]
+    crops = ("test_crop_a", "test_crop_b", "test_crop_a")
+    for component, crop in zip(calendar["components"], crops, strict=True):
+        component["crop_id"] = crop
+    for series in climate["daily_series"]:
+        by_month_day = {day["date"][5:]: day for day in series["days"]}
+        first = dt.date.fromisoformat(series["start_date"])
+        last = first.replace(year=first.year + years) - dt.timedelta(days=1)
+        days = []
+        day = first
+        while day <= last:
+            item = by_month_day.get(day.strftime("%m-%d")) or by_month_day["02-28"]
+            days.append({**item, "date": day.isoformat()})
+            day += dt.timedelta(days=1)
+        series["days"], series["end_date"] = days, last.isoformat()
+    built = build_carbon_forcing(
+        RotationCalendar.model_validate(calendar),
+        SiteClimate.model_validate(climate),
+        SiteSoilSlope.model_validate(document("PLACEHOLDER_chain_site_soil_slope.json")),
+    )
+    assert isinstance(built, CarbonForcing), built
+    return built
+
+
+def trend_detail(balance: CarbonBalance, computation: str) -> str:
+    (row,) = [t for t in balance.soil_carbon_trend if t.computation == computation]
+    assert row.value is None and row.missing.reason == "MISSING_INPUT", row
+    return row.missing.detail
+
+
+def test_fitted_slope_detail_does_not_grow_with_the_months_of_the_record():
+    """The detail of ``fitted_slope`` on the forcing the service builds.
+
+    That forcing names no starting pool, so the initial state is missing and
+    with it every stock and every time but the first. ``fitted_slope`` gets
+    one missing argument that names the initial state, and then two for each
+    month, all with one reason and with details that differ only by the month
+    they name. They are written once, whatever the number of months: the same
+    text, up to the digits of its counts and bounds, for 2 years and for 23.
+    """
+    short, long = (
+        run_rothc(service_forcing(years), parameters=catalogue()) for years in (2, 23)
+    )
+    assert [len(item.total_stock.steps) for item in (short, long)] == [24, 276]
+    details = [trend_detail(item, "fitted_slope") for item in (short, long)]
+    assert re.sub(r"\d+", "N", details[0]) == re.sub(r"\d+", "N", details[1])
+    start = long.total_stock.initial.missing  # why the initial state is missing
+    named = f"reason {start.reason}: {start.detail}"
+    assert details[1] == (
+        f"stocks[0] is missing, {named}; "
+        "552 arguments are missing (from stocks[1] to stocks[276], from times[1] "
+        "to times[276]), reason MISSING_INPUT, each detail naming a month from 0 "
+        "to 275 and otherwise the same: the state at its start is missing; the "
+        f"initial state is missing, {named}"
+    )
+    assert "48 arguments are missing (from stocks[1] to stocks[24], " in details[0]
+
+
+def test_starting_pools_missing_around_a_present_one_are_each_named():
+    """Three starting pools missing with one reason, a present one between them.
+
+    The detail of the initial state names the three, and does not read as a
+    run from the first to the last: the pool between them is present.
+    """
+    quantity = {name: q for name, (_, q) in FORCING_QUANTITIES.items()}
+    gone = {"missing": {"reason": "NOT_AVAILABLE", "detail": f"{MARK}: not measured"}}
+    absent = {quantity[f"{pool}_pool"] for pool in ("dpm", "bio", "hum")}
+    data = forcing_data()
+    data["starting_state"] = [
+        soil(item["quantity"], gone, STOCK_UNIT) if item["quantity"] in absent else item
+        for item in data["starting_state"]
+    ]
+    balance = run_rothc(forcing(data), parameters=catalogue())
+    initial = balance.total_stock.initial.missing
+    assert initial.reason == "MISSING_INPUT"
+    assert initial.detail == (
+        "3 arguments are missing (dpm, bio, hum), reason NOT_AVAILABLE: "
+        f"{MARK}: not measured"
+    )
+    for computation in TREND_COMPUTATIONS:
+        assert initial.detail in trend_detail(balance, computation)
+
+
 def section(title: str) -> str:
     text = README.read_text(encoding="utf-8")
     start = text.index(f"\n## {title}\n")
