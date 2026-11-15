@@ -46,5 +46,25 @@ describe('App routing', () => {
     expect(html).toContain('data-testid="fields-map"')
     expect(html).toContain(strings['map.select_hint'])
     expect(html).toContain(strings['identity.banner_title'])
+    expect(html).toContain('href="#/print"')
+    expect(html).toContain(strings['print.open_link'])
+  })
+
+  it('renders the printable field sheet at #/print for the selected field and without selection', () => {
+    const unselectedHtml = renderAppAtHash('#/print')
+    expect(unselectedHtml).toContain(strings['print.title'])
+    expect(unselectedHtml).toContain(strings['print.select_hint'])
+    expect(unselectedHtml).toContain('href="#/fields"')
+    expect(unselectedHtml).toContain(strings['print.back_to_fields'])
+
+    const selected = exampleCase.fields[0]
+    setSelectedFieldId(selected.field_id)
+    const selectedHtml = renderAppAtHash('#/print')
+    expect(selectedHtml).toContain(strings['print.title'])
+    expect(selectedHtml).toContain(selected.name)
+    expect(selectedHtml).toContain(selected.field_id)
+    expect(selectedHtml).toContain(exampleCase.label)
+    expect(selectedHtml).toContain(strings['example.banner'])
+    expect(selectedHtml).toContain('print:hidden')
   })
 })
