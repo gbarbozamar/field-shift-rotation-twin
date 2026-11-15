@@ -65,38 +65,22 @@
           }
         }
       ]
-    },
+    }
+  ],
+  "range_across_scenarios": [
     {
       "rotation_id": "example-rotation-1",
-      "scenario_id": "PLACEHOLDER_scenario_one",
-      "indicator": "water_deficit_exposure",
-      "years_evaluated": 0,
-      "years_within_limits": null,
-      "not_evaluated": [
-        {
-          "time_basis": "rotation",
-          "missing": {
-            "reason": "NOT_AVAILABLE",
-            "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"
-          }
-        }
-      ]
+      "indicator": "soil_loss",
+      "minimum": 0,
+      "maximum": 0,
+      "scenario_of_the_minimum": "PLACEHOLDER_scenario_one"
     },
     {
       "rotation_id": "example-rotation-2",
-      "scenario_id": "PLACEHOLDER_scenario_one",
-      "indicator": "water_deficit_exposure",
-      "years_evaluated": 0,
-      "years_within_limits": null,
-      "not_evaluated": [
-        {
-          "time_basis": "rotation",
-          "missing": {
-            "reason": "NOT_AVAILABLE",
-            "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"
-          }
-        }
-      ]
+      "indicator": "soil_loss",
+      "minimum": 0,
+      "maximum": 0,
+      "scenario_of_the_minimum": "PLACEHOLDER_scenario_one"
     }
   ],
   "paired_differences": [
@@ -109,9 +93,10 @@
       "difference": {
         "value": -4.0,
         "unit": "t ha-1 yr-1",
-        "range_missing": {
-          "reason": "NOT_AVAILABLE",
-          "detail": "PLACEHOLDER detail: the method that gives a paired difference its range is OPEN (docs/VALIDATION.md, D2), so the difference carries no range"
+        "range": {
+          "low": -14.0,
+          "high": 6.0,
+          "kind": "PLACEHOLDER_range_kind"
         },
         "provenance": "DERIVED",
         "source": "decision layer"
@@ -186,12 +171,106 @@
       "method": "OPEN: paired-difference method and citation, person-supplied"
     }
   ],
+  "equal_tolerances": [
+    {
+      "indicator": "soil_loss",
+      "tolerance": {
+        "value": 0.0,
+        "unit": "t ha-1 yr-1",
+        "range_missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: the designer of the case set the tolerance without a range"
+        },
+        "provenance": "DECLARED",
+        "source": "PLACEHOLDER source: the designer of the case"
+      }
+    },
+    {
+      "indicator": "water_deficit_exposure",
+      "tolerance": {
+        "value": null,
+        "unit": "dimensionless",
+        "missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: the designer of the case set no tolerance of 'equal' for this indicator"
+        }
+      }
+    },
+    {
+      "indicator": "soil_carbon_trend",
+      "tolerance": {
+        "value": null,
+        "unit": "t C ha-1 yr-1",
+        "missing": {
+          "reason": "NOT_DECLARED",
+          "detail": "PLACEHOLDER detail: the designer of the case set no tolerance of 'equal' for this indicator"
+        }
+      }
+    }
+  ],
+  "pair_cell_counts": [
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_loss",
+      "by_difference_range": {
+        "strict_improvement": 0,
+        "deterioration": 0,
+        "not_separated": 1
+      },
+      "by_sign_of_point_value": {
+        "better": 1,
+        "worse": 0,
+        "equal": 0,
+        "missing_side": 1
+      }
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "water_deficit_exposure",
+      "by_difference_range": {
+        "strict_improvement": 0,
+        "deterioration": 0,
+        "not_separated": 0
+      },
+      "by_sign_of_point_value": null,
+      "by_sign_of_point_value_missing": {
+        "reason": "NOT_DECLARED",
+        "detail": "PLACEHOLDER detail: no tolerance of 'equal' is set for this indicator (D87)"
+      }
+    },
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "scenario_id": "PLACEHOLDER_scenario_one",
+      "indicator": "soil_carbon_trend",
+      "by_difference_range": {
+        "strict_improvement": 0,
+        "deterioration": 0,
+        "not_separated": 0
+      },
+      "by_sign_of_point_value": null,
+      "by_sign_of_point_value_missing": {
+        "reason": "NOT_DECLARED",
+        "detail": "PLACEHOLDER detail: no tolerance of 'equal' is set for this indicator (D87)"
+      }
+    }
+  ],
+  "pair_states": [
+    {
+      "pair": ["example-rotation-1", "example-rotation-2"],
+      "value": "Not separated: uncertainty missing",
+      "reason": "a difference without its range",
+      "coverage": {
+        "cells_compared": 2,
+        "cells_of_the_pair": 5
+      }
+    }
+  ],
   "state": {
     "value": "OPEN: exact wording by the science reviewers",
     "indicators_not_resolved": ["soil_carbon_trend", "soil_loss"],
-    "reasons": [
-      "PLACEHOLDER reason: the wording of a reason comes from deterministic templates that are not written yet"
-    ]
+    "reasons": ["PLACEHOLDER reason: the wording of a reason comes from deterministic templates that are not written yet"]
   },
   "measure_first": [
     {
