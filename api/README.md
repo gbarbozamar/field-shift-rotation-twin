@@ -99,6 +99,14 @@ A valid request always answers `200`, also when nothing could be computed:
 - An interface answer that breaks these rules (a module without a reason, an
   unavailable source without `missing_reason`, a result together with a
   reason for its absence) is a defect and answers `500`.
+- `scenarios` (**PROPOSED**, D109): one item per phase of the rotation, in
+  order, each `{scenario_id, first_ag_year, outcome, calendar, result,
+  result_missing, modules}` (see "The phases of a rotation" below). The
+  top-level `outcome`, `calendar`, `result`, `result_missing` and `modules`
+  are those of `phase_1` (the calendar unchanged) and equal the first item;
+  `sources` is written once, at the top, because every phase has the same
+  inputs. There is always at least one item. Every non-null `result` loads
+  into `ResultsPerRotation`.
 
 ## Errors (`api/errors.py`)
 
@@ -344,6 +352,95 @@ differs from the forcing, or whose `carbon_model` is not `amg`: the forcing is
 the runner's own, so the mismatch is the engine's (`check_balance`). That includes
 a built engine that returns the not-built form of its own part: D12 allows
 that form only for an engine that is not built.
+
+### The phases of a rotation (`api/phases.py`; D109, D117; PROPOSED)
+
+Decision D109 of issue #77: each phase of a rotation is a scenario with its own
+`scenario_id`, each phase starting in the first agricultural year of the
+record; D117: phases are nested inside each value of an uncertain input (read
+by the decision layer). The runner builds **option (b), a calendar the runner
+moves** (#18, 00:57 UTC): EP1, EP3 and EP5 keep their signatures (D56) and get
+the calendar of each phase.
+
+- **Number of phases** `N`: the cycle length of the calendar in whole years,
+  the rule of `cycle_length_years` in `engine/calendar/repeat.py`. A one-year
+  rotation has one phase.
+- **Phase `p`** (0 … N−1), `scenario_id` `phase_{p+1}`, `first_ag_year` the
+  agricultural year (C5.3) of the EP2 calendar that comes first. The cut is
+  the first day of the start month in the calendar's year `p` (year 0 is the
+  agricultural year of `start_date`). A component that ends before the cut
+  moves forward `N − p` years (to the end of the cycle); every other date
+  moves back `p` years. A date keeps its month and day; a 29 February in a
+  year without one becomes 28 February (`repeat.shifted_date`, point 2), and
+  the calendar module of the phase counts those dates. Periods move with
+  their component. Components that do not move forward come first, then
+  those that do, each in the calendar's order.
+- **`start_date` / `end_date`** of a moved calendar: the first day of year 0
+  and the day before the first day of year `N`, so its cycle length stays `N`
+  and its first agricultural year is year 0, and it describes no day the
+  calendar repeated over the record does not. `api/test_phases.py` checks,
+  with `engine/calendar/repeat.py`, that for every phase `cycle_length_years`
+  is `N` and that agricultural year `k` of the phase holds what year `k + p`
+  of the calendar holds, and that the real EP1 lays year `p`'s crop on the
+  first agricultural year of the record.
+- **Phase 0 is the calendar of EP2 itself**, unchanged (the same object), so
+  it keeps EP2's `start_date` (the first placed date): the route and CH07 of
+  `validation/test_chain_examples.py` compare it with EP2's own calendar.
+  Phases 1 and above cannot use the first placed date: when no component
+  starts in the phase's first year, that date falls in a later agricultural
+  year, EP1 would lay that later year on the record's first year, and the
+  cycle could shrink. The only effect of the difference, in `repeat.py`
+  point 7: a component without an end date may end no later than the end of
+  year `N − 1` instead of the day before the next first placed date, which
+  widens the days an engine leaves unknown for it and fills none.
+- Nothing else changes: identifiers, crops, feasibility, start month,
+  provenance, sources and assumption marks. Each moved calendar is a new
+  `RotationCalendar`, validated.
+- **A component that starts before the cut and ends on or after it, or on a
+  missing date** (it would start before the phase's first year): no rule is
+  given (OPEN, lead developer). The runner finds it on the EP2 calendar,
+  whatever function moves it, and writes `OPEN: …` in the detail of the
+  phase's `calendar` module (counts only, no identifier). D133: no rule in
+  this release, nothing guessed, and `RotationCalendar` cannot hold a
+  component before its `start_date`, so the runner's copy of
+  `phase_calendar` **raises `ValueError`** for such a phase, as #221 allows.
+  A phase refused that way calls no engine: `calendar: null`,
+  `result: null`, `result_missing` `NOT_COMPUTABLE` (PROPOSED) with the OPEN
+  note, `outcome: no_result`. A `ValueError` for a phase without such a
+  component is a defect (`500`). If lane L1's function returns a calendar
+  for such a phase instead (a flag), that calendar is used as returned and
+  the OPEN note is still written. On the PLACEHOLDER calendar of
+  `contracts/inputs/examples/`, phase 2 is refused: its component 2 runs
+  from April to October across the July start of the agricultural year.
+- **`crossing_components` stays after #221 merges**, as long as D133 has no
+  rule: it is how the runner tells a refused phase (the OPEN case, answered
+  `200`) from a defect of the phase function (`500`), and how it names the
+  OPEN case in the same words whichever way lane L1 signals it (an error or
+  a flag). It goes, with that distinction, when the lead developer gives the
+  rule and the phase function no longer refuses.
+- **Who moves the calendar.** Lane L1 agreed on issue #221 to build
+  `phase_calendar(calendar, p) -> RotationCalendar` and
+  `list_phases(calendar) -> list[int]` in `engine/calendar/repeat.py`.
+  `discover_engine_functions()` finds both by name (fields `phase_calendar`
+  and `list_phases` of `EngineFunctions`); when both exist the runner uses
+  them, otherwise its own copy in `api/phases.py` (a PROPOSED transition).
+  What they return is checked: `list_phases` any sequence equal to
+  `0 … N−1`; `phase_calendar` a `RotationCalendar`, re-validated, that keeps
+  everything but the dates: contract, example mark, identifiers, start
+  month, feasibility, and the components as a multiset of (identifier, crop,
+  period types, which dates are missing). Anything else is a defect
+  (`TypeError`, `500`). Phase 0 is never
+  asked of them.
+- **Running.** EP2 once. For each phase, EP1, EP3 and EP5 once on its
+  calendar, with the same climate, soil-and-slope and `parameters` objects;
+  every rule of the table below applies per phase. Nothing is cached across
+  phases: a request costs `N` times the engines.
+- **One phase only** (`scenarios` holds the top-level answer once): EP2 not
+  built (`first_ag_year: null`), an input absent, site data of another field,
+  an infeasible calendar (run once, unmoved), and a calendar without a start
+  month (only `phase_1`, with a note on the calendar module naming how many
+  phases were not run). An implementation of `RotationEngines` that gives no
+  phases gets `phase_1` from the route, `first_ag_year: null`.
 
 ### The parameter catalogue (`parameters`; Q3, D46, D56)
 
@@ -618,6 +715,22 @@ here.
 | D46, D56 (Q3 of `contracts/ENTRYPOINTS.md`) | The runner loads the parameter catalogue and passes it to EP1 and EP3 as the keyword argument `parameters`; EP2 does not change; a parameter not in the catalogue is the engine's `MISSING_INPUT` (unit `l2/runner-parameters`). What the runner does when the catalogue has a problem, left to the platform developer by Q3: start-up fails (PROPOSED above). Replaces the OPEN "D46, the argument `parameters`" |
 
 ## OPEN
+
+- **The phases of D109** (`api/phases.py`):
+  - a component that starts before the first agricultural year of a phase
+    and ends inside it (or on a missing date): no rule in this release
+    (D133), for the lead developer (#18). The phase is refused
+    (`NOT_COMPUTABLE`, the OPEN case named), never guessed;
+  - drop the runner's copy of the phase rule once lane L1's
+    `phase_calendar` / `list_phases` (issue #221) merge; how their version
+    signals that component (an error or a flag) is read on that merge;
+    `crossing_components` stays until D133 has a rule (above);
+  - whether EP3 repeats the calendar over the record itself (lane L1,
+    `engine/water/EXPOSURE.md` OPEN 5); until it does, it sees one cycle of
+    the moved calendar;
+  - a summary over the phases (D74, D96): for the decision layer, not the
+    route;
+  - the cost: `N` runs of EP1, EP3 and EP5 per request.
 
 - **The inputs of AMG after D118 to D122.** Answered: `mean_temperature`
   (D118, built). Still missing with their reason:
