@@ -45,6 +45,7 @@ from engine.rothc.entry import (
 )
 from engine.rothc.modifiers import (
     advance_deficit,
+    bare_soil_deficit,
     clay_partition,
     cover_modifier,
     maximum_tsmd,
@@ -99,6 +100,7 @@ VALUES: dict[str, tuple[float, str]] = {
     "bio_share": (0.44, "dimensionless"),
     "iom_coefficient": (0.044, "dimensionless"),
     "iom_exponent": (1.11, "dimensionless"),
+    "bare_tsmd_divisor": (2.22, "dimensionless"),
 }
 # The composition of each origin: the first by its DPM:RPM ratio (plant
 # material), the second by its three shares (an organic amendment).
@@ -363,6 +365,7 @@ def core_run(data: dict, parameters: dict[str, float]) -> dict:
             offset=parameters["temperature_offset"],
             offset_unit=unmark(DEGREE),
         )
+        before = deficit
         deficit = advance_deficit(
             deficit=deficit,
             maximum=maximum,
@@ -372,6 +375,13 @@ def core_run(data: dict, parameters: dict[str, float]) -> dict:
             pan_evaporation=pan["months"][position]["value"],
             pan_evaporation_unit="mm",
             pan_factor=parameters["pan_factor"],
+        )
+        deficit = bare_soil_deficit(
+            deficit_before=before,
+            advanced=deficit,
+            maximum=maximum,
+            cover_state=cover["months"][position]["value"],
+            divisor=parameters["bare_tsmd_divisor"],
         )
         b = moisture_modifier(
             deficit=deficit,
