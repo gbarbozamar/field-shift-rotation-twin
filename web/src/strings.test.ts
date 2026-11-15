@@ -142,6 +142,24 @@ const WORDING_SHEET: Record<string, string> = {
   'decision.missing_side': 'Missing side',
   'decision.coverage': '{k} of {n} cells compared',
   'decision.years_within': 'Years within the limit: {min} to {max}, minimum at {scenario}',
+  // PROPOSED (Block 4, D4 + named-years selector): measurement priority with
+  // its field, agricultural-year filter, counts by year, and scenario-year
+  // paired differences.
+  'decision.measure_first': 'Measure first',
+  'decision.measure_first_field': 'Field: {field}',
+  'decision.measure_first_rank': 'Rank {rank}',
+  'decision.measure_first_not_declared': 'no uncertain input is declared for this case',
+  'decision.named_years': 'Agricultural year',
+  'decision.named_years_all': 'All years',
+  'decision.named_years_none': 'No agricultural years in this decision',
+  'decision.counts_by_year': 'Counts by year',
+  'decision.counts_by_year_summary': '{evaluated} evaluated, {within} within the limit',
+  'decision.counts_by_year_evaluated': '{evaluated} evaluated',
+  'decision.counts_by_year_within': 'Years within the limit',
+  'decision.counts_by_year_not_evaluated': 'Not evaluated',
+  'decision.counts_by_year_empty': 'No counts by year for this selection',
+  'decision.scenario_years': 'Scenario-year differences',
+  'decision.scenario_years_empty': 'No scenario-year differences for this selection',
   // PROPOSED (S-019, l2/plant-screen): the screen "What should I plant?".
   // Wording is a person's decision; the operator approves it.
   'plant.title': 'What should I plant?',
