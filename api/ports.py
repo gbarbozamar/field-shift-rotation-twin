@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, get_args
+from typing import TYPE_CHECKING, Any, Literal, Protocol, get_args
 
 from adapters.ports import (
     ClimateResult,
@@ -31,12 +31,18 @@ from adapters.ports import (
     SoilSlopeSource,
 )
 from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
-from contracts.results.models import ReasonCode, ResultsPerRotation
+from contracts.results.models import ReasonCode, ResultsPerRotation, ResultsTable
+
+if TYPE_CHECKING:
+    # Only for the annotation of ``DecisionLayer``: never imported at run time,
+    # so the app imports nothing of the decision output at start-up.
+    from contracts.decision_output import DecisionOutput
 
 __all__ = [
     "CLIMATE_CONTRACT",
     "SOIL_SLOPE_CONTRACT",
     "CalendarPayload",
+    "DecisionLayer",
     "EnginesResult",
     "ErrorDetail",
     "Missing",
@@ -241,3 +247,21 @@ class RunSettings:
     @property
     def has_period(self) -> bool:
         return self.start_date is not None and self.end_date is not None
+
+
+# --- decision layer -----------------------------------------------------------
+
+
+class DecisionLayer(Protocol):
+    """Turns a results table into a decision output document, or says why not.
+
+    PROPOSED (unit ``l2/decision-route``). The route ``POST /api/decisions/run``
+    depends on this interface only. The default implementation
+    (``api/decision_layer.py``) finds the function of sub-lane L2b by name on
+    each request. ``Missing`` is a typed absence (C3.1); what an implementation
+    raises is answered by the route as a typed absence too.
+    """
+
+    def decide(
+        self, table: ResultsTable, *, example_data: bool
+    ) -> DecisionOutput | Missing: ...
