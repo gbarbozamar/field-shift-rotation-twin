@@ -317,7 +317,13 @@ def test_two_crop_calendar_gives_ledger_with_carbon_recomputed():
         }
         for part in PARTS:
             found = series(ledger, f"{crop}_grain_{part}")
-            assert found.origin == crop and found.unit == CARBON_INPUT_UNIT
+            group = (
+                "aboveground"
+                if part == "aboveground_carbon_retained"
+                else "belowground"
+            )
+            assert found.origin == f"{crop}_{group}"  # D194 of #77
+            assert found.unit == CARBON_INPUT_UNIT
             assert [item.ag_year for item in found.years] == list(YEARS)
             for item in found.years:
                 assert item.value == pytest.approx(expected[part] / kg_per_tonne)
@@ -599,6 +605,171 @@ def test_series_load_into_carbon_forcing_unchanged():
     assert {s.unit for s in forcing.annual_carbon_inputs} == {AMG_INPUT_UNIT}
     assert ledger.carbon_input_unit == AMG_INPUT_UNIT
     assert ledger.carbon_unit == CARBON_UNIT != AMG_INPUT_UNIT
+
+
+def previous_origins(ledger: ResidueLedger) -> list[dict[str, Any]]:
+    """The series of the ledger with the origin of the rule before D194 (the
+    crop), written here and not taken from the engine: every other field as
+    the engine wrote it."""
+    result = []
+    for item in ledger.annual_carbon_inputs:
+        dumped = item.model_dump(mode="json")
+        crop = item.quantity.split("_grain_")[0]
+        dumped["origin"] = crop
+        result.append(dumped)
+    return result
+
+
+def test_series_origin_is_the_part_group():
+    """D194 of #77: per crop and purpose, three series whose origins are
+    <crop>_aboveground (retained aboveground carbon) and <crop>_belowground
+    (root carbon, rhizodeposit carbon); everything else is as before."""
+    ledger = run()
+    origins = {s.quantity: s.origin for s in ledger.annual_carbon_inputs}
+    assert origins == {
+        f"{crop}_grain_{part}": f"{crop}_{group}"
+        for crop in (CROP_A, CROP_B)
+        for part, group in (
+            ("aboveground_carbon_retained", "aboveground"),
+            ("root_carbon", "belowground"),
+            ("rhizodeposit_carbon", "belowground"),
+        )
+    }
+    # Every value, year, unit, label and source is the one of the previous
+    # rule: only the origin differs.
+    for before, after in zip(
+        previous_origins(ledger), ledger.annual_carbon_inputs, strict=True
+    ):
+        now = after.model_dump(mode="json")
+        assert now.pop("origin") != before.pop("origin")
+        assert now == before
+    # The components, which carry no origin, are untouched.
+    assert ResidueLedger.model_validate(ledger.model_dump(mode="json")) == ledger
+
+
+# --- through EP5: one humification coefficient for each origin group (D194) -------------
+
+
+def amg_ledger() -> ResidueLedger:
+    """The two-crop ledger over the agricultural years of the AMG test forcing
+    (calendar years, start month 1), so its series fit that horizon."""
+    from engine.amg import test_entry as amg_test
+
+    first, last = amg_test.YEARS[0], amg_test.YEARS[-1]
+    start = {"month": 1, "provisional": True, **LABEL}
+    calendar = calendar_data(
+        ag_year_start=start, start_date=f"{first}-01-01", end_date=f"{first}-12-31"
+    )
+    rotation = rotation_data()
+    rotation["ag_year_start"] = start
+    for item, (sowing, harvest) in zip(
+        calendar["components"],
+        ((f"{first}-01-15", f"{first}-06-20"), (f"{first}-07-10", f"{first}-11-30")),
+        strict=True,
+    ):
+        item["start"], item["end"] = date_value(sowing), date_value(harvest)
+    for item, part in zip(rotation["components"], calendar["components"], strict=True):
+        item["sowing"], item["harvest"] = part["start"], part["end"]
+    ledger = run(
+        rotation=rotation,
+        calendar=calendar,
+        climate=climate_data(dt.date(first, 1, 1), dt.date(last, 12, 31)),
+    )
+    assert (ledger.first_ag_year, ledger.last_ag_year) == (first, last)
+    return ledger
+
+
+# PLACEHOLDER humification coefficients, one per origin group of each crop, and
+# one under the plain crop word that must never be read (D194).
+HUMIFICATION = {
+    f"{CROP_A}_aboveground": 0.123,
+    f"{CROP_A}_belowground": 0.456,
+    f"{CROP_B}_aboveground": 0.234,
+    f"{CROP_B}_belowground": 0.567,
+}
+PLAIN_CROP = {CROP_A: 0.999, CROP_B: 0.888}
+
+
+def amg_parameters(coefficients: dict[str, float]) -> dict[str, dict]:
+    """The PLACEHOLDER catalogue of engine/amg/test_entry.py without its
+    humification records, with ``coefficients`` under the scope key of EP5."""
+    from engine.amg import entry
+    from engine.amg import test_entry as amg_test
+
+    records = amg_test.catalogue_with("humification_coefficient", None)
+    for origin, value in coefficients.items():
+        records[f"records/humification_{origin}.json"] = amg_test.unmark(
+            amg_test.record(
+                entry.PARAMETERS["humification_coefficient"][0],
+                value,
+                "dimensionless",
+                {entry.ORIGIN_SCOPE_KEY: origin},
+            )
+        )
+    return records
+
+
+def amg_forcing(ledger: ResidueLedger) -> CarbonForcing:
+    from engine.amg import test_entry as amg_test
+
+    data = amg_test.forcing_data()
+    data["annual_carbon_inputs"] = [
+        s.model_dump(mode="json") for s in ledger.annual_carbon_inputs
+    ]
+    return CarbonForcing.model_validate(data)
+
+
+def test_amg_reads_one_coefficient_per_origin_group():
+    """Through EP5 (``run_amg``): the humified input of each year is the sum of
+    each series times the coefficient of its origin group, recomputed here;
+    the records under the plain crop word are in the catalogue and not read."""
+    from engine.amg import entry, run_amg
+
+    ledger = amg_ledger()
+    forcing = amg_forcing(ledger)
+    balance = run_amg(
+        forcing, parameters=amg_parameters({**HUMIFICATION, **PLAIN_CROP})
+    )
+    (humified,) = [f for f in balance.flows if f.quantity.endswith("humified_input")]
+    assert len(humified.steps) == len(ledger.annual_carbon_inputs[0].years)
+
+    def value_of(series, year: int) -> float:
+        (found,) = [item.value for item in series.years if item.ag_year == year]
+        return found
+
+    # Start month 1: the agricultural year of a step is the year of its start.
+    for step in humified.steps:
+        year = step.start.year
+        expected = sum(
+            value_of(s, year) * HUMIFICATION[s.origin]
+            for s in forcing.annual_carbon_inputs
+        )
+        plain = sum(
+            value_of(s, year) * PLAIN_CROP[s.origin.rsplit("_", 1)[0]]
+            for s in forcing.annual_carbon_inputs
+        )
+        assert step.value == pytest.approx(expected, rel=1e-12)
+        assert step.value != pytest.approx(plain)  # the plain crop record unread
+    # The source of the flow names the humification record it read.
+    assert f"'{entry.PARAMETERS['humification_coefficient'][0]}'" in humified.source
+
+
+def test_amg_without_the_group_records_names_them_and_not_the_crop():
+    """With only records under the plain crop word, EP5 finds none for the
+    origins EP4 writes: the humified input is missing and names each
+    <crop>_aboveground and <crop>_belowground scope it looked for."""
+    from engine.amg import entry, run_amg
+
+    forcing = amg_forcing(amg_ledger())
+    balance = run_amg(forcing, parameters=amg_parameters(PLAIN_CROP))
+    (humified,) = [f for f in balance.flows if f.quantity.endswith("humified_input")]
+    detail = humified.steps[0].missing.detail
+    assert humified.steps[0].missing.reason == "MISSING_INPUT"
+    named = {s.origin for s in forcing.annual_carbon_inputs}
+    assert named == set(HUMIFICATION)
+    assert any(f'"{entry.ORIGIN_SCOPE_KEY}": "{origin}"' in detail for origin in named)
+    for crop in PLAIN_CROP:
+        assert f'"{entry.ORIGIN_SCOPE_KEY}": "{crop}"' not in detail
 
 
 def test_series_are_in_tonnes_hand_checked():

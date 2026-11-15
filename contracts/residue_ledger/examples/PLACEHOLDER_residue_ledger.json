@@ -309,7 +309,7 @@
     {
       "quantity": "placeholder_crop_a_grain_aboveground_carbon_retained",
       "unit": "PLACEHOLDER_carbon_input_unit",
-      "origin": "placeholder_crop_a",
+      "origin": "placeholder_crop_a_aboveground",
       "provenance": "DERIVED",
       "source": "PLACEHOLDER: example data, no real source",
       "range_missing": {
@@ -332,7 +332,7 @@
     {
       "quantity": "placeholder_crop_a_grain_root_carbon",
       "unit": "PLACEHOLDER_carbon_input_unit",
-      "origin": "placeholder_crop_a",
+      "origin": "placeholder_crop_a_belowground",
       "provenance": "DERIVED",
       "source": "PLACEHOLDER: example data, no real source",
       "range_missing": {
@@ -359,7 +359,7 @@
     {
       "quantity": "placeholder_crop_a_grain_rhizodeposit_carbon",
       "unit": "PLACEHOLDER_carbon_input_unit",
-      "origin": "placeholder_crop_a",
+      "origin": "placeholder_crop_a_belowground",
       "provenance": "DERIVED",
       "source": "PLACEHOLDER: example data, no real source",
       "range_missing": {
@@ -382,7 +382,7 @@
     {
       "quantity": "placeholder_crop_b_cover_aboveground_carbon_retained",
       "unit": "PLACEHOLDER_carbon_input_unit",
-      "origin": "placeholder_crop_b",
+      "origin": "placeholder_crop_b_aboveground",
       "first_ag_year": 2001,
       "last_ag_year": 2002,
       "years": [

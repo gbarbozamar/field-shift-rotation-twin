@@ -745,7 +745,8 @@ def test_wheat_soybean_maize_with_a_lead_in_answers_200(monkeypatch):
         of_its_crop = [
             series
             for series in ledger.annual_carbon_inputs
-            if series.origin == lead_in.crop_id
+            # D194: <crop>_aboveground and <crop>_belowground
+            if series.origin.rsplit("_", 1)[0] == lead_in.crop_id
         ]
         assert of_its_crop
         for series in of_its_crop:
@@ -761,3 +762,155 @@ def test_wheat_soybean_maize_with_a_lead_in_answers_200(monkeypatch):
     # Phase 1 starts with the wheat, so the cycle before it ends with the maize;
     # phase 2 starts after the wheat, which then crosses into its first year.
     assert lead_in_crops == ["maize", "wheat"]
+
+
+# --- 8. D194: the origin of each series, through the runner ---------------------
+
+
+# The two rotations of the demonstration (D128) on PLACEHOLDER years, with the
+# month and day of the row USER-AP (D72) of docs/SCIENCE_DECISIONS.md, as in
+# section 7. No number is asserted.
+DEMO_ROTATIONS: dict[str, list[tuple[str, str, str]]] = {
+    "soybean-winter-fallow": [("soybean", "2027-11-15", "2028-05-05")],
+    "wheat-soybean-maize": [
+        ("wheat", "2027-05-25", "2027-12-05"),
+        ("soybean", "2027-12-10", "2028-05-10"),
+        ("maize", "2028-09-20", "2029-04-20"),
+    ],
+}
+
+
+def _post_demo(name: str) -> dict[str, Any]:
+    """POST one demo rotation through the app with the catalogue the service
+    loads (``params/records/``); EP4 is what ``discover_engine_functions``
+    gives, which the caller patches."""
+    from fastapi.testclient import TestClient
+
+    from adapters.example_soil_slope import ExampleSoilSlopeSource
+    from api.config import PARAMETERS_FOLDER, load_parameters
+    from api.main import create_app
+    from api.ports import RunSettings
+    from api.test_phases import ROOT
+    from api.test_phases import ChainClimate as ChainExampleClimate
+    from contracts.inputs import SiteClimate
+
+    rotation = copy.deepcopy(ROTATION)
+    template = rotation["components"][0]
+    rotation["components"] = []
+    for position, (crop, sowing, harvest) in enumerate(DEMO_ROTATIONS[name], start=1):
+        item = copy.deepcopy(template)
+        item.update(
+            component_id=f"c{position}",
+            position=position,
+            crop_id=crop,
+            purpose="grain",
+        )
+        item["sowing"]["date"], item["harvest"]["date"] = sowing, harvest
+        rotation["components"].append(item)
+    examples = ROOT / "contracts" / "inputs" / "examples"
+    climate = SiteClimate.model_validate_json(
+        (examples / "PLACEHOLDER_chain_site_climate.json").read_text(encoding="utf-8")
+    )
+    record = climate.daily_series[0]
+    app = create_app(
+        [],
+        climate=ChainExampleClimate(climate),
+        soil_slope=ExampleSoilSlopeSource(
+            examples / "PLACEHOLDER_chain_site_soil_slope.json"
+        ),
+        settings=RunSettings(start_date=record.start_date, end_date=record.end_date),
+        parameters=load_parameters(PARAMETERS_FOLDER),
+    )
+    body = {
+        "site": {
+            "case_id": rotation["case_id"],
+            "field_id": rotation["field_id"],
+            "latitude": climate.point.latitude.value,
+            "longitude": climate.point.longitude.value,
+        },
+        "rotation": rotation,
+    }
+    response = TestClient(app, raise_server_exceptions=False).post(ROUTE, json=body)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_demo_rotations_answer_as_before_the_origin_split(monkeypatch):
+    """D194, unit l1/residues-origin-split-d194. For both demo rotations, and
+    both phases of the wheat rotation, through the real EP4 and EP5 with the
+    catalogue the service loads:
+
+    - every series EP4 writes has the origin <crop>_aboveground (retained
+      aboveground carbon) or <crop>_belowground (root and rhizodeposit carbon);
+    - the response is the same, field for field, as the one given by the same
+      ledgers with the origin of the rule before D194 (the crop), written here.
+
+    The response does not change because the catalogue holds no humification
+    record yet (the records of D194 wait for a person's signature): AMG's
+    values are missing before any coefficient is used.
+    """
+    found = discover_engine_functions()
+    if found.build_residue_ledger is None or found.run_amg is None:
+        pytest.skip("engine.residues or engine.amg is not built")
+    real = found.build_residue_ledger
+    for name, phases in (
+        ("soybean-winter-fallow", ["phase_1"]),
+        ("wheat-soybean-maize", ["phase_1", "phase_2"]),
+    ):
+        # The rule of D194, with the real ResidueLedger.
+        monkeypatch.undo()
+        ledgers: list[Any] = []
+
+        def recording(*, _sink: list[Any] = ledgers, **kwargs: Any) -> Any:
+            answer = real(**kwargs)
+            _sink.append(answer)
+            return answer
+
+        monkeypatch.setattr(
+            "api.app.discover_engine_functions",
+            lambda: replace(found, build_residue_ledger=recording),
+        )
+        split = _post_demo(name)
+        assert [s["scenario_id"] for s in split["scenarios"]] == phases
+        assert len(ledgers) == len(phases)
+        for ledger in ledgers:
+            assert ledger.annual_carbon_inputs
+            for item in ledger.annual_carbon_inputs:
+                crop = item.quantity.split("_grain_")[0]
+                group = (
+                    "aboveground"
+                    if item.quantity.endswith("_aboveground_carbon_retained")
+                    else "belowground"
+                )
+                assert item.origin == f"{crop}_{group}"
+
+        # The previous rule: the same ledgers, origin = crop. The real ledger
+        # contract rejects that origin now, so the runner reads a FakeLedger.
+        monkeypatch.undo()
+        monkeypatch.setattr(runner, "residue_ledger_type", lambda: FakeLedger)
+
+        previous_calls: list[Any] = []
+
+        def previous(*, _sink: list[Any] = previous_calls, **kwargs: Any) -> Any:
+            answer = real(**kwargs)
+            _sink.append(answer)
+            return FakeLedger(
+                case_id=answer.case_id,
+                field_id=answer.field_id,
+                rotation_id=answer.rotation_id,
+                years_missing=answer.years_missing,
+                components=list(answer.components),
+                annual_carbon_inputs=[
+                    item.model_copy(
+                        update={"origin": item.quantity.split("_grain_")[0]}
+                    )
+                    for item in answer.annual_carbon_inputs
+                ],
+            )
+
+        monkeypatch.setattr(
+            "api.app.discover_engine_functions",
+            lambda: replace(found, build_residue_ledger=previous),
+        )
+        assert _post_demo(name) == split
+        assert len(previous_calls) == len(phases)  # the previous rule did run
