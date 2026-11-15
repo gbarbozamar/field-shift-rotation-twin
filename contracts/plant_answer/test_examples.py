@@ -156,6 +156,24 @@ INVALID_REQUEST: list[tuple[str, Mutation, str]] = [
         "grain crop",
     ),
     (
+        "request-soybean-crop-sown-by-no-rotation",
+        both(
+            lambda d: d["economic_facts"]["crops"].append(
+                {
+                    **copy.deepcopy(d["economic_facts"]["crops"][0]),
+                    "crop_id": "PLACEHOLDER_soybean_2",
+                }
+            ),
+            put(["questions", "soybean_crop_ids"], ["PLACEHOLDER_soybean_2"]),
+        ),
+        "sown by at least one rotation",
+    ),
+    (
+        "request-rotation-sows-an-undeclared-crop",
+        put(["rotations", 2, "components", 2, "crop_id"], "PLACEHOLDER_other_crop"),
+        "every crop sown is declared in economic_facts",
+    ),
+    (
         "request-soil-loss-limit-in-another-unit",
         put(["soil_loss_limit", "unit"], "t ha-1"),
         "t ha-1 yr-1",
@@ -495,6 +513,13 @@ def test_answer_fields_mirror_the_dataclasses() -> None:
     assert set(m.TippingPointOut.model_fields) == names(TippingPoint)
     assert set(m.TippingPriceOut.model_fields) == names(TippingPrice) - {"decision"}
     assert set(m.YearKind.model_fields) == names(KindOfYear) | {"ag_year"}
+
+    from api.rain_stress import RainStress, RainStressMissing
+    from api.rotations import SourceOut
+
+    assert set(m.RainStressApplied.model_fields) == names(RainStress)
+    assert set(m.RainStressMissingOut.model_fields) == names(RainStressMissing)
+    assert set(m.SourceOut.model_fields) == set(SourceOut.model_fields)
 
 
 # --- Invalid and valid variants ----------------------------------------------

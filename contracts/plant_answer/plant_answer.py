@@ -214,6 +214,28 @@ class PlantRequest(ContractModel):
                     "questions.soybean_crop_ids: each is a grain crop of the "
                     "economic facts"
                 )
+        # PROPOSED (fix round 1): every crop a rotation sows has its economic
+        # facts, else its margin could only be missing.
+        declared = {crop.crop_id for crop in self.economic_facts.crops}
+        sown = {
+            component.crop_id
+            for rotation in self.rotations
+            for component in rotation.components
+        }
+        undeclared = sorted(sown - declared)
+        if undeclared:
+            raise ValueError(
+                "rotations: every crop sown is declared in economic_facts; "
+                f"not declared: {undeclared}"
+            )
+        # PROPOSED (fix round 1): a soybean crop that no rotation sows makes
+        # the tipping price a question about nothing.
+        not_sown = [c for c in self.questions.soybean_crop_ids if c not in sown]
+        if not_sown:
+            raise ValueError(
+                "questions.soybean_crop_ids: each is sown by at least one "
+                f"rotation; not sown: {not_sown}"
+            )
         return self
 
 
@@ -278,6 +300,9 @@ class SoilLossOut(ContractModel):
             raise ValueError("soil loss: a present mean needs at least one year")
         if self.sources != sorted(set(self.sources)):
             raise ValueError("soil loss: sources are sorted and unique")
+        # PROPOSED: stricter than KindMean, which allows a value with no
+        # sources and no assumption mark. C4.2 asks a displayed value for its
+        # source or the mark, so the route must give one of the two.
         if self.value is not None and not self.sources and not self.assumption:
             raise ValueError(
                 "soil loss: a value carries its sources or the assumption mark (C4.2)"

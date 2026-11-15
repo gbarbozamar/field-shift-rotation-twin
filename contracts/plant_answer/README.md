@@ -1,6 +1,6 @@
 # Plant answer contract
 
-**The examples are example data.** Both files under `examples/` say `"example_data": true` and their names start with `PLACEHOLDER_`. The site (latitude 1.0, longitude 2.0) is not a real place. The economic facts are the example of `contracts/economic_facts/`. The soil-loss levels, the soil-loss limit (6.0 t ha-1 yr-1), the rain-stress factor (1.2), the soybean price range (200 to 600 USD t-1) and the period (agricultural years 2015 to 2024, start month 7) are example data, chosen to show the shapes and taken from no source and no engine. No engine, test threshold or screen may take them as values.
+**The examples are example data.** Both files under `examples/` say `"example_data": true` and their names start with `PLACEHOLDER_`. The site (latitude 1.0, longitude 2.0) is not a field. The economic facts are the example of `contracts/economic_facts/`. The soil-loss levels, the soil-loss limit (6.0 t ha-1 yr-1), the rain-stress factor (1.2), the soybean price range (200 to 600 USD t-1) and the period (agricultural years 2015 to 2024, start month 7) are example data, chosen to show the shapes and taken from no source and no engine. No engine, test threshold or screen may take them as values.
 
 Status: **PROPOSED** (blueprint section 3.7), unit `l2/plant-answer-contract` (brief S-018a). Nothing here is in force until people approve the pull request.
 
@@ -40,7 +40,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 | `contract` | `"plant_request"` | |
 | `example_data` | bool | |
 | `site` | `SiteReference`: `case_id`, `field_id`, `latitude` (-90 to 90), `longitude` (-180 to 180) | Copied as a contract model from `api/rotations.py` |
-| `rotations` | 3 to 5 `RotationDefinition` | Distinct `rotation_id`; each of the field of the site (PROPOSED) |
+| `rotations` | 3 to 5 `RotationDefinition` | Distinct `rotation_id`; each of the field of the site (PROPOSED); every crop a rotation sows is declared in `economic_facts` (PROPOSED) |
 | `economic_facts` | `EconomicFacts` | Its `case_id` and `field_id` are those of the site |
 | `soil_loss_limit` | `Value` in `t ha-1 yr-1` | `DECLARED` when present, not negative; may be missing with its reason |
 | `questions` | `Questions` | See below |
@@ -49,7 +49,7 @@ All PROPOSED. Every model rejects unknown members and does not coerce types. No 
 
 | Field | Type | Rule |
 |---|---|---|
-| `soybean_crop_ids` | list of text | Not empty, distinct; in the request each is a grain crop of the facts (PROPOSED) |
+| `soybean_crop_ids` | list of text | Not empty, distinct; in the request each is a grain crop of the facts and is sown by at least one rotation (PROPOSED) |
 | `soybean_price_range` | `low`, `high`, `unit` | `unit` is `USD t-1`; `0 <= low < high` |
 | `margin_of` | `"average"`, `"el_nino"`, `"neutral"`, `"la_nina"` | `MARGINS_OF` of `economics/tipping.py`: the kind-of-year question |
 | `rain_stress_factor` | `Value` in `dimensionless`, or null | null: no stress test. `DECLARED` and above zero when present; may be missing with its reason |
@@ -85,6 +85,8 @@ Kinds of year: `source` (the record id, `oni_v6`), `start_month`, `years` (each 
 
 A value-or-missing follows C3 of `contracts/CONVENTIONS.md`: a number with its unit, or null with a reason code and a detail; never both, and never a zero standing for missing. The answer does not reuse `Value` for these items because the dataclasses it mirrors carry no provenance label or range (PROPOSED).
 
+**Soil loss needs a source or the mark (PROPOSED).** A present soil-loss mean (`SoilLossOut`) with an empty `sources` list and `assumption` false is refused (C4.2). This is stricter than `KindMean`, which allows it, so the route must give every present soil-loss mean its sources or the assumption mark.
+
 ### Rules of the answer (model validators)
 
 - An item holds a value or a reason, never both; a missing value carries its reason and its detail.
@@ -118,6 +120,8 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 | `request-soybean-crop-ids-empty` | No soybean crop is named |
 | `request-soybean-crop-ids-repeated` | A soybean crop is named twice |
 | `request-soybean-crop-not-a-grain-crop` | The soybean crop is the pasture |
+| `request-soybean-crop-sown-by-no-rotation` | The soybean crop is a second grain crop of the facts that no rotation sows |
+| `request-rotation-sows-an-undeclared-crop` | A rotation sows a crop that the economic facts do not declare |
 | `request-soil-loss-limit-in-another-unit` | The limit is in `t ha-1` |
 | `request-soil-loss-limit-not-declared` | The limit is labelled `OBSERVED` |
 | `request-rain-stress-factor-zero` | The factor is zero |
@@ -173,7 +177,7 @@ The identifiers are those of `test_examples.py`; each case is a change to an exa
 
 - Both examples load, dump and load back unchanged, and the answer example answers the request example.
 - Both examples say `example_data: true`; a test shows the check refuses `false`.
-- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses.
+- The literals equal those of `economics/` and `api/rain_stress.py`; the mirrored models have the field names of their dataclasses (and `RainStressApplied`, `RainStressMissingOut`, `SourceOut` those of `RainStress`, `RainStressMissing` and `SourceOut` of `api/`).
 - The answer example shows one chosen rotation, one that does not meet the limit, a missing value and a tipping price.
 
 ## OPEN
