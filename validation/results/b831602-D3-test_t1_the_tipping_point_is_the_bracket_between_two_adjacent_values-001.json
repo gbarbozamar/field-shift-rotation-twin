@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "b831602-D3-test_t1_the_tipping_point_is_the_bracket_between_two_adjacent_values-001",
+  "run_id": "run-20261115T100532Z-b831602",
+  "test_code": "D3",
+  "expected": {
+    "missing_reason": "the entry D3 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_t1_the_tipping_point_is_the_bracket_between_two_adjacent_values"
+  },
+  "notes": "Test decision/test_decision.py::test_t1_the_tipping_point_is_the_bracket_between_two_adjacent_values. Placed under D3: D3: under the headings 'D3 (T1)' and 'D3 (T0)'. The test ran on the functions of decision/ as they are at this commit, after unit l2/decision-rule-d165-d176 (#309); the notes of the run say what that means. The acceptance of entry D3 by a science reviewer is pending (docs/VALIDATION.md)."
+}
