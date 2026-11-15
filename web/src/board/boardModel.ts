@@ -1,5 +1,5 @@
-import { answerAtPrice } from '../plant/plantData'
-import type { PlantAnswer, PlantOption, TippingPoint, TippingPrice } from '../plant/plantData'
+import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
+import type { KindOfYear, PlantAnswer, PlantOption, TippingPoint, TippingPrice } from '../plant/plantData'
 
 /**
  * The layout rules of the rotation board (PROPOSED, l3/board). Display only:
@@ -103,62 +103,124 @@ export function priceTrack(tipping: TippingPrice): PriceTrack | null {
 }
 
 /** What the options are ordered by on the board. */
-export type SortKey = 'rule' | 'margin' | 'soil'
+export type SortKey = 'rule' | 'margin' | 'soil' | 'worst' | 'kinds_over' | 'yours'
 
-export const SORT_KEYS: readonly SortKey[] = ['rule', 'margin', 'soil']
+export const SORT_KEYS: readonly SortKey[] = ['rule', 'margin', 'soil', 'worst', 'kinds_over', 'yours']
 
 /** One option as a column of the comparison. */
 export interface BoardColumn {
   option: PlantOption
   /** Its letter, by its order in the answer: stable whatever the options are ordered by. */
   letter: string
-  /** Its position in the order shown, from 1; null when the order cannot place it. */
+  /** Its position in the order shown, from 1; options with the same value share it. Null when the order cannot place it. */
   position: number | null
+  /** True when another option has the same value, so they share a position. */
+  tied: boolean
 }
 
 const FIRST_LETTER = 65
 
+/** The letter of an option: A for the first of the answer, B for the second, and so on. */
+export function optionLetter(answer: PlantAnswer, option: PlantOption): string {
+  return String.fromCharCode(FIRST_LETTER + answer.options.indexOf(option))
+}
+
+/**
+ * The kind of year in which an option has its smallest margin, among the
+ * kinds the record holds (a count above zero). Null when the record is not
+ * classified, or a margin of one of those kinds is missing: a worst kind is
+ * not named from part of the kinds. A selection among values the answer
+ * carries; no number is computed.
+ */
+export function worstKind(answer: PlantAnswer, option: PlantOption): KindOfYear | null {
+  const counts = answer.kinds_of_year.counts
+  const kinds = KINDS_OF_YEAR.filter((kind) => counts[kind] !== null && counts[kind]! > 0)
+  if (kinds.length === 0 || kinds.some((kind) => option.margin[kind].value === null)) {
+    return null
+  }
+  return kinds.reduce((worst, kind) =>
+    option.margin[kind].value! < option.margin[worst].value! ? kind : worst,
+  )
+}
+
+/**
+ * The value an order compares, with its direction (1: the smaller first,
+ * -1: the larger first); null when the option cannot be placed in it.
+ *
+ * - margin: its margin, the larger first.
+ * - soil: its soil loss, the smaller first.
+ * - worst: its margin in its worst kind of year (worstKind), the larger first.
+ * - kinds_over: the number of kinds of year the answer says are over the
+ *   limit, the fewer first; not placed while a kind is not resolved.
+ */
+function sortValue(answer: PlantAnswer, option: PlantOption, sort: SortKey): number | null {
+  const kind = answer.margin_of
+  switch (sort) {
+    case 'margin':
+      return option.margin[kind].value
+    case 'soil':
+      return option.soil_loss[kind].value
+    case 'worst': {
+      const worst = worstKind(answer, option)
+      return worst !== null ? option.margin[worst].value : null
+    }
+    case 'kinds_over':
+      return option.kinds_not_resolved.length === 0 ? option.kinds_not_met.length : null
+    default:
+      return null
+  }
+}
+
+const SMALLER_FIRST: readonly SortKey[] = ['soil', 'kinds_over']
+
 /**
  * The options as columns, in the order asked for. Display order only: the
- * values compared are those the answer carries for the kind of year it was
- * asked for, and no score is computed.
+ * values compared are those the answer carries, and no score is computed.
  *
  * - rule: the order of the answer (boardCards): the chosen rotation, the
  *   others within the limit by margin, those not resolved, those over the
  *   limit. A position is a place the answer gives.
- * - margin: the larger margin first.
- * - soil: the smaller soil loss first.
- *
- * For margin and soil an option whose value is missing comes last, in the
- * order of the answer, and has no position: a missing value is not ranked.
+ * - yours: the order of the request, with no position.
+ * - margin, soil, worst, kinds_over: by the value of sortValue. Options with
+ *   the same value share a position and are marked tied; an option whose
+ *   value is missing comes last, in the order of the answer, with no
+ *   position: a missing value is not ranked.
  */
 export function boardColumns(answer: PlantAnswer, sort: SortKey): BoardColumn[] {
-  const letterOf = (option: PlantOption) =>
-    String.fromCharCode(FIRST_LETTER + answer.options.indexOf(option))
   if (sort === 'rule') {
     return boardCards(answer).map((card) => ({
       option: card.option,
-      letter: letterOf(card.option),
+      letter: optionLetter(answer, card.option),
       position: card.rank,
+      tied: false,
     }))
   }
-  const kind = answer.margin_of
-  const valueOf = (option: PlantOption) =>
-    sort === 'margin' ? option.margin[kind].value : option.soil_loss[kind].value
-  const direction = sort === 'margin' ? -1 : 1
+  if (sort === 'yours') {
+    return answer.options.map((option) => ({
+      option,
+      letter: optionLetter(answer, option),
+      position: null,
+      tied: false,
+    }))
+  }
+  const direction = SMALLER_FIRST.includes(sort) ? 1 : -1
   const ordered = answer.options
-    .map((option, index) => ({ option, index, value: valueOf(option) }))
+    .map((option, index) => ({ option, index, value: sortValue(answer, option, sort) }))
     .sort((a, b) => {
       if (a.value !== null && b.value !== null && a.value !== b.value) return direction * (a.value - b.value)
       if (a.value === null && b.value !== null) return 1
       if (a.value !== null && b.value === null) return -1
       return a.index - b.index
     })
-  return ordered.map(({ option, value }, index) => ({
-    option,
-    letter: letterOf(option),
-    position: value !== null ? index + 1 : null,
-  }))
+  return ordered.map(({ option, value }) => {
+    const first = ordered.findIndex((each) => each.value === value)
+    return {
+      option,
+      letter: optionLetter(answer, option),
+      position: value !== null ? first + 1 : null,
+      tied: value !== null && ordered.filter((each) => each.value === value).length > 1,
+    }
+  })
 }
 
 const PLACEHOLDER_PREFIX = /^PLACEHOLDER_/

@@ -265,17 +265,55 @@ export function AnswerBanner({
 
 // --- the price track ---------------------------------------------------------------
 
-function sideText(side: TrackSide, tipping: TippingPrice, end: number): string {
-  if (side.kind === 'tips') {
-    return formatString(strings['board.price.tips'], {
-      price: displayNumber(side.point.price),
-      unit: tipping.unit,
-    })
+/** What the answer becomes past a tipping point, in the wording of the plant screen. */
+function afterText(side: Extract<TrackSide, { kind: 'tips' }>, nameOf: (rotationId: string) => string): string {
+  const { answer_after: after, takes_over: takesOver } = side.point
+  if (after === 'chosen' && takesOver !== null) {
+    return formatString(strings['plant.after.chosen'], { rotation: nameOf(takesOver) })
   }
-  if (side.kind === 'unknown') {
-    return strings['board.price.unknown']
-  }
-  return formatString(strings['board.price.holds_to'], { price: displayNumber(end), unit: tipping.unit })
+  return strings[`plant.after.${after === 'chosen' ? 'not_resolved' : after}`]
+}
+
+function SideLine({
+  testid,
+  label,
+  side,
+  tipping,
+  end,
+  nameOf,
+}: {
+  testid: string
+  label: string
+  side: TrackSide
+  tipping: TippingPrice
+  end: number
+  nameOf: (rotationId: string) => string
+}) {
+  return (
+    <li data-testid={testid} data-side={side.kind}>
+      <span className="font-semibold">{label}</span>{' '}
+      {side.kind === 'tips' ? (
+        <span className="text-fs-muted">
+          {formatString(strings['plant.tip.point'], {
+            price: displayNumber(side.point.price),
+            unit: tipping.unit,
+            after: afterText(side, nameOf),
+          })}
+          {side.point.distance_percent !== null ? (
+            <span data-testid="board-price-distance" className="block font-semibold text-fs-text">
+              {formatString(strings['plant.tip.distance'], { distance: displayNumber(side.point.distance_percent) })}
+            </span>
+          ) : null}
+        </span>
+      ) : (
+        <span className="text-fs-muted">
+          {side.kind === 'unknown'
+            ? strings['board.price.unknown']
+            : formatString(strings['board.price.holds_to'], { price: displayNumber(end), unit: tipping.unit })}
+        </span>
+      )}
+    </li>
+  )
 }
 
 /**
@@ -283,7 +321,14 @@ function sideText(side: TrackSide, tipping: TippingPrice, end: number): string {
  * of today, the stretch where the answer stays the one of today, and where
  * it changes. A stretch whose answer is not computed is hatched.
  */
-export function PriceTrackPanel({ tipping }: { tipping: TippingPrice }) {
+export function PriceTrackPanel({
+  tipping,
+  nameOf,
+}: {
+  tipping: TippingPrice
+  /** How the board names a rotation: the one that takes over past a tipping point. */
+  nameOf: (rotationId: string) => string
+}) {
   const track = priceTrack(tipping)
   if (track === null) {
     const missing: MissingPart = tipping.missing ?? { reason: 'NOT_AVAILABLE' }
@@ -331,14 +376,22 @@ export function PriceTrackPanel({ tipping }: { tipping: TippingPrice }) {
         <span>{displayNumber(tipping.high)}</span>
       </div>
       <ul className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-        <li data-testid="board-price-down" data-side={track.down.kind}>
-          <span className="font-semibold">{strings['plant.tip.down']}</span>{' '}
-          <span className="text-fs-muted">{sideText(track.down, tipping, tipping.low)}</span>
-        </li>
-        <li data-testid="board-price-up" data-side={track.up.kind}>
-          <span className="font-semibold">{strings['plant.tip.up']}</span>{' '}
-          <span className="text-fs-muted">{sideText(track.up, tipping, tipping.high)}</span>
-        </li>
+        <SideLine
+          testid="board-price-down"
+          label={strings['plant.tip.down']}
+          side={track.down}
+          tipping={tipping}
+          end={tipping.low}
+          nameOf={nameOf}
+        />
+        <SideLine
+          testid="board-price-up"
+          label={strings['plant.tip.up']}
+          side={track.up}
+          tipping={tipping}
+          end={tipping.high}
+          nameOf={nameOf}
+        />
       </ul>
     </section>
   )

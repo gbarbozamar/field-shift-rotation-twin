@@ -23,7 +23,7 @@ import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../
 import { buildRotationStrip, cropOrder, plantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { boardColumns } from './boardModel'
+import { boardColumns, optionLetter } from './boardModel'
 import type { SortKey } from './boardModel'
 import { AnswerBanner, AnswerLimits, BoardControls, PriceTrackPanel, RainEcho, RecordRibbon } from './BoardParts'
 import { CompareTable, SortPicker, cropsText } from './CompareTable'
@@ -132,18 +132,18 @@ function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: Rai
   const [sort, setSort] = useState<SortKey>('rule')
   const columns = useMemo(() => boardColumns(answer, sort), [answer, sort])
   const chosen = answer.options.find((option) => option.rotation_id === answer.chosen) ?? null
-  // The rotation the cost of the limit is measured against, named as its column is.
-  const againstOption =
-    answer.limit_cost.kind === 'value'
-      ? (answer.options.find((option) => option.rotation_id === (answer.limit_cost as { against: string }).against) ?? null)
-      : null
-  const againstText =
-    againstOption !== null
-      ? formatString(strings['board.option_crops'], {
-          letter: String.fromCharCode(65 + answer.options.indexOf(againstOption)),
-          crops: cropsText(info(againstOption).strip) ?? againstOption.rotation_id,
-        })
-      : null
+  // A rotation named as its column is: its letter and its crops.
+  const nameOf = (rotationId: string): string => {
+    const option = answer.options.find((each) => each.rotation_id === rotationId)
+    if (option === undefined) {
+      return rotationId
+    }
+    return formatString(strings['board.option_crops'], {
+      letter: optionLetter(answer, option),
+      crops: cropsText(info(option).strip) ?? option.rotation_id,
+    })
+  }
+  const againstText = answer.limit_cost.kind === 'value' ? nameOf(answer.limit_cost.against) : null
   // The sources an answer lacks are its root reason: said once, in the notice.
   const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
   return (
@@ -164,9 +164,9 @@ function Answered({ answer, rainStress }: { answer: PlantAnswer; rainStress: Rai
         <h3 className="text-xl font-bold">{strings['board.compare.title']}</h3>
         <SortPicker sort={sort} onSort={setSort} />
       </div>
-      <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} />
+      <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} />
       <div className="grid gap-4 xl:grid-cols-2">
-        <PriceTrackPanel tipping={answer.tipping_price} />
+        <PriceTrackPanel tipping={answer.tipping_price} nameOf={nameOf} />
         <RecordRibbon record={answer.kinds_of_year} marginOf={answer.margin_of} />
       </div>
       <AnswerLimits answer={answer} />

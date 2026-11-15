@@ -9,7 +9,7 @@ import { cropOrder } from '../plant/rotationStrip'
 import type { RotationStrip } from '../plant/rotationStrip'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { strings } from '../strings'
-import { SORT_KEYS, cropName, isExampleCrop } from './boardModel'
+import { SORT_KEYS, cropName, isExampleCrop, worstKind } from './boardModel'
 import type { BoardColumn, SortKey } from './boardModel'
 
 /**
@@ -47,25 +47,26 @@ export function hasExampleCrops(strip: RotationStrip | null): boolean {
   return strip !== null && cropOrder([strip]).some(isExampleCrop)
 }
 
-/** The buttons that pick what the options are ordered by. */
+/** The selector of what the options are ordered by. */
 export function SortPicker({ sort, onSort }: { sort: SortKey; onSort: (sort: SortKey) => void }) {
   return (
-    <div data-testid="board-sort" role="group" aria-label={strings['board.sort.label']} className="flex flex-wrap items-center gap-2">
+    <label data-testid="board-sort" className="inline-flex flex-wrap items-center gap-2">
       <span className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.sort.label']}</span>
-      <div className="inline-flex flex-wrap gap-1 rounded-lg bg-fs-faint p-1">
+      <select
+        className="min-h-9 cursor-pointer rounded-lg border border-fs-border bg-fs-surface px-3 py-1 text-sm font-semibold"
+        value={sort}
+        onChange={(event) => {
+          const picked = SORT_KEYS.find((key) => key === event.target.value)
+          if (picked !== undefined) onSort(picked)
+        }}
+      >
         {SORT_KEYS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={key === sort}
-            className="cursor-pointer rounded-md px-3 py-1 text-sm aria-pressed:bg-fs-surface aria-pressed:font-bold aria-pressed:shadow-sm"
-            onClick={() => onSort(key)}
-          >
+          <option key={key} value={key}>
             {strings[`board.sort.${key}`]}
-          </button>
+          </option>
         ))}
-      </div>
-    </div>
+      </select>
+    </label>
   )
 }
 
@@ -165,7 +166,16 @@ function Row({
 }
 
 /** One kind of year of an option: its margin, and its soil loss with what the answer says of it. */
-function KindCell({ option, kind }: { option: PlantOption; kind: (typeof KINDS_OF_YEAR)[number] }) {
+function KindCell({
+  option,
+  kind,
+  worst,
+}: {
+  option: PlantOption
+  kind: (typeof KINDS_OF_YEAR)[number]
+  /** True when this is the kind of year in which the option has its smallest margin. */
+  worst: boolean
+}) {
   const margin = option.margin[kind]
   const loss = option.soil_loss[kind]
   const tone = verdictTone(drawnSoilVerdict(option, kind))
@@ -175,6 +185,11 @@ function KindCell({ option, kind }: { option: PlantOption; kind: (typeof KINDS_O
         <p title={String(margin.value)}>
           <span className="font-fs-heading text-base font-bold">{displayNumber(margin.value)}</span>{' '}
           <span className="text-[11px] text-fs-muted">{margin.unit}</span>
+          {worst ? (
+            <span data-testid="board-worst" className="ml-1.5 rounded border border-fs-border px-1 text-[10px] font-semibold uppercase text-fs-muted">
+              {strings['board.worst_mark']}
+            </span>
+          ) : null}
         </p>
       ) : (
         <p className="text-sm italic text-fs-muted">{strings['plant.table.no_value']}</p>
@@ -210,9 +225,12 @@ export function CompareTable({
   info,
   order,
   scales,
+  sort,
 }: {
   answer: PlantAnswer
   columns: BoardColumn[]
+  /** What the columns are ordered by: only the rule of the answer gives a first place. */
+  sort: SortKey
   info: (option: PlantOption) => OptionInfo
   /** The crops of all the options, for one set of colours. */
   order: readonly string[]
@@ -228,7 +246,7 @@ export function CompareTable({
         <thead>
           <tr>
             <td />
-            {columns.map(({ option, letter, position }) => {
+            {columns.map(({ option, letter, position, tied }) => {
               const { rotation, strip } = info(option)
               return (
                 <th
@@ -243,7 +261,7 @@ export function CompareTable({
                     {position !== null ? (
                       <span
                         data-testid="board-position"
-                        data-first={String(position === 1)}
+                        data-first={String(position === 1 && sort === 'rule')}
                         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-fs-border font-fs-heading text-base font-extrabold text-fs-muted data-[first=true]:border-fs-primary data-[first=true]:bg-fs-primary data-[first=true]:text-white"
                       >
                         {position}
@@ -252,6 +270,11 @@ export function CompareTable({
                     <span data-testid="board-letter" className="font-mono text-[11px] uppercase tracking-widest text-fs-muted">
                       {formatString(strings['board.option'], { letter })}
                     </span>
+                    {tied ? (
+                      <span data-testid="board-tied" className="rounded-full border border-fs-border px-2 py-0.5 text-[11px] font-semibold text-fs-muted">
+                        {strings['board.tied']}
+                      </span>
+                    ) : null}
                     <StatePill state={option.state} />
                   </div>
                   <p
@@ -330,7 +353,7 @@ export function CompareTable({
               selected={each === kind}
               columns={columns}
               cell={(option) => (
-                <KindCell option={option} kind={each} />
+                <KindCell option={option} kind={each} worst={worstKind(answer, option) === each} />
               )}
             />
           ))}

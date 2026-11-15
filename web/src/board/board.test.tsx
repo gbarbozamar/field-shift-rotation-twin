@@ -11,8 +11,8 @@ import type { PlantAnswer, RainStressPart, TippingPrice } from '../plant/plantDa
 import type { ServicePhase } from '../plant/PlantScreen'
 import { buildRotationStrip, plantRotations } from '../plant/rotationStrip'
 import { strings } from '../strings'
-import { boardCards, boardColumns, cropName, isExampleCrop, priceTrack } from './boardModel'
-import { cropsText } from './CompareTable'
+import { SORT_KEYS, boardCards, boardColumns, cropName, isExampleCrop, priceTrack, worstKind } from './boardModel'
+import { CompareTable, cropsText } from './CompareTable'
 import { BoardView, initialBoardState } from './BoardScreen'
 
 /**
@@ -187,7 +187,7 @@ describe('the order picked and the names (3)', () => {
   })
 
   it('a letter belongs to an option whatever the order', () => {
-    const letters = (sort: 'rule' | 'margin' | 'soil') =>
+    const letters = (sort: (typeof SORT_KEYS)[number]) =>
       Object.fromEntries(boardColumns(example, sort).map((c) => [c.option.rotation_id, c.letter]))
     expect(letters('margin')).toEqual(letters('rule'))
     expect(letters('soil')).toEqual(letters('rule'))
@@ -456,5 +456,106 @@ describe('the rain stress test, as the service says it (6)', () => {
     expect(visibleText(`<${echo}`)).toBe(
       formatString(strings['plant.service.rain_not_applied'], { label: applied.label, detail: applied.detail }),
     )
+  })
+})
+
+describe('the other orders, ties and the worst kind of year (7)', () => {
+  const kinds = ['el_nino', 'neutral', 'la_nina'] as const
+
+  it('every order keeps every option, once', () => {
+    for (const sort of SORT_KEYS) {
+      const ids = boardColumns(example, sort).map((c) => c.option.rotation_id)
+      expect([...ids].sort(), sort).toEqual(example.options.map((o) => o.rotation_id).sort())
+    }
+  })
+
+  it('your order is the order of the answer, with no position', () => {
+    const columns = boardColumns(example, 'yours')
+    expect(columns.map((c) => c.option.rotation_id)).toEqual(example.options.map((o) => o.rotation_id))
+    expect(columns.every((c) => c.position === null && !c.tied)).toBe(true)
+  })
+
+  it('the worst kind of year is the kind of the smallest margin among the kinds the record holds', () => {
+    for (const option of example.options) {
+      const raw = rawExample.options.find((o) => o.rotation_id === option.rotation_id)!
+      const held = kinds.filter((kind) => rawExample.kinds_of_year.counts[kind] > 0)
+      const smallest = Math.min(...held.map((kind) => raw.margin[kind].value as number))
+      expect(raw.margin[worstKind(example, option)!].value).toBe(smallest)
+    }
+  })
+
+  it('no worst kind is named when the record is not classified', () => {
+    const unclassified: PlantAnswer = {
+      ...example,
+      kinds_of_year: { ...example.kinds_of_year, counts: { el_nino: null, neutral: null, la_nina: null } },
+    }
+    expect(example.options.every((option) => worstKind(unclassified, option) === null)).toBe(true)
+    expect(boardColumns(unclassified, 'worst').every((c) => c.position === null)).toBe(true)
+  })
+
+  it('by the worst kind: the larger of those margins first', () => {
+    const columns = boardColumns(example, 'worst')
+    const values = columns.map((c) => c.option.margin[worstKind(example, c.option)!].value!)
+    expect(values).toEqual([...values].sort((a, b) => b - a))
+  })
+
+  it('by kinds over the limit: the fewer first; an option with a kind not resolved has no position', () => {
+    const columns = boardColumns(example, 'kinds_over')
+    const placed = columns.filter((c) => c.position !== null)
+    expect(placed.map((c) => c.option.kinds_not_met.length)).toEqual(
+      [...placed.map((c) => c.option.kinds_not_met.length)].sort((a, b) => a - b),
+    )
+    for (const column of columns) {
+      expect(column.position === null, column.option.rotation_id).toBe(column.option.kinds_not_resolved.length !== 0)
+    }
+  })
+
+  it('options with the same value share a position and are marked tied', () => {
+    const kind = example.margin_of
+    const [first, second, ...rest] = example.options
+    const same: PlantAnswer = {
+      ...example,
+      options: [first, { ...second, margin: { ...second.margin, [kind]: first.margin[kind] } }, ...rest],
+    }
+    const columns = boardColumns(same, 'margin')
+    const tied = columns.filter((c) => c.option === same.options[0] || c.option === same.options[1])
+    expect(tied.every((c) => c.tied)).toBe(true)
+    expect(new Set(tied.map((c) => c.position)).size).toBe(1)
+    expect(columns.filter((c) => !tied.includes(c)).every((c) => !c.tied)).toBe(true)
+  })
+
+  it('only the order of the rule gives a first place in the colour of the choice', () => {
+    for (const sort of SORT_KEYS) {
+      const html = renderToString(
+        <CompareTable
+          answer={example}
+          columns={boardColumns(example, sort)}
+          info={() => ({ rotation: null, strip: null })}
+          order={[]}
+          scales={{ margin: null, soilLoss: null }}
+          sort={sort}
+        />,
+      )
+      expect(count(html, 'data-testid="board-position" data-first="true"'), sort).toBe(sort === 'rule' ? 1 : 0)
+    }
+  })
+
+  it('the price panel says what the answer becomes past a tipping point and how far it is from today', () => {
+    const html = view(FIELD, answered(example))
+    for (const direction of ['down', 'up'] as const) {
+      const point = rawExample.tipping_price[direction]
+      const line = after(html, `board-price-${direction}`).split('</li>')[0]
+      if (point.price === null) {
+        expect(count(line, 'data-testid="board-price-distance"')).toBe(0)
+        continue
+      }
+      expect(visibleText(`<${line}`)).toContain(displayNumber(point.price))
+      expect(visibleText(`<${line}`)).toContain(
+        formatString(strings['plant.tip.distance'], { distance: displayNumber(point.distance_percent!) }),
+      )
+      if (point.answer_after !== 'chosen') {
+        expect(visibleText(`<${line}`)).toContain(strings[`plant.after.${point.answer_after as 'not_resolved'}`])
+      }
+    }
   })
 })
