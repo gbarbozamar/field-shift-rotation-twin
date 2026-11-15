@@ -2158,91 +2158,296 @@ def test_the_real_run_rothc_gets_the_forcing_of_ep5_and_its_rows_pass_unchanged(
     assert runner.NOT_BUILT not in json.dumps(modules["rothc"])
 
 
-# --- D220: the daily reference evapotranspiration reaches the forcing ------------
+# --- D220, D256: the daily reference evapotranspiration reaches the forcing -----
 #
-# The runner computes the daily FAO-56 reference evapotranspiration of D44 once
-# per request, as EP3 computes it, and passes it to the producer of the
-# forcing, which sums it by month into the potential evapotranspiration of
-# RothC. Inputs: the PLACEHOLDER chain climate and the catalogue of the
-# repository; no number of the science is asserted, only that the monthly
-# value is the sum of the daily ones the runner computed, or missing.
+# The runner calls lane L1's public function
+# ``engine.water.daily_reference_evapotranspiration`` (D256), found by name,
+# once per request, and passes its answer to the producer of the forcing,
+# which sums it by month into the potential evapotranspiration of RothC (D220)
+# and by agricultural year into the water balance of D181. No number of the
+# science is asserted: only that what reaches the forcing is the function's
+# series, and that this series is the one EP3 runs its daily chain on.
+
+CHAIN_SOIL_DOCUMENT = example("inputs", "PLACEHOLDER_chain_site_soil_slope.json")
 
 
-def test_d220_ep6_receives_the_monthly_climate_with_the_daily_et0_summed():
-    pytest.importorskip("engine.water.et0")
-    import math
+def chain_soil() -> SiteSoilSlope:
+    document = json.loads(json.dumps(CHAIN_SOIL_DOCUMENT))
+    document["case_id"] = CALENDAR_DOCUMENT["case_id"]
+    document["field_id"] = CALENDAR_DOCUMENT["field_id"]
+    return SiteSoilSlope.model_validate(document)
 
+
+class Recording:
+    """Wraps a function and keeps every call and answer."""
+
+    def __init__(self, function: Any) -> None:
+        self.function = function
+        self.calls: list[tuple[tuple, dict]] = []
+        self.answers: list[Any] = []
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        self.calls.append((args, kwargs))
+        self.answers.append(self.function(*args, **kwargs))
+        return self.answers[-1]
+
+
+def run_with_et0(et0: Any, parameters: dict[str, dict], *parts: Any):
+    """One run with fake carbon engines and ``et0`` as the public function."""
+    amg, rothc = Fake(balance()), Fake(rothc_balance())
+    engines = EntryPointEngines(
+        with_carbon(amg, rothc, *parts, daily_reference_evapotranspiration=et0),
+        carbon_models=CARBON_MODELS,
+        parameters=parameters,
+    )
+    result = engines.run(
+        ROTATION, climate_result(chain_climate()), soil_result(chain_soil())
+    )
+    forcing = rothc.calls[0][0][0]
+    assert forcing is amg.calls[0][0][0]  # one forcing for both models (D65)
+    return result, forcing
+
+
+def series_of(forcing: CarbonForcing, quantity: str):
+    (series,) = [
+        s for s in (*forcing.climate, *forcing.annual_climate) if s.quantity == quantity
+    ]
+    return series
+
+
+def assert_same_series(given: dict, expected: dict) -> None:
+    assert list(given) == list(expected)
+    for day, value in expected.items():
+        if isinstance(value, Missing):
+            assert isinstance(given[day], Missing), day
+            assert (given[day].reason, given[day].detail) == (
+                value.reason,
+                value.detail,
+            ), day
+        else:
+            assert given[day] == value, day
+
+
+def test_d256_the_public_function_is_discovered_by_its_name(
+    tmp_path, monkeypatch, no_engine_modules
+):
+    assert (runner.REFERENCE_ET0.module, runner.REFERENCE_ET0.function) == (
+        "engine.water",
+        "daily_reference_evapotranspiration",
+    )
+    write_package(
+        tmp_path,
+        {
+            "engine/__init__.py": "",
+            "engine/water/__init__.py": (
+                "def daily_reference_evapotranspiration(climate, *, parameters): ...\n"
+            ),
+        },
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    found = discover_engine_functions()
+    assert found.daily_reference_evapotranspiration is (
+        sys.modules["engine.water"].daily_reference_evapotranspiration
+    )
+    assert found.compute_water_deficit_exposure is None
+
+
+def test_d256_an_absent_function_is_not_built(tmp_path, monkeypatch, no_engine_modules):
+    write_package(
+        tmp_path,
+        {
+            "engine/__init__.py": "",
+            "engine/water/__init__.py": "def placeholder_other_function(): ...\n",
+        },
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    assert discover_engine_functions().daily_reference_evapotranspiration is None
+
+
+def test_d256_a_broken_import_inside_it_propagates(
+    tmp_path, monkeypatch, no_engine_modules
+):
+    write_package(
+        tmp_path,
+        {
+            "engine/__init__.py": "",
+            "engine/water/__init__.py": (
+                "from .reference_et0 import daily_reference_evapotranspiration\n"
+            ),
+            "engine/water/reference_et0.py": "import placeholder_absent_dependency\n",
+        },
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    with pytest.raises(ModuleNotFoundError) as caught:
+        discover_engine_functions()
+    assert caught.value.name == "placeholder_absent_dependency"
+
+
+def test_d256_the_runners_et0_is_the_one_ep3_runs_its_chain_on(monkeypatch):
+    """The ET0-pinning test: the series the runner passes to the forcing is,
+    day by day, the one EP3's daily chain obtains (``exposure.et0_days``)."""
+    water = pytest.importorskip("engine.water")
+    exposure = pytest.importorskip("engine.water.exposure")
+    if not hasattr(exposure, "et0_days"):
+        pytest.skip("engine.water.exposure.et0_days is not there to read EP3's ET0")
+    ep3 = getattr(water, "compute_water_deficit_exposure", None)
+    public = getattr(water, "daily_reference_evapotranspiration", None)
+    if ep3 is None or public is None:
+        pytest.skip("EP3 or the public function of D256 is not built")
     from api.config import PARAMETERS_FOLDER, load_parameters
 
     parameters = load_parameters(PARAMETERS_FOLDER)
+    seen = Recording(exposure.et0_days)
+    monkeypatch.setattr(exposure, "et0_days", seen)
+    et0 = Recording(public)
+    calendar_fn, soil_fn, _ = fakes()
+    result, _ = run_with_et0(et0, parameters, calendar_fn, soil_fn, ep3)
+    assert len(seen.answers) == 1, "EP3 computes its daily ET0 once per call"
+    of_ep3 = {item.date: item.value for item in seen.answers[0]}
+    ((args, kwargs),) = et0.calls  # once per request
+    assert args == (chain_climate(),)
+    assert kwargs == {"parameters": parameters} and kwargs["parameters"] is parameters
+    (runners,) = et0.answers
+    assert_same_series(runners, of_ep3)
+    assert any(isinstance(value, float) for value in runners.values())
+    assert result.result is not None
+
+
+PLACEHOLDER_ET0_REASON = "NOT_COMPUTABLE"
+PLACEHOLDER_ET0_DETAIL = "PLACEHOLDER: a day the fake public function holds missing"
+
+
+def fake_et0_series(*, hold: bool = True) -> dict[dt.date, float | Missing]:
+    """PLACEHOLDER test data, not science: one number per day of the chain
+    climate (its day of the month); with ``hold`` the 10th day held missing."""
+    (precipitation,) = [
+        s for s in chain_climate().daily_series if s.quantity == "precipitation"
+    ]
+    first = precipitation.days[0].date
+    held = first + dt.timedelta(days=9)
+    return {
+        item.date: (
+            Missing(reason=PLACEHOLDER_ET0_REASON, detail=PLACEHOLDER_ET0_DETAIL)
+            if hold and item.date == held
+            else float(item.date.day)
+        )
+        for item in precipitation.days
+    }
+
+
+@pytest.mark.parametrize("hold", [True, False])
+def test_d256_a_fake_public_series_reaches_the_forcing_unchanged(hold):
+    import math
+
+    series = fake_et0_series(hold=hold)
+    et0 = Fake(series)
+    parameters = catalogue()
+    _, forcing = run_with_et0(et0, parameters)
+    ((args, kwargs),) = et0.calls
+    assert args == (chain_climate(),) and kwargs["parameters"] is parameters
+    held = [day for day, value in series.items() if isinstance(value, Missing)]
+
+    def days_between(first: dt.date, after: dt.date) -> list[dt.date]:
+        return [first + dt.timedelta(days=n) for n in range((after - first).days)]
+
+    # RothC's monthly PET (D220): the monthly sum of the series.
+    pet = series_of(forcing, "potential_evapotranspiration")
+    checked, held_out = 0, 0
+    for item in pet.months:
+        first = dt.date(item.year, item.month, 1)
+        after = dt.date(item.year + item.month // 12, item.month % 12 + 1, 1)
+        days = days_between(first, after)
+        if any(day in held for day in days):
+            assert item.value is None
+            assert item.missing.reason == PLACEHOLDER_ET0_REASON
+            assert PLACEHOLDER_ET0_DETAIL in item.missing.detail
+            held_out += 1
+        elif all(day in series for day in days):
+            assert item.value == math.fsum(series[day] for day in days)
+            checked += 1
+    assert checked and held_out == (1 if hold else 0)
+
+    # The water balance of D181: (sum P - sum ET0) / 1000 per agricultural year.
+    (precipitation,) = [
+        s for s in chain_climate().daily_series if s.quantity == "precipitation"
+    ]
+    rain = {item.date: item.value for item in precipitation.days}
+    balance_series = series_of(forcing, "water_balance")
+    start_month = forcing.horizon.start.month
+    checked, held_out = 0, 0
+    for item in balance_series.years:
+        days = days_between(
+            dt.date(item.ag_year, start_month, 1),
+            dt.date(item.ag_year + 1, start_month, 1),
+        )
+        if any(day in held for day in days):
+            assert item.value is None
+            assert item.missing.reason == PLACEHOLDER_ET0_REASON
+            assert PLACEHOLDER_ET0_DETAIL in item.missing.detail
+            held_out += 1
+        elif all(isinstance(rain.get(day), float) and day in series for day in days):
+            expected = math.fsum(rain[day] for day in days) - math.fsum(
+                series[day] for day in days
+            )
+            assert item.value == expected / 1000
+            checked += 1
+    # With a held day, the year holding it is missing with its reason;
+    # without, at least one year is the number of D181 from the series.
+    assert (held_out == 1) if hold else (checked > 0 and not held)
+
+
+def test_d256_without_the_public_function_the_forcing_says_so():
+    _, forcing = run_with_et0(None, catalogue())
+    name = "engine.water.daily_reference_evapotranspiration"
+    pet = series_of(forcing, "potential_evapotranspiration")
+    assert all(item.value is None for item in pet.months)
+    assert all(item.missing.reason == "NOT_AVAILABLE" for item in pet.months)
+    assert all(name in item.missing.detail for item in pet.months)
+    water_balance = series_of(forcing, "water_balance")
+    assert all(item.value is None for item in water_balance.years)
+    assert all(item.missing.reason == "NOT_AVAILABLE" for item in water_balance.years)
+    assert all(name in item.missing.detail for item in water_balance.years)
+
+
+def test_d256_not_built_is_a_typed_absence_on_the_route_never_a_500():
     amg, rothc = Fake(balance()), Fake(rothc_balance())
     engines = EntryPointEngines(
-        with_carbon(amg, rothc), carbon_models=CARBON_MODELS, parameters=parameters
+        with_carbon(amg, rothc), carbon_models=CARBON_MODELS, parameters=catalogue()
     )
     response = client(engines, climate=ChainClimate()).post(ROUTE, json=BODY)
     assert response.status_code == 200, response.text
-    forcing = rothc.calls[0][0][0]
-    assert forcing is amg.calls[0][0][0]  # one forcing for both models (D65)
-    by_quantity = {series.quantity: series for series in forcing.climate}
-    assert set(by_quantity) == {
-        "rainfall",
-        "potential_evapotranspiration",
-        "mean_temperature",
-    }
-    daily = runner.daily_reference_evapotranspiration(chain_climate(), parameters)
-    assert isinstance(daily, dict) and daily
-    pet = by_quantity["potential_evapotranspiration"]
-    assert pet.unit == "mm"
-    for item in pet.months:
-        first = dt.date(item.year, item.month, 1)
-        days = [
-            daily.get(first + dt.timedelta(days=n))
-            for n in range(31)
-            if (first + dt.timedelta(days=n)).month == item.month
-        ]
-        if all(isinstance(value, float) for value in days):
-            assert item.value == math.fsum(days)
-        else:
-            assert item.value is None and item.missing is not None
-            assert "did not pass" not in item.missing.detail
+    assert len(rothc.calls) == 1
 
 
-def test_d220_without_engine_water_the_daily_et0_is_not_available(monkeypatch):
-    monkeypatch.setattr(runner, "ET0_MODULE", "placeholder_absent_package.et0")
-    answer = runner.daily_reference_evapotranspiration(chain_climate(), {})
-    assert answer.reason == "NOT_AVAILABLE"
-    assert "placeholder_absent_package" in answer.detail
+def test_d256_what_the_public_function_raises_propagates():
+    def raising(climate, *, parameters):
+        raise RuntimeError("PLACEHOLDER")
+
+    with pytest.raises(RuntimeError, match="PLACEHOLDER"):
+        run_with_et0(raising, catalogue())
 
 
-def _import_raising(missing_name: str):
-    """``importlib.import_module`` that fails for the ET0 module as if
-    ``missing_name`` were absent (the ``name`` Python sets on the error)."""
-    real = runner.importlib.import_module
+@pytest.mark.parametrize(
+    "answer",
+    [
+        None,
+        [],
+        {"PLACEHOLDER": 1.0},
+        {dt.date(2001, 1, 1): "PLACEHOLDER"},
+        {dt.date(2001, 1, 1): True},
+    ],
+)
+def test_d256_an_answer_of_another_shape_is_a_defect(answer):
+    with pytest.raises(TypeError, match="daily_reference_evapotranspiration"):
+        run_with_et0(Fake(answer), catalogue())
 
-    def fake(name, *args, **kwargs):
-        if name == runner.ET0_MODULE:
-            raise ModuleNotFoundError(
-                f"No module named {missing_name!r}", name=missing_name
-            )
-        return real(name, *args, **kwargs)
 
-    return fake
-
-
-def test_d220_the_et0_module_itself_absent_is_not_built(monkeypatch):
-    monkeypatch.setattr(
-        runner.importlib, "import_module", _import_raising(runner.ET0_MODULE)
+def test_d256_no_forcing_no_call():
+    et0 = Fake(fake_et0_series())
+    engines = EntryPointEngines(
+        with_carbon(None, None, daily_reference_evapotranspiration=et0),
+        carbon_models=CARBON_MODELS,
+        parameters=catalogue(),
     )
-    answer = runner.daily_reference_evapotranspiration(chain_climate(), {})
-    assert answer.reason == "NOT_AVAILABLE"
-
-
-def test_d220_a_module_the_et0_imports_absent_is_a_defect(monkeypatch):
-    monkeypatch.setattr(
-        runner.importlib,
-        "import_module",
-        _import_raising("placeholder_absent_dependency"),
-    )
-    with pytest.raises(ModuleNotFoundError) as caught:
-        runner.daily_reference_evapotranspiration(chain_climate(), {})
-    assert caught.value.name == "placeholder_absent_dependency"
+    engines.run(ROTATION, climate_result(chain_climate()), soil_result(chain_soil()))
+    assert et0.calls == []
