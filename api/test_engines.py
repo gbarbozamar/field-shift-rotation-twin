@@ -1848,12 +1848,24 @@ def test_the_rows_are_those_of_ep5_then_ep6_whatever_the_configured_order():
 
 
 @pytest.mark.parametrize("point", [runner.ROTHC], ids=lambda p: p.entry)
-def test_the_carbon_engines_written_not_built_do_not_exist_yet(point):
-    # The runner names these not built without looking. When one lands, this
-    # fails: the runner must then discover and call it (a unit of lane L2a).
-    assert runner._import_function(point) is None, (
-        f"{runner._name(point)} now exists: add it to DISCOVERED"
-    )
+def test_the_carbon_engines_the_runner_does_not_call_say_so(point):
+    # The runner does not look for these, whether or not they exist: the
+    # engine may land before the unit of lane L2a that discovers and calls it
+    # (decision of the lead developer of 15 November 2026 on #247; until then
+    # this test failed as soon as the engine existed). What the runner says of
+    # them must be true in both cases, so it never says "not built".
+    assert point not in runner.DISCOVERED
+    said = f"{runner.NOT_CALLED}: {runner._name(point)}"
+    assert runner.NOT_BUILT not in said
+    result = run(with_amg(Fake(balance())), climate=climate_result(chain_climate()))
+    rows = carbon_rows(result, point.module_id)
+    assert len(rows) == len(TREND_COMPUTATIONS)
+    assert all(r.value is None for r in rows)
+    assert all(r.missing.reason == "NOT_AVAILABLE" for r in rows)
+    assert all(r.missing.detail == said for r in rows)
+    (module,) = [m for m in result.modules if m.id == point.module_id]
+    assert (module.state, module.reason) == ("not_available", "NOT_AVAILABLE")
+    assert module.detail == said
 
 
 def test_crops_that_are_not_identifiers_are_counted_in_the_amg_detail():

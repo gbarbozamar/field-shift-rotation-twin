@@ -578,8 +578,9 @@ covers no whole agricultural year (`NO_COVERAGE`, C5.5).
 response" of `contracts/ENTRYPOINTS.md` (#210; PROPOSED there, not ours): the
 list of the balance of EP5 (`amg`), copied unchanged (or its three rows
 missing when EP5 was not called), then the three `rothc` rows missing
-`NOT_AVAILABLE`, detail "the module is not built yet:
-engine.rothc.run_rothc". That order holds whatever the order of
+`NOT_AVAILABLE`, detail "the runner does not call this engine yet:
+engine.rothc.run_rothc" (PROPOSED text, true whether or not the engine
+exists). That order holds whatever the order of
 `carbon_models`; a model that is not configured has no rows. Values of the
 two models are never merged (C1.5). With EP5 not built the six rows are as
 before, in the configured order. The balance itself (stocks and flows by
@@ -767,11 +768,17 @@ here.
   developer and the interface developer.
 - **RothC (EP6, `engine.rothc.run_rothc`)**: discovered and called on the same
   forcing once it exists, in a later unit of this lane.
-- **EP6 is written "not built" without being discovered.** `ROTHC` in
-  `api/engines.py` only names it; a test of `api/test_engines.py` fails as
-  soon as `engine.rothc.run_rothc` becomes importable, so that the runner is
-  then changed to discover and call it. For the platform developer. (EP4 is
-  discovered since unit `l2/runner-residues`.)
+- **EP6 is written "not called" without being discovered.** `ROTHC` in
+  `api/engines.py` only names it, and the runner does not look for it: its
+  rows and its module state say "the runner does not call this engine yet",
+  whether or not `engine.rothc.run_rothc` exists. Until 15 November 2026 a
+  test of `api/test_engines.py` failed as soon as that function became
+  importable, so that the runner was then changed to discover and call it;
+  the lead developer replaced it that day (unit `l2/rothc-tripwire`, a lane
+  exception while the platform developer was away) so that the engine of #247
+  could land first. **The unit that discovers and calls EP6 is still owed.**
+  For the platform developer. (EP4 is discovered since unit
+  `l2/runner-residues`.)
 - **Expose the residue ledger in the response** (components, closure):
   not done; Q14 (b) and Q15 of `contracts/ENTRYPOINTS.md`, for the lead
   developer and the interface developer.
