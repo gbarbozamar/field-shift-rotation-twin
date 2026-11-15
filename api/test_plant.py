@@ -38,7 +38,7 @@ from contracts.plant_answer import (
     check_answer_against_request,
 )
 from contracts.results.models import ResultsPerRotation
-from kinds_of_year import load_record
+from economics.test_plant import load_record
 
 ROOT = Path(__file__).parent.parent
 EXAMPLES = ROOT / "contracts" / "plant_answer" / "examples"
@@ -280,8 +280,8 @@ def test_the_example_request_gives_the_example_answer():
     example = PlantAnswer.model_validate(ANSWER).model_dump(mode="json")
     assert without_sources(data) == without_sources(example)
     for key in ("answer", "chosen", "limit_cost", "tipping_price"):
-        assert data[key] == ANSWER[key]
-    for ours, theirs in zip(data["options"], ANSWER["options"], strict=True):
+        assert data[key] == example[key]
+    for ours, theirs in zip(data["options"], example["options"], strict=True):
         assert ours["state"] == theirs["state"]
         assert ours["margin"] == theirs["margin"]
     # The sources: the two fakes, then the ONI record as in the example.
@@ -290,7 +290,10 @@ def test_the_example_request_gives_the_example_answer():
         "PLACEHOLDER_SOIL",
         "oni_v6",
     ]
-    assert data["sources"][2] == ANSWER["sources"][1]
+    # The record is the PLACEHOLDER record of economics/test_plant.py.
+    for key in ("id", "contract", "state"):
+        assert data["sources"][2][key] == ANSWER["sources"][1][key]
+    assert data["sources"][2]["attribution"] == load_record()["reference"]
     # One climate request, one soil request, each rotation run once on them.
     assert len(climate.requests) == 1
     assert soil.calls == [(REQUEST["site"]["case_id"], REQUEST["site"]["field_id"])]
@@ -501,8 +504,9 @@ def test_a_soil_loss_engine_not_built_gives_its_reason_to_every_option():
     assert data["answer"] == "not_resolved"
     # The kinds of year still come from the record and the margins are there.
     assert data["kinds_of_year"] == ANSWER["kinds_of_year"]
+    example = PlantAnswer.model_validate(ANSWER).model_dump(mode="json")
     assert [o["margin"] for o in data["options"]] == [
-        o["margin"] for o in ANSWER["options"]
+        o["margin"] for o in example["options"]
     ]
 
 
@@ -760,9 +764,10 @@ def test_a_pasture_kept_several_years_counts_in_each_year_until_its_harvest():
         plant_request.economic_facts,
         {k: v for k, v in data["kinds_of_year"]["counts"].items()},
     )
-    assert option["margin"]["average"] == json.loads(
-        json.dumps(dataclasses.asdict(expected.average))
-    )
+    # The D249 labels (provenance, range, source) are added by the answer.
+    labels = {"provenance", "range", "range_missing", "source"}
+    average = {k: v for k, v in option["margin"]["average"].items() if k not in labels}
+    assert average == json.loads(json.dumps(dataclasses.asdict(expected.average)))
 
 
 def test_a_grain_crop_harvested_in_a_later_year_counts_only_once():
@@ -958,9 +963,9 @@ def _assert_margin_as_computed(request: dict[str, Any]) -> None:
     expected = compute_rotation_margin(
         cycle.years, plant_request.economic_facts, data["kinds_of_year"]["counts"]
     )
-    assert option["margin"]["average"] == json.loads(
-        json.dumps(dataclasses.asdict(expected.average))
-    )
+    labels = {"provenance", "range", "range_missing", "source"}  # D249
+    average = {k: v for k, v in option["margin"]["average"].items() if k not in labels}
+    assert average == json.loads(json.dumps(dataclasses.asdict(expected.average)))
 
 
 def test_f1_a_crop_sown_in_the_year_a_pasture_ends_gets_computed_margins():

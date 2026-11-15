@@ -224,7 +224,7 @@ def assemble_answer(
     runs: Sequence[EngineRun],
     *,
     classified: Classified,
-    record: Mapping[str, Any],
+    record: Mapping[str, Any] | None,
     rain_stress: Mapping[str, Any] | None,
     sources: list[dict[str, Any]],
     example_data: bool,
@@ -235,6 +235,7 @@ def assemble_answer(
 - `classified`: what `classify_years(record, record_years, why, start_month, rotations)` gives. `record_years` is the first and last whole agricultural year of the record as the caller computed them, or `None` with `why` the text of why they are not known (the route reads them from its settings).
 - `rain_stress`: the rain-stress echo already as JSON-ready data, or `None`; `sources`: the source rows of the answer as JSON-ready data. Both are copied unchanged.
 - The answer is checked with `check_answer_against_request`; a failure raises.
+- Fitted to main's contract (#424, ported from #427, PROPOSED): every present number of the answer carries its provenance (`DERIVED` for what the answer computes, the soil-loss provenance of the results contract for a soil-loss mean, the declared labels for today's price) and, since no range is computed in this release, `range_missing` `NOT_AVAILABLE` (D249); a margin carries `MARGIN_SOURCE`; a real (not example) soil-loss value carries the D148 label; the option's limit is the declared limit with its labels; the answer carries `scope` (D245) and `declared_limits` holding `PHASE_ONE_ONLY` (D250). `record` `None` (no record configured) gives `kinds_of_year.source` `NO_RECORD_ID` (the id of the record's source row the route writes), since the contract requires a source text.
 - `ValueError` at the seam (PROPOSED, code review of S-030): a run with neither `result` nor `result_missing`; a soil loss that is neither `SoilLossResults` nor `SoilLossNotBuilt`; `record_years` whose first year is after its last; a `classified` whose `start_month` (set by `classify_years`, `None` for a `Classified(kinds, of_record)` built by hand) differs from the start month of the request.
 - Also public: `Classified`, `CycleYears`, `cycle_years`, `soil_loss_means` (for the route's tests) and `plain` (a dataclass or model as JSON-ready data, which the route uses for the rain-stress echo). `_ag_year_of` follows C5.3 of `contracts/CONVENTIONS.md` and is checked against `api.phases.ag_year_of`.
 

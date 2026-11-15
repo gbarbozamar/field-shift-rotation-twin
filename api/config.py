@@ -25,8 +25,11 @@ it once with ``params.catalogue.load_folder`` and checks it with
 empty catalogue is not a problem (Q3, D46, D56 of issue #77).
 
 ``KINDS_OF_YEAR_RECORD_FILE`` (PROPOSED, unit ``l2/plant-layer-by-name``,
-S-031) names the ONI record the plant route classifies the kinds of year on,
-such as ``kinds_of_year/records/oni_v6.json``. Unset or blank: no record (the
+S-031) names the ONI record the plant route classifies the kinds of year on.
+No record is in the repository until a person checks and signs it (D240 (5)
+of issue #77; R26, PROPOSED), so the path is one a person gives. The check
+below uses main's ``kinds_of_year`` (#422: the one-decimal ``printed`` values
+of D258). Unset or blank: no record (the
 plant answer gives every kind of year missing ``NOT_AVAILABLE``), and
 ``kinds_of_year`` is not imported. Set: the file is read once, here, the
 fields the plant layer reads are checked (``RECORD_FIELDS``) and the record

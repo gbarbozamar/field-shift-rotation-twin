@@ -9,8 +9,9 @@ What it does, in order:
 0. PROPOSED (unit ``l2/plant-layer-by-name``, S-031, decision R24): the plant
    layer is found by name (``api/plant_layer.py``, ``DiscoveredPlantLayer``
    unless ``create_app`` was given another ``PlantLayer``). Not built: ``200``
-   with exactly ``{"contract": "plant_answer_not_built", "answer_missing":
-   {"reason": "NOT_AVAILABLE", "detail": ...}}``, and nothing is called. A
+   with exactly ``{"answer": null, "answer_missing": {"reason":
+   "NOT_AVAILABLE", "detail": ...}}`` (R27, the form of #427), and nothing
+   is called. A
    plant layer that fails to import is ``500`` ``INTERNAL_ERROR`` here only.
 1. The body is loaded into ``PlantRequest``. A body that fails it is ``422``
    with the one error shape of ``api/errors.py``: ``ROTATION_INVALID`` when
@@ -139,13 +140,13 @@ ROUTE = "/plant/run"
 # Builds the engines for a stressed run from a parameter catalogue. PROPOSED.
 EnginesFactory = Callable[[dict[str, dict]], RotationEngines]
 
-# PROPOSED: the source row of the ONI record (contract, state). PROPOSED
-# (S-031, point 8 of the brief): the state of a record transcribed into the
-# repository is "transcribed", a state of the plant contract's SourceOut only
-# (contracts/plant_answer/README.md); it was "cached" before, which says that
-# a first response of a service was kept.
+# PROPOSED: the source row of the ONI record (contract, state). The state is
+# "cached", as main's contract lists the record (OPEN 5 of
+# contracts/plant_answer/README.md, #424): SourceOut has no state for a record
+# read from a file. S-031 had proposed a state "transcribed"; main's contract
+# does not have it (decision R27 of the loop, PROPOSED).
 RECORD_CONTRACT = "kinds_of_year_record"
-RECORD_STATE = "transcribed"
+RECORD_STATE = "cached"
 # PROPOSED (S-031): the id of the record's source row when there is no record
 # id to name (no record configured, or an injected record without ``id``).
 # Fix round 1 (F2): the same text and rule as ``economics.plant.NO_RECORD_ID``

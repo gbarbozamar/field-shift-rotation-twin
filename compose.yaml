@@ -31,11 +31,10 @@ services:
       # Soil and slope: the PLACEHOLDER example, to exercise the whole route.
       # Its numbers mean nothing and it is shown as example data.
       SOIL_SLOPE_EXAMPLE_FILE: ${SOIL_SLOPE_EXAMPLE_FILE-contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json}
-      # The ONI record the plant route classifies the kinds of year on, as the
-      # image sees it (working directory /app). Start with it empty to run
-      # without it:  KINDS_OF_YEAR_RECORD_FILE= docker compose watch
-      # PROPOSED (R24): local stack only; the record still carries UNSIGNED_AI_PRECHECK; a person switches it on in the host settings after signing it.
-      KINDS_OF_YEAR_RECORD_FILE: ${KINDS_OF_YEAR_RECORD_FILE-kinds_of_year/records/oni_v6.json}
+      # KINDS_OF_YEAR_RECORD_FILE is not set: no ONI record is shipped until a
+      # person checks and signs it (D240 (5) of #77; R26, PROPOSED), so every
+      # kind of year of a plant answer is missing NOT_AVAILABLE. A person who
+      # holds a signed record sets the variable to its path as the image sees it.
       # PROPOSED (S-032): the local stack switches the heavier-rain stress test on; the deployed service leaves it off unless a person sets it in the host settings.
       # Start with it empty to switch it off:  RAIN_STRESS_TEST= docker compose watch
       RAIN_STRESS_TEST: ${RAIN_STRESS_TEST-on}

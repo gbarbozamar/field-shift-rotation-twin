@@ -30,7 +30,7 @@ from contracts.plant_answer import (
 )
 from contracts.results.models import ResultsPerRotation
 from economics import plant
-from kinds_of_year import load_record
+from kinds_of_year import SEASONS
 
 ROOT = Path(__file__).parent.parent
 EXAMPLES = ROOT / "contracts" / "plant_answer" / "examples"
@@ -51,6 +51,40 @@ RESULTS_EXAMPLE = json.loads(
         / "PLACEHOLDER_results_per_rotation.json"
     ).read_text(encoding="utf-8")
 )
+
+
+# PLACEHOLDER record. No ONI record is in the repository until a person checks
+# and signs it (D240 (5), D34, D66), so these tests classify on a hand-made
+# record: the anomalies mean nothing and none is an ONI value. Every season of
+# the calendar year that holds the deciding season of an agricultural year of
+# the example answer is set to one PLACEHOLDER anomaly per kind, so the record
+# gives back the kinds of the example answer. Its id is the example's source.
+PLACEHOLDER_RULE = {"threshold": 0.5, "min_consecutive_seasons": 5}
+PLACEHOLDER_ANOMALY = {"el_nino": 1.0, "neutral": 0.0, "la_nina": -1.0}
+
+
+def load_record() -> dict:
+    """The PLACEHOLDER record of the kinds of the example answer."""
+    years = ANSWER["kinds_of_year"]["years"]
+    by_year = {y["season_year"]: PLACEHOLDER_ANOMALY[y["kind"]] for y in years}
+    first, last = min(by_year) - 30, max(by_year) + 30
+    return {
+        "id": ANSWER["kinds_of_year"]["source"],
+        "status": "PLACEHOLDER",
+        "reference": "PLACEHOLDER: a hand-made record for tests, not ONI values",
+        "date_read": None,
+        **PLACEHOLDER_RULE,
+        "seasons": [
+            {
+                "season": name,
+                "year": year,
+                "anom": by_year.get(year, 0.0),
+                "printed": by_year.get(year, 0.0),  # D258
+            }
+            for year in range(first, last + 1)
+            for name in SEASONS
+        ],
+    }
 
 
 @dataclasses.dataclass(frozen=True)
@@ -180,8 +214,12 @@ def test_assemble_answer_averages_the_soil_loss_of_a_contract_results_example():
     )
     check_answer_against_request(request, answer)
     means = plant.soil_loss_means(runs[0], classified)
+    labels = {"provenance", "range", "range_missing", "label"}  # D249, D148
     for option in answer.options:
-        assert option.soil_loss.average.model_dump(mode="json") == plant.plain(means[0])
+        dumped = option.soil_loss.average.model_dump(mode="json")
+        assert {k: v for k, v in dumped.items() if k not in labels} == plant.plain(
+            means[0]
+        )
     # mean_by_kind read at least one year of the example (the averaging
     # branch), not the missing-mean branch, whose ag_years are empty.
     assert means[0].ag_years

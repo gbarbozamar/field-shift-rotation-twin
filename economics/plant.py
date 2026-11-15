@@ -43,7 +43,15 @@ from contracts.plant_answer import (
     PlantRequest,
     check_answer_against_request,
 )
+from contracts.plant_answer.plant_answer import (
+    ANSWER_SCOPE,
+    D148_SOIL_LOSS_LABEL,
+    DERIVED,
+    MARGIN_SOURCE,
+    PHASE_ONE_ONLY,
+)
 from contracts.results.models import (
+    PROVENANCE_OF_SOIL_LOSS,
     UNIT_SOIL_LOSS_ANNUAL,
     ResultsPerRotation,
     SoilLossNotBuilt,
@@ -560,6 +568,75 @@ def _todays_price(request: PlantRequest) -> float | None:
     return None if None in prices else prices[0]
 
 
+# PROPOSED (D249 of #77): the range of a number the answer computes is not
+# computed in this release; a present number says so with its reason (C2.2).
+NO_RANGE = {
+    "reason": "NOT_AVAILABLE",
+    "detail": "no range is computed for this number in this release",
+}
+# The same, on an answer marked example data (C4.4).
+NO_RANGE_EXAMPLE = {
+    "reason": "NOT_AVAILABLE",
+    "detail": "PLACEHOLDER: example data, no range is computed for this number",
+}
+
+
+def _d249(
+    item: Any,
+    provenance: str,
+    *,
+    key: str = "value",
+    extra: Mapping[str, str] | None = None,
+    example_data: bool = False,
+) -> Any:
+    """D249: a present number with its provenance (C4.1) and its absent range
+    (C2.2); a missing number unchanged. ``key`` names the number of ``item``;
+    ``extra`` holds the other labels a present number carries (the D148 label
+    of a soil loss, the C4.2 source of a margin). A label already given is
+    kept."""
+    if not isinstance(item, dict) or item.get(key) is None:
+        return item
+    labelled = dict(item)
+    if labelled.get("provenance") is None:
+        labelled["provenance"] = provenance
+    if labelled.get("range") is None and labelled.get("range_missing") is None:
+        labelled["range_missing"] = dict(NO_RANGE_EXAMPLE if example_data else NO_RANGE)
+    for name, text in (extra or {}).items():
+        if labelled.get(name) is None:
+            labelled[name] = text
+    return labelled
+
+
+def _tipping_d249(
+    tipping: dict[str, Any], request: PlantRequest, example_data: bool
+) -> dict[str, Any]:
+    """D249 of the tipping price: today's price carries the labels of the
+    declared soybean price it copies; each tipping price is computed."""
+    labelled = dict(tipping)
+    if labelled.get("today") is not None:
+        declared = next(
+            crop.price
+            for crop in request.economic_facts.crops
+            if crop.crop_id in request.questions.soybean_crop_ids
+        )
+        labelled["provenance"] = declared.provenance
+        labelled["range"] = plain(declared.range)
+        labelled["range_missing"] = plain(declared.range_missing)
+    for side in ("up", "down"):
+        if side in labelled:
+            point = _d249(
+                labelled[side], DERIVED, key="price", example_data=example_data
+            )
+            if point.get("distance_percent") is not None:
+                point = dict(point)
+                point["distance_provenance"] = DERIVED
+                point["distance_range_missing"] = dict(
+                    NO_RANGE_EXAMPLE if example_data else NO_RANGE
+                )
+            labelled[side] = point
+    return labelled
+
+
 def assemble_answer(
     request: PlantRequest,
     runs: Sequence[EngineRun],
@@ -575,8 +652,10 @@ def assemble_answer(
     ``runs`` holds one run per rotation of the request, in its order.
     ``record`` is the ONI record ``classified`` was read on (its ``id`` names
     the source of the kinds of year). PROPOSED (S-031): ``None`` when no
-    record is configured; the source of the kinds of year is then null, which
-    the contract allows only when every year is missing. ``rain_stress`` is the rain-stress echo
+    record is configured; the source of the kinds of year is then
+    ``NO_RECORD_ID``, the id of the record's source row the route writes
+    (main's contract requires a source text, #424; PROPOSED, R27), and every
+    year is missing. ``rain_stress`` is the rain-stress echo
     already as JSON-ready data, or ``None`` when no factor was asked; it is
     copied into the answer unchanged. ``sources`` are the source rows of the
     answer, as JSON-ready data, copied unchanged. A ``classified`` whose
@@ -718,12 +797,33 @@ def assemble_answer(
             {
                 "rotation_id": definition.rotation_id,
                 "state": verdict.state,
-                "margin": {key: plain(margin[key]) for key in margin},
-                "soil_loss": {
-                    "average": plain(record_mean),
-                    **{kind: plain(by_kind[kind]) for kind in KINDS_OF_YEAR},
+                "margin": {
+                    key: _d249(
+                        plain(margin[key]),
+                        DERIVED,
+                        extra={"source": MARGIN_SOURCE},
+                        example_data=example_data,
+                    )
+                    for key in margin
                 },
-                "limit": plain(limit),
+                "soil_loss": {
+                    key: _d249(
+                        plain(mean),
+                        PROVENANCE_OF_SOIL_LOSS,
+                        # D250: every real soil-loss value carries the D148 label.
+                        extra=None if example_data else {"label": D148_SOIL_LOSS_LABEL},
+                        example_data=example_data,
+                    )
+                    for key, mean in (
+                        ("average", record_mean),
+                        *((kind, by_kind[kind]) for kind in KINDS_OF_YEAR),
+                    )
+                },
+                # D249: the declared limit with its labels, as the request has it.
+                "limit": {
+                    **plain(limit),
+                    "limit": request.soil_loss_limit.model_dump(mode="json"),
+                },
                 "limit_check": plain(verdict.limit_check),
             }
         )
@@ -740,17 +840,21 @@ def assemble_answer(
         "detail": decision.detail,
         "tied": list(decision.tied),
         "options": options,
-        "limit_cost": plain(decision.limit_cost),
-        "tipping_price": tipping,
+        "limit_cost": _d249(
+            plain(decision.limit_cost), DERIVED, example_data=example_data
+        ),
+        "tipping_price": _tipping_d249(tipping, request, example_data),
         "rain_stress": rain_stress,
         "erosivity": EROSIVITY,
         "kinds_of_year": {
-            "source": None if record is None else record_id(record),
+            "source": NO_RECORD_ID if record is None else record_id(record),
             "start_month": start_month,
             "years": [_year_kind(year, kinds[year]) for year in sorted(kinds)],
             "counts": counts,
         },
         "sources": sources,
+        "scope": ANSWER_SCOPE,
+        "declared_limits": [PHASE_ONE_ONLY],
     }
     answer = PlantAnswer.model_validate_json(json.dumps(document))
     check_answer_against_request(request, answer)

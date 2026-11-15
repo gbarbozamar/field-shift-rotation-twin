@@ -12,7 +12,9 @@ breaks another route. The ONI record is read only when
 Fakes only: the climate, the soil and slope and the engines are the fakes of
 api/test_rotations.py and api/test_plant.py; no network and no real service.
 No expected number is typed here: every value compared is read from the
-committed record or from the contract examples.
+PLACEHOLDER record of economics/test_plant.py or from the contract examples.
+No ONI record is in the repository (D240 (5) of #77, #422): a test that needs
+a record file writes that PLACEHOLDER record to a temporary folder.
 """
 
 from __future__ import annotations
@@ -36,19 +38,39 @@ from api.config import (
 from api.main import create_app
 from api.plant import NO_RECORD, RECORD_CONTRACT, RECORD_STATE, _record_source
 from api.plant import NO_RECORD_ID as API_NO_RECORD_ID
-from api.plant_layer import (
-    NOT_BUILT_CONTRACT,
-    DiscoveredPlantLayer,
-)
+from api.plant_layer import DiscoveredPlantLayer, not_built_body
 from api.ports import Missing, PlantParts
-from contracts.plant_answer import PlantAnswer, PlantAnswerNotBuilt
+from contracts.plant_answer import PlantAnswer
 from economics.plant import NO_RECORD_ID as ECONOMICS_NO_RECORD_ID
 from economics.plant import RECORD_NOT_CONFIGURED, answer_plant
-from kinds_of_year import DEFAULT_RECORD, load_record
+from kinds_of_year import load_record as read_record_file
 
 ROOT = Path(__file__).parent.parent
 PLANT_ROUTE = "/api/plant/run"
 ABSENT_MODULE = "PLACEHOLDER_absent_plant_module"
+# PLACEHOLDER: example data, not a date a record was read on. api/config.py
+# asks the record for a non-blank date_read; the record of
+# economics/test_plant.py has none.
+PLACEHOLDER_DATE_READ = "PLACEHOLDER date read"
+
+
+def load_record() -> dict[str, Any]:
+    """The PLACEHOLDER record of economics/test_plant.py, with a date_read.
+
+    D240 (5) of #77 (#422): no ONI record is shipped, so the tests that read
+    the committed record read this one instead; none of its values is ONI.
+    """
+    record = plant_tests.load_record()
+    record["date_read"] = PLACEHOLDER_DATE_READ
+    return record
+
+
+@pytest.fixture
+def record_file(tmp_path: Path) -> Path:
+    """The PLACEHOLDER record written to a file, as a person would configure one."""
+    path = tmp_path / "PLACEHOLDER_record.json"
+    path.write_text(json.dumps(load_record()), encoding="utf-8")
+    return path
 
 
 def _app(**kwargs: Any) -> TestClient:
@@ -90,8 +112,8 @@ def test_a1_an_absent_plant_layer_is_not_built_and_the_other_routes_answer(layer
     response = client.post(PLANT_ROUTE, json=plant_tests.REQUEST)
     assert response.status_code == 200, response.text
     data = response.json()
-    assert set(data) == {"contract", "answer_missing"}
-    assert data["contract"] == NOT_BUILT_CONTRACT == "plant_answer_not_built"
+    assert set(data) == {"answer", "answer_missing"}
+    assert data["answer"] is None
     assert set(data["answer_missing"]) == {"reason", "detail"}
     assert data["answer_missing"]["reason"] == "NOT_AVAILABLE"
     assert data["answer_missing"]["detail"]
@@ -101,8 +123,9 @@ def test_a1_an_absent_plant_layer_is_not_built_and_the_other_routes_answer(layer
         plant_tests.REQUEST["site"]["field_id"],
     ):
         assert text not in data["answer_missing"]["detail"]
-    loaded = PlantAnswerNotBuilt.model_validate(data)
-    assert loaded.model_dump(mode="json") == data
+    # R27: the body is exactly the one not_built_body writes for its Missing.
+    missing = Missing(reason="NOT_AVAILABLE", detail=data["answer_missing"]["detail"])
+    assert data == not_built_body(missing)
 
 
 def test_a1_not_built_calls_no_source_and_no_engine():
@@ -115,21 +138,9 @@ def test_a1_not_built_calls_no_source_and_no_engine():
         plant_layer=DiscoveredPlantLayer(plant_module=ABSENT_MODULE),
     )
     response = client.post(PLANT_ROUTE, json=plant_tests.REQUEST)
-    assert response.json()["contract"] == NOT_BUILT_CONTRACT
+    assert response.json()["answer"] is None
+    assert response.json()["answer_missing"]["reason"] == "NOT_AVAILABLE"
     assert (climate.requests, soil.calls, engines.calls) == ([], [], [])
-
-
-def test_a1_the_not_built_example_loads_into_its_model():
-    # PROPOSED: in a folder of its own, since the contract's test checks that
-    # examples/ holds exactly the request and the answer.
-    path = (
-        ROOT
-        / "contracts/plant_answer/examples_not_built"
-        / "PLACEHOLDER_plant_answer_not_built.json"
-    )
-    document = json.loads(path.read_text(encoding="utf-8"))
-    assert document["contract"] == NOT_BUILT_CONTRACT
-    PlantAnswerNotBuilt.model_validate(document)
 
 
 # --- a2: a plant layer module that raises at import ---------------------------------
@@ -250,9 +261,12 @@ def test_a4_without_a_record_a_plant_request_answers_with_every_kind_missing(
         # row (below) still names it.
         assert year["detail"].startswith(RECORD_NOT_CONFIGURED)
         assert KINDS_OF_YEAR_RECORD_FILE not in year["detail"]
-    assert data["kinds_of_year"]["source"] is None
+    # Main's contract requires a source text (#424): the id of the record's
+    # source row, the same rule as for a record without id (F2).
+    assert data["kinds_of_year"]["source"] == API_NO_RECORD_ID
     assert set(data["kinds_of_year"]["counts"].values()) == {None}
     row = _record_row(data)
+    assert row["id"] == data["kinds_of_year"]["source"]
     assert row["state"] == "unavailable"
     assert row["missing_reason"] == "NOT_AVAILABLE"
     assert row["detail"] == NO_RECORD
@@ -308,11 +322,9 @@ def test_a5_a_json_that_is_not_an_object_is_refused(tmp_path):
 # --- a6: set to the committed record ------------------------------------------------
 
 
-def test_a6_the_committed_record_is_passed_through_and_transcribed():
-    config = load_config(
-        {KINDS_OF_YEAR_RECORD_FILE: str(ROOT / "kinds_of_year/records/oni_v6.json")}
-    )
-    committed = load_record(DEFAULT_RECORD)
+def test_a6_the_configured_record_is_passed_through(record_file):
+    config = load_config({KINDS_OF_YEAR_RECORD_FILE: str(record_file)})
+    committed = read_record_file(record_file)
     assert config.kinds_of_year_record == committed
     data = plant_tests.answered(
         plant_tests.client(kinds_of_year_record=config.kinds_of_year_record).post(
@@ -321,7 +333,7 @@ def test_a6_the_committed_record_is_passed_through_and_transcribed():
     )
     plant_tests.checked(plant_tests.REQUEST, data)
     row = _record_row(data)
-    assert row["state"] == RECORD_STATE == "transcribed"
+    assert row["state"] == RECORD_STATE == "cached"
     assert row["id"] == committed["id"]
     assert row["missing_reason"] is None
     assert committed["date_read"] in row["detail"]
@@ -332,7 +344,7 @@ def test_a6_an_injected_record_without_date_read_gives_a_row_without_a_date():
     record = load_record()
     del record["date_read"]
     row = _record_source(record)
-    assert row["state"] == "transcribed"
+    assert row["state"] == "cached"
     assert "None" not in row["detail"]
     assert "read on" not in row["detail"]
     record = load_record()
@@ -443,7 +455,7 @@ def test_f3_a_season_row_the_classification_refuses_is_refused_at_start_up(tmp_p
 
 @pytest.mark.parametrize("broken", ["absent", "raises"])
 def test_f4_a_kinds_of_year_that_cannot_be_imported_is_a_config_error(
-    monkeypatch, broken
+    monkeypatch, broken, record_file
 ):
     for name in list(sys.modules):
         if name == "kinds_of_year" or name.startswith("kinds_of_year."):
@@ -463,20 +475,20 @@ def test_f4_a_kinds_of_year_that_cannot_be_imported_is_a_config_error(
 
         monkeypatch.setattr(builtins, "__import__", failing)
     with pytest.raises(ConfigError) as caught:
-        load_config({KINDS_OF_YEAR_RECORD_FILE: str(DEFAULT_RECORD)})
+        load_config({KINDS_OF_YEAR_RECORD_FILE: str(record_file)})
     assert KINDS_OF_YEAR_RECORD_FILE in str(caught.value)
     assert isinstance(caught.value.__cause__, ImportError)
 
 
-def test_f5_the_file_is_read_once_and_not_through_load_record(monkeypatch):
+def test_f5_the_file_is_read_once_and_not_through_load_record(monkeypatch, record_file):
     import kinds_of_year
 
     def never(*args, **kwargs):
         raise AssertionError("load_record is not called by load_config")
 
     monkeypatch.setattr(kinds_of_year, "load_record", never)
-    config = load_config({KINDS_OF_YEAR_RECORD_FILE: str(DEFAULT_RECORD)})
-    assert config.kinds_of_year_record == load_record(DEFAULT_RECORD)
+    config = load_config({KINDS_OF_YEAR_RECORD_FILE: str(record_file)})
+    assert config.kinds_of_year_record == read_record_file(record_file)
 
 
 def test_f5_a_file_that_is_not_utf8_is_refused(tmp_path):

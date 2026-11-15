@@ -1,7 +1,0 @@
-{
-  "contract": "plant_answer_not_built",
-  "answer_missing": {
-    "reason": "NOT_AVAILABLE",
-    "detail": "PLACEHOLDER: the plant layer is not built yet: economics.plant.answer_plant is absent"
-  }
-}
