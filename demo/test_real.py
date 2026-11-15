@@ -16,7 +16,10 @@ brief's D176 conditions state:
 - condition 2: the upper level D115 leaves missing for the wheat rotation
   (no cap before a winter cereal) makes that member **not evaluated**, and
   is never read as a tipping point of the cover — the guard is tested on a
-  structural table where the machinery alone would report a bracket.
+  structural table where the machinery alone would report a bracket - and
+  is never admitted into the set D4 is read over (D171): the guard of D4
+  is tested on the structural case where the machinery alone would give
+  "Not robust across scenarios" with the cover ranked first.
 - condition 4: the measured input of D10 and the check of D12 **wait** for
   a path that reruns the engines with the measured cover; the demo never
   calls ``recompute_with_measurement`` for the cover, and implements only
@@ -49,8 +52,10 @@ from contracts.results.models import (
 )
 from decision.functions import (
     NOT_EVALUATED,
+    NOT_ROBUST_ACROSS_SCENARIOS,
     ROBUST_PREFERENCE,
     UncertainInput,
+    measurement_priority,
     pair_state,
     tipping_point,
 )
@@ -448,13 +453,119 @@ def test_the_measurement_priority_of_the_cover() -> None:
     # move), so the input holds rank 2 (D4), with the states it was read from.
     assert item.rank == 2
     assert "surface residue cover" in item.input_name
-    assert item.states == ((0.0, None), (0.40, None))
+    # The upper level is not admitted for the pair (the wheat rotation does
+    # not run there, D115; the admitted set is the caller's table, D171), so
+    # the states D4 reads hold the admitted level alone, never the blanked
+    # upper-level copy of the wheat rotation.
+    assert item.states == ((0.0, None),)
     assert "never change the state" in item.why
     assert NOT_EVALUATED in item.why
     # The one-cell gap of the PROPOSED form: the cover drives the water rows
     # of every rotation and phase, and the form holds one cell — the demo
     # names the water cell of the first rotation (the mapping says so).
     assert item.cell[:2] == (real.PAIR[0], "water_deficit_exposure")
+    # The guard of condition 2 fired: the level D115 leaves missing stayed
+    # not evaluated and not admitted (D171), and D4 says so.
+    assert priority.guard is not None
+    assert "condition 2" in priority.guard
+    assert "not admitted" in priority.guard
+    assert "D171" in priority.guard
+
+
+def test_a_level_not_admitted_never_enters_d4() -> None:
+    # The structural case the verifier described, on a made-up table for
+    # the rule alone (no science value in it): at 0 % the pair is a robust
+    # preference, at the cap the wheat member is the typed absence of the
+    # sweep, stamped with the reason of D115 (the stamp
+    # member_not_evaluated writes) - the member is not evaluated there, so
+    # the level is not admitted for the pair. The machinery alone reads
+    # the not-admitted level into the base set and the states, and D4 then
+    # gives "Not robust across scenarios" with the cover ranked first -
+    # the wrong behaviour the verifier refused; the sweep refuses both,
+    # per condition 2 with D171.
+    def soil(
+        rotation_id: str,
+        scenario_id: str,
+        triple: tuple[float, float, float] | None,
+    ) -> ResultsTableRow:
+        value, low, high = triple or (None, None, None)
+        valued = triple is not None
+        return ResultsTableRow(
+            rotation_id=rotation_id,
+            scenario_id=scenario_id,
+            time_basis="ag_year",
+            ag_year=2020,
+            indicator="soil_loss",
+            direction="lower_is_better",
+            value=value,
+            unit="t ha-1 yr-1",
+            range=(
+                Range(low=low, high=high, kind="PLACEHOLDER_kind")
+                if valued
+                else None
+            ),
+            missing=(
+                None
+                if valued
+                else Missing(
+                    reason="MISSING_INPUT",
+                    detail=real.NO_CAP_BEFORE_A_WINTER_CEREAL,
+                )
+            ),
+            provenance="DERIVED" if valued else None,
+            source=(
+                "the structural table of the guard of D4, no science value"
+                if valued
+                else None
+            ),
+        )
+
+    first, second = real.PAIR
+    table = ResultsTable(
+        case_id="structural-case",
+        field_id="structural-field",
+        rows=[
+            # At 0 %: wholly better for the second rotation in the one
+            # phase - a robust preference.
+            soil(first, "cover-0/phase_1+phase_1", (8.0, 7.9, 8.1)),
+            soil(second, "cover-0/phase_1+phase_1", (6.0, 5.9, 6.1)),
+            # At the cap: the second rotation is the typed absence, every
+            # row of it stamped with the reason of D115.
+            soil(first, "cover-cap/phase_1+phase_1", (8.0, 7.9, 8.1)),
+            soil(second, "cover-cap/phase_1+phase_1", None),
+        ],
+    )
+    uncertain = UncertainInput(
+        name="structural cover",
+        unit="fraction",
+        cell=(first, "soil_loss", "ag_year", 2020, None, None),
+        values=(
+            (0.0, ("cover-0/phase_1+phase_1",)),
+            (0.40, ("cover-cap/phase_1+phase_1",)),
+        ),
+    )
+    # What the machinery alone reads over the whole table: the base state
+    # the not-admitted level turns into "Not robust across scenarios", and
+    # the cover ranked first on a state its level never held.
+    machinery = measurement_priority(table, first, second, (uncertain,))
+    assert machinery.base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert len(machinery.items) == 1
+    assert machinery.items[0].rank == 1
+    assert machinery.items[0].states == (
+        (0.0, ROBUST_PREFERENCE),
+        (0.40, None),
+    )
+    # What the sweep reads: the level is not admitted, so the base set
+    # holds the admitted level alone and D4 gives a robust preference,
+    # with no item to measure first and the guard that says so.
+    sweep = real.the_measurement_priority(table, uncertain)
+    assert sweep.machinery_base_state == NOT_ROBUST_ACROSS_SCENARIOS
+    assert sweep.base_state == ROBUST_PREFERENCE
+    assert sweep.items == ()
+    assert sweep.guard is not None
+    assert "condition 2" in sweep.guard
+    assert "not admitted" in sweep.guard
+    assert "never enter the base set of D4" in sweep.guard
 
 
 # --- condition 4: what waits, and the placement the present path allows --------------
@@ -533,5 +644,9 @@ def test_main_prints_the_honest_report(capsys) -> None:
     assert "declared C (D148, D158)" in printed
     assert "no number yet (D157)" in printed
     assert "'Not evaluated'" in printed
+    # The guard of condition 2 inside D4: the level D115 leaves missing is
+    # not admitted for the pair (D171), and the report says so.
+    assert "D4, the guard of condition 2" in printed
+    assert "not admitted for the pair" in printed
     assert "D10/D12:" in printed
     assert "never calls it for the cover" in printed
