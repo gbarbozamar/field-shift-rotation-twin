@@ -9,7 +9,7 @@
  */
 
 import type { MissingPart } from '../components/ValueDisplay'
-import type { MarginOf, PlantOption, Verdict } from './plantData'
+import type { MarginOf, OptionState, PlantOption, Verdict } from './plantData'
 
 /**
  * What the soil-loss bar says against the limit, for the quantity it draws
@@ -73,4 +73,23 @@ export function barPercent(value: number, scale: number): number {
     return 0
   }
   return Math.min(100, (Math.abs(value) / scale) * 100)
+}
+
+/**
+ * The tone a state or a verdict is drawn in (l3/board): one word, so that a
+ * style can select it through a data attribute. A value with an underscore
+ * cannot be selected that way (the style engine reads it as a space).
+ */
+export type Tone = 'chosen' | 'meets' | 'over' | 'open' | 'none'
+
+const VERDICT_TONE: Record<Verdict, Tone> = { meets: 'meets', does_not_meet: 'over', not_resolved: 'open' }
+
+/** The tone of the state of an option. */
+export function stateTone(state: OptionState): Tone {
+  return state === 'chosen' ? 'chosen' : VERDICT_TONE[state]
+}
+
+/** The tone of a soil loss as the answer judges it; none when the kind of year is not in the record. */
+export function verdictTone(drawn: DrawnVerdict): Tone {
+  return drawn.kind === 'not_in_record' ? 'none' : VERDICT_TONE[drawn.verdict]
 }

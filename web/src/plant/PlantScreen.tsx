@@ -320,7 +320,7 @@ function CostBlock({ answer }: { answer: PlantAnswer }) {
 }
 
 /** The sources an answer lacks, each once with its reason: why numbers are missing, said in one place. */
-function SourcesNotice({ answer }: { answer: PlantAnswer }) {
+export function SourcesNotice({ answer }: { answer: PlantAnswer }) {
   const lacking = answer.sources.filter((source) => source.state === 'unavailable' && source.missing_reason !== null)
   if (lacking.length === 0) {
     return null
@@ -913,7 +913,7 @@ function OriginLine({
  * The pending line, the answer not available with the reason the service
  * gave, or the error panel with the code in plain words and the raw code.
  */
-function StatusPanel({ status }: { status: ServiceStatus }) {
+export function StatusPanel({ status }: { status: ServiceStatus }) {
   if (status.kind === 'not_available') {
     return (
       <div

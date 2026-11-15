@@ -107,6 +107,16 @@
   --color-fs-crop-6: var(--fs-crop-6);
 }
 
+/* The hatch of what is not known (l3/board): a value that is missing, a
+   field with nothing declared, a price whose answer is not computed. */
+@utility fs-fog {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--fs-border) 0 4px,
+    transparent 4px 10px
+  );
+}
+
 body {
   background: var(--fs-bg);
   color: var(--fs-text);

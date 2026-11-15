@@ -333,6 +333,31 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.notice.sources': 'Not available for this answer',
   'plant.details': 'Details and sources',
   'plant.legend': 'Crops',
+  // PROPOSED (l3/board, 15 Nov 2026): the rotation board at #/board: its
+  // title, the short labels of the controls, the state of a field, the
+  // banner of the answer, the soil loss of a kind of year, the price track
+  // and the link to the screen with every detail line. Wording is a person's
+  // decision; the operator approves it.
+  'board.title': 'Rotation board',
+  'board.rotations': 'Rotations',
+  'board.field.ready': 'Rotations declared',
+  'board.hud.year': 'Kind of year',
+  'board.hud.rule': 'Limit rule',
+  'board.hud.rain': 'Rain',
+  'board.kind.average': 'Average',
+  'board.rule.on_average': 'On average',
+  'board.rule.every_kind': 'Every kind of year',
+  'board.rain.recorded': 'As recorded',
+  'board.rain.heavier': 'Heavier',
+  'board.verdict.chosen': 'Most margin within the limit',
+  'board.limit_is': 'limit {limit} {unit}',
+  'board.cost.none': 'No cost',
+  'board.kind.soil': 'soil {value}',
+  'board.price.title': 'Soybean price',
+  'board.price.tips': 'the answer changes at {price} {unit}',
+  'board.price.holds_to': 'same answer all the way to {price} {unit}',
+  'board.price.unknown': 'not computed',
+  'board.report': 'Open the full report',
 }
 
 /** Source of the shell page as it was before the strings unit. */

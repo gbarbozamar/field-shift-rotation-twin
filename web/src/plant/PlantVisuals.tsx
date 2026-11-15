@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { displayNumber } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { drawnSoilVerdict } from './optionBars'
+import { drawnSoilVerdict, stateTone } from './optionBars'
 import { swatchOf } from './PlantOptionParts'
 import { MARGINS_OF } from './plantData'
 import type { MarginOf, Measured, OptionState, PlantOption } from './plantData'
@@ -111,7 +111,8 @@ export function StatePill({ state }: { state: OptionState }) {
     <span
       data-testid="plant-pill"
       data-state={state}
-      className="inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold data-[state=chosen]:border-fs-primary data-[state=chosen]:bg-fs-primary data-[state=chosen]:text-white data-[state=meets]:border-fs-ok data-[state=meets]:text-fs-ok data-[state=does_not_meet]:border-fs-error data-[state=does_not_meet]:bg-fs-error-bg data-[state=does_not_meet]:text-fs-error data-[state=not_resolved]:border-fs-warning data-[state=not_resolved]:bg-fs-warning-bg data-[state=not_resolved]:text-fs-warning"
+      data-tone={stateTone(state)}
+      className="inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold data-[tone=chosen]:border-fs-primary data-[tone=chosen]:bg-fs-primary data-[tone=chosen]:text-white data-[tone=meets]:border-fs-ok data-[tone=meets]:text-fs-ok data-[tone=open]:border-fs-warning data-[tone=open]:bg-fs-warning-bg data-[tone=open]:text-fs-warning data-[tone=over]:border-fs-error data-[tone=over]:bg-fs-error-bg data-[tone=over]:text-fs-error"
     >
       {strings[`plant.pill.${state}`]}
     </span>
