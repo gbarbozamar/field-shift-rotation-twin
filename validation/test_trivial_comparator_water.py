@@ -209,6 +209,17 @@ def test_a_zero_demand_is_not_computable_as_in_ep3():
     assert ratio.crop_days == 2
 
 
+def test_a_negative_demand_is_not_computable_as_in_ep3():
+    # EP3 asks that the demanded sum be above zero (``not water_demanded >
+    # _ZERO``), not only that it differ from zero. A negative sum gives no
+    # ratio, never the negative number (here -5 / -3).
+    for entries in ([(3.0, -4.0), (2.0, -4.0)], [(3.0, -4.0), (2.0, 1.0)]):
+        ratio = year_ratio("A", "s1", 2020, days(2020, entries))
+        assert ratio.ratio is None, entries
+        assert ratio.missing.reason == _nothing_demanded(2020, 2).reason, entries
+        assert ratio.crop_days == 2
+
+
 def test_a_missing_day_makes_the_year_missing_and_never_a_zero():
     unknown = Missing(reason="MISSING_INPUT", detail="example data: no rain value")
     ratio = year_ratio("B", "s1", 2020, days(2020, [(3.0, 4.0), (unknown, 4.0)]))
@@ -286,6 +297,43 @@ def test_a_scenario_on_one_side_only_gives_no_order_with_the_reason():
     assert report["s9"].trivial.order is None
     assert "no daily series" in report["s9"].trivial.reason
     assert report["s9"].outcome == "no order from the trivial comparator"
+
+
+def test_the_means_are_compared_exactly_as_in_d0():
+    # A: 1.0 and 1e-17; B: 1.0 and 0.0. In floating point both sums are 1.0, so
+    # means taken in floating point tie; the stored values differ, so the exact
+    # means do not: A is ahead (OPEN 7 of D0, which this module follows).
+    series = {
+        ("A", "s1", 2020): days(2020, [(1.0, 1.0)]),
+        ("A", "s1", 2021): days(2021, [(1e-17, 1.0)]),
+        ("B", "s1", 2020): days(2020, [(1.0, 1.0)]),
+        ("B", "s1", 2021): days(2021, [(0.0, 1.0)]),
+    }
+    assert (1.0 + 1e-17) / 2 == (1.0 + 0.0) / 2  # the float means would tie
+    (order,) = water_orders(series)
+    assert order.order == ("A", "B")
+    assert order.reason is None
+
+
+def test_the_report_says_not_the_same_rotations_when_the_sides_differ():
+    # The comparator orders A and B; the table orders A and C. Both orders
+    # exist, over different rotations: neither "equal" nor "different".
+    full = {("A", "s1"): {2020: 0.6, 2021: 0.8}, ("C", "s1"): {2020: 0.5, 2021: 0.7}}
+    (item,) = compare_with_full_indicator(SERIES, table(full))
+    assert item.trivial.order == HAND_ORDER
+    assert item.full.order == ("A", "C")
+    assert item.outcome == "not the same rotations"
+    assert (item.rotations_ordered, item.rotations_ordered_full) == (2, 2)
+
+
+def test_the_report_says_no_order_from_the_full_indicator_when_only_it_gives_none():
+    # The comparator orders A, B; the full values tie (0.6 and 0.6 for both).
+    full = {("A", "s1"): {2020: 0.6, 2021: 0.6}, ("B", "s1"): {2020: 0.6, 2021: 0.6}}
+    (item,) = compare_with_full_indicator(SERIES, table(full))
+    assert item.trivial.order == HAND_ORDER
+    assert item.full.order is None and "equal" in item.full.reason
+    assert item.outcome == "no order from the full indicator"
+    assert (item.rotations_ordered, item.rotations_ordered_full) == (2, 0)
 
 
 # --- the functions are pure and hold no value of the method -----------------------
