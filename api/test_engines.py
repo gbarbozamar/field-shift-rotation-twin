@@ -2212,3 +2212,37 @@ def test_d220_without_engine_water_the_daily_et0_is_not_available(monkeypatch):
     answer = runner.daily_reference_evapotranspiration(chain_climate(), {})
     assert answer.reason == "NOT_AVAILABLE"
     assert "placeholder_absent_package" in answer.detail
+
+
+def _import_raising(missing_name: str):
+    """``importlib.import_module`` that fails for the ET0 module as if
+    ``missing_name`` were absent (the ``name`` Python sets on the error)."""
+    real = runner.importlib.import_module
+
+    def fake(name, *args, **kwargs):
+        if name == runner.ET0_MODULE:
+            raise ModuleNotFoundError(
+                f"No module named {missing_name!r}", name=missing_name
+            )
+        return real(name, *args, **kwargs)
+
+    return fake
+
+
+def test_d220_the_et0_module_itself_absent_is_not_built(monkeypatch):
+    monkeypatch.setattr(
+        runner.importlib, "import_module", _import_raising(runner.ET0_MODULE)
+    )
+    answer = runner.daily_reference_evapotranspiration(chain_climate(), {})
+    assert answer.reason == "NOT_AVAILABLE"
+
+
+def test_d220_a_module_the_et0_imports_absent_is_a_defect(monkeypatch):
+    monkeypatch.setattr(
+        runner.importlib,
+        "import_module",
+        _import_raising("placeholder_absent_dependency"),
+    )
+    with pytest.raises(ModuleNotFoundError) as caught:
+        runner.daily_reference_evapotranspiration(chain_climate(), {})
+    assert caught.value.name == "placeholder_absent_dependency"
