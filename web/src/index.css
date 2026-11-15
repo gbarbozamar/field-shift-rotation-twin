@@ -41,6 +41,11 @@
   --fs-radius: 8px;
   --fs-control-min: 44px;
   --fs-motion: 160ms;
+
+  /* Added by l3/plant-redesign (PROPOSED): a verdict that meets, and the
+     faint track behind bars and timelines. */
+  --fs-ok: #2f6b3a;
+  --fs-faint: #dce2d9;
 }
 
 /* Tailwind 4 theme bridge: registers the tokens as utilities for later
@@ -56,6 +61,11 @@
   --color-fs-info: var(--fs-info);
   --color-fs-warning: var(--fs-warning);
   --color-fs-error: var(--fs-error);
+  --color-fs-ok: var(--fs-ok);
+  --color-fs-faint: var(--fs-faint);
+  --color-fs-selection: var(--fs-selection-bg);
+  --color-fs-warning-bg: var(--fs-warning-bg);
+  --color-fs-error-bg: var(--fs-error-bg);
   --font-fs-body: var(--fs-font-body);
   --font-fs-heading: var(--fs-font-heading);
 }

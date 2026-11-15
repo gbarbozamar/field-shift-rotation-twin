@@ -315,6 +315,24 @@ const WORDING_SHEET: Record<string, string> = {
   'rail.waiting.compare': 'no run has answered yet',
   'rail.waiting.decision': 'nothing has been compared yet',
   'rail.waiting.handoff': 'no decision to hand over yet',
+  // PROPOSED (l3/plant-redesign, 15 Nov 2026): the visual layer of the screen
+  // "What should I plant?": the short state label of an option, the table of
+  // an option by kind of year, the labels of its bars, the notice of the
+  // sources an answer lacks, and the disclosure that holds the detail lines.
+  // Wording is a person's decision; the operator approves it.
+  'plant.pill.chosen': 'Chosen',
+  'plant.pill.meets': 'Within the limit',
+  'plant.pill.does_not_meet': 'Over the limit',
+  'plant.pill.not_resolved': 'Not resolved',
+  'plant.table.heading': 'By kind of year',
+  'plant.table.margin': 'Margin',
+  'plant.table.soil_loss': 'Soil loss',
+  'plant.table.row': '{what}, {unit}',
+  'plant.table.no_value': 'no value',
+  'plant.table.over_limit': 'over the limit',
+  'plant.notice.sources': 'Not available for this answer',
+  'plant.details': 'Details and sources',
+  'plant.legend': 'Crops',
 }
 
 /** Source of the shell page as it was before the strings unit. */

@@ -17,6 +17,7 @@ import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { barScale, drawnSoilVerdict } from './optionBars'
 import { MarginBar, SoilLossBar, StripBlock } from './PlantOptionParts'
+import { CropLegend, Figure, KindTable, LabelledBar, RotationTimeline, StatePill } from './PlantVisuals'
 import { buildRotationStrip, cropOrder, plantRotations } from './rotationStrip'
 import type { PlantRotations, RotationStrip } from './rotationStrip'
 import type { MissingPart } from '../components/ValueDisplay'
@@ -92,6 +93,13 @@ import type {
  * (rotationStrip.ts), a margin bar and a soil-loss bar with the limit line
  * (widths only, optionBars.ts), and its state in plain words from the fields
  * the answer carries.
+ *
+ * The visual layer (l3/plant-redesign, PROPOSED; PlantVisuals.tsx): the card
+ * leads with the label of the chosen rotation and three figures; each option
+ * shows a timeline of its crops by month, labelled bars and a table by kind of
+ * year; the sources an answer lacks are said once, in a notice. The detail
+ * lines of every value (source, check, provenance) are kept, folded under
+ * "Details and sources".
  *
  * A missing value shows its reason, never 0 or a blank. All wording lives in
  * strings.ts; rotation ids and the details of the answer render as data.
@@ -311,62 +319,167 @@ function CostBlock({ answer }: { answer: PlantAnswer }) {
   )
 }
 
-/** The answer at the price of today: the chosen rotation, or none / not resolved with the reason. */
-function AnswerCard({ answer }: { answer: PlantAnswer }) {
-  const chosen = answer.options.find((o) => o.rotation_id === answer.chosen) ?? null
+/** The sources an answer lacks, each once with its reason: why numbers are missing, said in one place. */
+function SourcesNotice({ answer }: { answer: PlantAnswer }) {
+  const lacking = answer.sources.filter((source) => source.state === 'unavailable' && source.missing_reason !== null)
+  if (lacking.length === 0) {
+    return null
+  }
+  return (
+    <div
+      data-testid="plant-sources-notice"
+      role="note"
+      className="mt-3 rounded-lg border border-fs-warning bg-fs-warning-bg px-3 py-2"
+    >
+      <p className="text-sm font-semibold text-fs-warning">{strings['plant.notice.sources']}</p>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+        {lacking.map((source) => (
+          <li key={source.id}>
+            {missingPatternText(
+              source.id,
+              source.detail !== null
+                ? { reason: source.missing_reason!, detail: source.detail }
+                : { reason: source.missing_reason! },
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** The soil-loss limit of an option as a measured value: declared, or missing with its reason. */
+function limitItem(option: PlantOption): Measured {
+  if (option.limit === null || option.limit_labels === null) {
+    return {
+      value: null,
+      unit: option.limit_unit,
+      missing: option.limit_missing ?? option.on_average.missing!,
+      labels: null,
+    }
+  }
+  return { value: option.limit, unit: option.limit_unit, missing: null, labels: option.limit_labels }
+}
+
+/** A row of the options with what the request says of its rotation. */
+interface OptionRow {
+  option: PlantOption
+  rotation: RotationDefinition | null
+  strip: RotationStrip | null
+  stripMissing: MissingPart | null
+}
+
+/**
+ * The answer at the price of today: the chosen rotation with its headline
+ * figures, its timeline and its table by kind of year, or none / not resolved
+ * with what the answer lacks; then what meeting the limit costs and the
+ * tipping price. The detail lines (each value with its source and its check)
+ * are folded under "Details and sources".
+ */
+function AnswerCard({
+  answer,
+  chosenRow,
+  order,
+}: {
+  answer: PlantAnswer
+  /** The row of the chosen option, when one is chosen. */
+  chosenRow: OptionRow | null
+  order: readonly string[]
+}) {
+  const chosen = chosenRow?.option ?? null
+  const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
+  const why =
+    chosen === null && answer.missing !== null ? (
+      <MissingLine what={strings['plant.answer.why']} missing={answer.missing} />
+    ) : null
   return (
     <article
       data-testid="plant-card"
-      className="rounded-lg border-2 border-teal-700 bg-white px-4 py-3"
+      className="rounded-2xl border-2 border-fs-primary bg-fs-surface px-5 py-4"
     >
-      <h3 className="text-xs font-semibold uppercase text-slate-500">{strings['plant.answer.heading']}</h3>
-      {answer.declared_limits.map((limit) => (
-        <p key={limit} data-testid="plant-declared-limit" className="text-sm text-slate-600">
-          {formatString(strings['plant.declared_limit'], { limit })}
-        </p>
-      ))}
+      <h3 className="font-mono text-[11px] font-medium uppercase tracking-widest text-fs-muted">
+        {strings['plant.answer.heading']}
+      </h3>
       {chosen !== null ? (
         <div>
-          <p className="text-sm text-slate-600">{strings['plant.answer.chosen']}</p>
-          <p data-testid="plant-chosen" className="font-mono text-lg font-semibold">
+          {chosenRow !== null && chosenRow.rotation !== null ? (
+            <p data-testid="plant-chosen-label" className="mt-1 font-fs-heading text-3xl font-bold leading-tight">
+              {chosenRow.rotation.label}
+            </p>
+          ) : null}
+          <p data-testid="plant-chosen" className="font-mono text-sm font-semibold text-fs-muted">
             {chosen.rotation_id}
           </p>
-          <MeasuredLine
-            what={formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })}
-            item={chosen.margin[answer.margin_of]}
-          />
-          <SoilLossLine kind="average" item={chosen.soil_loss.average} />
-          {answer.margin_of !== 'average' ? (
-            <SoilLossLine kind={answer.margin_of} item={chosen.soil_loss[answer.margin_of]} />
+          <p className="mt-1 text-sm text-fs-muted">{strings['plant.answer.chosen']}</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <Figure
+              what={formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })}
+              item={chosen.margin[answer.margin_of]}
+            />
+            <Figure
+              what={formatString(strings['plant.soil_loss_of'], { kind: kindLabel('average') })}
+              item={chosen.soil_loss.average}
+            />
+            <Figure what={strings['plant.limit']} item={limitItem(chosen)} />
+          </div>
+          {chosenRow !== null && chosenRow.strip !== null ? (
+            <RotationTimeline strip={chosenRow.strip} order={order} />
           ) : null}
-          <LimitLine option={chosen} />
-          <CheckLine strictness={answer.strictness} check={chosen.limit_check} />
-          {answer.strictness === 'every_kind' ? (
-            <KindsLines option={chosen} />
-          ) : null}
-          <h4 className="mt-3 text-sm font-semibold">{strings['plant.by_kind']}</h4>
-          {KINDS_OF_YEAR.map((kind) => (
-            <MeasuredLine key={kind} what={kindLabel(kind)} item={chosen.margin[kind]} />
-          ))}
+          <div className="mt-3">
+            <KindTable option={chosen} marginOf={answer.margin_of} />
+          </div>
         </div>
       ) : (
         <div>
-          <p data-testid="plant-not-chosen" className="text-lg font-semibold">
+          <p data-testid="plant-not-chosen" className="mt-1 font-fs-heading text-2xl font-bold leading-tight">
             {strings[`plant.answer.${answer.answer === 'none_meets' ? 'none_meets' : 'not_resolved'}`]}
           </p>
-          {answer.missing !== null ? (
-            <MissingLine what={strings['plant.answer.why']} missing={answer.missing} />
-          ) : null}
           {answer.tied.length !== 0 ? (
             <p className="text-sm">
               {formatString(strings['plant.answer.tied'], { rotations: answer.tied.join(', ') })}
             </p>
           ) : null}
+          <SourcesNotice answer={answer} />
+          {lacksSources ? null : why}
         </div>
       )}
-      <CostBlock answer={answer} />
-      <TippingBlock tipping={answer.tipping_price} />
-      <EconomicsSource />
+      <div className="grid gap-x-6 sm:grid-cols-2">
+        <CostBlock answer={answer} />
+        <TippingBlock tipping={answer.tipping_price} />
+      </div>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-xs font-semibold text-fs-muted">{strings['plant.details']}</summary>
+        <div className="mt-2 space-y-1 border-l-2 border-fs-border pl-3">
+          {answer.declared_limits.map((limit) => (
+            <p key={limit} data-testid="plant-declared-limit" className="text-sm text-fs-muted">
+              {formatString(strings['plant.declared_limit'], { limit })}
+            </p>
+          ))}
+          {lacksSources ? why : null}
+          {chosen !== null ? (
+            <div>
+              <MeasuredLine
+                what={formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })}
+                item={chosen.margin[answer.margin_of]}
+              />
+              <SoilLossLine kind="average" item={chosen.soil_loss.average} />
+              {answer.margin_of !== 'average' ? (
+                <SoilLossLine kind={answer.margin_of} item={chosen.soil_loss[answer.margin_of]} />
+              ) : null}
+              <LimitLine option={chosen} />
+              <CheckLine strictness={answer.strictness} check={chosen.limit_check} />
+              {answer.strictness === 'every_kind' ? (
+                <KindsLines option={chosen} />
+              ) : null}
+              <h4 className="mt-3 text-sm font-semibold">{strings['plant.by_kind']}</h4>
+              {KINDS_OF_YEAR.map((kind) => (
+                <MeasuredLine key={kind} what={kindLabel(kind)} item={chosen.margin[kind]} />
+              ))}
+            </div>
+          ) : null}
+          <EconomicsSource />
+        </div>
+      </details>
     </article>
   )
 }
@@ -414,7 +527,7 @@ function PriceAnswer({ answer, price }: { answer: PlantAnswer; price: number | n
     }
   }
   return (
-    <div data-testid="plant-price-answer" className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+    <div data-testid="plant-price-answer" className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-fs-muted">
       {content}
     </div>
   )
@@ -514,42 +627,63 @@ function OptionBlock({
         limitMissing={option.limit === null ? option.on_average.missing : null}
       />
     ) : null
+  const marginOfText = formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })
   return (
-    <article data-testid="plant-option" className="border-t border-slate-200 py-3">
-      {rotation !== null ? (
-        <h4 data-testid="plant-option-label" className="text-sm font-semibold">
-          {rotation.label}
-        </h4>
-      ) : null}
-      <p className="font-mono text-sm font-semibold">{option.rotation_id}</p>
-      <p data-testid="plant-option-state" className="text-sm">
-        {strings[`plant.state.${option.state}`]}
-      </p>
-      <StateDetail answer={answer} option={option} />
-      <StripBlock strip={strip} order={order} missing={stripMissing} />
-      <MeasuredLine
-        what={formatString(strings['plant.margin_of'], { kind: kindLabel(answer.margin_of) })}
-        item={margin}
-      />
-      {margin.value !== null && scales.margin !== null ? (
-        <MarginBar value={margin.value} scale={scales.margin} />
-      ) : null}
-      <SoilLossLine
-        kind="average"
-        item={option.soil_loss.average}
-        bar={answer.margin_of === 'average' ? lossBar : null}
-      />
-      {answer.margin_of !== 'average' ? (
-        <SoilLossLine kind={answer.margin_of} item={loss} bar={lossBar} />
-      ) : null}
-      <CheckLine
-        strictness={answer.strictness}
-        check={option.limit_check}
-        reasonShown={option.state === 'not_resolved' && option.limit_check.missing !== null}
-      />
-      {answer.strictness === 'every_kind' ? (
-        <KindsLines option={option} />
-      ) : null}
+    <article
+      data-testid="plant-option"
+      data-state={option.state}
+      className="-mx-3 rounded-xl border-t border-fs-border px-3 py-4 first:border-t-0 data-[state=chosen]:border-transparent data-[state=chosen]:bg-fs-selection"
+    >
+      <div className="grid gap-x-6 gap-y-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            {rotation !== null ? (
+              <h4 data-testid="plant-option-label" className="text-lg font-bold leading-tight">
+                {rotation.label}
+              </h4>
+            ) : null}
+            <StatePill state={option.state} />
+          </div>
+          <p className="font-mono text-xs text-fs-muted">{option.rotation_id}</p>
+          <p data-testid="plant-option-state" className="mt-1 text-sm text-fs-muted">
+            {strings[`plant.state.${option.state}`]}
+          </p>
+          {strip !== null ? (
+            <RotationTimeline strip={strip} order={order} />
+          ) : null}
+        </div>
+        <div className="min-w-0 space-y-2">
+          {margin.value !== null && scales.margin !== null ? (
+            <LabelledBar label={strings['plant.table.margin']}>
+              <MarginBar value={margin.value} scale={scales.margin} />
+            </LabelledBar>
+          ) : null}
+          {lossBar !== null ? (
+            <LabelledBar label={strings['plant.table.soil_loss']}>{lossBar}</LabelledBar>
+          ) : null}
+          <KindTable option={option} marginOf={answer.margin_of} />
+        </div>
+      </div>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs font-semibold text-fs-muted">{strings['plant.details']}</summary>
+        <div className="mt-2 space-y-1 border-l-2 border-fs-border pl-3">
+          <StateDetail answer={answer} option={option} />
+          <StripBlock strip={strip} order={order} missing={stripMissing} />
+          <MeasuredLine what={marginOfText} item={margin} />
+          <SoilLossLine kind="average" item={option.soil_loss.average} />
+          {answer.margin_of !== 'average' ? (
+            <SoilLossLine kind={answer.margin_of} item={loss} />
+          ) : null}
+          <CheckLine
+            strictness={answer.strictness}
+            check={option.limit_check}
+            reasonShown={option.state === 'not_resolved' && option.limit_check.missing !== null}
+          />
+          {answer.strictness === 'every_kind' ? (
+            <KindsLines option={option} />
+          ) : null}
+        </div>
+      </details>
     </article>
   )
 }
@@ -566,16 +700,10 @@ function asPlantRotations(rotations: RotationDefinition[] | PlantRotations): Pla
  * across the rows; the bar scales shared by the rows. Built once per answer
  * and rotations (useMemo), not at each step of the price slider.
  */
-function OptionRows({
-  answer,
-  rotations,
-}: {
-  answer: PlantAnswer
-  rotations: RotationDefinition[] | PlantRotations
-}) {
-  const { rows, order, scales } = useMemo(() => {
+function useOptionRows(answer: PlantAnswer, rotations: RotationDefinition[] | PlantRotations) {
+  return useMemo(() => {
     const read = asPlantRotations(rotations)
-    const built = answer.options.map((option) => {
+    const built: OptionRow[] = answer.options.map((option) => {
       const rotation = read.rotations?.find((r) => r.rotation_id === option.rotation_id) ?? null
       return {
         option,
@@ -591,21 +719,56 @@ function OptionRows({
       scales: barScales(answer),
     }
   }, [answer, rotations])
+}
+
+/**
+ * The answer of the service, laid out: the answer at the price looked at,
+ * the rain-stress part, the card of the answer, the options and the sources.
+ */
+function AnswerBody({
+  answer,
+  price,
+  rainStress,
+  rotations,
+}: {
+  answer: PlantAnswer
+  price: number | null
+  rainStress: RainStressPart | null
+  rotations: RotationDefinition[] | PlantRotations
+}) {
+  const { rows, order, scales } = useOptionRows(answer, rotations)
+  const chosenRow = rows.find((row) => row.option.rotation_id === answer.chosen) ?? null
   return (
-    <>
-      {rows.map(({ option, rotation, strip, stripMissing }) => (
-        <OptionBlock
-          key={option.rotation_id}
-          answer={answer}
-          option={option}
-          rotation={rotation}
-          strip={strip}
-          stripMissing={stripMissing}
-          order={order}
-          scales={scales}
-        />
-      ))}
-    </>
+    <div className="space-y-5">
+      <PriceAnswer answer={answer} price={price} />
+      {rainStress !== null ? (
+        <RainStressBlock part={rainStress} />
+      ) : null}
+      <AnswerCard answer={answer} chosenRow={chosenRow} order={order} />
+      <section
+        data-testid="plant-options"
+        className="rounded-2xl border border-fs-border bg-fs-surface px-5 py-4"
+      >
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h3 className="text-xl font-bold">{strings['plant.options.heading']}</h3>
+          <CropLegend order={order} />
+        </div>
+        {rows.map(({ option, rotation, strip, stripMissing }) => (
+          <OptionBlock
+            key={option.rotation_id}
+            answer={answer}
+            option={option}
+            rotation={rotation}
+            strip={strip}
+            stripMissing={stripMissing}
+            order={order}
+            scales={scales}
+          />
+        ))}
+        <EconomicsSource />
+      </section>
+      <Sources answer={answer} />
+    </div>
   )
 }
 
@@ -793,7 +956,7 @@ function StatusPanel({ status }: { status: ServiceStatus }) {
 /** The rain-stress part of a service answer: applied or not with its detail, or missing with its reason. */
 function RainStressBlock({ part }: { part: RainStressPart }) {
   return (
-    <div data-testid="plant-rain-stress" className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+    <div data-testid="plant-rain-stress" className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-fs-muted">
       {part.kind === 'applied' ? (
         <p className="text-sm">
           {formatString(strings[part.applied ? 'plant.service.rain_applied' : 'plant.service.rain_not_applied'], {
@@ -834,7 +997,7 @@ function provenanceText(provenance: string): string {
 function RainQuestion({ rain }: { rain: RainControl }) {
   return (
     <fieldset data-testid="plant-q-rain">
-      <legend className="font-semibold">{strings['plant.q.rain']}</legend>
+      <legend className="font-fs-heading text-lg font-bold leading-tight">{strings['plant.q.rain']}</legend>
       {rain.kind === 'available' ? (
         <div>
           <label className="inline-flex items-center gap-1 text-sm">
@@ -898,11 +1061,11 @@ function Questions({
   const tipping = answer?.tipping_price ?? null
   const usable = tipping !== null && tipping.today !== null && price !== null
   return (
-    <section className="space-y-5 rounded-lg border border-slate-200 bg-white px-4 py-4">
-      <h3 className="text-base font-semibold">{strings['plant.questions']}</h3>
+    <section className="space-y-6 rounded-2xl border border-fs-border bg-fs-surface px-5 py-4">
+      <h3 className="text-xl font-bold">{strings['plant.questions']}</h3>
 
       <div data-testid="plant-q-price">
-        <label htmlFor="plant-price" className="font-semibold">
+        <label htmlFor="plant-price" className="font-fs-heading text-lg font-bold leading-tight">
           {strings['plant.q.price']}
         </label>
         {usable ? (
@@ -913,7 +1076,7 @@ function Questions({
             <input
               id="plant-price"
               type="range"
-              className="w-full"
+              className="w-full accent-fs-primary"
               min={tipping.low}
               max={tipping.high}
               step="any"
@@ -941,11 +1104,13 @@ function Questions({
       </div>
 
       <fieldset data-testid="plant-q-kind">
-        <legend className="font-semibold">{strings['plant.q.kind']}</legend>
+        <legend className="font-fs-heading text-lg font-bold leading-tight">{strings['plant.q.kind']}</legend>
+        <div className="mt-2 flex flex-wrap gap-1.5">
         {MARGINS_OF.map((kind) => (
-          <label key={kind} className="mr-3 inline-flex items-center gap-1 text-sm">
+          <label key={kind} className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-fs-border bg-fs-bg px-3 py-1 text-sm has-[:checked]:border-fs-primary has-[:checked]:bg-fs-selection has-[:checked]:font-semibold has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-fs-info">
             <input
               type="radio"
+              className="sr-only"
               name="plant-kind"
               value={kind}
               checked={kind === marginOf}
@@ -954,16 +1119,19 @@ function Questions({
             {kindLabel(kind)}
           </label>
         ))}
+        </div>
       </fieldset>
 
       <RainQuestion rain={rain} />
 
       <fieldset data-testid="plant-q-strict">
-        <legend className="font-semibold">{strings['plant.q.strict']}</legend>
+        <legend className="font-fs-heading text-lg font-bold leading-tight">{strings['plant.q.strict']}</legend>
+        <div className="mt-2 flex flex-wrap gap-1.5">
         {STRICTNESSES.map((value) => (
-          <label key={value} className="mr-3 inline-flex items-center gap-1 text-sm">
+          <label key={value} className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-fs-border bg-fs-bg px-3 py-1 text-sm has-[:checked]:border-fs-primary has-[:checked]:bg-fs-selection has-[:checked]:font-semibold has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-fs-info">
             <input
               type="radio"
+              className="sr-only"
               name="plant-strict"
               value={value}
               checked={value === strictness}
@@ -972,6 +1140,7 @@ function Questions({
             {strings[`plant.strict.${value}`]}
           </label>
         ))}
+        </div>
       </fieldset>
     </section>
   )
@@ -993,11 +1162,11 @@ export function PlantView(props: PlantViewProps) {
   } = props
   const answer = status === undefined ? selectAnswer(set, strictness, marginOf) : null
   return (
-    <section aria-labelledby="plant-title" className="mx-auto max-w-5xl">
-      <h2 id="plant-title" className="text-2xl font-semibold">
+    <section aria-labelledby="plant-title" className="mx-auto max-w-6xl">
+      <h2 id="plant-title" className="text-4xl font-bold leading-tight">
         {strings['plant.title']}
       </h2>
-      <p className="mt-1 text-sm text-slate-600">{strings['plant.rule']}</p>
+      <p className="mt-2 max-w-[68ch] text-fs-muted">{strings['plant.rule']}</p>
 
       {set.example_data && status === undefined ? (
         <div role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
@@ -1015,9 +1184,9 @@ export function PlantView(props: PlantViewProps) {
 
       <OriginLine origin={origin} onAskService={onAskService} onBackToExample={onBackToExample} />
 
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,330px)_minmax(0,1fr)]">
         <Questions answer={answer} {...props} />
-        <div className="space-y-4 md:col-span-2">
+        <div className="min-w-0 space-y-4">
           {status !== undefined ? (
             <StatusPanel status={status} />
           ) : answer === null ? (
@@ -1026,19 +1195,7 @@ export function PlantView(props: PlantViewProps) {
               missing={{ reason: 'NOT_AVAILABLE', detail: strings['plant.answer.missing_detail'] }}
             />
           ) : (
-            <div className="space-y-4">
-              <PriceAnswer answer={answer} price={price} />
-              {rainStress !== null ? (
-                <RainStressBlock part={rainStress} />
-              ) : null}
-              <AnswerCard answer={answer} />
-              <section data-testid="plant-options" className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                <h3 className="text-base font-semibold">{strings['plant.options.heading']}</h3>
-                <OptionRows answer={answer} rotations={rotations} />
-                <EconomicsSource />
-              </section>
-              <Sources answer={answer} />
-            </div>
+            <AnswerBody answer={answer} price={price} rainStress={rainStress} rotations={rotations} />
           )}
         </div>
       </div>
