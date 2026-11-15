@@ -258,6 +258,29 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.bar.margin_loss': 'Below zero: a loss',
   'plant.bar.soil_against': '{what} against the limit',
   'plant.bar.not_in_record': 'this kind of year is not in the record, so there is no verdict',
+  // PROPOSED (S-021, l2/plant-screen-service): "Ask the service" on the screen
+  // "What should I plant?": where the answer comes from, the pending line, the
+  // error panel (one text per error code of api/errors.py, plus UNEXPECTED),
+  // the factor heavier rain sends, and the rain-stress part of the answer.
+  'plant.service.origin_example': 'Saved example answers, no service called',
+  'plant.service.origin_service': 'Answer from the service at {api}',
+  'plant.service.ask': 'Ask the service',
+  'plant.service.back': 'Back to the saved example',
+  'plant.service.pending': 'Asking the service for the answer to these questions',
+  'plant.service.error_heading': 'The service did not answer',
+  'plant.service.error.MALFORMED_JSON': 'The service could not read the request as JSON.',
+  'plant.service.error.INVALID_REQUEST': 'The service refused the request: a part of it breaks the plant request contract.',
+  'plant.service.error.SITE_INVALID': 'The service refused the site of the request.',
+  'plant.service.error.ROTATION_INVALID': 'The service refused a rotation of the request.',
+  'plant.service.error.INTERNAL_ERROR': 'The service failed while computing the answer. Nothing was invented to fill in.',
+  'plant.service.error.NOT_FOUND': 'The service has no plant route at this address.',
+  'plant.service.error.METHOD_NOT_ALLOWED': 'The plant route of the service does not accept this method.',
+  'plant.service.error.UNEXPECTED': 'The connection to the service failed, or its answer could not be read as an answer to these questions.',
+  'plant.service.rain_factor': 'Factor sent: {value} {unit} ({provenance})',
+  'plant.service.rain_no_factor_detail': 'the example request declares no rain-stress factor',
+  'plant.service.rain_what': 'Heavier rain, {label}',
+  'plant.service.rain_applied': 'Heavier rain, {label}: {detail}',
+  'plant.service.rain_not_applied': 'Heavier rain, {label}, not applied: {detail}',
 }
 
 /** Source of the shell page as it was before the strings unit. */

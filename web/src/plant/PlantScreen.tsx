@@ -1,5 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useReducer } from 'react'
 import type { ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
+import { ApiError } from '../seam/runRotationApi'
+import type { ApiErrorCode } from '../seam/runRotationApi'
+import type { ProvenanceLabel } from '../components/ValueDisplay'
+import {
+  configuredApiBase,
+  declaredRainFactor,
+  plantQueryOptions,
+  plantRequestFor,
+} from './plantRoute'
+import type { DeclaredFactor, PlantServiceAnswer } from './plantRoute'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { barScale, drawnSoilVerdict } from './optionBars'
@@ -17,9 +29,9 @@ import {
   plantExamples,
   selectAnswer,
   selectQuestions,
+  startPrice,
 } from './plantData'
 import type {
-  PlantQuestions,
   AnswerKind,
   KindOfYear,
   LimitCheck,
@@ -28,6 +40,7 @@ import type {
   PlantAnswer,
   PlantAnswerSet,
   PlantOption,
+  RainStressPart,
   SoilLossItem,
   Strictness,
   TippingPoint,
@@ -54,6 +67,19 @@ import type {
  * a direction whose tipping point is missing for another reason says so.
  * Heavier rain needs the service (S-021): without a backend the control is
  * disabled and the stress test is not available, with its reason.
+ *
+ * Ask the service (S-021, PROPOSED). When a backend address is configured
+ * (VITE_API_URL set and not blank, plantRoute.ts), the screen still opens on
+ * the saved example answers and also offers "Ask the service": the example
+ * plant request, with the questions chosen (how strict, the kind of year,
+ * heavier rain on or off), goes to POST /api/plant/run, one call per distinct
+ * request (cached, no retry, no refetch on focus). In that mode heavier rain
+ * is an enabled checkbox that sends the example request's own declared
+ * factor, shown with its unit and its provenance; the answer's rain-stress
+ * part is shown. While the call is on its way a pending line, and when it
+ * fails an error panel with its code in plain words, are shown in place of an
+ * answer: no example answer is rendered then. "Back to the saved example"
+ * goes back. A line says where the answer shown comes from.
  *
  * Each option is a row (S-020, PROPOSED): its rotation label from the
  * definition in the request, the strip of its crops year by year
@@ -613,17 +639,197 @@ export interface PlantViewProps {
   onStrictness?: (strictness: Strictness) => void
   onMarginOf?: (marginOf: MarginOf) => void
   onPrice?: (price: number) => void
+  /** The heavier-rain control (S-021); unavailable, with its reason, by default. */
+  rain?: RainControl
+  /** Where the answer shown comes from (S-021); the saved example answers by default. */
+  origin?: AnswerOrigin
+  /** Given when a backend is configured, in example mode: the "Ask the service" button. */
+  onAskService?: () => void
+  /** Given in service mode: the "Back to the saved example" button. */
+  onBackToExample?: () => void
+  /** In service mode, a call on its way or failed: shown in place of an answer. */
+  status?: ServiceStatus
+  /** The rain-stress part of a service answer (S-021), shown beside it. */
+  rainStress?: RainStressPart | null
 }
+
+/** The heavier-rain control: unavailable without the service, or the factor the request declares. */
+export type RainControl =
+  | { kind: 'unavailable' }
+  | { kind: 'no_factor' }
+  | { kind: 'available'; on: boolean; factor: DeclaredFactor; onRain?: (on: boolean) => void }
+
+const RAIN_UNAVAILABLE: RainControl = { kind: 'unavailable' }
+
+/** Where the answer shown comes from. */
+export type AnswerOrigin = { kind: 'example' } | { kind: 'service'; api: string }
+
+const ORIGIN_EXAMPLE: AnswerOrigin = { kind: 'example' }
+
+/** A service call without an answer to show. */
+export type ServiceStatus = { kind: 'pending' } | { kind: 'failed'; code: ApiErrorCode }
 
 function ignore() {}
 
+/** The line that says where the answer comes from, with the button that switches. */
+function OriginLine({
+  origin,
+  onAskService,
+  onBackToExample,
+}: {
+  origin: AnswerOrigin
+  onAskService?: () => void
+  onBackToExample?: () => void
+}) {
+  return (
+    <div data-testid="plant-origin" className="mt-3 flex flex-wrap items-center gap-3">
+      <p className="text-sm text-slate-600">
+        {origin.kind === 'service'
+          ? formatString(strings['plant.service.origin_service'], { api: origin.api })
+          : strings['plant.service.origin_example']}
+      </p>
+      {onAskService !== undefined ? (
+        <button
+          type="button"
+          data-testid="plant-service-ask"
+          className="rounded border border-teal-700 px-3 py-1 text-sm font-medium text-teal-800"
+          onClick={onAskService}
+        >
+          {strings['plant.service.ask']}
+        </button>
+      ) : null}
+      {onBackToExample !== undefined ? (
+        <button
+          type="button"
+          data-testid="plant-service-back"
+          className="rounded border border-slate-400 px-3 py-1 text-sm font-medium text-slate-700"
+          onClick={onBackToExample}
+        >
+          {strings['plant.service.back']}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+/** The pending line, or the error panel with the code in plain words and the raw code. */
+function StatusPanel({ status }: { status: ServiceStatus }) {
+  if (status.kind === 'pending') {
+    return (
+      <p data-testid="plant-service-pending" className="text-sm text-slate-500">
+        {strings['plant.service.pending']}
+      </p>
+    )
+  }
+  return (
+    <div
+      data-testid="plant-service-error"
+      role="alert"
+      className="rounded-lg border border-red-300 bg-red-50 px-4 py-3"
+    >
+      <h3 className="text-sm font-semibold text-red-800">{strings['plant.service.error_heading']}</h3>
+      <p className="text-sm text-red-700">{strings[`plant.service.error.${status.code}`]}</p>
+      <p data-testid="plant-service-error-code" className="text-xs text-slate-500">
+        {formatString(strings['api.code.shown'], { code: status.code })}
+      </p>
+    </div>
+  )
+}
+
+/** The rain-stress part of a service answer: applied or not with its detail, or missing with its reason. */
+function RainStressBlock({ part }: { part: RainStressPart }) {
+  return (
+    <div data-testid="plant-rain-stress" className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+      {part.kind === 'applied' ? (
+        <p className="text-sm">
+          {formatString(strings[part.applied ? 'plant.service.rain_applied' : 'plant.service.rain_not_applied'], {
+            label: part.label,
+            detail: part.detail,
+          })}
+        </p>
+      ) : (
+        <div>
+          <MissingLine
+            what={formatString(strings['plant.service.rain_what'], { label: part.label })}
+            missing={part.missing}
+          />
+          <p className="text-xs text-slate-500">{part.detail}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 type QuestionsProps = Omit<PlantViewProps, 'set'> & { answer: PlantAnswer | null }
+
+const PROVENANCE_LABELS: readonly ProvenanceLabel[] = ['DECLARED', 'OBSERVED', 'DERIVED', 'SIMULATED']
+
+/** The provenance label of a factor in words; an unknown label renders as data. */
+function provenanceText(provenance: string): string {
+  return (PROVENANCE_LABELS as readonly string[]).includes(provenance)
+    ? strings[`provenance.${provenance as ProvenanceLabel}`]
+    : provenance
+}
+
+/**
+ * The heavier-rain question (S-021): disabled with its reason without the
+ * service (as before S-021) or when the request declares no factor; in
+ * service mode an enabled checkbox, and when on, the factor it sends as the
+ * request declares it, with its unit, provenance and the declared mark.
+ */
+function RainQuestion({ rain }: { rain: RainControl }) {
+  return (
+    <fieldset data-testid="plant-q-rain">
+      <legend className="font-semibold">{strings['plant.q.rain']}</legend>
+      {rain.kind === 'available' ? (
+        <div>
+          <label className="inline-flex items-center gap-1 text-sm">
+            <input
+              type="checkbox"
+              checked={rain.on}
+              onChange={(event) => (rain.onRain ?? ignore)(event.target.checked)}
+            />
+            {strings['plant.q.rain_control']}
+          </label>
+          {rain.on ? (
+            <div>
+              <p data-testid="plant-rain-factor" className="text-sm">
+                {formatString(strings['plant.service.rain_factor'], {
+                  value: num(rain.factor.value),
+                  unit: rain.factor.unit,
+                  provenance: provenanceText(rain.factor.provenance),
+                })}
+              </p>
+              <DeclaredMark testid="plant-rain-declared" />
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div>
+          <label className="inline-flex items-center gap-1 text-sm text-slate-400">
+            <input type="checkbox" disabled />
+            {strings['plant.q.rain_control']}
+          </label>
+          <MissingLine
+            what={strings['plant.q.rain_control']}
+            missing={
+              rain.kind === 'no_factor'
+                ? { reason: 'NOT_DECLARED', detail: strings['plant.service.rain_no_factor_detail'] }
+                : { reason: 'NOT_AVAILABLE', detail: strings['plant.q.rain_unavailable_detail'] }
+            }
+          />
+        </div>
+      )}
+    </fieldset>
+  )
+}
 
 function Questions({
   answer,
   strictness,
   marginOf,
   price,
+  rain = RAIN_UNAVAILABLE,
   onStrictness = ignore,
   onMarginOf = ignore,
   onPrice = ignore,
@@ -689,17 +895,7 @@ function Questions({
         ))}
       </fieldset>
 
-      <fieldset data-testid="plant-q-rain">
-        <legend className="font-semibold">{strings['plant.q.rain']}</legend>
-        <label className="inline-flex items-center gap-1 text-sm text-slate-400">
-          <input type="checkbox" disabled />
-          {strings['plant.q.rain_control']}
-        </label>
-        <MissingLine
-          what={strings['plant.q.rain_control']}
-          missing={{ reason: 'NOT_AVAILABLE', detail: strings['plant.q.rain_unavailable_detail'] }}
-        />
-      </fieldset>
+      <RainQuestion rain={rain} />
 
       <fieldset data-testid="plant-q-strict">
         <legend className="font-semibold">{strings['plant.q.strict']}</legend>
@@ -722,8 +918,19 @@ function Questions({
 
 /** The screen for given questions: a pure function of the answers and the questions asked. */
 export function PlantView(props: PlantViewProps) {
-  const { set, strictness, marginOf, price, rotations = plantRotations } = props
-  const answer = selectAnswer(set, strictness, marginOf)
+  const {
+    set,
+    strictness,
+    marginOf,
+    price,
+    rotations = plantRotations,
+    origin = ORIGIN_EXAMPLE,
+    onAskService,
+    onBackToExample,
+    status,
+    rainStress = null,
+  } = props
+  const answer = status === undefined ? selectAnswer(set, strictness, marginOf) : null
   return (
     <section aria-labelledby="plant-title" className="mx-auto max-w-5xl">
       <h2 id="plant-title" className="text-2xl font-semibold">
@@ -739,10 +946,14 @@ export function PlantView(props: PlantViewProps) {
         </div>
       ) : null}
 
+      <OriginLine origin={origin} onAskService={onAskService} onBackToExample={onBackToExample} />
+
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <Questions answer={answer} {...props} />
         <div className="space-y-4 md:col-span-2">
-          {answer === null ? (
+          {status !== undefined ? (
+            <StatusPanel status={status} />
+          ) : answer === null ? (
             <MissingLine
               what={strings['plant.answer.missing_what']}
               missing={{ reason: 'NOT_AVAILABLE', detail: strings['plant.answer.missing_detail'] }}
@@ -750,6 +961,9 @@ export function PlantView(props: PlantViewProps) {
           ) : (
             <div className="space-y-4">
               <PriceAnswer answer={answer} price={price} />
+              {rainStress !== null ? (
+                <RainStressBlock part={rainStress} />
+              ) : null}
               <AnswerCard answer={answer} />
               <section data-testid="plant-options" className="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <h3 className="text-base font-semibold">{strings['plant.options.heading']}</h3>
@@ -773,27 +987,220 @@ export function PlantView(props: PlantViewProps) {
 const FIRST_STRICTNESS: Strictness = 'on_average'
 const FIRST_MARGIN_OF: MarginOf = 'average'
 
-/** The screen at #/plant, on the example answers, with the questions in its state. */
-export default function PlantScreen() {
-  // One state for the three questions: selecting another answer (how strict,
-  // the kind of year) resets the price looked at to that answer's price of
-  // today, inside its range (selectQuestions).
-  const [questions, setQuestions] = useState<PlantQuestions>(() =>
-    selectQuestions(plantExamples, FIRST_STRICTNESS, FIRST_MARGIN_OF),
-  )
+/**
+ * The state of the screen (S-021, PROPOSED): the mode (the saved example
+ * answers, or the service), the questions chosen, and the price looked at.
+ * In service mode the price belongs to the request it was moved on
+ * (priceKey); an answer to another request starts at its own price of today.
+ */
+export interface PlantScreenState {
+  mode: 'example' | 'service'
+  strictness: Strictness
+  marginOf: MarginOf
+  /** Heavier rain on: the request sends the example request's declared factor. */
+  rain: boolean
+  price: number | null
+  /** The request the price was moved on, in service mode; null otherwise. */
+  priceKey: string | null
+}
+
+export type PlantAction =
+  | { type: 'ask' }
+  | { type: 'back' }
+  | { type: 'strictness'; value: Strictness }
+  | { type: 'margin_of'; value: MarginOf }
+  | { type: 'rain'; on: boolean }
+  | { type: 'price'; price: number; key: string | null }
+
+/**
+ * The first state: the example answers, the questions of the contract
+ * example, at the price of today; heavier rain off (PROPOSED: the stress
+ * test is asked for, not assumed).
+ */
+export function initialPlantState(): PlantScreenState {
+  const questions = selectQuestions(plantExamples, FIRST_STRICTNESS, FIRST_MARGIN_OF)
+  return {
+    mode: 'example',
+    strictness: questions.strictness,
+    marginOf: questions.marginOf,
+    rain: false,
+    price: questions.price,
+    priceKey: null,
+  }
+}
+
+/** The state with the example answer of these questions selected, at its price of today. */
+function onExample(state: PlantScreenState, strictness: Strictness, marginOf: MarginOf): PlantScreenState {
+  const questions = selectQuestions(plantExamples, strictness, marginOf)
+  return { ...state, mode: 'example', strictness, marginOf, price: questions.price, priceKey: null }
+}
+
+/**
+ * The transitions of the screen. Pure. In example mode, selecting another
+ * answer resets the price looked at to that answer's price of today
+ * (selectQuestions), as before S-021; in service mode the questions change
+ * the request, and the price follows the answer to it.
+ */
+export function plantScreenReducer(state: PlantScreenState, action: PlantAction): PlantScreenState {
+  switch (action.type) {
+    case 'ask':
+      return { ...state, mode: 'service', priceKey: null }
+    case 'back':
+      return onExample(state, state.strictness, state.marginOf)
+    case 'strictness':
+      return state.mode === 'example'
+        ? onExample(state, action.value, state.marginOf)
+        : { ...state, strictness: action.value }
+    case 'margin_of':
+      return state.mode === 'example'
+        ? onExample(state, state.strictness, action.value)
+        : { ...state, marginOf: action.value }
+    case 'rain':
+      return { ...state, rain: action.on }
+    case 'price':
+      return { ...state, price: action.price, priceKey: action.key }
+  }
+}
+
+/** The request the screen sends: the example request with the questions chosen, in service mode only. */
+export function serviceRequestOf(
+  state: PlantScreenState,
+  baseRequest: unknown = rawPlantRequest,
+): Record<string, unknown> | null {
+  if (state.mode !== 'service') {
+    return null
+  }
+  return plantRequestFor(baseRequest, {
+    strictness: state.strictness,
+    marginOf: state.marginOf,
+    rain: state.rain,
+  })
+}
+
+/** The state of a service call, as the view renders it. */
+export type ServicePhase =
+  | { phase: 'pending' }
+  | { phase: 'failed'; code: ApiErrorCode }
+  | { phase: 'answered'; answer: PlantServiceAnswer }
+
+/** The phase of the call, from the query. An error that is not an ApiError is UNEXPECTED. */
+export function servicePhaseOf(query: {
+  isPending: boolean
+  isError: boolean
+  error: unknown
+  data: PlantServiceAnswer | undefined
+}): ServicePhase {
+  if (query.isError) {
+    return { phase: 'failed', code: query.error instanceof ApiError ? query.error.code : 'UNEXPECTED' }
+  }
+  if (query.isPending || query.data === undefined) {
+    return { phase: 'pending' }
+  }
+  return { phase: 'answered', answer: query.data }
+}
+
+/** The factor the example request declares (example data), or null. */
+const DECLARED_FACTOR: DeclaredFactor | null = declaredRainFactor(rawPlantRequest)
+
+/**
+ * The screen for a state: a pure function of the state, the configured
+ * backend (null: none) and, in service mode, the phase of the call.
+ */
+export function PlantScreenView({
+  state,
+  apiBase,
+  service,
+  dispatch = ignore,
+}: {
+  state: PlantScreenState
+  apiBase: string | null
+  service: ServicePhase | null
+  dispatch?: (action: PlantAction) => void
+}) {
+  const handlers = {
+    strictness: state.strictness,
+    marginOf: state.marginOf,
+    onStrictness: (value: Strictness) => dispatch({ type: 'strictness', value }),
+    onMarginOf: (value: MarginOf) => dispatch({ type: 'margin_of', value }),
+  }
+  if (state.mode === 'example' || apiBase === null || service === null) {
+    return (
+      <PlantView
+        set={plantExamples}
+        price={state.price}
+        onPrice={(price) => dispatch({ type: 'price', price, key: null })}
+        onAskService={apiBase !== null ? () => dispatch({ type: 'ask' }) : undefined}
+        {...handlers}
+      />
+    )
+  }
+  const key = JSON.stringify(serviceRequestOf(state))
+  const rain: RainControl =
+    DECLARED_FACTOR === null
+      ? { kind: 'no_factor' }
+      : {
+          kind: 'available',
+          on: state.rain,
+          factor: DECLARED_FACTOR,
+          onRain: (on) => dispatch({ type: 'rain', on }),
+        }
+  const common = {
+    ...handlers,
+    rain,
+    origin: { kind: 'service', api: apiBase } as const,
+    onBackToExample: () => dispatch({ type: 'back' }),
+  }
+  if (service.phase !== 'answered') {
+    // No answer to show: the request itself says whether it is example data.
+    const set: PlantAnswerSet = { example_data: rawPlantRequest.example_data, answers: [] }
+    const status: ServiceStatus =
+      service.phase === 'pending' ? { kind: 'pending' } : { kind: 'failed', code: service.code }
+    return (
+      <PlantView set={set} price={null} status={status} {...common} />
+    )
+  }
+  const answer = service.answer.answer
+  const set: PlantAnswerSet = { example_data: answer.example_data, answers: [answer] }
   return (
     <PlantView
-      set={plantExamples}
-      strictness={questions.strictness}
-      marginOf={questions.marginOf}
-      price={questions.price}
-      onStrictness={(strictness) =>
-        setQuestions((q) => selectQuestions(plantExamples, strictness, q.marginOf))
-      }
-      onMarginOf={(marginOf) =>
-        setQuestions((q) => selectQuestions(plantExamples, q.strictness, marginOf))
-      }
-      onPrice={(price) => setQuestions((q) => ({ ...q, price }))}
+      set={set}
+      price={state.priceKey === key ? state.price : startPrice(answer)}
+      onPrice={(price) => dispatch({ type: 'price', price, key })}
+      rainStress={service.answer.rainStress}
+      {...common}
     />
   )
+}
+
+/** Without a backend: the example answers only, nothing called. */
+function PlantScreenWithoutService() {
+  const [state, dispatch] = useReducer(plantScreenReducer, undefined, initialPlantState)
+  return <PlantScreenView state={state} apiBase={null} service={null} dispatch={dispatch} />
+}
+
+/** With a backend: the example answers first, and the call of the route in service mode. */
+function PlantScreenWithService({ apiBase }: { apiBase: string }) {
+  const [state, dispatch] = useReducer(plantScreenReducer, undefined, initialPlantState)
+  const request = serviceRequestOf(state)
+  const query = useQuery({
+    ...plantQueryOptions(apiBase, request ?? {}),
+    enabled: request !== null,
+  })
+  return (
+    <PlantScreenView
+      state={state}
+      apiBase={apiBase}
+      service={request === null ? null : servicePhaseOf(query)}
+      dispatch={dispatch}
+    />
+  )
+}
+
+/**
+ * The screen at #/plant. The backend is the configured one (VITE_API_URL,
+ * configuredApiBase) unless given: null means none, and the screen shows the
+ * example answers only and calls nothing, as before S-021.
+ */
+export default function PlantScreen({ apiBase = configuredApiBase() }: { apiBase?: string | null }) {
+  return apiBase === null ? <PlantScreenWithoutService /> : <PlantScreenWithService apiBase={apiBase} />
 }
