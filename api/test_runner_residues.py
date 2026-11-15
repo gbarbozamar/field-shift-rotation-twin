@@ -861,9 +861,9 @@ def test_demo_rotations_answer_as_before_the_origin_split(monkeypatch):
         monkeypatch.undo()
         ledgers: list[Any] = []
 
-        def recording(**kwargs: Any) -> Any:
+        def recording(*, _sink: list[Any] = ledgers, **kwargs: Any) -> Any:
             answer = real(**kwargs)
-            ledgers.append(answer)
+            _sink.append(answer)
             return answer
 
         monkeypatch.setattr(
@@ -891,9 +891,9 @@ def test_demo_rotations_answer_as_before_the_origin_split(monkeypatch):
 
         previous_calls: list[Any] = []
 
-        def previous(**kwargs: Any) -> Any:
+        def previous(*, _sink: list[Any] = previous_calls, **kwargs: Any) -> Any:
             answer = real(**kwargs)
-            previous_calls.append(answer)
+            _sink.append(answer)
             return FakeLedger(
                 case_id=answer.case_id,
                 field_id=answer.field_id,
