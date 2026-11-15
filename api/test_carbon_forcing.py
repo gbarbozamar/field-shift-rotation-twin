@@ -161,8 +161,8 @@ def test_the_horizon_is_the_whole_agricultural_years_of_the_record():
 def test_every_value_but_the_decided_ones_is_missing_with_its_reason():
     # The decided values: the yearly mean temperature (D118), the soil depth
     # of D180, and the monthly rainfall and mean temperature of D220. The
-    # monthly potential evapotranspiration is missing here: no daily
-    # reference evapotranspiration is passed.
+    # monthly potential evapotranspiration and the yearly water balance of
+    # D181 are missing here: no daily reference evapotranspiration is passed.
     forcing = chain_forcing()
     dumped = forcing.model_dump(mode="json")
     dumped["annual_climate"] = [
@@ -178,8 +178,9 @@ def test_every_value_but_the_decided_ones_is_missing_with_its_reason():
     assert (forcing.soil_depth.value, forcing.soil_depth.unit) == (20.0, "cm")
     climate = {series.quantity: series for series in forcing.annual_climate}
     assert set(climate) == {producer.MEAN_TEMPERATURE, producer.WATER_BALANCE}
-    assert "D119" in climate["water_balance"].years[0].missing.detail
-    assert "evapotranspiration" in climate["water_balance"].years[0].missing.detail
+    assert "D181" in climate["water_balance"].years[0].missing.detail
+    assert "did not pass" in climate["water_balance"].years[0].missing.detail
+    assert climate["water_balance"].unit == "m"  # the unit D181 writes
     assert "D122" in forcing.annual_carbon_inputs[0].years[0].missing.detail
     for series in [climate["water_balance"], *forcing.annual_carbon_inputs]:
         assert series.years
@@ -769,3 +770,157 @@ def test_d221_a_monthly_series_over_other_months_is_a_defect():
     )
     with pytest.raises(TypeError, match="months of the forcing horizon"):
         forcing_with(monthly_carbon_inputs=[a_monthly_series(other)])
+
+
+# --- 7. D181: the yearly water balance of AMG -----------------------------------
+#
+# A synthetic record of two agricultural years from 2001-07-01 (the chain start
+# month), precipitation only: 3.0 mm a day in the first year and 1.0 in the
+# second, except 3.5 on 2002-06-30 (the last day of the first year) and 0.25
+# on 2002-07-01 (the first day of the second). The daily ET0 is 2.0 every day.
+# Both years have 365 days. Hand counts, in mm then m (D181: mm / 1000):
+#   2001: 364 x 3.0 + 3.5 = 1095.5; minus 365 x 2.0 = 730.0: 365.5 mm, 0.3655 m.
+#   2002: 0.25 + 364 x 1.0 = 364.25; minus 730.0: -365.75 mm, -0.36575 m,
+#         below -290 mm, the low end of the range of D181: kept, and named.
+# The numbers mean nothing; they are chosen so that a sum, a sign, the unit
+# and the boundary of the agricultural year each change the answer.
+
+WATER_DAYS = [dt.date(2001, 7, 1) + dt.timedelta(days=n) for n in range(730)]
+
+
+def water_climate(changes: dict[str, dict[str, Any]] | None = None) -> SiteClimate:
+    climate = json.loads(json.dumps(CHAIN_CLIMATE))
+    (series,) = [s for s in climate["daily_series"] if s["quantity"] == "precipitation"]
+    values = {day: 3.0 if day < dt.date(2002, 7, 1) else 1.0 for day in WATER_DAYS}
+    values[dt.date(2002, 6, 30)] = 3.5
+    values[dt.date(2002, 7, 1)] = 0.25
+    series["days"] = [
+        {"date": day.isoformat(), "value": values[day]} for day in WATER_DAYS
+    ]
+    # SiteClimate keeps every day of a daily series (a day without data stays
+    # in it as missing), so a day absent inside the record can only be a day
+    # of the runner's ET0 mapping; that case is the second one below.
+    for day, change in (changes or {}).items():
+        index = WATER_DAYS.index(dt.date.fromisoformat(day))
+        series["days"][index] = {"date": day, **change}
+    series["start_date"] = WATER_DAYS[0].isoformat()
+    series["end_date"] = WATER_DAYS[-1].isoformat()
+    climate["daily_series"] = [series]
+    return SiteClimate.model_validate(climate)
+
+
+def water_et0() -> dict[dt.date, Any]:
+    return {day: 2.0 for day in WATER_DAYS}
+
+
+def water_balance(forcing: CarbonForcing):
+    (series,) = [s for s in forcing.annual_climate if s.quantity == "water_balance"]
+    return series, {item.ag_year: item for item in series.years}
+
+
+def test_d181_the_water_balance_is_the_yearly_sum_of_p_minus_et0_in_m():
+    forcing = forcing_with(water_climate(), reference_evapotranspiration=water_et0())
+    series, by_year = water_balance(forcing)
+    assert (series.first_ag_year, series.last_ag_year) == (2001, 2002)
+    assert series.unit == "m"
+    assert by_year[2001].value == 365.5 / 1000  # a sum, in m, positive
+    assert by_year[2002].value == -365.75 / 1000  # negative: ET0 above rain
+    assert series.provenance == "DERIVED"
+    assert "D181" in series.source and "D44" in series.source
+    assert "Penman (1948)" in series.source and "declared adaptation" in series.source
+    assert "IW = 0" in series.source
+    assert series.range_missing.reason == "NOT_AVAILABLE"
+
+
+def test_d181_the_agricultural_year_boundary_splits_the_days():
+    # 2002-06-30 belongs to 2001, 2002-07-01 to 2002: moving either day's
+    # change across the boundary would change both years by hand count.
+    _, by_year = water_balance(
+        forcing_with(water_climate(), reference_evapotranspiration=water_et0())
+    )
+    assert by_year[2001].value * 1000 == pytest.approx(364 * 3.0 + 3.5 - 730.0)
+    assert by_year[2002].value * 1000 == pytest.approx(0.25 + 364 * 1.0 - 730.0)
+
+
+def test_d181_a_year_outside_the_calibrated_range_keeps_its_number_and_is_named():
+    series, by_year = water_balance(
+        forcing_with(water_climate(), reference_evapotranspiration=water_et0())
+    )
+    assert by_year[2002].value is not None and by_year[2002].missing is None
+    assert "-290 to 595 mm yr-1" in series.source
+    assert "Clivot et al. 2019, p. 107" in series.source
+    outside = series.source.split("Outside the calibrated range", 1)[1]
+    assert "2002" in outside and "2001" not in outside
+
+
+def test_d181_every_year_inside_the_range_says_so():
+    et0 = water_et0()
+    for day in WATER_DAYS[365:]:
+        et0[day] = 1.0  # 2002: 364.25 - 365.0 = -0.75 mm, inside the range
+    series, by_year = water_balance(
+        forcing_with(water_climate(), reference_evapotranspiration=et0)
+    )
+    assert by_year[2002].value == pytest.approx(-0.75 / 1000)
+    assert "Every year with a value lies inside that range" in series.source
+    assert "Outside the calibrated range" not in series.source
+
+
+def test_d181_a_missing_or_absent_day_makes_its_year_missing_never_zero():
+    held = {
+        "value": None,
+        "missing": {"reason": "NO_COVERAGE", "detail": "PLACEHOLDER"},
+    }
+    _, by_year = water_balance(
+        forcing_with(
+            water_climate({"2001-10-02": held}),
+            reference_evapotranspiration=water_et0(),
+        )
+    )
+    assert by_year[2001].value is None
+    assert by_year[2001].missing.reason == "NO_COVERAGE"
+    assert "2001-10-02" in by_year[2001].missing.detail
+    assert "precipitation" in by_year[2001].missing.detail
+    assert by_year[2002].value == -365.75 / 1000  # the other year stays
+
+    et0 = water_et0()
+    del et0[dt.date(2003, 1, 15)]
+    _, by_year = water_balance(
+        forcing_with(water_climate(), reference_evapotranspiration=et0)
+    )
+    assert by_year[2002].value is None
+    assert by_year[2002].missing.reason == "NO_COVERAGE"
+    assert "2003-01-15" in by_year[2002].missing.detail
+    assert by_year[2001].value == 365.5 / 1000
+
+    et0 = water_et0()
+    et0[dt.date(2001, 8, 8)] = Missing(reason="MISSING_INPUT", detail="PLACEHOLDER")
+    _, by_year = water_balance(
+        forcing_with(water_climate(), reference_evapotranspiration=et0)
+    )
+    assert by_year[2001].value is None
+    assert by_year[2001].missing.reason == "MISSING_INPUT"
+    assert "2001-08-08" in by_year[2001].missing.detail
+
+
+def test_d181_without_et0_or_precipitation_every_year_is_missing_with_its_reason():
+    series, by_year = water_balance(forcing_with(water_climate()))
+    assert {item.missing.reason for item in by_year.values()} == {"NOT_AVAILABLE"}
+    assert "did not pass" in by_year[2001].missing.detail
+    assert (series.provenance, series.source) == (None, None)
+
+    not_computed = Missing(reason="MISSING_INPUT", detail="PLACEHOLDER: no record")
+    _, by_year = water_balance(
+        forcing_with(water_climate(), reference_evapotranspiration=not_computed)
+    )
+    assert {item.missing.reason for item in by_year.values()} == {"MISSING_INPUT"}
+    assert "PLACEHOLDER: no record" in by_year[2001].missing.detail
+
+    other_unit = json.loads(water_climate().model_dump_json())
+    other_unit["daily_series"][0]["unit"] = "PLACEHOLDER_unit"
+    _, by_year = water_balance(
+        forcing_with(
+            SiteClimate.model_validate(other_unit),
+            reference_evapotranspiration=water_et0(),
+        )
+    )
+    assert {item.missing.reason for item in by_year.values()} == {"NOT_COMPUTABLE"}
