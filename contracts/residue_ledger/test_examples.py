@@ -183,8 +183,44 @@ def test_series_rules_are_checked():
     data["annual_carbon_inputs"][0]["unit"] = data["carbon_unit"]
     rejected(data, "is not in the carbon_input_unit")
     data = load()
-    data["annual_carbon_inputs"][0]["origin"] = "placeholder_unknown_crop"
-    rejected(data, "not the crop of any component")
+    data["annual_carbon_inputs"][0]["origin"] = "placeholder_unknown_crop_aboveground"
+    rejected(data, "is not '<crop>_aboveground' for a crop of a component")
+
+
+def test_series_origin_follows_the_part_group():
+    """D194 of #77: the origin is <crop>_aboveground for the retained
+    aboveground carbon and <crop>_belowground for root and rhizodeposit
+    carbon, for a crop of a component of the ledger."""
+    data = load()
+    by_quantity = {s["quantity"]: s for s in data["annual_carbon_inputs"]}
+    root = by_quantity["placeholder_crop_a_grain_root_carbon"]
+    retained = by_quantity["placeholder_crop_a_grain_aboveground_carbon_retained"]
+    assert root["origin"] == "placeholder_crop_a_belowground"
+    assert retained["origin"] == "placeholder_crop_a_aboveground"
+    ledger = ResidueLedger.model_validate(data)
+    assert {s.origin for s in ledger.annual_carbon_inputs} == {
+        "placeholder_crop_a_aboveground",
+        "placeholder_crop_a_belowground",
+        "placeholder_crop_b_aboveground",
+    }
+    for index, quantity, origin, words in (
+        # the plain crop word is no longer an origin of a ledger series
+        (1, "root_carbon", "placeholder_crop_a", "'<crop>_belowground'"),
+        (0, "aboveground", "placeholder_crop_a", "'<crop>_aboveground'"),
+        # the group that does not match the part at the end of the quantity
+        (1, "root_carbon", "placeholder_crop_a_aboveground", "'<crop>_belowground'"),
+        (2, "rhizodeposit", "placeholder_crop_a_aboveground", "'<crop>_belowground'"),
+        (0, "aboveground", "placeholder_crop_a_belowground", "'<crop>_aboveground'"),
+        # a crop that no component of the ledger has
+        (1, "root_carbon", "placeholder_crop_c_belowground", "'<crop>_belowground'"),
+    ):
+        changed = load()
+        assert quantity in changed["annual_carbon_inputs"][index]["quantity"]
+        changed["annual_carbon_inputs"][index]["origin"] = origin
+        rejected(changed, f"its origin is not {words}")
+    changed = load()
+    changed["annual_carbon_inputs"][0]["quantity"] = "placeholder_crop_a_grain_leaves"
+    rejected(changed, "does not end in a part of the ledger")
 
 
 def test_missing_value_without_reason_or_with_a_number_is_rejected():

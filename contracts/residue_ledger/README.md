@@ -49,7 +49,8 @@ This folder fixes structure only. It names no record and no value, and it fixes 
 - A component appears at most once per cycle, the lead-in included.
 - Every mass value is in `mass_unit` and every carbon value in `carbon_unit`, including a value that is missing (C3.1).
 - `ag_year` is given exactly when the harvest date is given.
-- No quantity identifier appears twice in `annual_carbon_inputs`. Every series runs from `first_ag_year` to `last_ag_year`, is in `carbon_input_unit`, and has as its `origin` the crop of a component of the ledger.
+- No quantity identifier appears twice in `annual_carbon_inputs`. Every series runs from `first_ag_year` to `last_ag_year` and is in `carbon_input_unit`.
+- The `origin` of a series follows the part at the end of its quantity (D194 of #77, https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765): `<crop>_aboveground` for `aboveground_carbon_retained`, and `<crop>_belowground` for `root_carbon` and `rhizodeposit_carbon`, where `<crop>` is the crop of a component of the ledger. The plain crop word is not an origin of a ledger series. A quantity that does not end in one of those three parts is rejected, because its origin cannot be checked. The rule is `ORIGIN_GROUP_OF_PART` and `series_origin` in `models.py`; EP4 writes its origins with `series_origin`.
 - Everything the shared parts already check. A value or a missing part, never both, never neither (C3.1). A present value carries a provenance label and a source or the assumption mark (C4.1, C4.2), and a range or the reason it has none (C2.2). Unknown fields are rejected and nothing is coerced.
 
 The model does not check closure, that retained plus exported is produced, nor that a series value is the sum of the components of its year. Both are statements of the engine and not of the shape, as for `CarbonBalance`. The engine checks both in its tests (`engine/residues/test_ledger.py`).
@@ -74,7 +75,8 @@ Each case is a test function of `test_examples.py`. A test checks that this list
 | `test_value_in_another_unit_than_the_ledger_is_rejected` | A mass or a carbon value in another unit than the ledger states |
 | `test_agricultural_year_without_harvest_date_is_rejected` | `ag_year` without a harvest date, or a harvest date without `ag_year` |
 | `test_unknown_purpose_or_residue_word_is_rejected` | A word outside the closed lists of the rotation definition |
-| `test_series_rules_are_checked` | A repeated quantity, other years, a unit other than `carbon_input_unit` (also `carbon_unit` when the two differ), an origin that is no crop of the ledger |
+| `test_series_rules_are_checked` | A repeated quantity, other years, a unit other than `carbon_input_unit` (also `carbon_unit` when the two differ), an origin whose crop is no crop of the ledger |
+| `test_series_origin_follows_the_part_group` | D194: `<crop>_belowground` on a root or rhizodeposit series and `<crop>_aboveground` on the retained aboveground series load; the plain crop word, the other group, and a crop that no component has are rejected, and so is a quantity that does not end in a part |
 | `test_missing_value_without_reason_or_with_a_number_is_rejected` | A value without a number or a reason, or with both |
 | `test_unknown_field_is_rejected` | A field the model does not have |
 | `test_readme_lists_the_cases_of_this_file` | This list and the file name the same cases |
@@ -86,7 +88,7 @@ The ledger's series already have the shape, the agricultural years and the unit 
 - `annual_carbon_inputs[i]` → `CarbonForcing.annual_carbon_inputs[i]`, unchanged (`model_dump(mode="json")`, or the same object).
 - `first_ag_year` to `last_ag_year` are the whole agricultural years of the climate record, the years `api/carbon_forcing.py` gives the forcing's `horizon` (`whole_ag_years`).
 - `unit` is `carbon_input_unit`. EP4 writes `t C ha-1`, the unit AMG requires for a carbon input (D147 of #77): it divides its sums in `kg C ha-1` by 1000, the SI definition of the prefixes. The runner and AMG convert nothing.
-- `origin` is the crop. AMG reads its humification coefficient by `origin` under the scope key `crop` (`engine/amg/entry.py`, `ORIGIN_SCOPE_KEY`).
+- `origin` is `<crop>_aboveground` for the retained aboveground carbon and `<crop>_belowground` for root and rhizodeposit carbon (D194 of #77). AMG reads its humification coefficient by `origin` under the scope key `crop` (`engine/amg/entry.py`, `ORIGIN_SCOPE_KEY`), so it reads one coefficient for each group: D194 gives `h_AG` to the first and `h_BG` to the second (AMGv2 parameters v2.0, https://doi.org/10.57745/MEQQIX). This contract writes no record.
 - `quantity` is `<crop>_<purpose>_<part>`. `<part>` is `aboveground_carbon_retained`, `root_carbon` or `rhizodeposit_carbon`. AMG sums every series of `annual_carbon_inputs`, each with the coefficient of its origin.
 
 What the platform still decides is in `engine/residues/README.md`, under "For the platform".
@@ -97,7 +99,7 @@ Each item is a question a person answers; the role is named.
 
 1. **Acceptance of the shape.** The field list above, the names, one entry per component and cycle, the flat value fields, and series per crop, purpose and part. For the lead developer, and the platform developer as consumer.
 2. **Whether the forcing takes the ledger or only its series** (Q14 (b) of `contracts/ENTRYPOINTS.md`). Here only the series reach `CarbonForcing`, and the components stay in the ledger. For the lead developer and the platform developer.
-3. **The vocabulary of `origin` and of `quantity`** (OPEN 4 of `contracts/carbon_forcing/README.md`). Here the origin is the crop and the quantity names crop, purpose and part. If the humification coefficient of AMG differs by organ (aboveground, roots, rhizodeposits), the origin would need the part too. For the lead developer and the science reviewers.
+3. **The vocabulary of `origin` and of `quantity`** (OPEN 4 of `contracts/carbon_forcing/README.md`). Answered for the origin of a ledger series by D194 of #77: `<crop>_aboveground` and `<crop>_belowground` (see "Rules the model checks"). Still open: the vocabulary of `quantity` (crop, purpose and part here); whether a `cover` or `pasture` series takes the same groups (D194 names grain crops only; today their values are `NOT_COMPUTABLE`); and whether the crop named in the origin must be the crop named in the quantity (the model checks only that it is a crop of the ledger). For the lead developer and the science reviewers.
 4. **Closure checked by the model.** It is not checked here, so no tolerance is written. For the lead developer.
 5. **Ranges.** Every computed value carries `range_missing` with reason `NOT_AVAILABLE` (Q6 of `contracts/ENTRYPOINTS.md`, C2.3). For the science reviewers.
 6. **Private names imported.** None directly: `AnnualCarbonInputSeries` brings `_SeriesHeader` and `_SeriesItem` of `contracts/inputs/site_climate.py` with it, as in `contracts/carbon_forcing/`.
