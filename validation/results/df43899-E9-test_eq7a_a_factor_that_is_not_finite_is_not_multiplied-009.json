@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "df43899-E9-test_eq7a_a_factor_that_is_not_finite_is_not_multiplied-009",
+  "run_id": "run-20261115T170110Z-df43899",
+  "test_code": "E9",
+  "expected": {
+    "missing_reason": "the entry E9 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/erosion/test_equation.py::test_eq7a_a_factor_that_is_not_finite_is_not_multiplied[inf-c]"
+  },
+  "notes": "Test engine/erosion/test_equation.py::test_eq7a_a_factor_that_is_not_finite_is_not_multiplied[inf-c]. Placed under E9: listed by name on the 'Test' line of entry E9 of docs/VALIDATION.md."
+}
