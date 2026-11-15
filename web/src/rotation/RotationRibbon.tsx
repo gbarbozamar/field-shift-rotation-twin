@@ -27,6 +27,11 @@ import { strings } from '../strings'
  * intensities and methods are contract identifiers: they render exactly as
  * they travel, without translation.
  *
+ * The lines above the timeline carry what the definition says about the
+ * year and the cycle: the start month keeps its provisional mark (C5.4)
+ * and a rotation that does not repeat says so, in place of the repeats
+ * line.
+ *
  * All user-visible wording lives in strings.ts. Class lists follow the
  * strings rule of the repo: arrays of single-word tokens joined at runtime.
  */
@@ -184,12 +189,18 @@ export function RotationRibbon({ rotation }: { rotation: RotationDefinition }) {
       <p className="mt-3 text-sm font-medium">
         {formatString(strings['ribbon.rotation_of'], { label: rotation.label })}
       </p>
-      <p className="mt-1 text-sm text-slate-500">
+      <p data-testid="ag-year-line" className="mt-1 text-sm text-slate-500">
         {formatString(strings['ribbon.ag_year_start'], { month: rotation.ag_year_start.month })}
+        {rotation.ag_year_start.provisional && (
+          <>
+            {' '}
+            {strings['ribbon.provisional']}
+          </>
+        )}
       </p>
-      {rotation.repeats && (
-        <p className="mt-1 text-sm text-slate-500">{strings['ribbon.repeats']}</p>
-      )}
+      <p data-testid="repeats-line" className="mt-1 text-sm text-slate-500">
+        {rotation.repeats ? strings['ribbon.repeats'] : strings['ribbon.not_repeating']}
+      </p>
       <ol className={['mt-4', 'flex', 'list-none', 'gap-4', 'overflow-x-auto', 'pb-2'].join(' ')}>
         {components.map((component) => (
           <ComponentCard key={component.component_id} component={component} />

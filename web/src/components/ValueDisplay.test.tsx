@@ -22,9 +22,15 @@ import type { ProvenanceLabel, ReasonCode, UncertaintyRange, ValueItem } from '.
 const FIXTURE_VALUE = 7.1
 const FIXTURE_UNIT = 't ha-1 yr-1'
 const FIXTURE_SOURCE = 'PLACEHOLDER_source'
+// A derivation trace of the length the engine writes: the provenance
+// paragraph a value travels with once the seam is complete. Its render is
+// the collapsed source line of case 4.
+const FIXTURE_LONG_SOURCE =
+  'PLACEHOLDER derivation: EP2 accumulated the water balance of the daily record of the example station over the agricultural year that starts in month 7, EP3 placed the FAO-56 stages from the catalogue stage lengths, and the value was summed over the months of the cycle'
 const FIXTURE_RANGE: UncertaintyRange = { low: 5.9, high: 8.4, kind: 'PLACEHOLDER_kind' }
 const FIXTURE_WHAT = 'Soil carbon trend'
 const FIXTURE_DETAIL = 'critical period not defined'
+const FIXTURE_NOT_APPLICABLE_DETAIL = 'cover crop is terminated, not harvested'
 
 // The unit of the soil-carbon trend as it travels in the conventions (C1.5).
 // A missing value keeps its unit (C3.1), here as in the contract; the
@@ -55,6 +61,9 @@ const EXPECTED_VALUE_LINE: Record<ProvenanceLabel, string> = {
 }
 
 const EXPECTED_SOURCE_LINE = 'Source: PLACEHOLDER_source'
+// The source line is a collapsed disclosure: the whole "Source: …" line in
+// its summary, and the exact trace again as the disclosed paragraph.
+const EXPECTED_SOURCE_TEXT = `${EXPECTED_SOURCE_LINE} ${FIXTURE_SOURCE}`
 const EXPECTED_RANGE_LINE = '5.9 to 8.4 (PLACEHOLDER_kind)'
 
 /** "{what}: {reason phrase}" with the reason phrases of the strings file. */
@@ -77,9 +86,11 @@ function markupOf(item: ValueItem): string {
 
 /** The exact text of one line of the display, or null when it is not rendered. */
 function lineText(markup: string, testid: string): string | null {
-  const match = markup.match(new RegExp(`<p[^>]*data-testid="${testid}"[^>]*>([\\s\\S]*?)</p>`))
+  const match = markup.match(
+    new RegExp(`<(p|summary)[^>]*data-testid="${testid}"[^>]*>([\\s\\S]*?)</\\1>`),
+  )
   if (match === null) return null
-  return match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 /** The whole visible text of the display, lines joined by one space. */
@@ -100,7 +111,7 @@ describe('ValueDisplay: a value with unit, provenance label and source', () => {
       })
       expect(lineText(markup, 'value-line')).toBe(EXPECTED_VALUE_LINE[label])
       expect(lineText(markup, 'source-line')).toBe(EXPECTED_SOURCE_LINE)
-      expect(visibleText(markup)).toBe(`${EXPECTED_VALUE_LINE[label]} ${EXPECTED_SOURCE_LINE}`)
+      expect(visibleText(markup)).toBe(`${EXPECTED_VALUE_LINE[label]} ${EXPECTED_SOURCE_TEXT}`)
     })
   }
 })
@@ -120,7 +131,7 @@ describe('ValueDisplay: a value with its uncertainty range', () => {
     expect(lineText(markup, 'source-line')).toBe(EXPECTED_SOURCE_LINE)
     expect(lineText(markup, 'range-line')).toBe(EXPECTED_RANGE_LINE)
     expect(visibleText(markup)).toBe(
-      `${EXPECTED_VALUE_LINE.DERIVED} ${EXPECTED_SOURCE_LINE} ${EXPECTED_RANGE_LINE}`,
+      `${EXPECTED_VALUE_LINE.DERIVED} ${EXPECTED_SOURCE_TEXT} ${EXPECTED_RANGE_LINE}`,
     )
   })
 })
@@ -141,7 +152,7 @@ describe('ValueDisplay: a value whose range is absent with a reason', () => {
     expect(lineText(markup, 'range-line')).toBe(null)
     // Nothing else is rendered: no bounds and no kind are invented for the
     // absent range.
-    expect(visibleText(markup)).toBe(`${EXPECTED_VALUE_LINE.DERIVED} ${EXPECTED_SOURCE_LINE}`)
+    expect(visibleText(markup)).toBe(`${EXPECTED_VALUE_LINE.DERIVED} ${EXPECTED_SOURCE_TEXT}`)
   })
 })
 
@@ -192,5 +203,119 @@ describe('ValueDisplay: a value marked as an assumption', () => {
     expect(lineText(markup, 'assumption-line')).toBe('assumption')
     expect(lineText(markup, 'source-line')).toBe(null)
     expect(visibleText(markup)).toBe('7.1 t ha-1 yr-1 Declared assumption')
+  })
+})
+
+// --- the detail of a missing part, for any reason code (display polish) ---------
+
+describe('ValueDisplay: a missing part with a detail shows it for any reason code', () => {
+  it('appends the NOT_APPLICABLE detail in parentheses, after the reason phrase', () => {
+    const markup = markupOf({
+      value: null,
+      unit: FIXTURE_UNIT_OF_MISSING,
+      missing: { reason: 'NOT_APPLICABLE', detail: FIXTURE_NOT_APPLICABLE_DETAIL },
+    })
+    expect(lineText(markup, 'missing-line')).toBe(
+      `Soil carbon trend: not applicable (${FIXTURE_NOT_APPLICABLE_DETAIL})`,
+    )
+  })
+
+  it('appends the detail of any other reason code the same way', () => {
+    const markup = markupOf({
+      value: null,
+      unit: FIXTURE_UNIT_OF_MISSING,
+      missing: { reason: 'NO_COVERAGE', detail: 'the example series ends before this year' },
+    })
+    expect(lineText(markup, 'missing-line')).toBe(
+      'Soil carbon trend: no coverage for this place or period (the example series ends before this year)',
+    )
+  })
+
+  it('renders no suffix when the missing part carries no detail', () => {
+    const markup = markupOf({
+      value: null,
+      unit: FIXTURE_UNIT_OF_MISSING,
+      missing: { reason: 'NOT_APPLICABLE' },
+    })
+    const line = lineText(markup, 'missing-line')
+    expect(line).toBe(EXPECTED_MISSING_LINE.NOT_APPLICABLE)
+    expect(line).not.toContain('(')
+  })
+
+  it('keeps MISSING_INPUT naming its detail inside the phrase, not twice in a suffix', () => {
+    const markup = markupOf({
+      value: null,
+      unit: FIXTURE_UNIT_OF_MISSING,
+      missing: { reason: 'MISSING_INPUT', detail: FIXTURE_DETAIL },
+    })
+    expect(visibleText(markup)).toBe(EXPECTED_MISSING_LINE.MISSING_INPUT)
+  })
+})
+
+// --- the collapsed source line (display polish) ----------------------------------
+
+describe('ValueDisplay: the source line collapses its trace', () => {
+  it('renders the source as a closed disclosure clipped to one line', () => {
+    const markup = markupOf({
+      value: FIXTURE_VALUE,
+      unit: FIXTURE_UNIT,
+      provenance: 'DERIVED',
+      source: FIXTURE_LONG_SOURCE,
+    })
+    const disclosure = markup.match(/<details[^>]*data-testid="source-details"[^>]*>/)?.[0]
+    expect(disclosure).toBeDefined()
+    expect(disclosure).not.toContain('open')
+    // The clipped line is the whole source line, one line of text.
+    expect(lineText(markup, 'source-line')).toBe(`Source: ${FIXTURE_LONG_SOURCE}`)
+  })
+
+  it('carries the exact trace unchanged inside the disclosure', () => {
+    const markup = markupOf({
+      value: FIXTURE_VALUE,
+      unit: FIXTURE_UNIT,
+      provenance: 'DERIVED',
+      source: FIXTURE_LONG_SOURCE,
+    })
+    expect(lineText(markup, 'source-full')).toBe(FIXTURE_LONG_SOURCE)
+    expect(markup).toContain(`>${FIXTURE_LONG_SOURCE}<`)
+  })
+})
+
+// --- the display precision of a measured value (display polish) ------------------
+
+describe('ValueDisplay: display precision of a measured value', () => {
+  it('renders a long value rounded to three decimals, with the exact value in the title', () => {
+    const exact = 2.3650713015276774
+    const markup = markupOf({
+      value: exact,
+      unit: FIXTURE_UNIT,
+      provenance: 'OBSERVED',
+      source: FIXTURE_SOURCE,
+    })
+    expect(lineText(markup, 'value-line')).toBe(`2.365 ${FIXTURE_UNIT} Observed`)
+    expect(markup).toContain(
+      '<span data-testid="value-number" class="font-medium" title="2.3650713015276774">2.365</span>',
+    )
+  })
+
+  it('renders a value that is exactly 2.1 as 2.1, without forced trailing zeros', () => {
+    const markup = markupOf({
+      value: 2.1,
+      unit: FIXTURE_UNIT,
+      provenance: 'DECLARED',
+    })
+    expect(markup).toContain(
+      '<span data-testid="value-number" class="font-medium" title="2.1">2.1</span>',
+    )
+  })
+
+  it('keeps every value it displays exact in its title attribute', () => {
+    const markup = markupOf({
+      value: FIXTURE_VALUE,
+      unit: FIXTURE_UNIT,
+      provenance: 'DECLARED',
+      source: FIXTURE_SOURCE,
+    })
+    expect(markup).toContain(`title="${String(FIXTURE_VALUE)}"`)
   })
 })
