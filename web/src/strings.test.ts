@@ -214,6 +214,8 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.source_line': '{id}: {detail}',
   'plant.source.economics':
     'margins, the cost of meeting the limit and the tipping price, computed by the economics functions from the economic facts of this answer',
+  // PROPOSED (S-019 fix round 1): the mark of a value the user declares.
+  'plant.declared': 'Declared by the user in the request (example data)',
 }
 
 /** Source of the shell page as it was before the strings unit. */

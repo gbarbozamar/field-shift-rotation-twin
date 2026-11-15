@@ -102,16 +102,28 @@ function SoilLossLine({ kind, item }: { kind: MarginOf; item: SoilLossItem }) {
   )
 }
 
+/** The mark of a value the user declares in the request (C4.2): its source. */
+function DeclaredMark({ testid }: { testid: string }) {
+  return (
+    <p data-testid={testid} className="text-xs text-slate-500">
+      {strings['plant.declared']}
+    </p>
+  )
+}
+
 function LimitLine({ option }: { option: PlantOption }) {
   if (option.limit === null) {
     // The parser keeps a reason on the check whenever the limit is missing.
     return <MissingLine what={strings['plant.limit']} missing={option.on_average.missing!} />
   }
   return (
-    <MeasuredLine
-      what={strings['plant.limit']}
-      item={{ value: option.limit, unit: option.limit_unit, missing: null }}
-    />
+    <div>
+      <MeasuredLine
+        what={strings['plant.limit']}
+        item={{ value: option.limit, unit: option.limit_unit, missing: null }}
+      />
+      <DeclaredMark testid="plant-limit-declared" />
+    </div>
   )
 }
 
@@ -283,13 +295,17 @@ function PriceAnswer({ answer, price }: { answer: PlantAnswer; price: number | n
       content = <p className="text-sm">{strings['plant.price.same']}</p>
     } else if (at.kind === 'past') {
       content = (
-        <p className="text-sm font-medium">
-          {formatString(strings['plant.price.past'], {
-            price: num(at.point.price),
-            unit: at.point.unit,
-            after: afterText(at.point.answer_after, at.point.takes_over),
-          })}
-        </p>
+        <div>
+          <p className="text-sm font-medium">
+            {formatString(strings['plant.price.past'], {
+              price: num(at.point.price),
+              unit: at.point.unit,
+              after: afterText(at.point.answer_after, at.point.takes_over),
+            })}
+          </p>
+          {/* The tipping price shown here carries its source. */}
+          <EconomicsSource />
+        </div>
       )
     } else {
       content = (
@@ -406,6 +422,9 @@ function Questions({
             <p className="text-xs text-slate-500">
               {formatString(strings['plant.q.price_today'], { price: num(tipping.today!), unit: tipping.unit })}
             </p>
+            {/* Today's price and the range are declared by the user; the
+                tipping prices carry the economics source in the card. */}
+            <DeclaredMark testid="plant-price-declared" />
           </div>
         ) : (
           <input id="plant-price" type="range" className="w-full" disabled />

@@ -222,6 +222,10 @@ export const strings = {
   'plant.source_line': '{id}: {detail}',
   'plant.source.economics':
     'margins, the cost of meeting the limit and the tipping price, computed by the economics functions from the economic facts of this answer',
+  // PROPOSED (S-019 fix round 1): the mark of a value the user declares in
+  // the request (the soil-loss limit, the soybean prices). Wording is a
+  // person's decision.
+  'plant.declared': 'Declared by the user in the request (example data)',
 } as const
 
 /**

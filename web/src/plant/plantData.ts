@@ -30,9 +30,12 @@ import type { MissingPart, ReasonCode } from '../components/ValueDisplay'
  * without its reason (C3.1), a chosen answer without a rotation, a rotation
  * chosen when the answer is not, an answer that is not chosen without its
  * reason, a state "chosen" on another rotation than the chosen one, "none
- * meets" while an option is in another state, a limit check that is not
- * resolved without its reason, a tipping point with a price and a reason
- * together. Pure: value in, typed answer out, or an Error with a technical
+ * meets" while an option is in another state, an option whose state is not
+ * the verdict of its limit check, a chosen option that does not meet the
+ * limit, a limit check that is not the check of the strictness used, a limit
+ * check that is not resolved without its reason and detail, a missing limit
+ * cost without its reason and detail, tied rotations fewer than two or not
+ * all in state meets, a tipping point with a price and a reason together. Pure: value in, typed answer out, or an Error with a technical
  * code (no wording; nothing user-visible lives here).
  */
 
@@ -227,9 +230,15 @@ function limitCheck(value: unknown, what: string): LimitCheck {
   if (!oneOf(item.verdict, VERDICTS)) {
     throw new Error(`${what}:verdict-not-in-the-list`)
   }
+  // As LimitCheckOut: a reason and a detail exactly when it is not resolved.
+  const unresolved = item.verdict === 'not_resolved'
   const hasReason = item.reason !== null && item.reason !== undefined
-  if ((item.verdict === 'not_resolved') !== hasReason) {
+  if (unresolved !== hasReason) {
     throw new Error(`${what}:reason-exactly-when-not-resolved`)
+  }
+  const hasDetail = item.detail !== null && item.detail !== undefined
+  if (unresolved !== hasDetail) {
+    throw new Error(`${what}:detail-exactly-when-not-resolved`)
   }
   return {
     verdict: item.verdict,
@@ -261,13 +270,22 @@ function option(value: unknown, what: string, strictness: Strictness): PlantOpti
   }
   const onAverage = limitCheck(limit.on_average, `${what}:limit:on-average`)
   const everyKind = limitCheck(limit.every_kind, `${what}:limit:every-kind`)
-  if (limit.limit === null && onAverage.verdict !== 'not_resolved') {
+  if (
+    limit.limit === null &&
+    (onAverage.verdict !== 'not_resolved' || everyKind.verdict !== 'not_resolved')
+  ) {
     // With no limit no check is resolved, so the check carries the reason.
     throw new Error(`${what}:limit:missing-with-a-resolved-check`)
   }
   const check = limitCheck(item.limit_check, `${what}:limit-check`)
   const ofStrictness = strictness === 'on_average' ? onAverage : everyKind
-  if (check.verdict !== ofStrictness.verdict) {
+  // As PlantAnswer: the limit_check is the check of the strictness used,
+  // verdict, reason and detail alike.
+  if (
+    check.verdict !== ofStrictness.verdict ||
+    check.missing?.reason !== ofStrictness.missing?.reason ||
+    check.missing?.detail !== ofStrictness.missing?.detail
+  ) {
     throw new Error(`${what}:limit-check-not-of-the-strictness`)
   }
   return {
@@ -295,7 +313,11 @@ function limitCost(value: unknown, what: string): LimitCost {
     if (!isNonEmptyString(item.against)) {
       throw new Error(`${what}:value-without-against`)
     }
-    if (item.reason !== null || item.costs_nothing !== false) {
+    if (
+      (item.reason !== null && item.reason !== undefined) ||
+      (item.detail !== null && item.detail !== undefined) ||
+      item.costs_nothing !== false
+    ) {
       throw new Error(`${what}:value-with-a-reason`)
     }
     if (!isNonEmptyString(item.unit)) {
@@ -303,14 +325,25 @@ function limitCost(value: unknown, what: string): LimitCost {
     }
     return { kind: 'value', value: item.value, against: item.against, unit: item.unit }
   }
+  if (item.against !== null && item.against !== undefined) {
+    // As LimitCostOut: a rotation it is against exactly with a cost value.
+    throw new Error(`${what}:against-without-a-value`)
+  }
   if (item.costs_nothing === true) {
-    if (item.reason !== null) {
+    if (
+      (item.reason !== null && item.reason !== undefined) ||
+      (item.detail !== null && item.detail !== undefined)
+    ) {
       throw new Error(`${what}:nothing-with-a-reason`)
     }
     return { kind: 'nothing' }
   }
   if (item.reason === null || item.reason === undefined) {
     throw new Error(`${what}:missing-without-a-reason`)
+  }
+  // As LimitCostOut: a missing cost carries a reason and a detail.
+  if (item.detail === null || item.detail === undefined) {
+    throw new Error(`${what}:missing-without-a-detail`)
   }
   return { kind: 'missing', missing: missingPart(item.reason, item.detail, what) }
 }
@@ -430,6 +463,10 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
   if (isChosen === hasReason) {
     throw new Error(`${what}:reason-exactly-when-nothing-is-chosen`)
   }
+  // As PlantAnswer: the reason travels with its detail.
+  if (isChosen === (item.detail !== null && item.detail !== undefined)) {
+    throw new Error(`${what}:detail-exactly-when-nothing-is-chosen`)
+  }
   if (!Array.isArray(item.options)) {
     throw new Error(`${what}:options-not-a-list`)
   }
@@ -447,11 +484,33 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
   if (item.answer === 'none_meets' && options.some((o) => o.state !== 'does_not_meet')) {
     throw new Error(`${what}:none-meets-with-an-option-in-another-state`)
   }
+  // As PlantAnswer: the chosen rotation meets the limit, and the state of
+  // every other option is the verdict of its limit check.
+  for (const [index, o] of options.entries()) {
+    if (o.state === 'chosen') {
+      if (o.limit_check.verdict !== 'meets') {
+        throw new Error(`${what}:options[${index}]:chosen-does-not-meet-the-limit`)
+      }
+    } else if (o.state !== o.limit_check.verdict) {
+      throw new Error(`${what}:options[${index}]:state-not-the-verdict-of-its-check`)
+    }
+  }
   if (!Array.isArray(item.tied) || !item.tied.every((t) => oneOf(t, ids))) {
     throw new Error(`${what}:tied-not-options`)
   }
+  if (new Set(item.tied).size !== item.tied.length) {
+    throw new Error(`${what}:tied-not-distinct`)
+  }
   if (item.tied.length > 0 && item.answer !== 'not_resolved') {
     throw new Error(`${what}:tied-when-the-answer-is-resolved`)
+  }
+  // As choose_rotation: tied rotations are at least two, each in state meets.
+  if (item.tied.length === 1) {
+    throw new Error(`${what}:tied-fewer-than-two`)
+  }
+  const stateOf = new Map(options.map((o) => [o.rotation_id, o.state]))
+  if (item.tied.some((t) => stateOf.get(t) !== 'meets')) {
+    throw new Error(`${what}:tied-not-in-state-meets`)
   }
   if (!Array.isArray(item.sources)) {
     throw new Error(`${what}:sources-not-a-list`)
@@ -463,6 +522,14 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
     }
     return { id: source.id, detail: isNonEmptyString(source.detail) ? source.detail : null }
   })
+  const cost = limitCost(item.limit_cost, `${what}:limit-cost`)
+  // As PlantAnswer: a cost only when a rotation is chosen, against another option.
+  if (!isChosen && cost.kind !== 'missing') {
+    throw new Error(`${what}:limit-cost:cost-when-nothing-is-chosen`)
+  }
+  if (cost.kind === 'value' && (!ids.includes(cost.against) || cost.against === item.chosen)) {
+    throw new Error(`${what}:limit-cost:against-not-another-option`)
+  }
   return {
     example_data: item.example_data,
     strictness,
@@ -472,7 +539,7 @@ export function parsePlantAnswer(value: unknown, what = 'invalid-plant-answer'):
     missing: hasReason ? missingPart(item.reason, item.detail, what) : null,
     tied: [...item.tied],
     options,
-    limit_cost: limitCost(item.limit_cost, `${what}:limit-cost`),
+    limit_cost: cost,
     tipping_price: tippingPrice(item.tipping_price, `${what}:tipping-price`),
     sources,
   }

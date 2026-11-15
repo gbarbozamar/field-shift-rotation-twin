@@ -168,6 +168,85 @@ describe('the parser refuses what the contract refuses (7)', () => {
     expect(() => parsePlantAnswer(answer)).toThrow('missing-without-a-reason')
   })
 
+  it('refuses an option whose state is not the verdict of its limit check', () => {
+    // The copy test (2) of PlantScreen.test.tsx used before fix round 1: every
+    // state forced to does_not_meet while the limit checks stay as they are.
+    const answer = exampleCopy()
+    answer.answer = 'none_meets'
+    answer.chosen = null
+    answer.reason = 'NOT_APPLICABLE'
+    answer.detail = rawExample.options.map((o) => o.rotation_id).join('; ')
+    for (const option of answer.options) option.state = 'does_not_meet'
+    answer.limit_cost = {
+      ...answer.limit_cost,
+      value: null,
+      against: null,
+      reason: 'NOT_APPLICABLE',
+      detail: answer.detail,
+    }
+    expect(() => parsePlantAnswer(answer)).toThrow('state-not-the-verdict-of-its-check')
+  })
+
+  it('refuses a chosen option that does not meet the limit', () => {
+    const answer = exampleCopy()
+    const chosen = answer.options.find((o: { state: string }) => o.state === 'chosen')
+    const doesNotMeet = { verdict: 'does_not_meet', reason: null, detail: null }
+    chosen.limit.on_average = { ...doesNotMeet }
+    chosen.limit_check = { ...doesNotMeet }
+    expect(() => parsePlantAnswer(answer)).toThrow('chosen-does-not-meet-the-limit')
+  })
+
+  it('refuses a limit check that is not the check of the strictness used', () => {
+    const answer = exampleCopy()
+    answer.options[2].limit_check.detail = answer.options[2].limit.every_kind.detail
+    expect(() => parsePlantAnswer(answer)).toThrow('limit-check-not-of-the-strictness')
+  })
+
+  it('refuses a limit check that is not resolved without its detail', () => {
+    const answer = exampleCopy()
+    answer.options[2].limit_check.detail = null
+    expect(() => parsePlantAnswer(answer)).toThrow('detail-exactly-when-not-resolved')
+  })
+
+  it('refuses a missing limit cost without its detail', () => {
+    const answer = exampleCopy()
+    answer.answer = 'not_resolved'
+    answer.chosen = null
+    answer.reason = 'NOT_APPLICABLE'
+    answer.detail = rawExample.options[2].limit_check.detail
+    answer.options[1].state = 'meets'
+    answer.limit_cost = {
+      ...answer.limit_cost,
+      value: null,
+      against: null,
+      reason: 'NOT_APPLICABLE',
+      detail: null,
+    }
+    expect(() => parsePlantAnswer(answer)).toThrow('missing-without-a-detail')
+  })
+
+  it('refuses tied rotations fewer than two, or not all in state meets', () => {
+    const answer = exampleCopy()
+    answer.answer = 'not_resolved'
+    answer.chosen = null
+    answer.reason = 'NOT_APPLICABLE'
+    answer.detail = rawExample.options[2].limit_check.detail
+    answer.options[1].state = 'meets'
+    answer.limit_cost = {
+      ...answer.limit_cost,
+      value: null,
+      against: null,
+      reason: 'NOT_APPLICABLE',
+      detail: answer.detail,
+    }
+    // The copy without tied rotations is accepted, so each refusal below is the tied rule.
+    expect(() => parsePlantAnswer(answer)).not.toThrow()
+    answer.tied = [rawExample.options[1].rotation_id]
+    expect(() => parsePlantAnswer(answer)).toThrow('tied-fewer-than-two')
+    answer.tied = [rawExample.options[1].rotation_id, rawExample.options[0].rotation_id]
+    expect(() => parsePlantAnswer(answer)).toThrow('tied-not-in-state-meets')
+  })
+
   it('refuses a present soil loss with no source and no assumption mark', () => {
     const answer = exampleCopy()
     answer.options[0].soil_loss.el_nino.sources = []

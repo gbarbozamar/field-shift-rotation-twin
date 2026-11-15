@@ -22,7 +22,8 @@ import { strings } from '../strings'
  * (1) the screen renders the chosen rotation of the example answer with its
  *     margin, soil loss, limit and tipping price;
  * (2) an answer where none meets the limit (a copy of the example where only
- *     the answer and state fields change) shows "none meets" with its reason;
+ *     the answer, state and limit-check verdict fields change, consistent
+ *     with the contract) shows "none meets" with its reason;
  * (3) changing a question (how strict, the kind of year, the price past the
  *     tipping point) changes the answer shown;
  * (4) a missing value shows its reason, never 0;
@@ -112,6 +113,19 @@ describe('PlantScreen: the chosen rotation (1)', () => {
     )
   })
 
+  it('marks the limit and the declared prices as declared by the user, and the tipping prices with their source', () => {
+    expect(visibleText(section(html, 'plant-limit-declared'))).toContain(strings['plant.declared'])
+    expect(visibleText(section(html, 'plant-price-declared'))).toContain(strings['plant.declared'])
+    expect(card).toContain(
+      formatString(strings['value.source'], { source: strings['plant.source.economics'] }),
+    )
+    const low = rawExample.tipping_price.price_range.low
+    const pastIt = visibleText(section(render(plantExamples, 'on_average', 'average', low), 'plant-price-answer'))
+    expect(pastIt).toContain(
+      formatString(strings['value.source'], { source: strings['plant.source.economics'] }),
+    )
+  })
+
   it('shows its margin in each kind of year, labelled El Nino, neutral and La Nina', () => {
     expect(card).toContain(strings['plant.by_kind'])
     for (const k of ['el_nino', 'neutral', 'la_nina'] as const) {
@@ -176,13 +190,21 @@ describe('PlantScreen: the chosen rotation (1)', () => {
 })
 
 describe('PlantScreen: none meets the limit (2)', () => {
-  // A copy of the example where only the answer and state fields change.
+  // A copy of the example where only the answer, state and limit-check
+  // verdict fields change (with the reason and detail fields they require),
+  // so that the contract would accept it: the state of each option is the
+  // verdict of its on-average check. No margin, soil loss or limit changes.
   const raw = JSON.parse(JSON.stringify(rawExample))
   raw.answer = 'none_meets'
   raw.chosen = null
   raw.reason = 'NOT_APPLICABLE'
   raw.detail = rawExample.options.map((o) => o.rotation_id).join('; ')
-  for (const option of raw.options) option.state = 'does_not_meet'
+  for (const option of raw.options) {
+    option.state = 'does_not_meet'
+    const doesNotMeet = { verdict: 'does_not_meet', reason: null, detail: null }
+    option.limit.on_average = { ...doesNotMeet }
+    option.limit_check = { ...doesNotMeet }
+  }
   raw.limit_cost = {
     ...raw.limit_cost,
     value: null,
@@ -257,17 +279,34 @@ describe('PlantScreen: a missing value shows its reason, never 0 (4)', () => {
   const html = render()
   const missingOption = rawExample.options.find((o) => o.soil_loss.average.value === null)!
   const index = rawExample.options.indexOf(missingOption)
-  const block = visibleText(section(html, 'plant-option', index))
+  const blockHtml = section(html, 'plant-option', index).split('data-testid="plant-option"')[0]
+  const block = visibleText(blockHtml)
   const loss = missingOption.soil_loss.average
   const what = formatString(strings['plant.soil_loss_of'], { kind: kind('average') })
-
-  it('shows the missing soil loss with its reason', () => {
-    expect(block).toContain(
-      missingPatternText(what, { reason: loss.reason as MissingPart['reason'], detail: loss.detail! }),
-    )
+  const reasonText = missingPatternText(what, {
+    reason: loss.reason as MissingPart['reason'],
+    detail: loss.detail!,
   })
 
-  it('never writes a zero for it', () => {
+  /** The visible text of every element of the block carrying this data-testid. */
+  function elementsText(testid: string): string[] {
+    const pattern = new RegExp(`<p data-testid="${testid}"[^>]*>(.*?)</p>`, 'g')
+    return [...blockHtml.matchAll(pattern)].map((m) => visibleText(m[1]))
+  }
+
+  it('shows the missing soil loss with its reason', () => {
+    expect(block).toContain(reasonText)
+  })
+
+  it('never writes a zero for it: its element holds the reason text and nothing else', () => {
+    const ofIt = elementsText('plant-missing').filter((text) => text.startsWith(what))
+    expect(ofIt).toEqual([reasonText])
+    // No number zero stands for it (digits inside the reason detail, such as
+    // a year, are not a value of it).
+    expect(ofIt[0].replace(loss.detail!, '')).not.toMatch(/\d/)
+    expect(ofIt[0]).not.toMatch(/(^|[^\d.])0([.,]0+)?([^\d.]|$)/)
+    // And no value line is written for it at all.
+    expect(elementsText('plant-value').filter((text) => text.startsWith(what))).toEqual([])
     expect(block).not.toContain(`${what}: 0`)
     expect(block).not.toContain(valueLine(what, 0, loss.unit))
   })
