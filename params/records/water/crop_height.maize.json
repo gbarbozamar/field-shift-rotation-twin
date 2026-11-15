@@ -1,0 +1,18 @@
+{
+  "id": "crop_height",
+  "scope": {
+    "crop": "maize"
+  },
+  "value": 2.0,
+  "unit": "m",
+  "range": null,
+  "range_missing_reason": "Table 12 prints one value for this row, with no range.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 6, Table 12, column «Maximum Crop Height (h) (m)», row «Maize, Field (grain) (field corn)»",
+    "url": "https://www.fao.org/4/X0490E/x0490e0b.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-15 by an AI session in FAO-56 Table 12 (official HTML edition) under D34 of issue #77, and re-opened by the orchestrating session for D204. Value to compare: row «Maize, Field (grain) (field corn)», column «Maximum Crop Height (h) (m)»: «2». No local height of maize was found. UPDATED on 2026-11-15 by an AI session to follow D204 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D204: maize 2 m. LIMIT D204 DECLARES: one height per crop for the whole cycle (FAO-56 asks for the height of each period: «h mean maximum plant height during the period of calculation (initial, development, mid-season, or late-season) [m],», chapter 7, symbols of Eq. 72). A height per stage is a lane L1 unit for after the event. New draft written on 2026-11-15 for the second rotation of D128. SIGNED on 2026-11-15: checked_by gbarbozamar, row M4 of section 3.1 of the water signing sheet. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+}

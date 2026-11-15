@@ -4,7 +4,7 @@ Unit `l0/erosion-r-factor` (issue #161): the factor `R` of `docs/METHODS.md` M1.
 
 > **Status: PROPOSED** (blueprint section 3.7). The forms, the signatures, the handling of missing values and units, the parameter identifiers and the test cases below were written by a builder session. They take effect only when a person approves the pull request. This is a science-class change: it also needs a science reviewer. Items under [OPEN](#open) need an answer from a person.
 
-**This unit holds no constant of the method.** Not in the code, not as a default, not in a test, not in this file. The exponent and threshold of the daily index, the coefficients of the control regression and the mean annual level of `R` are arguments without a default; the caller reads each from the parameter catalogue, where it was transcribed from its source and checked by a person (issue #77, D34). The session read none of the sources S4 to S8 and wrote no number of the method from memory.
+**This unit holds no constant of the method.** Not in the code, not as a default, not in a test, not in this file. The exponent and threshold of the daily index, the coefficients of the control regression and the mean annual level of `R` are arguments without a default; the caller reads each from the parameter catalogue, where it was transcribed from its source and checked by a person (issue #77, D34). The session read none of the sources S4 to S8 and wrote no number of the method from memory. (On `main` `9f6c2a7`: `params/records/` holds `rusle_r_factor` for Colonia under D83 and the twelve `rusle_r_monthly_erosivity_<month>` records under D84 and D101 since `#203`; the daily-index and control-regression constants have no records in `params/records/`.)
 
 Acceptance test, from the repository root:
 
@@ -105,6 +105,8 @@ The identifiers are `PROPOSED`, with the prefix `rusle_` of `LS.md`; M1.2 propos
 | `exponent` of `control_monthly_erosivity` | `rusle_r_monthly_control_exponent` | The exponent of monthly precipitation in the control regression | None: it is an exponent | S7 as S4 gives it, with the equation number. OPEN | |
 | `mean_annual_r` of `r_by_year_and_month` | `rusle_r_factor` | The mean annual level of `R` at the field, from the published national values interpolated to the field | `MJ mm ha-1 h-1 yr-1` (D11) | S4; the interpolation to the field is a later unit. OPEN | |
 
+Catalogue status on `main` (`9f6c2a7`): `rusle_r_factor` (`params/records/rusle_r_factor.colonia.json`, Colonia, D83) is committed and signed (`#203`). The two daily-index constants (`rusle_r_daily_index_exponent`, `rusle_r_daily_index_threshold`) have no record in `params/records/` while S5 and S6 remain behind paywalls, and the two control-regression constants (`rusle_r_monthly_control_coefficient`, `rusle_r_monthly_control_exponent`) have no record and stay out of the first-release route (PC-7).
+
 ## PROPOSED cases
 
 Each case is a test function of `test_r_factor.py`; a test checks that this list and the file agree. Every constant in the tests is a PLACEHOLDER: small whole numbers chosen so that the arithmetic is done by hand. No case holds an expected value of the science.
@@ -197,7 +199,7 @@ Each is **skipped**, and its reason says what it waits for: the inputs, the expe
 
 Decision D69 of issue #77 (14 November 2026): while S5 and S6 stay behind paywalls, the first release takes the **monthly erosivity of a published climatology** (D69 names GloREDa, Panagos et al. 2023, Zenodo record 8036998), and **the fraction of a month is that month's value over the sum of the twelve**. Decision USER-G of the lead developer (the same day, recorded in `docs/SCIENCE_DECISIONS.md`) defers the variation between years: the same twelve fractions hold for every agricultural year. D69 declares that limit: the climatology gives a climatological fraction, not the variation between years that M1.2 asks for.
 
-**Still open under D69, and not settled by this code:** which licence governs the climatology (the copy of one distributor states conditions that contradict the licence of the Zenodo record); the team confirms it before any value is committed. Until then no monthly value of the climatology is in this repository and the monthly values stay `NOT_AVAILABLE` in EP1.
+**Update on `main` (`9f6c2a7`; D84, D101, #187, #203):** When this unit was written, the licence of the climatology was still open under D69 and no monthly value was in the repository. Decision [D101](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6885772469) (14 November 2026) settled the licence as Creative Commons Attribution 4.0 International (`CC BY 4.0`) for Zenodo record 8036998 (recording the conflicting ESDAC copy conditions without applying them to the Zenodo copy). Unit `l0/first-number` (`#203`) committed the twelve signed monthly records `rusle_r_monthly_erosivity_<month>` at the demonstration point La Estanzuela (D84) in `params/records/` with scope `{}`. Unit `l0/erosion-ep1-c-r` (`#187`) wired `climatology.py` into EP1 (`compute_soil_loss`), so monthly soil-loss values on the main route are now computed from those twelve records rather than staying `NOT_AVAILABLE` (monthly values stay `NOT_AVAILABLE` only on `compute_soil_loss_daily_index`, off the main path).
 
 ```text
 fraction(month)  = E(month) / (E(1) + ... + E(12))          E: published monthly erosivity at the point
@@ -213,7 +215,7 @@ R(year, month)   = mean_annual_r * fraction(month)            the same for every
 
 | Input a person supplies | Proposed identifier | Unit | Source | Value |
 |---|---|---|---|---|
-| The twelve monthly erosivity values at the point | OPEN: the scope keys of `params/README.md` have no month, so twelve records need a new key, or the values travel as site data from an adapter of the platform lane | OPEN: as the climatology prints it | D69: GloREDa, licence to be confirmed; locator (layer, cell) OPEN | |
+| The twelve monthly erosivity values at the point | Committed in `#203` as `rusle_r_monthly_erosivity_<month>` with scope `{}` (`SOIL_LOSS.md` OPEN 11 keeps open whether `params/` adds a `month` scope key or an adapter supplies them) | OPEN: as the climatology prints it (`#203` uses one shared string across the twelve records) | D69, D84, D101: GloREDa (Zenodo record 8036998, `CC BY 4.0`); La Estanzuela cell records committed in `params/records/` (`#203`) | |
 
 Cases, in `test_climatology.py` (a test checks that this list and that file agree; every number in it is a PLACEHOLDER):
 
@@ -229,7 +231,7 @@ Cases, in `test_climatology.py` (a test checks that this list and that file agre
 | `test_climatology_module_holds_no_number_but_calendar_ones` | The module writes only 0, 1, 2 and 12 |
 | `test_readme_lists_the_cases_of_test_climatology` | This list and `test_climatology.py` name the same cases |
 
-Not verified: no value of the climatology was read or run through these functions; whether its monthly layers are in the unit D11 implies for a month is OPEN (OPEN 9).
+Status of verification: since `#203` and `#187`, the twelve La Estanzuela GloREDa records are in `params/records/` and EP1 (`compute_soil_loss`) runs them through `climatology.py`; whether the monthly layers are in the unit D11 implies for a month stays OPEN (OPEN 9), and acceptance by a science reviewer is pending.
 
 ## OPEN
 
@@ -257,7 +259,7 @@ Each item is a question a person has to answer, with the role that answers it. N
 ## Not verified
 
 - **The forms and every constant against S4 to S7.** The session read none of the sources, by rule.
-- **Use by the rest of the engine.** EP1 (#158) and the rotation `C` (#157) are written on other branches at the same time; nothing here shows yet that the tables fit them.
+- **Use by the rest of the engine.** When this unit was written, EP1 (`#158`) and `c_factor/` (`#162`) were on separate branches; on `main` (`9f6c2a7`), `#187` wired EP1 to both `r_factor/` and `c_factor/`, `#229` wired main-route `C` to `climatological_monthly_fractions`, and `validation/trivial_comparator_erosion.py` (D211) also calls `climatological_monthly_fractions`. Acceptance by a science reviewer remains pending.
 - **The names scan of CI.** The list of forbidden names is a secret of the repository.
 - **Lint in CI.** The CI workflow runs ruff on `api/`, `adapters/` and `ci/` only; the session ran ruff on its own files.
 - **Real data.** No test reads a real series; the period of D29 and the IMERG series of D23 were not run through these functions.
