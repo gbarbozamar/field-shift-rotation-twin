@@ -54,6 +54,10 @@ RECORDED_RUNS = {
         "outcomes": {"passed": 497, "failed": 0, "not_evaluated": 1},
         "skipped_in_the_whole_suite": 16,
     },
+    "run-20261115T232512Z-8ccc65e": {
+        "outcomes": {"passed": 497, "failed": 0, "not_evaluated": 1},
+        "skipped_in_the_whole_suite": 15,
+    },
 }
 
 _ENTRY_HEADING_RE = re.compile(r"^### ([EHD][0-9]+[a-z]?)\s*$")

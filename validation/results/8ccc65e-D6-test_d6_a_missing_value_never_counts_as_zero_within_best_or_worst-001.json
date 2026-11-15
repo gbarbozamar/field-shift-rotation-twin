@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "8ccc65e-D6-test_d6_a_missing_value_never_counts_as_zero_within_best_or_worst-001",
+  "run_id": "run-20261115T232512Z-8ccc65e",
+  "test_code": "D6",
+  "expected": {
+    "missing_reason": "the entry D6 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_d6_a_missing_value_never_counts_as_zero_within_best_or_worst"
+  },
+  "notes": "Test decision/test_decision.py::test_d6_a_missing_value_never_counts_as_zero_within_best_or_worst. Placed under D6: under the heading of D6 in decision/test_decision.py, as the first and second runs placed it."
+}
