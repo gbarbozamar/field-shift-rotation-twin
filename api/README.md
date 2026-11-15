@@ -368,94 +368,64 @@ the runner's own, so the mismatch is the engine's (`check_balance`). That includ
 a built engine that returns the not-built form of its own part: D12 allows
 that form only for an engine that is not built.
 
-### The phases of a rotation (`api/phases.py`; D109, D117; PROPOSED)
+### The phases of a rotation (`api/phases.py`; D109, D117, D141; PROPOSED)
 
 Decision D109 of issue #77: each phase of a rotation is a scenario with its own
 `scenario_id`, each phase starting in the first agricultural year of the
 record; D117: phases are nested inside each value of an uncertain input (read
 by the decision layer). The runner builds **option (b), a calendar the runner
-moves** (#18, 00:57 UTC): EP1, EP3 and EP5 keep their signatures (D56) and get
-the calendar of each phase.
+moves** (D132; #18, 00:57 UTC): EP1, EP3 and EP5 keep their signatures (D56)
+and get the calendar of each phase.
 
-- **Number of phases** `N`: the cycle length of the calendar in whole years,
-  the rule of `cycle_length_years` in `engine/calendar/repeat.py`. A one-year
-  rotation has one phase.
-- **Phase `p`** (0 … N−1), `scenario_id` `phase_{p+1}`, `first_ag_year` the
-  agricultural year (C5.3) of the EP2 calendar that comes first. The cut is
-  the first day of the start month in the calendar's year `p` (year 0 is the
-  agricultural year of `start_date`). A component that ends before the cut
-  moves forward `N − p` years (to the end of the cycle); every other date
-  moves back `p` years. A date keeps its month and day; a 29 February in a
-  year without one becomes 28 February (`repeat.shifted_date`, point 2), and
-  the calendar module of the phase counts those dates. Periods move with
-  their component. Components that do not move forward come first, then
-  those that do, each in the calendar's order.
-- **`start_date` / `end_date`** of a moved calendar: the first day of year 0
-  and the day before the first day of year `N`, so its cycle length stays `N`
-  and its first agricultural year is year 0, and it describes no day the
-  calendar repeated over the record does not. `api/test_phases.py` checks,
-  with `engine/calendar/repeat.py`, that for every phase `cycle_length_years`
-  is `N` and that agricultural year `k` of the phase holds what year `k + p`
-  of the calendar holds, and that the real EP1 lays year `p`'s crop on the
-  first agricultural year of the record.
-- **Phase 0 is the calendar of EP2 itself**, unchanged (the same object), so
-  it keeps EP2's `start_date` (the first placed date): the route and CH07 of
-  `validation/test_chain_examples.py` compare it with EP2's own calendar.
-  Phases 1 and above cannot use the first placed date: when no component
-  starts in the phase's first year, that date falls in a later agricultural
-  year, EP1 would lay that later year on the record's first year, and the
-  cycle could shrink. The only effect of the difference, in `repeat.py`
-  point 7: a component without an end date may end no later than the end of
-  year `N − 1` instead of the day before the next first placed date, which
-  widens the days an engine leaves unknown for it and fills none.
-- Nothing else changes: identifiers, crops, feasibility, start month,
-  provenance, sources and assumption marks. Each moved calendar is a new
-  `RotationCalendar`, validated.
-- **A component that starts before the cut and ends on or after it, or on a
-  missing date** (it would start before the phase's first year): no rule is
-  given (OPEN, lead developer). The runner finds it on the EP2 calendar,
-  whatever function moves it, and writes `OPEN: …` in the detail of the
-  phase's `calendar` module (counts only, no identifier). D133: no rule in
-  this release, nothing guessed, and `RotationCalendar` cannot hold a
-  component before its `start_date`, so the runner's copy of
-  `phase_calendar` **raises `ValueError`** for such a phase, as #221 allows.
-  A phase refused that way calls no engine: `calendar: null`,
-  `result: null`, `result_missing` `NOT_COMPUTABLE` (PROPOSED) with the OPEN
-  note, `outcome: no_result`. A `ValueError` for a phase without such a
-  component is a defect (`500`). If lane L1's function returns a calendar
-  for such a phase instead (a flag), that calendar is used as returned and
-  the OPEN note is still written. On the PLACEHOLDER calendar of
-  `contracts/inputs/examples/`, phase 2 is refused: its component 2 runs
-  from April to October across the July start of the agricultural year.
-- **`crossing_components` stays after #221 merges**, as long as D133 has no
-  rule: it is how the runner tells a refused phase (the OPEN case, answered
-  `200`) from a defect of the phase function (`500`), and how it names the
-  OPEN case in the same words whichever way lane L1 signals it (an error or
-  a flag). It goes, with that distinction, when the lead developer gives the
-  rule and the phase function no longer refuses.
-- **Who moves the calendar.** Lane L1 agreed on issue #221 to build
-  `phase_calendar(calendar, p) -> RotationCalendar` and
-  `list_phases(calendar) -> list[int]` in `engine/calendar/repeat.py`.
-  `discover_engine_functions()` finds both by name (fields `phase_calendar`
-  and `list_phases` of `EngineFunctions`); when both exist the runner uses
-  them, otherwise its own copy in `api/phases.py` (a PROPOSED transition).
-  What they return is checked: `list_phases` any sequence equal to
+- **Who lays the phases out: lane L1.** `phase_calendar(calendar, p) ->
+  RotationCalendar` and `list_phases(calendar) -> list[int]` in
+  `engine/calendar/repeat.py` (#221, #228). `discover_engine_functions()`
+  finds both by name (fields `phase_calendar` and `list_phases` of
+  `EngineFunctions`), and `components_crossing_phase(calendar, p) ->
+  list[str]` too, optional (field `components_crossing_phase`). The runner
+  holds **no copy of their rules**, the crossing rule included.
+- **Phase `p`** (0 … N−1, N = what `list_phases` gives), `scenario_id`
+  `phase_{p+1}`, `first_ag_year` the agricultural year (C5.3) in which the
+  phase's calendar starts (checked below). Phase 0 is the calendar of EP2 itself,
+  unchanged (the same object; the route and CH07 of
+  `validation/test_chain_examples.py` compare it) and is never asked of
+  `phase_calendar`. Every other phase is what `phase_calendar` returns, used
+  as returned.
+- **What they return is checked:** `list_phases` any sequence equal to
   `0 … N−1`; `phase_calendar` a `RotationCalendar`, re-validated, that keeps
   everything but the dates: contract, example mark, identifiers, start
   month, feasibility, and the components as a multiset of (identifier, crop,
-  period types, which dates are missing). Anything else is a defect
-  (`TypeError`, `500`). Phase 0 is never
-  asked of them.
-- **Running.** EP2 once. For each phase, EP1, EP3 and EP5 once on its
+  period types); **a date missing in the EP2 calendar stays missing**
+  (never filled), while a present date may come back missing (the phase
+  rule may leave it missing with its reason); and, for `p ≥ 1`, its
+  `start_date` falls in agricultural year `first + p` of the EP2 calendar,
+  so no phase is misaligned or repeated (true of lane L1's rule, its point
+  12). Anything else is a defect (`TypeError`, `500`). Whatever they raise propagates (`500`), **a `ValueError`
+  included**: D141 gives a rule for every phase, so no phase is refused.
+- **A component that crosses into a phase's first year (D141, amends
+  D133: no phase is refused).** The phase is computed on the calendar
+  `phase_calendar` returns, whatever form lane L1 gives it (today the D133
+  form, the crossing date missing `NOT_COMPUTABLE`); the engines answer the
+  days that depend on a missing date missing with their reason, never as
+  days with no crop. When `components_crossing_phase` exists, the detail of
+  the phase's `calendar` module gives how many components it names (a
+  count, never an identifier) and that the phase runs on the calendar
+  `phase_calendar` returned; it makes no claim on how the phase is laid
+  out. Without that function no count is written. A date on 29 February
+  that came back 28 February is counted in the same detail.
+- **Running.** EP2 once. For each phase, EP1, EP3, EP4 and EP5 once on its
   calendar, with the same climate, soil-and-slope and `parameters` objects;
   every rule of the table below applies per phase. Nothing is cached across
   phases: a request costs `N` times the engines.
 - **One phase only** (`scenarios` holds the top-level answer once): EP2 not
   built (`first_ag_year: null`), an input absent, site data of another field,
-  an infeasible calendar (run once, unmoved), and a calendar without a start
-  month (only `phase_1`, with a note on the calendar module naming how many
-  phases were not run). An implementation of `RotationEngines` that gives no
-  phases gets `phase_1` from the route, `first_ag_year: null`.
+  an infeasible calendar (run once, unmoved), **the phase functions not
+  found** (either of the two absent, for example an older engine tree: only
+  `phase_1`, and the calendar module says the phases were not laid out), and
+  a calendar without a start month (only `phase_1`, with a note on the
+  calendar module naming how many phases `list_phases` gives that were not
+  run). An implementation of `RotationEngines` that gives no phases gets
+  `phase_1` from the route, `first_ag_year: null`.
 
 ### The parameter catalogue (`parameters`; Q3, D46, D56)
 
@@ -590,7 +560,7 @@ importable. Every row is PROPOSED (platform developer, issue #18).
 | `soil_depth` | Missing `NOT_AVAILABLE`, unit `OPEN`, detail naming C1.6 (depth OPEN) |
 | `annual_climate` `mean_temperature` (D118) | One item per agricultural year of the horizon: the arithmetic mean over the year of the daily mean temperatures of D30. D30 reads "Derived by the engine (mean from the daily maximum and minimum; pressure from elevation), not requested as series"; the daily mean is the arithmetic mean of `air_temperature_max_2m` and `air_temperature_min_2m` (CQ2, CQ3 of `contracts/CLIMATE_QUANTITIES.md`, found by quantity, never by position), the same form as `mean_temperature` of `engine/water/et0/equations.py`. A year with a day missing in either series is missing `MISSING_INPUT` naming the series, the day and its reason (never filled or partially averaged, C3.3, C3.4); a day absent from a series, `NO_COVERAGE`. An absent input series: every year `MISSING_INPUT`. Input units that differ: every year `NOT_COMPUTABLE`, unit `OPEN`, nothing converted. Otherwise the unit of the inputs; provenance `DERIVED` (C4.3); source naming D118, D30 and the source of each input series; `range_missing` with the reason the inputs carry (or `NOT_AVAILABLE` if they differ): no range is derived (C2.2) |
 | `annual_climate` `water_balance` (D119) | Every year missing `NOT_AVAILABLE`, unit `OPEN`: D119 (precipitation minus FAO-56 ET0, each summed over the agricultural year, in mm) is conditional on a science reviewer's check against the AMG description, and no ET0 series reaches the producer (FAO-56 ET0 is computed inside the water engine). The detail says both |
-| `annual_carbon_inputs`, EP4 built (unit `l2/runner-residues`) | The `annual_carbon_inputs` of the `ResidueLedger`, copied unchanged: the same series, in the same order (up to three per crop and purpose, `origin` the crop). **No unit is converted:** the ledger writes `kg C ha-1` and `run_amg` requires `t C ha-1`, so AMG answers `NOT_COMPUTABLE` naming the unit; who converts is OPEN 3 of the ledger (OPEN below). The `amg` module detail says how many series were copied, in which unit, that the platform converts none and, when the unit is not `t C ha-1`, that this is OPEN 3. A series with `NOT_COMPUTABLE` years (for example a cover or pasture crop, OPEN 5 of the ledger, or an infeasible calendar) is copied, never left out, since leaving it out would make AMG run without that crop's carbon; the detail gives their number and leaves the reasons to the series (PROPOSED). A ledger with years and no series: the detail says the ledger wrote no carbon-input series. The ledger applies the same identifier filter as the per-crop series, so the note on crops left out (next row) is written whatever the source of the series. A ledger without agricultural years (`years_missing`): the per-crop series of the next row, every year missing with the ledger's `years_missing` instead of the D122 text |
+| `annual_carbon_inputs`, EP4 built (unit `l2/runner-residues`) | The `annual_carbon_inputs` of the `ResidueLedger`, copied unchanged: the same series, in the same order (up to three per crop and purpose, `origin` the crop). **No unit is converted:** by D147 of issue #77 EP4 writes these series in `t C ha-1`, the unit `run_amg` requires (until it does, AMG answers `NOT_COMPUTABLE` naming the unit). The `amg` module detail says how many series were copied, in which unit, that the platform converts none and, only when a unit is not `t C ha-1`, that those series do not follow D147 (EP4 is to write `t C ha-1`), so AMG refuses them. A series with `NOT_COMPUTABLE` years (for example a cover or pasture crop, OPEN 5 of the ledger, or an infeasible calendar) is copied, never left out, since leaving it out would make AMG run without that crop's carbon; the detail gives their number and leaves the reasons to the series (PROPOSED). A ledger with years and no series: the detail says the ledger wrote no carbon-input series. The ledger applies the same identifier filter as the per-crop series, so the note on crops left out (next row) is written whatever the source of the series. A ledger without agricultural years (`years_missing`): the per-crop series of the next row, every year missing with the ledger's `years_missing` instead of the D122 text |
 | `annual_carbon_inputs`, EP4 not built | One series per crop of the calendar, once each in order of first appearance, `origin` and `quantity` both the `crop_id` (`run_amg` looks the humification coefficient up under scope key `crop` = `origin`, `ORIGIN_SCOPE_KEY`). Every year missing `NOT_AVAILABLE`: the residue ledger (EP4) is not built (D122). Unit `t C ha-1`, the unit `run_amg` requires (`STOCK_UNIT`, derived from C1.5 as the engine derives it). A `crop_id` that is not a quantity identifier (`^[a-z][a-z0-9_]*$`) cannot be a series and is left out, never renamed; `CarbonForcing` has no field to say so, so the runner adds to the detail of the `amg` module "N crop(s) of the calendar could not be written as carbon-input series of the forcing: their crop_id is not a quantity identifier" (their number only, never the identifiers; `crops_left_out`). Why series and not an empty list: with no series `run_amg` answers `NOT_COMPUTABLE` ("no origin") for the humified input; with all-missing series it answers `MISSING_INPUT` naming the reason, the residue ledger |
 | `soil_properties` (D120) | `clay_content`, `carbonate_content`, `ph`: copied from `SiteSoilSlope.soil_properties` only if an item with exactly that `quantity` is there (never converted, never renamed); otherwise missing `NOT_AVAILABLE`, unit `OPEN`, detail naming D120 (a person reads them from the D112 profile, under D34). Why `NOT_AVAILABLE` and not `NOT_DECLARED`: D120 keeps `NOT_DECLARED` for a property the profile does not print, which only the person reading it can know; until a person has read it, the platform only knows that no value has reached it, the meaning of `NOT_AVAILABLE` closest in C3.2. When the reading says "not printed", the soil file carries the item missing `NOT_DECLARED` and it is copied as it is |
 | `starting_state` (D121) | `soil_organic_carbon` (PROPOSED source): the `SiteSoilSlope.soil_properties` item with exactly that quantity, copied unchanged only if its unit is `t C ha-1`, the stock unit `run_amg` requires. Another unit (for example a concentration) is never converted: missing `NOT_COMPUTABLE`, detail naming D121. Absent: missing `NOT_AVAILABLE`, detail naming D121 (a person reads it from the D112 profile, under D34) |
@@ -755,25 +725,24 @@ here.
 | D51, D52 | A response without a point is usable; one provenance label for the three values of the point |
 | D55 | The unit strings and the label of the point; with it the settings file of the adapter is written (`adapters/settings/nasa_power.json`) |
 | D29 | The climate record period of the deployed service: 2001-01-01 to 2024-12-31 |
+| D147 | EP4 writes the annual carbon-input series of `CarbonForcing.annual_carbon_inputs` in `t C ha-1` (from the ledger's `kg C ha-1`, 1 t = 1000 kg); the runner and AMG do no arithmetic on them. Replaces the OPEN "who converts `kg C ha-1` to `t C ha-1`" (OPEN 3 of the ledger); the runner still converts nothing, and its `amg` note on a unit other than `t C ha-1` says the series do not follow D147 |
+| D141 (amends D133) | Each phase is laid out as the first one is; no phase is refused (unit `l2/runner-d141`). Replaces the OPEN "a component that starts before the first agricultural year of a phase" and "drop the runner's copy of the phase rule" |
 | D46, D56 (Q3 of `contracts/ENTRYPOINTS.md`) | The runner loads the parameter catalogue and passes it to EP1 and EP3 as the keyword argument `parameters`; EP2 does not change; a parameter not in the catalogue is the engine's `MISSING_INPUT` (unit `l2/runner-parameters`). What the runner does when the catalogue has a problem, left to the platform developer by Q3: start-up fails (PROPOSED above). Replaces the OPEN "D46, the argument `parameters`" |
 
 ## OPEN
 
 - **The phases of D109** (`api/phases.py`):
-  - a component that starts before the first agricultural year of a phase
-    and ends inside it (or on a missing date): no rule in this release
-    (D133), for the lead developer (#18). The phase is refused
-    (`NOT_COMPUTABLE`, the OPEN case named), never guessed;
-  - drop the runner's copy of the phase rule once lane L1's
-    `phase_calendar` / `list_phases` (issue #221) merge; how their version
-    signals that component (an error or a flag) is read on that merge;
-    `crossing_components` stays until D133 has a rule (above);
   - whether EP3 repeats the calendar over the record itself (lane L1,
     `engine/water/EXPOSURE.md` OPEN 5); until it does, it sees one cycle of
     the moved calendar;
   - a summary over the phases (D74, D96): for the decision layer, not the
     route;
-  - the cost: `N` runs of EP1, EP3 and EP5 per request.
+  - the cost: `N` runs of EP1, EP3, EP4 and EP5 per request;
+  - for lanes L0 and L1: whether the D141 layout is expressible in the
+    current `RotationCalendar` contract together with `repeat_over_record`
+    (no component may start before `start_date`,
+    `contracts/inputs/rotation_calendar.py`). The runner only uses what
+    `phase_calendar` returns.
 
 - **The inputs of AMG after D118 to D122.** Answered: `mean_temperature`
   (D118, built). Still missing with their reason:
@@ -785,12 +754,8 @@ here.
     the soil file; whether the profile gives organic carbon as a stock in
     `t C ha-1` (D121) is for that person;
   - the carbon inputs (D122): the residue ledger (EP4) is wired (unit
-    `l2/runner-residues`); its series reach AMG in `kg C ha-1` while AMG
-    requires `t C ha-1`. **Who converts** (the platform, AMG, or the ledger
-    writing a second unit), and with which record, is OPEN 3 of the residue
-    ledger, for the lead developer and the platform developer; until then
-    the platform converts nothing and AMG answers `NOT_COMPUTABLE` naming the
-    unit. Whether `NOT_COMPUTABLE` series of a cover or pasture crop are
+    `l2/runner-residues`); who converts its unit is decided (D147, table
+    above). Whether `NOT_COMPUTABLE` series of a cover or pasture crop are
     copied (PROPOSED here: yes) is for the lead developer. The vocabulary of
     `origin` and of the carbon-input quantities stays Q14 (b).
 - **The soil depth and its unit** (C1.6), for the science reviewers.
