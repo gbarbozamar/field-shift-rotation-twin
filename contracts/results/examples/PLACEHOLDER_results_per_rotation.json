@@ -211,14 +211,27 @@
   },
   "water_deficit_exposure": [
     {
-      "time_basis": "rotation",
+      "time_basis": "ag_year",
+      "ag_year": 2001,
       "indicator": "water_deficit_exposure",
       "direction": "higher_is_better",
       "value": null,
       "unit": "dimensionless",
       "missing": {
-        "reason": "NOT_AVAILABLE",
-        "detail": "PLACEHOLDER detail: the definition of this indicator is incomplete (conventions C1.4), so it is reported as missing"
+        "reason": "MISSING_INPUT",
+        "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2001, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"
+      }
+    },
+    {
+      "time_basis": "ag_year",
+      "ag_year": 2002,
+      "indicator": "water_deficit_exposure",
+      "direction": "higher_is_better",
+      "value": null,
+      "unit": "dimensionless",
+      "missing": {
+        "reason": "MISSING_INPUT",
+        "detail": "PLACEHOLDER detail: the daily water balance has no value on some days of agricultural year 2002, because a parameter it needs has no record; the ratio is a number only for a year computed on every day"
       }
     }
   ],
