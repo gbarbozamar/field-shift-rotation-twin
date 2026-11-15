@@ -46,7 +46,13 @@ from api.test_engines import (
     soil_result,
     write_package,
 )
-from api.test_phases import THREE_YEARS, FakePhases, _post, _rotation
+from api.test_phases import (
+    THREE_YEARS,
+    THREE_YEARS_PHASES,
+    FakePhases,
+    _post,
+    _rotation,
+)
 from contracts.carbon_forcing import AnnualCarbonInputSeries, CarbonForcing
 from contracts.inputs.common import Missing as InputMissing
 from contracts.inputs.common import Value
@@ -233,8 +239,13 @@ def test_ep4_is_called_once_per_phase_with_its_calendar_by_keyword():
     amg = Fake(balance())
     parameters: dict[str, dict] = {}
     climate = climate_result(chain_climate())
+    phases = FakePhases(3, THREE_YEARS_PHASES)
     result = run(
-        engine_functions(residues, amg, calendar_fn, soil_fn, water_fn),
+        replace(
+            engine_functions(residues, amg, calendar_fn, soil_fn, water_fn),
+            phase_calendar=phases.phase_calendar,
+            list_phases=phases.list_phases,
+        ),
         parameters=parameters,
         climate=climate,
     )
@@ -340,14 +351,14 @@ def test_the_series_reach_ep5_unchanged_in_their_unit():
     assert {s.unit for s in forcing.annual_carbon_inputs} == {LEDGER_UNIT}
     detail = modules(result)["amg"].detail
     assert LEFT_UNCHANGED in detail
-    assert "OPEN 3 of the residue ledger" in detail
+    assert "D147" in detail and "OPEN" not in detail
     assert producer.STOCK_UNIT in detail
     # The example's crops are not identifiers: the note is kept with a ledger.
     crops = {c["crop_id"] for c in CALENDAR_DOCUMENT["components"]}
     assert runner.crops_left_out_detail(len(crops)) in detail
 
 
-def test_series_in_the_unit_amg_requires_carry_no_open_note():
+def test_series_in_the_unit_amg_requires_carry_no_unit_note():
     item = series("placeholder_input_a").model_copy(
         update={"unit": producer.STOCK_UNIT}
     )
@@ -356,7 +367,7 @@ def test_series_in_the_unit_amg_requires_carry_no_open_note():
     result = run(engine_functions(Fake(ledger(item)), amg))
     detail = modules(result)["amg"].detail
     assert LEFT_UNCHANGED in detail
-    assert "OPEN 3" not in detail
+    assert "D147" not in detail
 
 
 def test_not_computable_series_are_copied_and_named():
@@ -607,8 +618,10 @@ def test_ep4_is_not_called_for_site_data_of_another_field():
     assert state.detail.startswith(runner.OTHER_FIELD)
 
 
-def test_ep4_is_not_called_for_a_refused_phase():
-    phases = FakePhases(raises=True)
+def test_ep4_is_not_called_when_phase_calendar_raises():
+    # D141: no phase is refused; a ValueError of the phase function is a
+    # defect, raised before any engine after EP2 is called.
+    phases = FakePhases(2, raises=True)
     calendar_fn, soil_fn, water_fn = fakes()
     residues = Fake(ledger())
     functions = replace(
@@ -616,10 +629,6 @@ def test_ep4_is_not_called_for_a_refused_phase():
         phase_calendar=phases.phase_calendar,
         list_phases=phases.list_phases,
     )
-    result = run(functions)
-    assert len(result.phases) > 1
-    assert len(residues.calls) == len(soil_fn.calls) == 1  # phase 1 only
-    for phase in result.phases[1:]:
-        assert phase.result.calendar is None
-        state = {m.id: m for m in phase.result.modules}["residues"]
-        assert (state.state, state.reason) == ("not_available", "MISSING_INPUT")
+    with pytest.raises(ValueError):
+        run(functions)
+    assert residues.calls == soil_fn.calls == []
