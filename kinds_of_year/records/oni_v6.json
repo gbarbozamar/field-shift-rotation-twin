@@ -1,0 +1,1894 @@
+{
+  "id": "oni_v6",
+  "status": "PROPOSED",
+  "reference": "NOAA Climate Prediction Center. Oceanic Ni\u00f1o Index (ONI), based on ERSST version 6: \"Oceanic Ni\u00f1o Index (ONI): Historical El Ni\u00f1o / La Ni\u00f1a episodes (1950-Present)\", table \"Cold & Warm Episodes by Season (ERSSTv6)\", and the data file oni.ascii.txt (columns SEAS YR TOTAL ANOM).",
+  "url_table_page": "https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso/oni/v6/",
+  "url_data_file": "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt",
+  "url_moved_from": "https://origin.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ONI_v5.php",
+  "locator": "Values: column ANOM of oni.ascii.txt and the one-decimal cell of the v6 table page, rows DJF 2000 to NDJ 2025 (312 seasons). Both sources read again on 2026-11-15 by the L2a orchestrating session: all 312 ANOM values equal the data file byte for byte, and the printed values were extracted from the table page by two independent parsers that agree on every cell of 1950-2025. The check sheet with the 312 rows travels with the signing package.",
+  "date_read": "2026-11-15",
+  "definition_text": "Warm (red) and cold (blue) periods based on a threshold of +/- 0.5oC for the Oceanic Ni\u00f1o Index (ONI) [3 month running mean of ERSST.v6 SST anomalies in the Ni\u00f1o 3.4 region (5oN-5oS, 120o-170oW)], based on centered 30-year base periods updated every 5 years. For historical purposes, periods of below and above normal SSTs are colored in blue and red when the threshold is met for a minimum of 5 consecutive overlapping seasons.",
+  "revision_text": "ONI values may change up to two months after the initial \"real time\" value is posted.",
+  "threshold": 0.5,
+  "threshold_unit": "degC",
+  "min_consecutive_seasons": 5,
+  "threshold_met_when": "D240 (2) and D258 of issue #77: the threshold is applied to the one-decimal values printed in the v6 table. Each season of this record carries 'printed', the value as the v6 table prints it, next to 'anom', the two-decimal value of oni.ascii.txt. The threshold reads 'printed' as given; the code holds no rounding rule.",
+  "note": "PROPOSED source change, reported: the brief named ONI version 5. On 2026-11-15 the address of the brief (origin.cpc.ncep.noaa.gov ... ONI_v5.php) did not resolve, and the same path on www.cpc.ncep.noaa.gov says the page has moved and points to the ERSST version 6 table; it also says that per NWS Public Information Statement 26-05 the Relative Oceanic Ni\u00f1o Index (RONI) is used for official monitoring and prediction. The values of oni.ascii.txt read on that date match the version 6 table and not the version 5 table (for example DJF 2000: ANOM -1.47, v6 table -1.5, v5 table -1.7), so this record is labelled version 6. The definition sentences are the same on the v5 and v6 pages except for the ERSST version they name. Transcribed through two independent web-fetch reads of oni.ascii.txt (direct download was not available in the session), which agreed on every value.",
+  "transcribed_by": "AI session (lane L2a loop, PR #310, seasons DJF 2000-NDJ 2025; printed values added and re-verified against both live sources by the L2a orchestrating session on 2026-11-15, two independent parsers agreeing)",
+  "checked_by": "martinbarreto0",
+  "data_header_line": "SEAS  YR   TOTAL   ANOM",
+  "seasons": [
+    {
+      "season": "DJF",
+      "year": 2000,
+      "anom": -1.47,
+      "printed": -1.5
+    },
+    {
+      "season": "JFM",
+      "year": 2000,
+      "anom": -1.26,
+      "printed": -1.3
+    },
+    {
+      "season": "FMA",
+      "year": 2000,
+      "anom": -0.98,
+      "printed": -1.0
+    },
+    {
+      "season": "MAM",
+      "year": 2000,
+      "anom": -0.81,
+      "printed": -0.8
+    },
+    {
+      "season": "AMJ",
+      "year": 2000,
+      "anom": -0.67,
+      "printed": -0.7
+    },
+    {
+      "season": "MJJ",
+      "year": 2000,
+      "anom": -0.62,
+      "printed": -0.6
+    },
+    {
+      "season": "JJA",
+      "year": 2000,
+      "anom": -0.48,
+      "printed": -0.5
+    },
+    {
+      "season": "JAS",
+      "year": 2000,
+      "anom": -0.4,
+      "printed": -0.4
+    },
+    {
+      "season": "ASO",
+      "year": 2000,
+      "anom": -0.42,
+      "printed": -0.4
+    },
+    {
+      "season": "SON",
+      "year": 2000,
+      "anom": -0.54,
+      "printed": -0.5
+    },
+    {
+      "season": "OND",
+      "year": 2000,
+      "anom": -0.76,
+      "printed": -0.8
+    },
+    {
+      "season": "NDJ",
+      "year": 2000,
+      "anom": -0.78,
+      "printed": -0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2001,
+      "anom": -0.76,
+      "printed": -0.8
+    },
+    {
+      "season": "JFM",
+      "year": 2001,
+      "anom": -0.54,
+      "printed": -0.5
+    },
+    {
+      "season": "FMA",
+      "year": 2001,
+      "anom": -0.43,
+      "printed": -0.4
+    },
+    {
+      "season": "MAM",
+      "year": 2001,
+      "anom": -0.29,
+      "printed": -0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2001,
+      "anom": -0.19,
+      "printed": -0.2
+    },
+    {
+      "season": "MJJ",
+      "year": 2001,
+      "anom": -0.08,
+      "printed": -0.1
+    },
+    {
+      "season": "JJA",
+      "year": 2001,
+      "anom": -0.05,
+      "printed": 0.0
+    },
+    {
+      "season": "JAS",
+      "year": 2001,
+      "anom": -0.13,
+      "printed": -0.1
+    },
+    {
+      "season": "ASO",
+      "year": 2001,
+      "anom": -0.15,
+      "printed": -0.1
+    },
+    {
+      "season": "SON",
+      "year": 2001,
+      "anom": -0.26,
+      "printed": -0.3
+    },
+    {
+      "season": "OND",
+      "year": 2001,
+      "anom": -0.33,
+      "printed": -0.3
+    },
+    {
+      "season": "NDJ",
+      "year": 2001,
+      "anom": -0.32,
+      "printed": -0.3
+    },
+    {
+      "season": "DJF",
+      "year": 2002,
+      "anom": -0.15,
+      "printed": -0.1
+    },
+    {
+      "season": "JFM",
+      "year": 2002,
+      "anom": 0.07,
+      "printed": 0.1
+    },
+    {
+      "season": "FMA",
+      "year": 2002,
+      "anom": 0.11,
+      "printed": 0.1
+    },
+    {
+      "season": "MAM",
+      "year": 2002,
+      "anom": 0.15,
+      "printed": 0.2
+    },
+    {
+      "season": "AMJ",
+      "year": 2002,
+      "anom": 0.3,
+      "printed": 0.3
+    },
+    {
+      "season": "MJJ",
+      "year": 2002,
+      "anom": 0.45,
+      "printed": 0.5
+    },
+    {
+      "season": "JJA",
+      "year": 2002,
+      "anom": 0.57,
+      "printed": 0.6
+    },
+    {
+      "season": "JAS",
+      "year": 2002,
+      "anom": 0.63,
+      "printed": 0.6
+    },
+    {
+      "season": "ASO",
+      "year": 2002,
+      "anom": 0.78,
+      "printed": 0.8
+    },
+    {
+      "season": "SON",
+      "year": 2002,
+      "anom": 0.99,
+      "printed": 1.0
+    },
+    {
+      "season": "OND",
+      "year": 2002,
+      "anom": 1.19,
+      "printed": 1.2
+    },
+    {
+      "season": "NDJ",
+      "year": 2002,
+      "anom": 1.08,
+      "printed": 1.1
+    },
+    {
+      "season": "DJF",
+      "year": 2003,
+      "anom": 0.9,
+      "printed": 0.9
+    },
+    {
+      "season": "JFM",
+      "year": 2003,
+      "anom": 0.59,
+      "printed": 0.6
+    },
+    {
+      "season": "FMA",
+      "year": 2003,
+      "anom": 0.38,
+      "printed": 0.4
+    },
+    {
+      "season": "MAM",
+      "year": 2003,
+      "anom": -0.01,
+      "printed": 0.0
+    },
+    {
+      "season": "AMJ",
+      "year": 2003,
+      "anom": -0.18,
+      "printed": -0.2
+    },
+    {
+      "season": "MJJ",
+      "year": 2003,
+      "anom": -0.13,
+      "printed": -0.1
+    },
+    {
+      "season": "JJA",
+      "year": 2003,
+      "anom": 0.09,
+      "printed": 0.1
+    },
+    {
+      "season": "JAS",
+      "year": 2003,
+      "anom": 0.14,
+      "printed": 0.1
+    },
+    {
+      "season": "ASO",
+      "year": 2003,
+      "anom": 0.23,
+      "printed": 0.2
+    },
+    {
+      "season": "SON",
+      "year": 2003,
+      "anom": 0.23,
+      "printed": 0.2
+    },
+    {
+      "season": "OND",
+      "year": 2003,
+      "anom": 0.29,
+      "printed": 0.3
+    },
+    {
+      "season": "NDJ",
+      "year": 2003,
+      "anom": 0.29,
+      "printed": 0.3
+    },
+    {
+      "season": "DJF",
+      "year": 2004,
+      "anom": 0.34,
+      "printed": 0.3
+    },
+    {
+      "season": "JFM",
+      "year": 2004,
+      "anom": 0.27,
+      "printed": 0.3
+    },
+    {
+      "season": "FMA",
+      "year": 2004,
+      "anom": 0.19,
+      "printed": 0.2
+    },
+    {
+      "season": "MAM",
+      "year": 2004,
+      "anom": 0.1,
+      "printed": 0.1
+    },
+    {
+      "season": "AMJ",
+      "year": 2004,
+      "anom": 0.12,
+      "printed": 0.1
+    },
+    {
+      "season": "MJJ",
+      "year": 2004,
+      "anom": 0.22,
+      "printed": 0.2
+    },
+    {
+      "season": "JJA",
+      "year": 2004,
+      "anom": 0.39,
+      "printed": 0.4
+    },
+    {
+      "season": "JAS",
+      "year": 2004,
+      "anom": 0.54,
+      "printed": 0.5
+    },
+    {
+      "season": "ASO",
+      "year": 2004,
+      "anom": 0.58,
+      "printed": 0.6
+    },
+    {
+      "season": "SON",
+      "year": 2004,
+      "anom": 0.61,
+      "printed": 0.6
+    },
+    {
+      "season": "OND",
+      "year": 2004,
+      "anom": 0.64,
+      "printed": 0.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2004,
+      "anom": 0.71,
+      "printed": 0.7
+    },
+    {
+      "season": "DJF",
+      "year": 2005,
+      "anom": 0.62,
+      "printed": 0.6
+    },
+    {
+      "season": "JFM",
+      "year": 2005,
+      "anom": 0.55,
+      "printed": 0.6
+    },
+    {
+      "season": "FMA",
+      "year": 2005,
+      "anom": 0.4,
+      "printed": 0.4
+    },
+    {
+      "season": "MAM",
+      "year": 2005,
+      "anom": 0.37,
+      "printed": 0.4
+    },
+    {
+      "season": "AMJ",
+      "year": 2005,
+      "anom": 0.27,
+      "printed": 0.3
+    },
+    {
+      "season": "MJJ",
+      "year": 2005,
+      "anom": 0.09,
+      "printed": 0.1
+    },
+    {
+      "season": "JJA",
+      "year": 2005,
+      "anom": -0.04,
+      "printed": 0.0
+    },
+    {
+      "season": "JAS",
+      "year": 2005,
+      "anom": -0.14,
+      "printed": -0.1
+    },
+    {
+      "season": "ASO",
+      "year": 2005,
+      "anom": -0.11,
+      "printed": -0.1
+    },
+    {
+      "season": "SON",
+      "year": 2005,
+      "anom": -0.27,
+      "printed": -0.3
+    },
+    {
+      "season": "OND",
+      "year": 2005,
+      "anom": -0.57,
+      "printed": -0.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2005,
+      "anom": -0.82,
+      "printed": -0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2006,
+      "anom": -0.86,
+      "printed": -0.9
+    },
+    {
+      "season": "JFM",
+      "year": 2006,
+      "anom": -0.8,
+      "printed": -0.8
+    },
+    {
+      "season": "FMA",
+      "year": 2006,
+      "anom": -0.63,
+      "printed": -0.6
+    },
+    {
+      "season": "MAM",
+      "year": 2006,
+      "anom": -0.45,
+      "printed": -0.4
+    },
+    {
+      "season": "AMJ",
+      "year": 2006,
+      "anom": -0.19,
+      "printed": -0.2
+    },
+    {
+      "season": "MJJ",
+      "year": 2006,
+      "anom": -0.05,
+      "printed": 0.0
+    },
+    {
+      "season": "JJA",
+      "year": 2006,
+      "anom": 0.12,
+      "printed": 0.1
+    },
+    {
+      "season": "JAS",
+      "year": 2006,
+      "anom": 0.33,
+      "printed": 0.3
+    },
+    {
+      "season": "ASO",
+      "year": 2006,
+      "anom": 0.54,
+      "printed": 0.5
+    },
+    {
+      "season": "SON",
+      "year": 2006,
+      "anom": 0.71,
+      "printed": 0.7
+    },
+    {
+      "season": "OND",
+      "year": 2006,
+      "anom": 0.88,
+      "printed": 0.9
+    },
+    {
+      "season": "NDJ",
+      "year": 2006,
+      "anom": 0.88,
+      "printed": 0.9
+    },
+    {
+      "season": "DJF",
+      "year": 2007,
+      "anom": 0.62,
+      "printed": 0.6
+    },
+    {
+      "season": "JFM",
+      "year": 2007,
+      "anom": 0.19,
+      "printed": 0.2
+    },
+    {
+      "season": "FMA",
+      "year": 2007,
+      "anom": -0.12,
+      "printed": -0.1
+    },
+    {
+      "season": "MAM",
+      "year": 2007,
+      "anom": -0.32,
+      "printed": -0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2007,
+      "anom": -0.34,
+      "printed": -0.3
+    },
+    {
+      "season": "MJJ",
+      "year": 2007,
+      "anom": -0.41,
+      "printed": -0.4
+    },
+    {
+      "season": "JJA",
+      "year": 2007,
+      "anom": -0.49,
+      "printed": -0.5
+    },
+    {
+      "season": "JAS",
+      "year": 2007,
+      "anom": -0.77,
+      "printed": -0.8
+    },
+    {
+      "season": "ASO",
+      "year": 2007,
+      "anom": -1.05,
+      "printed": -1.0
+    },
+    {
+      "season": "SON",
+      "year": 2007,
+      "anom": -1.38,
+      "printed": -1.4
+    },
+    {
+      "season": "OND",
+      "year": 2007,
+      "anom": -1.57,
+      "printed": -1.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2007,
+      "anom": -1.72,
+      "printed": -1.7
+    },
+    {
+      "season": "DJF",
+      "year": 2008,
+      "anom": -1.76,
+      "printed": -1.8
+    },
+    {
+      "season": "JFM",
+      "year": 2008,
+      "anom": -1.61,
+      "printed": -1.6
+    },
+    {
+      "season": "FMA",
+      "year": 2008,
+      "anom": -1.37,
+      "printed": -1.4
+    },
+    {
+      "season": "MAM",
+      "year": 2008,
+      "anom": -1.05,
+      "printed": -1.0
+    },
+    {
+      "season": "AMJ",
+      "year": 2008,
+      "anom": -0.85,
+      "printed": -0.8
+    },
+    {
+      "season": "MJJ",
+      "year": 2008,
+      "anom": -0.56,
+      "printed": -0.6
+    },
+    {
+      "season": "JJA",
+      "year": 2008,
+      "anom": -0.33,
+      "printed": -0.3
+    },
+    {
+      "season": "JAS",
+      "year": 2008,
+      "anom": -0.2,
+      "printed": -0.2
+    },
+    {
+      "season": "ASO",
+      "year": 2008,
+      "anom": -0.25,
+      "printed": -0.2
+    },
+    {
+      "season": "SON",
+      "year": 2008,
+      "anom": -0.36,
+      "printed": -0.4
+    },
+    {
+      "season": "OND",
+      "year": 2008,
+      "anom": -0.57,
+      "printed": -0.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2008,
+      "anom": -0.79,
+      "printed": -0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2009,
+      "anom": -0.89,
+      "printed": -0.9
+    },
+    {
+      "season": "JFM",
+      "year": 2009,
+      "anom": -0.84,
+      "printed": -0.8
+    },
+    {
+      "season": "FMA",
+      "year": 2009,
+      "anom": -0.63,
+      "printed": -0.6
+    },
+    {
+      "season": "MAM",
+      "year": 2009,
+      "anom": -0.35,
+      "printed": -0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2009,
+      "anom": 0.03,
+      "printed": 0.0
+    },
+    {
+      "season": "MJJ",
+      "year": 2009,
+      "anom": 0.34,
+      "printed": 0.3
+    },
+    {
+      "season": "JJA",
+      "year": 2009,
+      "anom": 0.5,
+      "printed": 0.5
+    },
+    {
+      "season": "JAS",
+      "year": 2009,
+      "anom": 0.56,
+      "printed": 0.6
+    },
+    {
+      "season": "ASO",
+      "year": 2009,
+      "anom": 0.66,
+      "printed": 0.7
+    },
+    {
+      "season": "SON",
+      "year": 2009,
+      "anom": 0.92,
+      "printed": 0.9
+    },
+    {
+      "season": "OND",
+      "year": 2009,
+      "anom": 1.31,
+      "printed": 1.3
+    },
+    {
+      "season": "NDJ",
+      "year": 2009,
+      "anom": 1.5,
+      "printed": 1.5
+    },
+    {
+      "season": "DJF",
+      "year": 2010,
+      "anom": 1.47,
+      "printed": 1.5
+    },
+    {
+      "season": "JFM",
+      "year": 2010,
+      "anom": 1.21,
+      "printed": 1.2
+    },
+    {
+      "season": "FMA",
+      "year": 2010,
+      "anom": 0.88,
+      "printed": 0.9
+    },
+    {
+      "season": "MAM",
+      "year": 2010,
+      "anom": 0.38,
+      "printed": 0.4
+    },
+    {
+      "season": "AMJ",
+      "year": 2010,
+      "anom": -0.16,
+      "printed": -0.2
+    },
+    {
+      "season": "MJJ",
+      "year": 2010,
+      "anom": -0.66,
+      "printed": -0.7
+    },
+    {
+      "season": "JJA",
+      "year": 2010,
+      "anom": -0.98,
+      "printed": -1.0
+    },
+    {
+      "season": "JAS",
+      "year": 2010,
+      "anom": -1.24,
+      "printed": -1.2
+    },
+    {
+      "season": "ASO",
+      "year": 2010,
+      "anom": -1.43,
+      "printed": -1.4
+    },
+    {
+      "season": "SON",
+      "year": 2010,
+      "anom": -1.54,
+      "printed": -1.5
+    },
+    {
+      "season": "OND",
+      "year": 2010,
+      "anom": -1.57,
+      "printed": -1.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2010,
+      "anom": -1.48,
+      "printed": -1.5
+    },
+    {
+      "season": "DJF",
+      "year": 2011,
+      "anom": -1.29,
+      "printed": -1.3
+    },
+    {
+      "season": "JFM",
+      "year": 2011,
+      "anom": -1.06,
+      "printed": -1.1
+    },
+    {
+      "season": "FMA",
+      "year": 2011,
+      "anom": -0.85,
+      "printed": -0.8
+    },
+    {
+      "season": "MAM",
+      "year": 2011,
+      "anom": -0.68,
+      "printed": -0.7
+    },
+    {
+      "season": "AMJ",
+      "year": 2011,
+      "anom": -0.5,
+      "printed": -0.5
+    },
+    {
+      "season": "MJJ",
+      "year": 2011,
+      "anom": -0.34,
+      "printed": -0.3
+    },
+    {
+      "season": "JJA",
+      "year": 2011,
+      "anom": -0.37,
+      "printed": -0.4
+    },
+    {
+      "season": "JAS",
+      "year": 2011,
+      "anom": -0.5,
+      "printed": -0.5
+    },
+    {
+      "season": "ASO",
+      "year": 2011,
+      "anom": -0.76,
+      "printed": -0.8
+    },
+    {
+      "season": "SON",
+      "year": 2011,
+      "anom": -0.94,
+      "printed": -0.9
+    },
+    {
+      "season": "OND",
+      "year": 2011,
+      "anom": -1.02,
+      "printed": -1.0
+    },
+    {
+      "season": "NDJ",
+      "year": 2011,
+      "anom": -0.92,
+      "printed": -0.9
+    },
+    {
+      "season": "DJF",
+      "year": 2012,
+      "anom": -0.71,
+      "printed": -0.7
+    },
+    {
+      "season": "JFM",
+      "year": 2012,
+      "anom": -0.56,
+      "printed": -0.6
+    },
+    {
+      "season": "FMA",
+      "year": 2012,
+      "anom": -0.44,
+      "printed": -0.4
+    },
+    {
+      "season": "MAM",
+      "year": 2012,
+      "anom": -0.35,
+      "printed": -0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2012,
+      "anom": -0.18,
+      "printed": -0.2
+    },
+    {
+      "season": "MJJ",
+      "year": 2012,
+      "anom": 0.03,
+      "printed": 0.0
+    },
+    {
+      "season": "JJA",
+      "year": 2012,
+      "anom": 0.28,
+      "printed": 0.3
+    },
+    {
+      "season": "JAS",
+      "year": 2012,
+      "anom": 0.39,
+      "printed": 0.4
+    },
+    {
+      "season": "ASO",
+      "year": 2012,
+      "anom": 0.37,
+      "printed": 0.4
+    },
+    {
+      "season": "SON",
+      "year": 2012,
+      "anom": 0.28,
+      "printed": 0.3
+    },
+    {
+      "season": "OND",
+      "year": 2012,
+      "anom": 0.13,
+      "printed": 0.1
+    },
+    {
+      "season": "NDJ",
+      "year": 2012,
+      "anom": -0.03,
+      "printed": 0.0
+    },
+    {
+      "season": "DJF",
+      "year": 2013,
+      "anom": -0.24,
+      "printed": -0.2
+    },
+    {
+      "season": "JFM",
+      "year": 2013,
+      "anom": -0.28,
+      "printed": -0.3
+    },
+    {
+      "season": "FMA",
+      "year": 2013,
+      "anom": -0.23,
+      "printed": -0.2
+    },
+    {
+      "season": "MAM",
+      "year": 2013,
+      "anom": -0.2,
+      "printed": -0.2
+    },
+    {
+      "season": "AMJ",
+      "year": 2013,
+      "anom": -0.3,
+      "printed": -0.3
+    },
+    {
+      "season": "MJJ",
+      "year": 2013,
+      "anom": -0.38,
+      "printed": -0.4
+    },
+    {
+      "season": "JJA",
+      "year": 2013,
+      "anom": -0.45,
+      "printed": -0.4
+    },
+    {
+      "season": "JAS",
+      "year": 2013,
+      "anom": -0.34,
+      "printed": -0.3
+    },
+    {
+      "season": "ASO",
+      "year": 2013,
+      "anom": -0.32,
+      "printed": -0.3
+    },
+    {
+      "season": "SON",
+      "year": 2013,
+      "anom": -0.14,
+      "printed": -0.1
+    },
+    {
+      "season": "OND",
+      "year": 2013,
+      "anom": -0.12,
+      "printed": -0.1
+    },
+    {
+      "season": "NDJ",
+      "year": 2013,
+      "anom": -0.11,
+      "printed": -0.1
+    },
+    {
+      "season": "DJF",
+      "year": 2014,
+      "anom": -0.24,
+      "printed": -0.2
+    },
+    {
+      "season": "JFM",
+      "year": 2014,
+      "anom": -0.21,
+      "printed": -0.2
+    },
+    {
+      "season": "FMA",
+      "year": 2014,
+      "anom": -0.02,
+      "printed": 0.0
+    },
+    {
+      "season": "MAM",
+      "year": 2014,
+      "anom": 0.25,
+      "printed": 0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2014,
+      "anom": 0.35,
+      "printed": 0.4
+    },
+    {
+      "season": "MJJ",
+      "year": 2014,
+      "anom": 0.22,
+      "printed": 0.2
+    },
+    {
+      "season": "JJA",
+      "year": 2014,
+      "anom": 0.07,
+      "printed": 0.1
+    },
+    {
+      "season": "JAS",
+      "year": 2014,
+      "anom": 0.07,
+      "printed": 0.1
+    },
+    {
+      "season": "ASO",
+      "year": 2014,
+      "anom": 0.24,
+      "printed": 0.2
+    },
+    {
+      "season": "SON",
+      "year": 2014,
+      "anom": 0.51,
+      "printed": 0.5
+    },
+    {
+      "season": "OND",
+      "year": 2014,
+      "anom": 0.7,
+      "printed": 0.7
+    },
+    {
+      "season": "NDJ",
+      "year": 2014,
+      "anom": 0.8,
+      "printed": 0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2015,
+      "anom": 0.73,
+      "printed": 0.7
+    },
+    {
+      "season": "JFM",
+      "year": 2015,
+      "anom": 0.65,
+      "printed": 0.7
+    },
+    {
+      "season": "FMA",
+      "year": 2015,
+      "anom": 0.72,
+      "printed": 0.7
+    },
+    {
+      "season": "MAM",
+      "year": 2015,
+      "anom": 0.86,
+      "printed": 0.9
+    },
+    {
+      "season": "AMJ",
+      "year": 2015,
+      "anom": 1.04,
+      "printed": 1.0
+    },
+    {
+      "season": "MJJ",
+      "year": 2015,
+      "anom": 1.19,
+      "printed": 1.2
+    },
+    {
+      "season": "JJA",
+      "year": 2015,
+      "anom": 1.44,
+      "printed": 1.4
+    },
+    {
+      "season": "JAS",
+      "year": 2015,
+      "anom": 1.73,
+      "printed": 1.7
+    },
+    {
+      "season": "ASO",
+      "year": 2015,
+      "anom": 2.02,
+      "printed": 2.0
+    },
+    {
+      "season": "SON",
+      "year": 2015,
+      "anom": 2.28,
+      "printed": 2.3
+    },
+    {
+      "season": "OND",
+      "year": 2015,
+      "anom": 2.45,
+      "printed": 2.5
+    },
+    {
+      "season": "NDJ",
+      "year": 2015,
+      "anom": 2.59,
+      "printed": 2.6
+    },
+    {
+      "season": "DJF",
+      "year": 2016,
+      "anom": 2.5,
+      "printed": 2.5
+    },
+    {
+      "season": "JFM",
+      "year": 2016,
+      "anom": 2.21,
+      "printed": 2.2
+    },
+    {
+      "season": "FMA",
+      "year": 2016,
+      "anom": 1.69,
+      "printed": 1.7
+    },
+    {
+      "season": "MAM",
+      "year": 2016,
+      "anom": 1.11,
+      "printed": 1.1
+    },
+    {
+      "season": "AMJ",
+      "year": 2016,
+      "anom": 0.57,
+      "printed": 0.6
+    },
+    {
+      "season": "MJJ",
+      "year": 2016,
+      "anom": 0.09,
+      "printed": 0.1
+    },
+    {
+      "season": "JJA",
+      "year": 2016,
+      "anom": -0.19,
+      "printed": -0.2
+    },
+    {
+      "season": "JAS",
+      "year": 2016,
+      "anom": -0.34,
+      "printed": -0.3
+    },
+    {
+      "season": "ASO",
+      "year": 2016,
+      "anom": -0.42,
+      "printed": -0.4
+    },
+    {
+      "season": "SON",
+      "year": 2016,
+      "anom": -0.51,
+      "printed": -0.5
+    },
+    {
+      "season": "OND",
+      "year": 2016,
+      "anom": -0.49,
+      "printed": -0.5
+    },
+    {
+      "season": "NDJ",
+      "year": 2016,
+      "anom": -0.37,
+      "printed": -0.4
+    },
+    {
+      "season": "DJF",
+      "year": 2017,
+      "anom": -0.08,
+      "printed": -0.1
+    },
+    {
+      "season": "JFM",
+      "year": 2017,
+      "anom": 0.08,
+      "printed": 0.1
+    },
+    {
+      "season": "FMA",
+      "year": 2017,
+      "anom": 0.27,
+      "printed": 0.3
+    },
+    {
+      "season": "MAM",
+      "year": 2017,
+      "anom": 0.32,
+      "printed": 0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2017,
+      "anom": 0.35,
+      "printed": 0.4
+    },
+    {
+      "season": "MJJ",
+      "year": 2017,
+      "anom": 0.32,
+      "printed": 0.3
+    },
+    {
+      "season": "JJA",
+      "year": 2017,
+      "anom": 0.14,
+      "printed": 0.1
+    },
+    {
+      "season": "JAS",
+      "year": 2017,
+      "anom": -0.07,
+      "printed": -0.1
+    },
+    {
+      "season": "ASO",
+      "year": 2017,
+      "anom": -0.23,
+      "printed": -0.2
+    },
+    {
+      "season": "SON",
+      "year": 2017,
+      "anom": -0.44,
+      "printed": -0.4
+    },
+    {
+      "season": "OND",
+      "year": 2017,
+      "anom": -0.61,
+      "printed": -0.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2017,
+      "anom": -0.76,
+      "printed": -0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2018,
+      "anom": -0.71,
+      "printed": -0.7
+    },
+    {
+      "season": "JFM",
+      "year": 2018,
+      "anom": -0.67,
+      "printed": -0.7
+    },
+    {
+      "season": "FMA",
+      "year": 2018,
+      "anom": -0.55,
+      "printed": -0.5
+    },
+    {
+      "season": "MAM",
+      "year": 2018,
+      "anom": -0.35,
+      "printed": -0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2018,
+      "anom": -0.07,
+      "printed": -0.1
+    },
+    {
+      "season": "MJJ",
+      "year": 2018,
+      "anom": 0.13,
+      "printed": 0.1
+    },
+    {
+      "season": "JJA",
+      "year": 2018,
+      "anom": 0.2,
+      "printed": 0.2
+    },
+    {
+      "season": "JAS",
+      "year": 2018,
+      "anom": 0.3,
+      "printed": 0.3
+    },
+    {
+      "season": "ASO",
+      "year": 2018,
+      "anom": 0.52,
+      "printed": 0.5
+    },
+    {
+      "season": "SON",
+      "year": 2018,
+      "anom": 0.82,
+      "printed": 0.8
+    },
+    {
+      "season": "OND",
+      "year": 2018,
+      "anom": 1.04,
+      "printed": 1.0
+    },
+    {
+      "season": "NDJ",
+      "year": 2018,
+      "anom": 1.05,
+      "printed": 1.1
+    },
+    {
+      "season": "DJF",
+      "year": 2019,
+      "anom": 0.99,
+      "printed": 1.0
+    },
+    {
+      "season": "JFM",
+      "year": 2019,
+      "anom": 0.94,
+      "printed": 0.9
+    },
+    {
+      "season": "FMA",
+      "year": 2019,
+      "anom": 0.87,
+      "printed": 0.9
+    },
+    {
+      "season": "MAM",
+      "year": 2019,
+      "anom": 0.82,
+      "printed": 0.8
+    },
+    {
+      "season": "AMJ",
+      "year": 2019,
+      "anom": 0.71,
+      "printed": 0.7
+    },
+    {
+      "season": "MJJ",
+      "year": 2019,
+      "anom": 0.59,
+      "printed": 0.6
+    },
+    {
+      "season": "JJA",
+      "year": 2019,
+      "anom": 0.38,
+      "printed": 0.4
+    },
+    {
+      "season": "JAS",
+      "year": 2019,
+      "anom": 0.2,
+      "printed": 0.2
+    },
+    {
+      "season": "ASO",
+      "year": 2019,
+      "anom": 0.31,
+      "printed": 0.3
+    },
+    {
+      "season": "SON",
+      "year": 2019,
+      "anom": 0.51,
+      "printed": 0.5
+    },
+    {
+      "season": "OND",
+      "year": 2019,
+      "anom": 0.72,
+      "printed": 0.7
+    },
+    {
+      "season": "NDJ",
+      "year": 2019,
+      "anom": 0.75,
+      "printed": 0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2020,
+      "anom": 0.71,
+      "printed": 0.7
+    },
+    {
+      "season": "JFM",
+      "year": 2020,
+      "anom": 0.66,
+      "printed": 0.7
+    },
+    {
+      "season": "FMA",
+      "year": 2020,
+      "anom": 0.57,
+      "printed": 0.6
+    },
+    {
+      "season": "MAM",
+      "year": 2020,
+      "anom": 0.33,
+      "printed": 0.3
+    },
+    {
+      "season": "AMJ",
+      "year": 2020,
+      "anom": 0.04,
+      "printed": 0.0
+    },
+    {
+      "season": "MJJ",
+      "year": 2020,
+      "anom": -0.18,
+      "printed": -0.2
+    },
+    {
+      "season": "JJA",
+      "year": 2020,
+      "anom": -0.29,
+      "printed": -0.3
+    },
+    {
+      "season": "JAS",
+      "year": 2020,
+      "anom": -0.43,
+      "printed": -0.4
+    },
+    {
+      "season": "ASO",
+      "year": 2020,
+      "anom": -0.77,
+      "printed": -0.8
+    },
+    {
+      "season": "SON",
+      "year": 2020,
+      "anom": -1.0,
+      "printed": -1.0
+    },
+    {
+      "season": "OND",
+      "year": 2020,
+      "anom": -1.11,
+      "printed": -1.1
+    },
+    {
+      "season": "NDJ",
+      "year": 2020,
+      "anom": -1.06,
+      "printed": -1.1
+    },
+    {
+      "season": "DJF",
+      "year": 2021,
+      "anom": -0.99,
+      "printed": -1.0
+    },
+    {
+      "season": "JFM",
+      "year": 2021,
+      "anom": -0.85,
+      "printed": -0.9
+    },
+    {
+      "season": "FMA",
+      "year": 2021,
+      "anom": -0.74,
+      "printed": -0.7
+    },
+    {
+      "season": "MAM",
+      "year": 2021,
+      "anom": -0.56,
+      "printed": -0.6
+    },
+    {
+      "season": "AMJ",
+      "year": 2021,
+      "anom": -0.4,
+      "printed": -0.4
+    },
+    {
+      "season": "MJJ",
+      "year": 2021,
+      "anom": -0.31,
+      "printed": -0.3
+    },
+    {
+      "season": "JJA",
+      "year": 2021,
+      "anom": -0.35,
+      "printed": -0.3
+    },
+    {
+      "season": "JAS",
+      "year": 2021,
+      "anom": -0.46,
+      "printed": -0.5
+    },
+    {
+      "season": "ASO",
+      "year": 2021,
+      "anom": -0.64,
+      "printed": -0.6
+    },
+    {
+      "season": "SON",
+      "year": 2021,
+      "anom": -0.77,
+      "printed": -0.8
+    },
+    {
+      "season": "OND",
+      "year": 2021,
+      "anom": -0.91,
+      "printed": -0.9
+    },
+    {
+      "season": "NDJ",
+      "year": 2021,
+      "anom": -0.83,
+      "printed": -0.8
+    },
+    {
+      "season": "DJF",
+      "year": 2022,
+      "anom": -0.76,
+      "printed": -0.8
+    },
+    {
+      "season": "JFM",
+      "year": 2022,
+      "anom": -0.68,
+      "printed": -0.7
+    },
+    {
+      "season": "FMA",
+      "year": 2022,
+      "anom": -0.77,
+      "printed": -0.8
+    },
+    {
+      "season": "MAM",
+      "year": 2022,
+      "anom": -0.86,
+      "printed": -0.9
+    },
+    {
+      "season": "AMJ",
+      "year": 2022,
+      "anom": -0.83,
+      "printed": -0.8
+    },
+    {
+      "season": "MJJ",
+      "year": 2022,
+      "anom": -0.73,
+      "printed": -0.7
+    },
+    {
+      "season": "JJA",
+      "year": 2022,
+      "anom": -0.7,
+      "printed": -0.7
+    },
+    {
+      "season": "JAS",
+      "year": 2022,
+      "anom": -0.78,
+      "printed": -0.8
+    },
+    {
+      "season": "ASO",
+      "year": 2022,
+      "anom": -0.87,
+      "printed": -0.9
+    },
+    {
+      "season": "SON",
+      "year": 2022,
+      "anom": -0.89,
+      "printed": -0.9
+    },
+    {
+      "season": "OND",
+      "year": 2022,
+      "anom": -0.82,
+      "printed": -0.8
+    },
+    {
+      "season": "NDJ",
+      "year": 2022,
+      "anom": -0.7,
+      "printed": -0.7
+    },
+    {
+      "season": "DJF",
+      "year": 2023,
+      "anom": -0.55,
+      "printed": -0.5
+    },
+    {
+      "season": "JFM",
+      "year": 2023,
+      "anom": -0.33,
+      "printed": -0.3
+    },
+    {
+      "season": "FMA",
+      "year": 2023,
+      "anom": -0.11,
+      "printed": -0.1
+    },
+    {
+      "season": "MAM",
+      "year": 2023,
+      "anom": 0.19,
+      "printed": 0.2
+    },
+    {
+      "season": "AMJ",
+      "year": 2023,
+      "anom": 0.46,
+      "printed": 0.5
+    },
+    {
+      "season": "MJJ",
+      "year": 2023,
+      "anom": 0.73,
+      "printed": 0.7
+    },
+    {
+      "season": "JJA",
+      "year": 2023,
+      "anom": 1.0,
+      "printed": 1.0
+    },
+    {
+      "season": "JAS",
+      "year": 2023,
+      "anom": 1.25,
+      "printed": 1.3
+    },
+    {
+      "season": "ASO",
+      "year": 2023,
+      "anom": 1.5,
+      "printed": 1.5
+    },
+    {
+      "season": "SON",
+      "year": 2023,
+      "anom": 1.74,
+      "printed": 1.7
+    },
+    {
+      "season": "OND",
+      "year": 2023,
+      "anom": 1.9,
+      "printed": 1.9
+    },
+    {
+      "season": "NDJ",
+      "year": 2023,
+      "anom": 1.99,
+      "printed": 2.0
+    },
+    {
+      "season": "DJF",
+      "year": 2024,
+      "anom": 1.84,
+      "printed": 1.8
+    },
+    {
+      "season": "JFM",
+      "year": 2024,
+      "anom": 1.53,
+      "printed": 1.5
+    },
+    {
+      "season": "FMA",
+      "year": 2024,
+      "anom": 1.18,
+      "printed": 1.2
+    },
+    {
+      "season": "MAM",
+      "year": 2024,
+      "anom": 0.77,
+      "printed": 0.8
+    },
+    {
+      "season": "AMJ",
+      "year": 2024,
+      "anom": 0.43,
+      "printed": 0.4
+    },
+    {
+      "season": "MJJ",
+      "year": 2024,
+      "anom": 0.18,
+      "printed": 0.2
+    },
+    {
+      "season": "JJA",
+      "year": 2024,
+      "anom": 0.06,
+      "printed": 0.1
+    },
+    {
+      "season": "JAS",
+      "year": 2024,
+      "anom": -0.04,
+      "printed": 0.0
+    },
+    {
+      "season": "ASO",
+      "year": 2024,
+      "anom": -0.12,
+      "printed": -0.1
+    },
+    {
+      "season": "SON",
+      "year": 2024,
+      "anom": -0.19,
+      "printed": -0.2
+    },
+    {
+      "season": "OND",
+      "year": 2024,
+      "anom": -0.29,
+      "printed": -0.3
+    },
+    {
+      "season": "NDJ",
+      "year": 2024,
+      "anom": -0.43,
+      "printed": -0.4
+    },
+    {
+      "season": "DJF",
+      "year": 2025,
+      "anom": -0.46,
+      "printed": -0.5
+    },
+    {
+      "season": "JFM",
+      "year": 2025,
+      "anom": -0.22,
+      "printed": -0.2
+    },
+    {
+      "season": "FMA",
+      "year": 2025,
+      "anom": -0.08,
+      "printed": -0.1
+    },
+    {
+      "season": "MAM",
+      "year": 2025,
+      "anom": 0.02,
+      "printed": 0.0
+    },
+    {
+      "season": "AMJ",
+      "year": 2025,
+      "anom": -0.04,
+      "printed": 0.0
+    },
+    {
+      "season": "MJJ",
+      "year": 2025,
+      "anom": -0.02,
+      "printed": 0.0
+    },
+    {
+      "season": "JJA",
+      "year": 2025,
+      "anom": -0.11,
+      "printed": -0.1
+    },
+    {
+      "season": "JAS",
+      "year": 2025,
+      "anom": -0.26,
+      "printed": -0.3
+    },
+    {
+      "season": "ASO",
+      "year": 2025,
+      "anom": -0.43,
+      "printed": -0.4
+    },
+    {
+      "season": "SON",
+      "year": 2025,
+      "anom": -0.57,
+      "printed": -0.6
+    },
+    {
+      "season": "OND",
+      "year": 2025,
+      "anom": -0.61,
+      "printed": -0.6
+    },
+    {
+      "season": "NDJ",
+      "year": 2025,
+      "anom": -0.6,
+      "printed": -0.6
+    }
+  ]
+}
