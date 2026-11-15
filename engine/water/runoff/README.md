@@ -4,7 +4,7 @@ The daily surface runoff of D44 of issue #77 ("runoff by the Curve Number"), as 
 
 Status: **PROPOSED** (blueprint section 3.7). Nothing here is in force until people approve the pull request: the lead developer, who owns lane L1 and decided the method (D44), and a science reviewer, because the forms of the equations are science class (blueprint section 3.6).
 
-Status on `main` (15 November 2026): EP3 is built. `compute_water_deficit_exposure` is `engine/water/exposure.py` (#135); it imports this module and gives the balance of `engine/water/balance/` its daily runoff. It gives no water number with the catalogue of `params/records/` until the records the chain reads are signed. The sentences below that call EP3 not built describe the state when this folder landed.
+Status on `main` (15 November 2026): EP3 is built. `compute_water_deficit_exposure` is `engine/water/exposure.py` (#135, chained to runoff and `Ke` by #165); it imports this module and gives the balance of `engine/water/balance/` its daily runoff. It gives no water number with the catalogue of `params/records/` until the records the chain reads are signed. The sentences below that call EP3 not built describe the state when this folder landed.
 
 Acceptance test, from the repository root:
 
