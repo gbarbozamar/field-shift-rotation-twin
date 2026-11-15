@@ -28,7 +28,8 @@ of the stage lengths, the day numbering, the straight line of ``by_stage``
 for both uses, the form in which the tail is returned, the stage length kept
 by a stage cut at the harvest, and every ``detail``. The cut and the tail are
 decisions D135 and D136 of issue #77. See EXPOSURE.md in this folder, choices
-6, 16 and 17 and OPEN 4 and 25 to 29.
+6, 16 and 17 and OPEN 4, 26 to 29 and 38 (OPEN 25 is closed by D135 to
+D137).
 
 Pure function (G1): no file, no network, no clock, no environment variable,
 and the arguments are not changed. The only integer is the one of day
