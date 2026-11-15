@@ -223,27 +223,60 @@ Depends on: Q2, Q3 (parameters; answered: see the question), Q5 (which agricultu
 
 ### EP4 `engine/residues/`
 
-Status: OPEN
+Status: PROPOSED
 
-| Aspect | Candidate |
+Built by unit `l1/residue-ledger-ep4` (brief #220), at the lead developer's request, so that AMG gets carbon inputs (D122 of #77). Everything in this entry is PROPOSED, for the lead developer's approval. The platform developer consumes the result. The forms and the records are in `engine/residues/README.md`.
+
+| Aspect | Entry |
 |---|---|
 | Lane | L1 Engines (lead developer) |
-| Module path | `engine.residues` (file `engine/residues/__init__.py`) |
+| Module path | `engine.residues` (file `engine/residues/__init__.py`; the function is in `engine/residues/ledger.py` and is exported from the package) |
 | Function name | `build_residue_ledger` |
-| Argument `rotation` | `"Rotation definition"`: contract of blueprint section 5 that does not exist yet. `OPEN` |
-| Argument `calendar` | `RotationCalendar` (`contracts/inputs/rotation_calendar.py`). The value returned by EP2 |
-| Return type | `"ResidueLedger"`: contract of blueprint section 5, producer Engines. It does not exist yet: `OPEN` |
+| Argument `rotation` | `RotationDefinition` (`contracts/rotation_definition/rotation_definition.py`): the item `rotation` of the request, as the route validates it. It gives each component's `purpose` and declared `management.residue`, which the calendar does not carry |
+| Argument `calendar` | `RotationCalendar` (`contracts/inputs/rotation_calendar.py`). The value returned by EP2, feasible or not |
+| Argument `climate` | `SiteClimate` (`contracts/inputs/site_climate.py`). Only the period of its daily series is read, for the agricultural years (D47) |
+| Argument `parameters` | `dict[str, dict]`: the parameter catalogue as loaded by the runner (Q3, D46, D56). Keyword-only, as in `run_amg` |
+| Return type | `ResidueLedger` (`contracts/residue_ledger/models.py`, PROPOSED) |
 
 ```text
 build_residue_ledger(
-    rotation: "Rotation definition",
+    rotation: RotationDefinition,
     calendar: RotationCalendar,
-) -> "ResidueLedger"
+    climate: SiteClimate,
+    *,
+    parameters: dict[str, dict],
+) -> ResidueLedger
 ```
 
-Why it is `OPEN`: the blueprint says what the ledger holds (biomass and carbon closure; export and retention; roots and cover kept apart) and not what it is computed from. The two arguments are a candidate only: what the user declares, and when. The session cannot say whether the ledger also needs site data, the result of another engine or values of the parameter catalogue. The question is Q13.
+What it returns: a `ResidueLedger` with one entry per component of the calendar in each cycle of the rotation repeated over the record (D47, `engine.calendar.repeat_over_record`, as EP1). Each entry holds the aboveground residue at harvest produced, exported and retained, as mass and as carbon, and apart from it the roots and the rhizodeposits. For a `grain` component:
 
-When it cannot compute: it returns a `"ResidueLedger"` in which every value that is not computed is missing with its reason (G4). For an infeasible calendar that reason is `NOT_COMPUTABLE`. This needs a `"ResidueLedger"` contract in which every value can be missing (C3.1); that is part of Q13.
+- the residue = `residue_yield_ratio` × `crop_yield` (D129 (c));
+- the carbon = the mass × `residue_carbon_fraction`;
+- the export = the residue × `residue_removed_fraction` when the component declares `removed`, and nothing when it declares `left_on_surface` or `incorporated`;
+- the roots = `root_mass_at_harvest` with `root_carbon_fraction`;
+- the rhizodeposits = `rhizodeposit_carbon`.
+
+Every record is read by crop. The ledger also holds, per crop, purpose and part that enters the soil, one `AnnualCarbonInputSeries` over the whole agricultural years of the record. These are the series the platform copies unchanged into `CarbonForcing.annual_carbon_inputs`.
+
+When it cannot compute (G4):
+
+- An infeasible calendar makes every value `NOT_COMPUTABLE`.
+- A record that is not in `parameters` makes the values that need it `MISSING_INPUT`, naming it by `id` and scope (D56). So does a record with a `null` value, whose reason is repeated.
+- A component whose purpose is `cover` or `pasture` has every value `NOT_COMPUTABLE`: D129 (c) needs a yield.
+- When no agricultural year can be laid out, the ledger carries `years_missing` with its reason and lists nothing.
+
+It raises only `TypeError` for an argument that is not of its type, and `ValueError` when the three arguments name different `case_id` or `field_id` (G5).
+
+Still `OPEN` (`engine/residues/README.md`, OPEN; `contracts/residue_ledger/README.md`, OPEN):
+
+- the identifiers of the two records shared with #218;
+- the units: the ledger is in `kg ha-1` (dry matter) and `kg C ha-1`, while AMG requires `t C ha-1` for a carbon input and converts nothing, so who converts is open; also the dry-matter basis of the yield;
+- how roots, rhizodeposits, cover crops and pastures are computed;
+- when a residue enters the soil;
+- the acceptance of the contract's shape;
+- whether a carbon engine takes the ledger itself (Q14 (b)).
+
+The runner does not call EP4 yet: that is a change of lane L2a.
 
 ### EP5 `engine/amg/`
 
@@ -402,6 +435,23 @@ Each item is a question a person can answer. The role that answers it is named a
 **Q12. Does the erosion engine consume the residue ledger?** Blueprint section 5 names the lead lane as a consumer of `ResidueLedger`. If the erosion engine is that consumer, EP1 gains the argument `residues: "ResidueLedger"` and EP4 is called before EP1. For the lead developer.
 
 **Q13. What is the residue ledger computed from, and what is its contract?** EP4 is `OPEN` until the `ResidueLedger` contract exists and a person says which inputs the ledger needs: what the user declares, the calendar, site data, the result of another engine, parameters. The contract has to let every value be missing with its reason. For the lead developer, as owner of lane L1; the science reviewers for what the ledger is computed from.
+
+- `PROPOSED` by unit `l1/residue-ledger-ep4` (brief #220, at the lead developer's request after D122 of #77), for the lead developer's approval:
+  - the contract `contracts/residue_ledger/`;
+  - the signature of EP4 above: `rotation`, `calendar`, `climate` and keyword-only `parameters`, returning `ResidueLedger`;
+  - the residue at harvest from the records of D129 (c) (`residue_yield_ratio` × `crop_yield`, by crop);
+  - five more records by crop: `residue_carbon_fraction`, `residue_removed_fraction`, `root_mass_at_harvest`, `root_carbon_fraction`, `rhizodeposit_carbon`.
+
+  No site datum other than the period of the record and no result of another engine is read. EP4 takes `parameters`, which answers for EP4 the last bullet of Q3 ("whether they gain it").
+- Still `OPEN`:
+  - the two identifiers shared with #218 (`engine/residues/README.md`, OPEN 1);
+  - the units of the ledger (`kg ha-1`, `kg C ha-1`) against the `t C ha-1` of AMG (OPEN 3), the dry-matter basis of the yield, and whether the ratio is mass per mass (OPEN 2; CITATION NEEDED);
+  - how roots and rhizodeposits are computed, and any partition form, which would be a record with a cited source (OPEN 4; CITATION NEEDED);
+  - a method for cover crops and pastures (OPEN 5);
+  - when a residue enters the soil, and the zero of a year without a harvest (OPEN 6);
+  - the acceptance of the contract's shape (`contracts/residue_ledger/README.md`, OPEN 1).
+
+  For the lead developer and the science reviewers.
 
 **Q14. What do the two carbon entry points receive and return?** EP5 and EP6 were `OPEN` until the `ModelState` and `CarbonBalance` contracts existed. `CarbonForcing` is PROPOSED in `contracts/carbon_forcing/` (#155, D62) and `CarbonBalance` in `contracts/carbon_balance/` (#199, #205); EP5 is `PROPOSED` and `run_amg` exists, EP6 stays `OPEN` because `run_rothc` does not exist. Four parts. (a) `ModelState`: is it an argument (the starting state, the same for both models), part of what is returned, or both? (b) The residue ledger: does a carbon engine take `ResidueLedger` as an argument, or does `CarbonForcing` already hold what comes from it? `CarbonForcing` has `carbon_inputs` and `annual_carbon_inputs`, each series with an `origin` whose vocabulary is `OPEN` (`contracts/carbon_forcing/README.md`, OPEN 4). (c) The indicator: who computes the three values of `soil_carbon_trend` per model (C1.6): each carbon engine, which then returns `list[SoilCarbonTrend]` (`contracts/results/models.py`) next to the balance, or one function shared by both models, and in which folder does it live? (d) The two variants of AMG in blueprint section 8: does the one function return both, and how is each labelled? `CarbonForcing` now carries both monthly series and annual series (`annual_climate`, `annual_carbon_inputs`), at the lead developer's request on #155; which one each variant reads stays part of this question (`contracts/carbon_forcing/README.md`, OPEN 4). For the lead developer (EP5), the interface developer (EP6) and the platform developer, as producer of `CarbonForcing`.
 
