@@ -75,7 +75,7 @@ from contracts.results.models import (
 )
 from engine.erosion import equation, ls
 from engine.erosion import soil_loss as module
-from params.catalogue import check_catalogue
+from params.catalogue import check_catalogue, load_folder
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
@@ -1103,9 +1103,26 @@ def test_empty_catalogue_names_every_parameter_and_keeps_every_year():
         assert f"{named(pid)} has no record in parameters (D56)" in detail
     c_part = detail.split("factor 'c' is missing", 1)[1].split("factor 'p'", 1)[0]
     assert "DECLARED" in c_part and "D69" in c_part and "USER-G" in c_part
-    for pid in (*module.MONTHLY_EROSIVITY_IDS, *module.DAILY_ROUTE_PARAMETER_IDS):
-        if pid not in module.PARAMETER_IDS:
-            assert f"'{pid}'" not in detail
+    # Changed by unit l0/erosion-c-main-route (#218): C falls back to the
+    # declared record and names the records of the computed C that are missing.
+    assert "PROPOSED fallback of brief #218" in c_part
+    for pid in module.MONTHLY_EROSIVITY_IDS:
+        assert f"{named(pid)} has no record in parameters (D56)" in c_part
+    stage = {"stage": module.STAGE_SHOWN}
+    for crop in CROPS:
+        for pid in module.CANOPY_IDS:
+            assert f"{named(pid, {'crop': crop, **stage})} has no record" in c_part
+        for pid in module.MAIN_C_RESIDUE_IDS:
+            assert f"{named(pid, {'crop': crop})} has no record" in c_part
+    for pid in module.CANOPY_IDS:
+        assert f"{named(pid, module.NO_CROP_SCOPE)} has no record" in c_part
+    for pid in (
+        module.R_EXPONENT_ID,
+        module.R_THRESHOLD_ID,
+        module.RESIDUE_MASS_ID,
+        module.YIELD_CONVERSION_ID,
+    ):
+        assert f"'{pid}'" not in detail
     assert {item.missing.reason for item in result.monthly} == {"MISSING_INPUT"}
     for item in result.monthly:
         month_detail = item.missing.detail
@@ -1800,6 +1817,570 @@ def test_month_that_is_not_a_number_is_named_not_dropped():
     assert whole == {m: 1.5 for m in months}
 
 
+# --- C on the main route (unit l0/erosion-c-main-route, issue #218; D129) ----
+
+# The crops of the two rotations of the demonstration (D128), as PLACEHOLDER
+# crop identifiers: soybean with winter fallow, against soybean-wheat-maize.
+SOY = unmarked("PLACEHOLDER-soybean")
+WHEAT = unmarked("PLACEHOLDER-wheat")
+MAIZE = unmarked("PLACEHOLDER-maize")
+DEMO_CROPS = (SOY, WHEAT, MAIZE)
+
+# PLACEHOLDER days after planting of the series of D129, not the days of any
+# table, and PLACEHOLDER numbers on them: repeated digits, a canopy cover a
+# fraction. Not values of the method.
+STAGE_DAYS = (11, 22, 44)
+C_SERIES: dict[tuple[str, str], tuple[float, ...]] = {
+    (module.CANOPY_COVER_ID, SOY): (0.111, 0.555, 0.333),
+    (module.CANOPY_COVER_ID, WHEAT): (0.222, 0.444, 0.666),
+    (module.CANOPY_COVER_ID, MAIZE): (0.333, 0.777, 0.555),
+    (module.FALL_HEIGHT_ID, SOY): (1.11, 2.22, 3.33),
+    (module.FALL_HEIGHT_ID, WHEAT): (0.555, 1.11, 2.22),
+    (module.FALL_HEIGHT_ID, MAIZE): (2.22, 3.33, 4.44),
+}
+# PLACEHOLDER numbers of the residue records by crop (D129 (b), (c)).
+C_RESIDUE: dict[tuple[str, str], float] = {
+    (module.RESIDUE_YIELD_RATIO_ID, SOY): 1.11,
+    (module.RESIDUE_YIELD_RATIO_ID, WHEAT): 2.22,
+    (module.RESIDUE_YIELD_RATIO_ID, MAIZE): 1.11,
+    (module.CROP_YIELD_ID, SOY): 5.55,
+    (module.CROP_YIELD_ID, WHEAT): 4.44,
+    (module.CROP_YIELD_ID, MAIZE): 6.66,
+    (module.DECAY_COEFFICIENT_ID, SOY): 0.0333,
+    (module.DECAY_COEFFICIENT_ID, WHEAT): 0.0222,
+    (module.DECAY_COEFFICIENT_ID, MAIZE): 0.0111,
+    (module.MASS_COVER_COEFFICIENT_ID, SOY): 0.0555,
+    (module.MASS_COVER_COEFFICIENT_ID, WHEAT): 0.0444,
+    (module.MASS_COVER_COEFFICIENT_ID, MAIZE): 0.0333,
+}
+YIELD_UNIT = "PLACEHOLDER_yield_unit"
+# The yield of these crops is in YIELD_UNIT, so the conversion record turns it
+# into MASS_UNIT; the yield of maize is already in MASS_UNIT and needs none.
+CONVERTED = (SOY, WHEAT)
+CONVERSION = 0.777  # PLACEHOLDER, not a conversion factor of any two units
+CONVERSION_UNIT = f"{MASS_UNIT}{module.CONVERSION_SEPARATOR}{YIELD_UNIT}"
+
+
+def stage_word(days: int) -> str:
+    return f"{module.STAGE_PREFIX}{days}"
+
+
+def c_residue_unit(pid: str, crop: str) -> str:
+    return {
+        module.RESIDUE_YIELD_RATIO_ID: module.DIMENSIONLESS,
+        module.CROP_YIELD_ID: YIELD_UNIT if crop in CONVERTED else MASS_UNIT,
+        module.DECAY_COEFFICIENT_ID: f"{module.DAY}-1",
+        module.MASS_COVER_COEFFICIENT_ID: f"({MASS_UNIT})-1",
+    }[pid]
+
+
+def c_records() -> dict[str, dict]:
+    """The records of the computed C of the main route, still marked."""
+    records: dict[str, dict] = {}
+    for (pid, crop), numbers in C_SERIES.items():
+        unit = crop_unit_of(pid)
+        for days, number in zip(STAGE_DAYS, numbers):
+            word = stage_word(days)
+            records[crop_key(pid, f"{crop}.{word}")] = placeholder_record(
+                pid, number, unit, {"crop": crop, "stage": word}
+            )
+    for (pid, crop), number in C_RESIDUE.items():
+        records[crop_key(pid, crop)] = placeholder_record(
+            pid, number, c_residue_unit(pid, crop), {"crop": crop}
+        )
+    records[site_key(module.YIELD_CONVERSION_ID)] = placeholder_record(
+        module.YIELD_CONVERSION_ID, CONVERSION, CONVERSION_UNIT
+    )
+    return records
+
+
+def marked_c_catalogue(*leave_out: str) -> dict[str, dict]:
+    """The complete catalogue with the records of the computed C, marked;
+    ``leave_out`` names records by their key."""
+    records = {**marked_catalogue(), **c_records()}
+    return {key: record for key, record in records.items() if key not in leave_out}
+
+
+def c_catalogue(*leave_out: str) -> dict[str, dict]:
+    built = unmarked(marked_c_catalogue(*leave_out))
+    assert check_catalogue(built) == []
+    return built
+
+
+def c_catalogue_with(key: str, **fields: Any) -> dict[str, dict]:
+    marked = marked_c_catalogue()
+    marked[key].update(fields)
+    return unmarked(marked)
+
+
+def demo_window(
+    ag_year: int, first: int, last: int, crop: str
+) -> tuple[str, dt.date, dt.date]:
+    """A crop from the first day of month position ``first`` of an agricultural
+    year to the last day of month position ``last`` (positions from zero)."""
+    month = start_month()
+
+    def month_of(position: int) -> tuple[int, int]:
+        index = ag_year * 12 + month - 1 + position
+        return index // 12, index % 12 + 1
+
+    return crop, dt.date(*month_of(first), 1), month_bounds(*month_of(last))[1]
+
+
+def demo_calendar(rotation: str, first_ag_year: int) -> RotationCalendar:
+    """A PLACEHOLDER calendar of one demonstration rotation (D128), its first
+    agricultural year ``first_ag_year``. Soybean with winter fallow: one year,
+    soybean and then no crop. Soybean-wheat-maize: two years, wheat then
+    soybean, then maize. The month positions are PLACEHOLDER dates."""
+    if rotation == "soybean-winter-fallow":
+        years = 1
+        windows = [demo_window(first_ag_year, 4, 9, SOY)]
+    else:
+        years = 2
+        windows = [
+            demo_window(first_ag_year, 0, 4, WHEAT),
+            demo_window(first_ag_year, 5, 9, SOY),
+            demo_window(first_ag_year + 1, 2, 8, MAIZE),
+        ]
+    document = calendar_document()
+    document["start_date"] = first_day_of(first_ag_year).isoformat()
+    document["end_date"] = last_day_of(first_ag_year + years - 1).isoformat()
+    document["components"] = [
+        component(f"PLACEHOLDER-c{position}", crop, begins, ends)
+        for position, (crop, begins, ends) in enumerate(windows, start=1)
+    ]
+    return RotationCalendar.model_validate(document)
+
+
+DEMO_ROTATIONS = ("soybean-winter-fallow", "soybean-wheat-maize")
+
+
+def run_demo(
+    rotation: str, parameters: dict[str, dict] | None = None, **arguments: Any
+) -> SoilLossResults:
+    """The main route on the record of ``daily_years``, whose first,
+    partly covered agricultural year is the calendar's first year."""
+    span = daily_years()
+    arguments.setdefault("climate_", computable_climate(span))
+    arguments.setdefault("calendar_", demo_calendar(rotation, ag_year_of(span[0])))
+    return run_computable(
+        c_catalogue() if parameters is None else parameters, **arguments
+    )
+
+
+def on_series(days: tuple[int, ...], numbers: tuple[float, ...], day: int) -> float:
+    """The PROPOSED reading of a series (OPEN 29), computed again: linear
+    between two of its days, its first value before them, its last after."""
+    if day <= days[0]:
+        return numbers[0]
+    if day >= days[-1]:
+        return numbers[-1]
+    for (d0, v0), (d1, v1) in zip(zip(days, numbers), zip(days[1:], numbers[1:])):
+        if d0 <= day <= d1:
+            return v0 + (v1 - v0) * (day - d0) / (d1 - d0)
+    raise AssertionError(day)
+
+
+def expected_main_ratio(
+    day: dt.date,
+    windows: list[tuple[str, dt.date, dt.date]],
+    numbers: dict[str, float],
+) -> float:
+    """The soil-loss ratio of one day of the main route, by the forms of
+    c_factor/README.md under PC-1 and the design of D129."""
+    covering = [(crop, start) for crop, start, end in windows if start <= day <= end]
+    if covering:
+        ((crop, start),) = covering
+        after = (day - start).days
+        canopy_cover = on_series(
+            STAGE_DAYS, C_SERIES[(module.CANOPY_COVER_ID, crop)], after
+        )
+        height = on_series(STAGE_DAYS, C_SERIES[(module.FALL_HEIGHT_ID, crop)], after)
+    else:
+        canopy_cover = CROP_VALUES[(module.CANOPY_COVER_ID, NO_CROP)]
+        height = CROP_VALUES[(module.FALL_HEIGHT_ID, NO_CROP)]
+    harvest, _, harvest_end = max(
+        (w for w in windows if w[2] < day), key=lambda w: w[2]
+    )
+    mass = (
+        C_RESIDUE[(module.RESIDUE_YIELD_RATIO_ID, harvest)]
+        * C_RESIDUE[(module.CROP_YIELD_ID, harvest)]
+        * (CONVERSION if harvest in CONVERTED else 1.0)
+    )
+    mass *= math.exp(
+        -C_RESIDUE[(module.DECAY_COEFFICIENT_ID, harvest)] * (day - harvest_end).days
+    )
+    residue_cover = 1 - math.exp(
+        -C_RESIDUE[(module.MASS_COVER_COEFFICIENT_ID, harvest)] * mass
+    )
+    surface = math.exp(
+        -numbers[module.SURFACE_COVER_B_PER_PERCENT_ID] * residue_cover * 100
+    )
+    effective = canopy_cover * (1 - residue_cover)
+    canopy = 1 - effective * math.exp(
+        -numbers[module.FALL_HEIGHT_COEFFICIENT_ID] * height
+    )
+    return canopy * surface
+
+
+def expected_main_c(
+    calendar_: RotationCalendar, climate_: SiteClimate
+) -> dict[int, float]:
+    """C of every covered year: the mean daily ratio of each month, weighted by
+    the share of its calendar month in the twelve monthly records, one year."""
+    numbers = placeholder_values()
+    monthly = [numbers[pid] for pid in module.MONTHLY_EROSIVITY_IDS]
+    span = series_span(climate_)
+    windows = repeated_windows(calendar_, span)
+    result = {}
+    for year in covered_ag_years(span):
+        c = 0.0
+        for y, m in months_of(year):
+            ratios = [
+                expected_main_ratio(day, windows, numbers)
+                for day in days_between(*month_bounds(y, m))
+            ]
+            c += monthly[m - 1] / sum(monthly) * sum(ratios) / len(ratios)
+        result[year] = c
+    return result
+
+
+def product_with_c(c: float) -> float:
+    numbers = dict(placeholder_values(), **{module.C_ID: c})
+    return expected_product(numbers)
+
+
+def covered_only(result: SoilLossResults, span: tuple[dt.date, dt.date]) -> dict:
+    years = covered_ag_years(span)
+    return {item.ag_year: item for item in result.annual if item.ag_year in years}
+
+
+def test_computed_c_tells_the_two_demonstration_rotations_apart():
+    """With a PLACEHOLDER catalogue holding the records of the computed C, the
+    two rotations of D128 give different soil loss; each covered year equals
+    R K LS C P with C computed again here (D129), and its months add up to it."""
+    span = daily_years()
+    climate_ = computable_climate(span)
+    by_rotation = {}
+    for rotation in DEMO_ROTATIONS:
+        calendar_ = demo_calendar(rotation, ag_year_of(span[0]))
+        result = run_demo(rotation, climate_=climate_, calendar_=calendar_)
+        expected = {
+            year: product_with_c(c)
+            for year, c in expected_main_c(calendar_, climate_).items()
+        }
+        years = covered_only(result, span)
+        assert sorted(years) == sorted(expected) and len(years) > 1
+        for year, item in years.items():
+            assert item.missing is None, item.missing
+            assert item.value == pytest.approx(expected[year], rel=1e-9), year
+            assert item.provenance == PROVENANCE_OF_SOIL_LOSS
+            assert module.COMPUTED_C in item.source
+            assert "fallback" not in item.source
+            assert f"'{module.C_ID}' with scope" not in item.source
+            for crop in {SOY} if rotation == DEMO_ROTATIONS[0] else set(DEMO_CROPS):
+                assert f"'{module.CROP_YIELD_ID}' with scope" in item.source
+                assert json.dumps({"crop": crop}) in item.source
+            months = [m for m in result.monthly if m.ag_year == year]
+            assert sum(m.value for m in months) == pytest.approx(item.value, rel=1e-9)
+            c = expected[year] / product_with_c(1.0)
+            for month in months:
+                assert month.value == pytest.approx(
+                    expected_month(
+                        month.month, dict(placeholder_values(), **{module.C_ID: c})
+                    ),
+                    rel=1e-9,
+                )
+        by_rotation[rotation] = {year: item.value for year, item in years.items()}
+    first, second = (by_rotation[rotation] for rotation in DEMO_ROTATIONS)
+    assert first.keys() == second.keys()
+    assert all(first[year] != pytest.approx(second[year]) for year in first)
+    # The conversion record is read for the crops whose yield needs it only.
+    assert (
+        f"'{module.YIELD_CONVERSION_ID}'"
+        in run_demo(DEMO_ROTATIONS[0]).annual[1].source
+    )
+
+
+def test_without_the_c_records_c_is_the_declared_record_and_the_source_says_so():
+    """Without the records of the computed C, C is the declared rusle_c_factor
+    (M1.2, D125) for every year and every rotation, by the PROPOSED fallback,
+    and the source says so and names what is missing."""
+    span = daily_years()
+    for rotation in DEMO_ROTATIONS:
+        result = run_demo(rotation, parameters=catalogue())
+        for item in covered_only(result, span).values():
+            assert item.value == expected_product()
+            assert "PROPOSED fallback of brief #218" in item.source
+            assert "DECLARED" in item.source and "D125" in item.source
+            assert f"'{module.C_ID}' with scope {{}}" in item.source
+            stage = {"crop": SOY, "stage": module.STAGE_SHOWN}
+            assert (
+                f"{named(module.CANOPY_COVER_ID, stage)} has no record" in item.source
+            )
+            assert module.COMPUTED_C not in item.source
+
+
+def c_record_keys() -> list[str]:
+    """One key per kind of record of the computed C, to leave out in turn."""
+    return [
+        site_key(module.FALL_HEIGHT_COEFFICIENT_ID),
+        site_key(module.SURFACE_COVER_B_PER_PERCENT_ID),
+        site_key(module.YIELD_CONVERSION_ID),
+        site_key(module.MONTHLY_EROSIVITY_IDS[0]),
+        crop_key(module.CANOPY_COVER_ID, NO_CROP),
+        crop_key(module.FALL_HEIGHT_ID, NO_CROP),
+        *(crop_key(pid, SOY) for pid in module.MAIN_C_RESIDUE_IDS),
+    ]
+
+
+def fallback_missing_part(source: str) -> str:
+    """The list of missing records that the source of a fallback gives."""
+    return source.split(module.DECLARED_C, 1)[1].split("; LS from", 1)[0]
+
+
+def assert_fallback(parameters: dict[str, dict], text: str) -> None:
+    result = run_demo(DEMO_ROTATIONS[0], parameters=parameters)
+    for item in covered_only(result, daily_years()).values():
+        assert item.value == expected_product()
+        assert "PROPOSED fallback of brief #218" in item.source
+        missing = fallback_missing_part(item.source)
+        assert text in missing, missing
+        assert missing.count("parameter '") == 1, missing
+
+
+@pytest.mark.parametrize("key", c_record_keys())
+def test_one_missing_c_record_falls_back_and_names_it(key):
+    """Each record of the computed C, left out or with a null value: C is the
+    declared record for every year and the source names that record, and no
+    other, as missing."""
+    record = unmarked(marked_c_catalogue()[key])
+    name = named(record["id"], record["scope"])
+    reason = unmarked(f"{WORD}: the source gives no value here")
+    assert_fallback(c_catalogue(key), f"{name} has no record in parameters (D56)")
+    nulled = c_catalogue_with(key, value=None, value_missing_reason=reason)
+    assert_fallback(nulled, f"the record of {name} has no value: {reason}")
+
+
+def test_missing_stage_series_falls_back_and_a_shorter_series_does_not():
+    """Every stage record of one canopy series of a crop left out: the fallback
+    names the series by its scope with day_<N>. One stage record with a null
+    value: the fallback names it. One stage record left out: the series is
+    shorter, not missing, and C is computed from the days that remain
+    (OPEN 30)."""
+    prefix = f"{module.CANOPY_COVER_ID}.{SOY}."
+    keys = [key for key in marked_c_catalogue() if key.startswith(prefix)]
+    assert len(keys) == len(STAGE_DAYS)
+    stage = {"crop": SOY, "stage": module.STAGE_SHOWN}
+    assert_fallback(
+        c_catalogue(*keys), f"{named(module.CANOPY_COVER_ID, stage)} has no record"
+    )
+    record = unmarked(marked_c_catalogue()[keys[0]])
+    reason = unmarked(f"{WORD}: the source gives no value here")
+    nulled = c_catalogue_with(keys[0], value=None, value_missing_reason=reason)
+    name = named(module.CANOPY_COVER_ID, record["scope"])
+    assert_fallback(nulled, f"the record of {name} has no value: {reason}")
+    shorter = run_demo(DEMO_ROTATIONS[0], parameters=c_catalogue(keys[0]))
+    for item in covered_only(shorter, daily_years()).values():
+        assert item.value is not None and module.COMPUTED_C in item.source
+
+
+def test_c_record_units_that_disagree_make_c_missing_and_name_the_records():
+    """A unit mismatch among the records of the computed C is not a missing
+    record: C of every covered year is missing with the unit-guard reason,
+    naming the records involved, and the fallback does not apply."""
+    soy = {"crop": SOY}
+    word = stage_word(STAGE_DAYS[1])
+    cases = {
+        "yield unit that the conversion does not convert": (
+            c_catalogue_with(
+                crop_key(module.CROP_YIELD_ID, SOY), unit="PLACEHOLDER_other_unit"
+            ),
+            [
+                named(module.CROP_YIELD_ID, soy),
+                named(module.MASS_COVER_COEFFICIENT_ID, soy),
+                named(module.YIELD_CONVERSION_ID),
+            ],
+        ),
+        "conversion not written '<to> per <from>'": (
+            c_catalogue_with(site_key(module.YIELD_CONVERSION_ID), unit=MASS_UNIT),
+            [named(module.YIELD_CONVERSION_ID)],
+        ),
+        "ratio not dimensionless": (
+            c_catalogue_with(
+                crop_key(module.RESIDUE_YIELD_RATIO_ID, SOY), unit="PLACEHOLDER_unit"
+            ),
+            [named(module.RESIDUE_YIELD_RATIO_ID, soy)],
+        ),
+        "alpha not the inverse of a unit": (
+            c_catalogue_with(
+                crop_key(module.MASS_COVER_COEFFICIENT_ID, SOY), unit=MASS_UNIT
+            ),
+            [named(module.MASS_COVER_COEFFICIENT_ID, soy)],
+        ),
+        "a series in two unit strings": (
+            c_catalogue_with(
+                crop_key(module.FALL_HEIGHT_ID, f"{SOY}.{word}"),
+                unit="PLACEHOLDER_other_height_unit",
+            ),
+            [f"parameter '{module.FALL_HEIGHT_ID}' for crop '{SOY}'"],
+        ),
+        "canopy cover not dimensionless": (
+            c_catalogue_with(
+                crop_key(module.CANOPY_COVER_ID, f"{SOY}.{word}"),
+                unit="PLACEHOLDER_unit",
+            ),
+            [f"parameter '{module.CANOPY_COVER_ID}' for crop '{SOY}'"],
+        ),
+    }
+    span = daily_years()
+    for case, (parameters, texts) in cases.items():
+        result = run_demo(DEMO_ROTATIONS[0], parameters=parameters)
+        for item in covered_only(result, span).values():
+            assert item.value is None, case
+            detail = item.missing.detail
+            assert (
+                f"factor 'c' is missing (reason {module.UNIT_NOT_ACCEPTED}" in detail
+            ), case
+            assert module.NO_FALLBACK in detail, case
+            for text in texts:
+                assert text in detail, (case, text)
+
+
+def test_stage_series_is_read_between_and_beyond_its_days():
+    """The PROPOSED reading of a series by days after planting (OPEN 29), and
+    which stage words are read: ``day_<N>`` with N in ASCII digits."""
+    points = tuple(
+        module._Point(day=d, value=v)
+        for d, v in zip(STAGE_DAYS, C_SERIES[(module.CANOPY_COVER_ID, SOY)])
+    )
+    series = module._Series(points=points, unit=module.DIMENSIONLESS)
+    numbers = C_SERIES[(module.CANOPY_COVER_ID, SOY)]
+    for day in (0, 1, STAGE_DAYS[0], 16, STAGE_DAYS[1], 33, STAGE_DAYS[2], 400):
+        assert module._on_series(series, day) == pytest.approx(
+            on_series(STAGE_DAYS, numbers, day)
+        ), day
+    one = module._Series(points=(module._Point(day=7, value=0.555),), unit="x")
+    assert {module._on_series(one, day) for day in (0, 7, 99)} == {0.555}
+    assert module._days_after_planting("day_11") == 11
+    assert module._days_after_planting("day_0") == 0
+    for word in ("day_", "day_x", "day_-1", "day_1.5", "stage_11", "day_１", "11"):
+        assert module._days_after_planting(word) is None, word
+    # A stage word that is not day_<N>: C is not computed, no fallback.
+    marked = marked_c_catalogue()
+    record = copy.deepcopy(marked[crop_key(module.CANOPY_COVER_ID, f"{SOY}.day_11")])
+    record["scope"]["stage"] = "PLACEHOLDER_flowering"
+    marked["extra.json"] = record
+    result = run_demo(DEMO_ROTATIONS[0], parameters=unmarked(marked))
+    for item in covered_only(result, daily_years()).values():
+        assert item.value is None
+        assert "is not read" in item.missing.detail
+        assert module.NO_FALLBACK in item.missing.detail
+
+
+def test_year_without_a_last_harvest_leaves_only_its_c_missing_without_fallback():
+    """A record that begins on the first day of its first agricultural year:
+    the first cycle has no harvest before its first one, so C of that year is
+    missing (OPEN 2) and every other covered year is computed; the records are
+    all present, so the fallback does not apply."""
+    span = several_full_years()
+    climate_ = computable_climate(span)
+    calendar_ = demo_calendar(DEMO_ROTATIONS[1], ag_year_of(span[0]))
+    result = run_demo(DEMO_ROTATIONS[1], climate_=climate_, calendar_=calendar_)
+    years = covered_ag_years(span)
+    by_year = {item.ag_year: item for item in result.annual}
+    first = by_year[years[0]]
+    assert first.value is None
+    assert module.NO_HARVEST_BEFORE in first.missing.detail
+    assert module.NO_FALLBACK in first.missing.detail
+    for year in years[1:]:
+        assert by_year[year].value is not None
+        assert module.COMPUTED_C in by_year[year].source
+
+
+RECORDS = ROOT / "params" / "records"
+DEMO_SOIL = ROOT / "data" / "demo" / "la_estanzuela_soil_slope.json"
+
+
+def test_records_on_main_give_the_declared_product_whatever_the_rotation():
+    """The deployed catalogue of params/records/ (the 26 records of #203) holds
+    no record of the computed C, so C falls back to the declared record and the
+    soil loss of the demonstration point is the same declared product for
+    both rotations, computed again here from the records: the deployed number
+    is unchanged until the records of the computed C are added. When they are
+    added, this guard fails and the unit that adds them updates it."""
+    records, problems = load_folder(RECORDS)
+    assert problems == [] and check_catalogue(records) == []
+    c_ids = {
+        *module.MAIN_C_CROP_ONLY_IDS,
+        *module.MAIN_C_SITE_ONLY_IDS,
+        *module.CANOPY_IDS,
+        *module.MAIN_C_RESIDUE_IDS,
+        *module.MAIN_C_SITE_IDS,
+    }
+    assert not [r["id"] for r in records.values() if r["id"] in c_ids], (
+        "records of the computed C are in params/records/: update this guard"
+    )
+    soil_document_ = json.loads(DEMO_SOIL.read_text("utf-8"))
+    identity = {k: soil_document_[k] for k in ("case_id", "field_id")}
+    soil_ = SiteSoilSlope.model_validate(soil_document_)
+    climate_document_ = climate_document()
+    climate_document_.update(identity)
+    span = daily_years()
+    climate_ = climate_with(rain_series(*span), climate_document_)
+
+    def value_of(pid: str) -> float:
+        (record,) = [r for r in records.values() if r["id"] == pid and r["scope"] == {}]
+        return record["value"]
+
+    numbers = {
+        pid: value_of(pid)
+        for pid in (*module.PARAMETER_IDS, *module.MONTHLY_EROSIVITY_IDS)
+    }
+    s_break_unit = ls.SlopeUnit(
+        next(r["unit"] for r in records.values() if r["id"] == module.S_BREAK_ID)
+    )
+    steepness = ls.slope_steepness_factor(
+        slope_steepness=soil_.slope_steepness.value,
+        slope_unit=ls.SlopeUnit(soil_.slope_steepness.unit),
+        s_break=numbers[module.S_BREAK_ID],
+        s_break_unit=s_break_unit,
+        **{name: numbers[pid] for name, pid in module.S_COEFFICIENTS.items()},
+    )
+    length = ls.slope_length_factor(
+        slope_length=soil_.slope_length.value,
+        slope_length_unit=soil_.slope_length.unit,
+        lambda_unit=numbers[module.LAMBDA_UNIT_ID],
+        lambda_unit_unit=next(
+            r["unit"] for r in records.values() if r["id"] == module.LAMBDA_UNIT_ID
+        ),
+        slope_steepness=soil_.slope_steepness.value,
+        slope_unit=ls.SlopeUnit(soil_.slope_steepness.unit),
+        **{name: numbers[pid] for name, pid in module.L_COEFFICIENTS.items()},
+    )
+    declared = (
+        numbers[module.R_ID]
+        * numbers[module.K_ID]
+        * length
+        * steepness
+        * numbers[module.C_ID]
+        * numbers[module.P_ID]
+    )
+    values = set()
+    for rotation in DEMO_ROTATIONS:
+        document = demo_calendar(rotation, ag_year_of(span[0])).model_dump(mode="json")
+        document.update(identity)
+        result = run(
+            RotationCalendar.model_validate(document), climate_, soil_, records
+        )
+        assert isinstance(result, SoilLossResults)
+        for item in covered_only(result, span).values():
+            assert item.value == pytest.approx(declared, rel=1e-12)
+            assert "PROPOSED fallback of brief #218" in item.source
+            values.add(item.value)
+    assert len(values) == 1
+
+
 # --- the modules --------------------------------------------------------------
 
 
@@ -1897,7 +2478,14 @@ def test_soil_loss_md_lists_every_parameter_identifier():
         r"^\| `[A-Za-z0-9_]+` \| `([a-z0-9_]+)` \|", section, flags=re.MULTILINE
     )
     assert sorted(listed) == sorted(
-        dict.fromkeys((*SITE_IDS, *module.CROP_PARAMETER_IDS))
+        dict.fromkeys(
+            (
+                *SITE_IDS,
+                *module.CROP_PARAMETER_IDS,
+                *module.MAIN_C_CROP_ONLY_IDS,
+                *module.MAIN_C_SITE_ONLY_IDS,
+            )
+        )
     )
 
 
