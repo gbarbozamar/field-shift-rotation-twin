@@ -90,6 +90,9 @@ BODY = {
 # models accept no other identifier.
 CARBON_MODELS = ("amg", "rothc")
 SOIL_SLOPE_FILE = CONTRACTS / "inputs" / "examples" / "PLACEHOLDER_site_soil_slope.json"
+# The cycle of the PLACEHOLDER calendar lasts two years, so the runner makes
+# two runs of EP1, EP3 and EP5, one per phase (D109; api/phases.py).
+PHASES = 2
 
 
 def example(folder: str, name: str) -> dict[str, Any]:
@@ -427,15 +430,17 @@ def test_call_order_and_arguments():
         soil=soil,
         load_rotation=lambda rotation: loaded if rotation == ROTATION else None,
     )
-    assert order == ["EP2", "EP1", "EP3"]
+    assert order == ["EP2", *["EP1", "EP3"] * PHASES]
     assert calendar_fn.calls == [((loaded,), {})]
     for fake in (soil_fn, water_fn):
-        ((args, kwargs),) = fake.calls
-        assert args == ()  # by keyword only (G3)
-        assert set(kwargs) == {"calendar", "climate", "soil_slope", "parameters"}
-        assert kwargs["calendar"] is calendar_answer
-        assert kwargs["climate"] is climate.data
-        assert kwargs["soil_slope"] is soil.data
+        assert len(fake.calls) == PHASES
+        for args, kwargs in fake.calls:
+            assert args == ()  # by keyword only (G3)
+            assert set(kwargs) == {"calendar", "climate", "soil_slope", "parameters"}
+            assert kwargs["climate"] is climate.data
+            assert kwargs["soil_slope"] is soil.data
+        # Phase 1 is the calendar of EP2 itself (api/phases.py).
+        assert fake.calls[0][1]["calendar"] is calendar_answer
 
 
 def test_default_load_rotation_gives_ep2_a_rotation_definition():
@@ -565,7 +570,7 @@ def test_one_of_ep1_and_ep3_not_built(absent):
     if absent == "erosion":
         assert isinstance(assembled.soil_loss, SoilLossNotBuilt)
         assert "engine.erosion.compute_soil_loss" in assembled.soil_loss.missing.detail
-        assert len(water_fn.calls) == 1
+        assert len(water_fn.calls) == PHASES
         assert all(
             a is b for a, b in zip(assembled.water_deficit_exposure, water_fn.answer)
         )
@@ -579,7 +584,7 @@ def test_one_of_ep1_and_ep3_not_built(absent):
             "engine.water.compute_water_deficit_exposure"
             in assembled.water_deficit_exposure.missing.detail
         )
-        assert len(soil_fn.calls) == 1
+        assert len(soil_fn.calls) == PHASES
         assert assembled.soil_loss is soil_fn.answer
         other, values = "erosion", [*soil_fn.answer.annual, *soil_fn.answer.monthly]
     expected = module_status_of(other, count_values(values))
@@ -1028,7 +1033,7 @@ def test_another_field_with_an_engine_not_built_keeps_the_precedence_rule():
 def test_site_data_of_the_same_field_calls_the_engines():
     calendar_fn, soil_fn, water_fn = checking_fakes()
     result = run(functions(calendar_fn, soil_fn, water_fn))
-    assert len(soil_fn.calls) == 1 and len(water_fn.calls) == 1
+    assert len(soil_fn.calls) == len(water_fn.calls) == PHASES
     assert result.result is not None
     assert result.result_missing is None
 
@@ -1362,10 +1367,11 @@ def test_ep1_and_ep3_get_the_catalogue_by_keyword_and_ep2_never():
     result = engines.run(ROTATION, climate_result(), soil_result())
     assert result.result is not None
     for fake in (soil_fn, water_fn):
-        ((args, kwargs),) = fake.calls
-        assert args == ()
-        assert set(kwargs) == {"calendar", "climate", "soil_slope", "parameters"}
-        assert kwargs["parameters"] is loaded  # the same object, not a copy
+        assert len(fake.calls) == PHASES
+        for args, kwargs in fake.calls:
+            assert args == ()
+            assert set(kwargs) == {"calendar", "climate", "soil_slope", "parameters"}
+            assert kwargs["parameters"] is loaded  # the same object, not a copy
     # EP2 is never given the catalogue.
     assert calendar_fn.calls == [((RotationDefinition.model_validate(ROTATION),), {})]
 
@@ -1402,7 +1408,7 @@ def test_the_catalogue_passes_unchanged_and_is_the_same_object_every_call():
     passed = [
         kwargs["parameters"] for fake in (soil_fn, water_fn) for _, kwargs in fake.calls
     ]
-    assert len(passed) == 4
+    assert len(passed) == 2 * 2 * PHASES  # two runs, two engines, every phase
     assert all(item is loaded for item in passed)
     assert loaded == before
 
@@ -1419,8 +1425,9 @@ def test_engines_that_require_parameters_answer_200_through_the_route():
     assert response.status_code == 200, response.text
     assert response.json()["result"] is not None
     for fake in (soil_fn, water_fn):
-        ((_, kwargs),) = fake.calls
-        assert kwargs["parameters"] is loaded
+        assert len(fake.calls) == PHASES
+        for _, kwargs in fake.calls:
+            assert kwargs["parameters"] is loaded
 
 
 def test_without_a_catalogue_the_runner_passes_the_empty_one():
@@ -1430,9 +1437,10 @@ def test_without_a_catalogue_the_runner_passes_the_empty_one():
     )
     engines.run(ROTATION, climate_result(), soil_result())
     for fake in (soil_fn, water_fn):
-        ((_, kwargs),) = fake.calls
-        assert kwargs["parameters"] == {}
-        assert kwargs["parameters"] is engines.parameters
+        assert len(fake.calls) == PHASES
+        for _, kwargs in fake.calls:
+            assert kwargs["parameters"] == {}
+            assert kwargs["parameters"] is engines.parameters
 
 
 def test_the_empty_catalogue_given_is_passed_as_given():
@@ -1444,8 +1452,9 @@ def test_the_empty_catalogue_given_is_passed_as_given():
         parameters=empty,
     )
     engines.run(ROTATION, climate_result(), soil_result())
-    ((_, kwargs),) = soil_fn.calls
-    assert kwargs["parameters"] is empty
+    assert len(soil_fn.calls) == PHASES
+    for _, kwargs in soil_fn.calls:
+        assert kwargs["parameters"] is empty
 
 
 @pytest.mark.parametrize("bad", [[], "PLACEHOLDER", ({},)])
@@ -1473,8 +1482,9 @@ def test_create_app_gives_its_catalogue_to_the_default_engines(monkeypatch):
     response = app_client.post(ROUTE, json=BODY)
     assert response.status_code == 200, response.text
     for fake in (soil_fn, water_fn):
-        ((_, kwargs),) = fake.calls
-        assert kwargs["parameters"] is loaded
+        assert len(fake.calls) == PHASES
+        for _, kwargs in fake.calls:
+            assert kwargs["parameters"] is loaded
 
 
 def test_create_app_refuses_a_catalogue_beside_engines_passed_in():
@@ -1577,7 +1587,7 @@ def carbon_rows(result, carbon_model: str) -> list[SoilCarbonTrend]:
 def test_ep5_rows_reach_the_result_unchanged_and_rothc_stays_missing():
     amg = Fake(balance())
     result = run(with_amg(amg), climate=climate_result(chain_climate()))
-    assert len(amg.calls) == 1
+    assert len(amg.calls) == PHASES
     assert carbon_rows(result, "amg") == amg.answer.soil_carbon_trend
     assert all(
         a is b for a, b in zip(carbon_rows(result, "amg"), amg.answer.soil_carbon_trend)
@@ -1659,7 +1669,7 @@ def test_ep5_is_called_after_ep2_ep1_and_ep3():
         ),
         climate=climate_result(chain_climate()),
     )
-    assert order == ["EP2", "EP1", "EP3", "EP5"]
+    assert order == ["EP2", *["EP1", "EP3", "EP5"] * PHASES]
 
 
 def test_ep5_not_built_is_the_answer_before_ep5_existed():
@@ -1840,7 +1850,7 @@ def test_the_rows_are_those_of_ep5_then_ep6_whatever_the_configured_order():
     # contracts/ENTRYPOINTS.md, "From the entry points to one response".
     amg = Fake(balance())
     result = run_with_models(amg, ("rothc", "amg"))
-    assert len(amg.calls) == 1
+    assert len(amg.calls) == PHASES
     rows = result.result.soil_carbon_trend
     assert [r.carbon_model for r in rows] == ["amg"] * 3 + ["rothc"] * 3
     assert rows[:3] == amg.answer.soil_carbon_trend
