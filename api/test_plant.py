@@ -26,7 +26,7 @@ from fastapi.testclient import TestClient
 
 from api.config import PARAMETERS_FOLDER, load_parameters
 from api.main import create_app
-from api.plant import NO_FACTORY, REDACTED_MESSAGE
+from api.plant import EXTRA_KEY_SEGMENT, NO_FACTORY, REDACTED_MESSAGE
 from api.ports import EnginesResult, ErrorDetail, Missing, ModuleStatus, RunSettings
 from api.rain_stress import R_ID, rain_stress, scale_erosivity
 from api.test_rotations import FakeClimate, FakeSoilSlope
@@ -378,6 +378,32 @@ def test_an_error_does_not_repeat_a_submitted_value():
 
 
 @pytest.mark.parametrize(
+    "where",
+    [
+        [],
+        ["site"],
+        ["economic_facts", "crops", 0],
+        ["rotations", 0, "components", 0],
+    ],
+)
+def test_an_error_path_never_repeats_a_submitted_key(where):
+    climate, soil, engines = FakeClimate(), FakeSoilSlope(), FakeEngines()
+    request = copy.deepcopy(REQUEST)
+    target = request
+    for step in where:
+        target = target[step]
+    target["PLACEHOLDER_submitted_key"] = 1
+    response = client(climate=climate, soil_slope=soil, engines=engines).post(
+        ROUTE, json=request
+    )
+    assert response.status_code == 422, response.text
+    assert "PLACEHOLDER_submitted_key" not in response.text
+    paths = [d["path"] for d in response.json()["error"]["details"]]
+    assert paths and all(path.endswith(EXTRA_KEY_SEGMENT) for path in paths)
+    _nothing_called(climate, soil, engines)
+
+
+@pytest.mark.parametrize(
     ("payload", "status", "code"),
     [
         ([1, 2, 3], 422, "INVALID_REQUEST"),
@@ -546,6 +572,46 @@ def test_margin_of_a_kind_of_year_changes_the_answer():
     checked(request, data)
     assert (data["answer"], data["chosen"]) != (ANSWER["answer"], ANSWER["chosen"])
     assert data["answer"] == "not_resolved"
+
+
+def _pasture_sown_on(day: str) -> dict[str, Any]:
+    request = copy.deepcopy(REQUEST)
+    (pasture,) = [r for r in request["rotations"] if r["rotation_id"] == PASTURE]
+    pasture["components"][-1]["sowing"]["date"] = day
+    return request
+
+
+def _a_year_later(day: str) -> str:
+    date = dt.date.fromisoformat(day)
+    return date.replace(year=date.year + 1).isoformat()
+
+
+PASTURE_COMPONENTS = next(
+    r["components"] for r in REQUEST["rotations"] if r["rotation_id"] == PASTURE
+)
+
+
+@pytest.mark.parametrize(
+    "day",
+    [
+        # A year of the cycle with no crop sown: the pasture a year later.
+        _a_year_later(PASTURE_COMPONENTS[-1]["sowing"]["date"]),
+        # The declared-margin pasture sharing its year with the crop before it.
+        PASTURE_COMPONENTS[-2]["sowing"]["date"],
+    ],
+)
+def test_a_rotation_without_years_gives_its_own_reason_to_the_tipping_price(day):
+    request = _pasture_sown_on(day)
+    data = answered(client().post(ROUTE, json=request))
+    checked(request, data)
+    (option,) = [o for o in data["options"] if o["rotation_id"] == PASTURE]
+    assert {m["reason"] for m in option["margin"].values()} == {"NOT_COMPUTABLE"}
+    tipping = data["tipping_price"]
+    assert tipping["reason"] == "NOT_COMPUTABLE"
+    assert f"{PASTURE} (NOT_COMPUTABLE: " in tipping["detail"]
+    for side in ("up", "down"):
+        assert tipping[side]["price"] is None
+        assert tipping[side]["reason"] == "NOT_COMPUTABLE"
 
 
 # --- defects: 500 -----------------------------------------------------------------------

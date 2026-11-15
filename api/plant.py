@@ -117,6 +117,11 @@ RECORD_STATE = "cached"
 # api/rotation_validator.py does for one rotation). PROPOSED.
 REDACTED_MESSAGE = "The value breaks a rule of the plant request contract."
 
+# Written in an error path in place of a key the contract does not define
+# (a submitted key is never repeated). PROPOSED.
+EXTRA_KEY_SEGMENT = "<extra>"
+EXTRA_FORBIDDEN = "extra_forbidden"
+
 # PROPOSED texts of absences the route writes.
 NO_FACTORY = (
     "the engines were given to the app without a way to rebuild them on a "
@@ -158,6 +163,20 @@ def _code_of(errors: Sequence[Mapping[str, Any]]) -> ErrorCode:
     return ErrorCode.INVALID_REQUEST
 
 
+def _safe_loc(loc: Sequence[Any], error_type: str) -> tuple[Any, ...]:
+    """The location of an error with no key the client made up. PROPOSED.
+
+    A key that is not a field name of the model at that point reaches a
+    location only as the last segment of an ``extra_forbidden`` error (no
+    model of ``PlantRequest`` has a mapping of free keys); it is written as
+    ``EXTRA_KEY_SEGMENT``. Every other segment is a field name, an index or a
+    tag of the contract.
+    """
+    if error_type == EXTRA_FORBIDDEN and loc:
+        return (*loc[:-1], EXTRA_KEY_SEGMENT)
+    return tuple(loc)
+
+
 def request_problems(
     body: Mapping[str, Any],
 ) -> tuple[PlantRequest | None, ErrorCode | None, list[ErrorDetail]]:
@@ -165,7 +184,9 @@ def request_problems(
 
     A message that repeats a submitted value (text of three characters or
     more, as ``api/rotation_validator.py`` looks for) is replaced by
-    ``REDACTED_MESSAGE``; the path and the code still say where and what.
+    ``REDACTED_MESSAGE``; the path and the code still say where and what. A
+    key that is not a field name of the model at that point is never written
+    in the path (``_safe_loc``).
     """
     try:
         request = PlantRequest.model_validate_json(json.dumps(body))
@@ -181,7 +202,7 @@ def request_problems(
                 message = REDACTED_MESSAGE
             details.append(
                 ErrorDetail(
-                    path=join_path(item["loc"]),
+                    path=join_path(_safe_loc(item["loc"], str(item["type"]))),
                     code=str(item["type"]),
                     message=message,
                 )
@@ -529,7 +550,7 @@ def build_answer(
     margins: list[dict[str, MarginResult]] = []
     limits = []
     tipping_years: list[list[list[str]]] = []
-    years_missing: list[str] = []
+    years_missing: list[tuple[str, str]] = []  # (reason, rotation and detail)
     soil: list[tuple[KindMean, dict[str, KindMean]]] = []
     for definition, run in zip(request.rotations, runs, strict=True):
         if run.result is not None and run.result.rotation_id != definition.rotation_id:
@@ -560,7 +581,12 @@ def build_answer(
             margins.append(
                 {"average": missing, **dict.fromkeys(KINDS_OF_YEAR, missing)}
             )
-            years_missing.append(f"{definition.rotation_id} ({cycle.detail})")
+            years_missing.append(
+                (
+                    cycle.reason,
+                    f"{definition.rotation_id} ({cycle.reason}: {cycle.detail})",
+                )
+            )
             continue
         tipping_years.append(cycle.years)
         margin = compute_rotation_margin(cycle.years, facts, year_counts)
@@ -584,13 +610,16 @@ def build_answer(
     price_range = questions.soybean_price_range.model_dump(mode="json")
     today = _todays_price(request)
     if years_missing:
+        # PROPOSED: the reason of the first rotation without years, in the
+        # order of the request; the detail names each such rotation with its
+        # own reason.
         tipping = _shared_tipping(
             today,
             price_range,
-            "MISSING_INPUT",
-            "the crops of each agricultural year of a rotation are not known, so "
+            years_missing[0][0],
+            "the margin of each agricultural year of a rotation is not known, so "
             "its margin at another soybean price is not computed: "
-            + "; ".join(years_missing),
+            + "; ".join(detail for _, detail in years_missing),
         )
     else:
         found = find_tipping_price(
