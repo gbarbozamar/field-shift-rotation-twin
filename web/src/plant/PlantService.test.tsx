@@ -1,3 +1,4 @@
+import { getPlan, planBaseRequest, planFieldId } from '../board/planStore'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -106,6 +107,11 @@ function serviceState(): PlantScreenState {
 afterEach(() => {
   vi.unstubAllGlobals()
 })
+
+/** The base request the report sends: the board's plan for the example request's field. */
+function planRequest() {
+  return planBaseRequest(getPlan(), planFieldId(null))!
+}
 
 describe('no backend configured (1)', () => {
   const fetch = vi.fn()
@@ -492,12 +498,12 @@ describe('fix 4: the request is built once, and the price key is cheap', () => {
   it('the view copies no request, and the screen copies it once per render', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, rawAnswer)))
     const state = serviceState()
-    const answered = await runPlant(BASE, serviceRequestOf(state)!)
+    const answered = await runPlant(BASE, serviceRequestOf(state, planRequest())!)
     const clones = vi.spyOn(globalThis, 'structuredClone')
     try {
       view(state, { phase: 'answered', answer: answered })
       expect(clones).not.toHaveBeenCalled()
-      serviceRequestOf(state)
+      serviceRequestOf(state, planRequest())
       const perRequest = clones.mock.calls.length
       expect(perRequest).toBeGreaterThan(0)
       clones.mockClear()
@@ -589,7 +595,7 @@ describe('fix 8: the real screen in service mode reads the answer from its query
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     const state = serviceState()
-    const request = serviceRequestOf(state)!
+    const request = serviceRequestOf(state, planRequest())!
     const client = new QueryClient()
     client.setQueryData(plantQueryOptions(BASE, request).queryKey, readPlantServiceAnswer(rawAnswer, request))
     const html = renderToString(

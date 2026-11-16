@@ -371,7 +371,6 @@ const WORDING_SHEET: Record<string, string> = {
   'board.map.hide': 'Hide the map',
   'board.limit.yours': 'Your soil-loss limit',
   'board.rotations': 'Rotations',
-  'board.field.ready': 'Rotations declared',
   'board.hud.year': 'Kind of year',
   'board.hud.rule': 'Limit rule',
   'board.hud.rain': 'Rain erosivity',

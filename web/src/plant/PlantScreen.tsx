@@ -23,6 +23,8 @@ import type { PlantRotations, RotationStrip } from './rotationStrip'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
+import { planBaseRequest, planFieldId, usePlan } from '../board/planStore'
+import { useSelectedFieldId } from '../identity/selection'
 import {
   KINDS_OF_YEAR,
   MARGINS_OF,
@@ -1524,16 +1526,24 @@ export default function PlantScreen({
   apiBase?: string | null
   initialState?: PlantScreenState
 }) {
+  // The report opens on the board's plan: its questions, rotations, numbers
+  // and field, so "the full report" is the report of the user's own question.
+  const plan = usePlan()
+  const selectedFieldId = useSelectedFieldId()
+  const fieldId = planFieldId(selectedFieldId)
   const [state, dispatch] = useReducer(
     plantScreenReducer,
     initialState ?? null,
-    (first: PlantScreenState | null) => first ?? initialPlantState(),
+    // The board's questions, but not its "asked": the report still waits for "Ask the service" (D251).
+    (first: PlantScreenState | null) =>
+      first ?? { ...initialPlantState(), strictness: plan.state.strictness, marginOf: plan.state.marginOf, rain: plan.state.rain },
   )
+  const baseRequest = useMemo(() => planBaseRequest(plan, fieldId), [plan.sent, plan.factsSent, plan.rainValue, fieldId])
   // Built once per (mode, strictness, margin_of, heavier rain): the price
   // looked at does not copy the request again.
   const request = useMemo(
-    () => (apiBase === null ? null : serviceRequestOf(state)),
-    [apiBase, state.mode, state.strictness, state.marginOf, state.rain],
+    () => (apiBase === null || baseRequest === null ? null : serviceRequestOf(state, baseRequest)),
+    [apiBase, baseRequest, state.mode, state.strictness, state.marginOf, state.rain],
   )
   const query = useQuery(
     plantScreenQueryOptions(apiBase, request),

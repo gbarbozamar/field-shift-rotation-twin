@@ -228,25 +228,18 @@ describe('the view by state (4)', () => {
     )
   })
 
-  it('lists every field of the case; only the field the request describes has rotations declared', () => {
+  it('lists every field of the case, each with its area and climate point: every field can be planned', () => {
     const list = after(view(null, null), 'board-fields').split('</ul>')[0]
     for (const field of exampleCase.fields) {
       expect(visibleText(`<${list}`)).toContain(field.name)
     }
-    expect(count(list, 'data-described="true"')).toBe(1)
-    expect(count(visibleText(`<${list}`), strings['board.field.ready'])).toBe(1)
-    expect(count(visibleText(`<${list}`), missingPatternText(strings['board.rotations'], { reason: 'NOT_DECLARED' }))).toBe(
-      exampleCase.fields.length - 1,
-    )
+    expect(count(list, 'data-testid="board-field-point"')).toBe(exampleCase.fields.length)
   })
 
-  it('a field the request does not describe: rotations not declared, and no answer borrowed', () => {
-    const html = view(OTHER_FIELD, answered(example))
-    expect(visibleText(after(html, 'board-not-declared'))).toContain(
-      missingPatternText(strings['board.rotations'], { reason: 'NOT_DECLARED' }),
-    )
-    expect(count(html, 'data-testid="board-option"')).toBe(0)
-    expect(count(html, 'data-testid="board-answer"')).toBe(0)
+  it('another field is planned like the first: its own answer, never a borrowed one', () => {
+    const html = view(OTHER_FIELD, { phase: 'pending' })
+    expect(html).not.toContain('data-testid="board-not-declared"')
+    expect(visibleText(after(html, 'plant-service-pending'))).toContain(strings['plant.service.pending'])
   })
 
   it('no service configured: it says so and shows no answer (D251)', () => {
@@ -766,10 +759,10 @@ describe('names, the order note and a board that does not blank (10)', () => {
 })
 
 describe('polish (11)', () => {
-  it('the controls are shown but not offered when no field can be asked for', () => {
+  it('the controls are shown but not offered with no field picked or no service', () => {
     const disabled = (html: string) => count(after(html, 'board-controls').split('</div></div>')[0], 'disabled=""')
     expect(disabled(view(null, null))).toBeGreaterThan(0)
-    expect(disabled(view(OTHER_FIELD, null))).toBeGreaterThan(0)
+    expect(after(view(OTHER_FIELD, answered(example)), 'board-kind').split('>')[0]).not.toContain('disabled=""')
     expect(disabled(view(FIELD, null, null))).toBeGreaterThan(0)
     expect(after(view(FIELD, answered(example)), 'board-kind').split('>')[0]).not.toContain('disabled=""')
   })

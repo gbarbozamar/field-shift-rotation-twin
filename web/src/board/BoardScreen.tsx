@@ -1,25 +1,25 @@
-import { useMemo, useReducer, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { UseQueryOptions } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
-import { displayNumber, missingPatternText } from '../components/ValueDisplay'
+import { displayNumber } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import type { ExampleField } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
 import FieldsMap from '../map/FieldsMap'
-import { siteReferenceOf } from '../seam/RotationRun'
 import { fieldAreaHa } from '../map/geometry'
 import { barScale } from '../plant/optionBars'
 import {
   SourcesNotice,
   StatusPanel,
-  initialPlantState,
   plantScreenReducer,
   serviceRequestOf,
   servicePhaseOf,
 } from '../plant/PlantScreen'
 import type { PlantAction, PlantScreenState, ServicePhase, ServiceStatus } from '../plant/PlantScreen'
+import { EXAMPLE_FACTS, FACT_UNITS, REQUEST_READ, extraCropIds, planBaseRequest, planFieldId, siteOf, updatePlan, usePlan } from './planStore'
+export { initialBoardState } from './planStore'
 import { CropLegend } from '../plant/PlantVisuals'
 import type { PlantAnswer, PlantOption, RainStressPart } from '../plant/plantData'
 import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../plant/plantRoute'
@@ -47,9 +47,9 @@ import { CompareTable, MARGIN_MARK, SOIL_MARK, SortPicker, TableNotes, optionTit
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
 import { FactsEditor } from './FactsEditor'
-import { applyFacts, changedFacts, declaredCropIds, factsProblems, readFactUnits, readFacts, withExtraCrops } from './factsDraft'
+import { changedFacts, factsProblems, withExtraCrops } from './factsDraft'
 import type { FactsDraft } from './factsDraft'
-import { cropsUsed, draftProblems, exampleRotations, normalizeDraft } from './rotationDraft'
+import { draftProblems, exampleRotations, normalizeDraft } from './rotationDraft'
 import type { DraftRotation } from './rotationDraft'
 
 /**
@@ -75,54 +75,11 @@ import type { DraftRotation } from './rotationDraft'
  * stays on the screen "What should I plant?", one link away.
  */
 
-/** The field the plant request describes: the only one the board can ask for. */
-const REQUEST_FIELD_ID: string = rawPlantRequest.site.field_id
-
-const REQUEST_READ = readBaseRequest(rawPlantRequest)
-
 /** The soil-loss limit the request declares, as declared; null when it has no value. */
 const REQUEST_LIMIT: { value: number; unit: string } | null =
   typeof rawPlantRequest.soil_loss_limit.value === 'number'
     ? { value: rawPlantRequest.soil_loss_limit.value, unit: rawPlantRequest.soil_loss_limit.unit }
     : null
-
-/** The numbers the example request declares: where the user's own numbers start. */
-const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
-const FACT_UNITS = readFactUnits(rawPlantRequest)
-const DECLARED_CROPS = declaredCropIds(rawPlantRequest)
-
-/**
- * The site the board asks for: the request's field, at the centre of its
- * outline in the example case (the point the run seam sends too), never the
- * placeholder coordinates of the example request.
- */
-const REQUEST_FIELD = exampleCase.fields.find((field) => field.field_id === REQUEST_FIELD_ID) ?? null
-const REQUEST_SITE = REQUEST_FIELD === null ? null : siteReferenceOf(exampleCase.case_id, REQUEST_FIELD)
-if (REQUEST_SITE === null) throw new Error('board:request-field-without-outline')
-
-/** The crops these rotations sow that the request declares no economic facts for. */
-function extraCropIds(rotations: DraftRotation[]): string[] {
-  return cropsUsed(rotations).filter((id) => !DECLARED_CROPS.includes(id))
-}
-
-/** The rain factor the example request declares; null when it declares none to send. */
-const REQUEST_RAIN_VALUE: number | null = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor.value : null
-
-/** A copy of a request whose declared rain factor carries this value (kept as declared otherwise). */
-function withRainFactor(request: Record<string, unknown>, value: number | null): Record<string, unknown> {
-  if (value === null) return request
-  const copy = structuredClone(request)
-  const questions = copy.questions as Record<string, unknown>
-  const factor = questions.rain_stress_factor as Record<string, unknown> | null
-  if (factor === null || factor === undefined) return copy
-  factor.value = value
-  return copy
-}
-
-/** The board asks as soon as its field is picked: the state starts in service mode. */
-export function initialBoardState(): PlantScreenState {
-  return plantScreenReducer(initialPlantState(), { type: 'ask' })
-}
 
 function ignore() {}
 
@@ -145,28 +102,22 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
   return (
     <ul data-testid="board-fields" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
       {fields.map((field) => {
-        const described = field.field_id === REQUEST_FIELD_ID
+        const site = siteOf(field.field_id)
         return (
           <li key={field.field_id} className="relative">
             <div
               data-selected={String(field.field_id === selectedFieldId)}
-              data-described={String(described)}
-              className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[described=false]:border-dashed data-[described=false]:bg-transparent data-[described=false]:text-fs-muted data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
+              className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
             >
               <p className="font-bold leading-tight">{field.name}</p>
               <p data-testid="board-field-area" className="text-xs tabular-nums">
                 {formatString(strings['field.area'], { ha: fieldAreaHa(field).toFixed(1) })}
               </p>
-              {described && REQUEST_SITE !== null && (
+              {site !== null && (
                 <p data-testid="board-field-point" className="text-[11px] tabular-nums text-fs-muted">
-                  {formatString(strings['board.field.point'], { lat: REQUEST_SITE.latitude.toFixed(4), lon: REQUEST_SITE.longitude.toFixed(4) })}
+                  {formatString(strings['board.field.point'], { lat: site.latitude.toFixed(4), lon: site.longitude.toFixed(4) })}
                 </p>
               )}
-              <p className="text-xs text-fs-muted">
-                {described
-                  ? strings['board.field.ready']
-                  : missingPatternText(strings['board.rotations'], { reason: 'NOT_DECLARED' })}
-              </p>
             </div>
             <button
               type="button"
@@ -353,13 +304,6 @@ function BoardSide({
       </p>
     )
   }
-  if (selectedFieldId !== REQUEST_FIELD_ID) {
-    return (
-      <p data-testid="board-not-declared" className="rounded-2xl border border-fs-border px-6 py-10 text-center text-lg text-fs-muted fs-fog">
-        {missingPatternText(strings['board.rotations'], { reason: 'NOT_DECLARED' })}
-      </p>
-    )
-  }
   if (apiBase === null) {
     return (
       <p data-testid="board-no-service" className="rounded-2xl border border-fs-border bg-fs-surface px-6 py-10 text-center text-lg">
@@ -440,7 +384,7 @@ export function BoardView({
 }) {
   // The steps are numbered as shown: the candidates are a step only for the
   // field whose rotations can be edited.
-  const hasCandidates = builder !== null && selectedFieldId === REQUEST_FIELD_ID
+  const hasCandidates = builder !== null && selectedFieldId !== null
   const scenarioStep = hasCandidates ? 3 : 2
   return (
     <section aria-labelledby="board-title" className="mx-auto max-w-[100rem] space-y-6">
@@ -517,7 +461,7 @@ export function BoardView({
           onRainFactor={onRainFactor}
           record={service !== null && service.phase === 'answered' ? service.answer.answer.kinds_of_year : null}
           limit={limit}
-          disabled={selectedFieldId !== REQUEST_FIELD_ID || apiBase === null}
+          disabled={selectedFieldId === null || apiBase === null}
           onMarginOf={(value) => dispatch({ type: 'margin_of', value })}
           onStrictness={(value) => dispatch({ type: 'strictness', value })}
           onRain={(on) => dispatch({ type: 'rain', on })}
@@ -547,21 +491,15 @@ const NO_SERVICE_CLIENT = new QueryClient()
 /** The screen at #/board. The backend is the configured one (VITE_API_URL) unless given. */
 export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase?: string | null }) {
   const selectedFieldId = useSelectedFieldId()
-  const [state, dispatch] = useReducer(plantScreenReducer, null, initialBoardState)
-  // The rotations compared (sent) and those being edited (draft): the
-  // service is asked for the sent ones only, so an edit asks nothing until
-  // the user compares.
-  const [sent, setSent] = useState<DraftRotation[]>(exampleRotations)
-  const [draft, setDraft] = useState<DraftRotation[]>(exampleRotations)
-  // The user's own numbers, sent and being edited, as the rotations are.
-  const [factsSent, setFactsSent] = useState<FactsDraft>(EXAMPLE_FACTS)
-  const [factsDraft, setFactsDraft] = useState<FactsDraft>(EXAMPLE_FACTS)
-  // The rain factor the user declares for the stress test (the example's to start).
-  const [rainValue, setRainValue] = useState<number | null>(REQUEST_RAIN_VALUE)
-  const baseRequest = useMemo(
-    () => withRainFactor(applyFacts({ ...rawPlantRequest, site: REQUEST_SITE, rotations: sent }, factsSent), rainValue),
-    [sent, factsSent, rainValue],
-  )
+  // The plan lives in a store for the whole visit: the report and the print sheet read the same plan.
+  const plan = usePlan()
+  const { state, sent, draft, factsSent, factsDraft } = plan
+  const dispatch = (action: PlantAction) => updatePlan((p) => ({ ...p, state: plantScreenReducer(p.state, action) }))
+  const setDraft = (rotations: DraftRotation[]) => updatePlan((p) => ({ ...p, draft: rotations }))
+  const setFactsDraft = (facts: FactsDraft) => updatePlan((p) => ({ ...p, factsDraft: facts }))
+  const setRainValue = (value: number) => updatePlan((p) => ({ ...p, rainValue: value }))
+  const fieldId = planFieldId(selectedFieldId)
+  const baseRequest = useMemo(() => planBaseRequest(plan, fieldId), [plan.sent, plan.factsSent, plan.rainValue, fieldId])
   const baseRead = useMemo(() => readBaseRequest(baseRequest), [baseRequest])
   // The grain crops of the rotations being edited that the request declares no facts for ask for the user's numbers.
   const factsForDraft = withExtraCrops(factsDraft, extraCropIds(draft))
@@ -569,13 +507,10 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   // One comparison sends the rotations and the numbers together, so a new crop never goes without its numbers.
   const compareAll = () => {
     const ordered = normalizeDraft(draft)
-    setDraft(ordered)
-    setSent(ordered)
-    setFactsDraft(factsForDraft)
-    setFactsSent(factsForDraft)
+    updatePlan((p) => ({ ...p, draft: ordered, sent: ordered, factsDraft: factsForDraft, factsSent: factsForDraft }))
   }
   const rotations = useMemo(() => readPlantRotations(baseRequest), [baseRequest])
-  const asks = apiBase !== null && selectedFieldId === REQUEST_FIELD_ID
+  const asks = apiBase !== null && selectedFieldId !== null && baseRequest !== null
   const request = useMemo(
     () => (asks ? serviceRequestOf(state, baseRequest) : null),
     [asks, baseRequest, state.mode, state.strictness, state.marginOf, state.rain],
@@ -634,9 +569,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
           onCompare={compareAll}
           onReset={() => {
             const example = exampleRotations()
-            setDraft(example)
-            setSent(example)
-            setFactsSent(withExtraCrops(factsSent, []))
+            updatePlan((p) => ({ ...p, draft: example, sent: example, factsSent: withExtraCrops(p.factsSent, []) }))
           }}
         />
         <FactsEditor
@@ -646,10 +579,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
           blocked={draftProblems(draft).length !== 0}
           onChange={setFactsDraft}
           onCompare={compareAll}
-          onReset={() => {
-            setFactsDraft(EXAMPLE_FACTS)
-            setFactsSent(EXAMPLE_FACTS)
-          }}
+          onReset={() => updatePlan((p) => ({ ...p, factsDraft: EXAMPLE_FACTS, factsSent: EXAMPLE_FACTS }))}
         />
         </>
       }
