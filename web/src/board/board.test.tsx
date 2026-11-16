@@ -890,3 +890,17 @@ describe('the site the board asks for (l3/original-mock)', () => {
     expect(visibleText(html)).not.toContain(`${rawRequest.site.latitude.toFixed(4)}, ${rawRequest.site.longitude.toFixed(4)}`)
   })
 })
+
+describe('the plan on the print sheet (l3/original-mock)', async () => {
+  const { PlanSummaryView } = await import('./PlanSummary')
+  const { initialPlan } = await import('./planStore')
+  it('says there is no answer yet, then shows the answer of this field with each option, and the user’s numbers', () => {
+    const plan = initialPlan()
+    expect(renderToString(<PlanSummaryView plan={plan} fieldId={FIELD} />)).toContain('data-testid="plan-no-answer"')
+    const withAnswer = { ...plan, lastAnswer: { fieldId: FIELD, answer: example, mocked: false } }
+    const html = renderToString(<PlanSummaryView plan={withAnswer} fieldId={FIELD} />)
+    expect(html).toContain('data-testid="plan-answer"')
+    expect(html).toContain('data-testid="plan-numbers"')
+    expect(renderToString(<PlanSummaryView plan={withAnswer} fieldId={OTHER_FIELD} />)).toContain('data-testid="plan-no-answer"')
+  })
+})

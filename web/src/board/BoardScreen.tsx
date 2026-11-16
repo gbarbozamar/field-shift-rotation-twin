@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { UseQueryOptions } from '@tanstack/react-query'
@@ -540,6 +540,14 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   if (answerNow !== null && answerNow !== seen.current) {
     setSeen({ current: answerNow, previous: seen.current })
   }
+  // The answer shown is kept with the plan, so the print sheet can carry it.
+  const answeredService = phase !== null && phase.phase === 'answered' ? phase.answer : null
+  useEffect(() => {
+    if (answeredService === null || selectedFieldId === null) return
+    const report = mockReportOf(answeredService)
+    const mocked = report !== null && (report.whole || report.soilKinds.length !== 0 || report.record || report.marginKinds.length !== 0)
+    updatePlan((p) => ({ ...p, lastAnswer: { fieldId: selectedFieldId, answer: answeredService.answer, mocked } }))
+  }, [answeredService, selectedFieldId])
   const [mapChoice, setMapChoice] = useState<boolean | null>(null)
   const mapOpen = mapChoice ?? selectedFieldId === null
   return (

@@ -3,6 +3,7 @@ import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
 import { exampleCase } from '../identity/exampleCase'
 import { initialPlantState, plantScreenReducer } from '../plant/PlantScreen'
 import type { PlantScreenState } from '../plant/PlantScreen'
+import type { PlantAnswer } from '../plant/plantData'
 import { readBaseRequest } from '../plant/plantRoute'
 import { siteReferenceOf } from '../seam/RotationRun'
 import { applyFacts, declaredCropIds, readFactUnits, readFacts } from './factsDraft'
@@ -39,6 +40,8 @@ export interface Plan {
   factsSent: FactsDraft
   factsDraft: FactsDraft
   rainValue: number | null
+  /** The last answer the board showed, for the field it was asked for, and whether it was mixed with mock values. */
+  lastAnswer: { fieldId: string; answer: PlantAnswer; mocked: boolean } | null
 }
 
 /** The board asks as soon as a field is picked: the questions start in service mode. */
@@ -54,6 +57,7 @@ export function initialPlan(): Plan {
     factsSent: EXAMPLE_FACTS,
     factsDraft: EXAMPLE_FACTS,
     rainValue: REQUEST_RAIN_VALUE,
+    lastAnswer: null,
   }
 }
 

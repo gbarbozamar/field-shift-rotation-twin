@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+import PlanSummary from '../board/PlanSummary'
 import { missingPatternText, ValueDisplay } from '../components/ValueDisplay'
 import type { MissingPart } from '../components/ValueDisplay'
 import { demoRotationsD128 } from '../decision/demoRotations'
@@ -55,6 +57,8 @@ export interface GeometrySummary {
 
 export interface PrintSheetViewProps {
   selectedFieldId: string | null
+  /** The user's plan for the field (the board's), shown after the field; none in a bare view. */
+  plan?: ReactNode
   caseData?: PrintableCaseData
   climate?: SiteClimate
   soilSlope?: SiteSoilSlope
@@ -110,7 +114,7 @@ function MissingLine({ label, missing }: { label: string; missing: MissingPart }
   return (
     <p
       data-testid="print-missing-line"
-      className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+      className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
     >
       {missingPatternText(label, missing)}
     </p>
@@ -124,11 +128,11 @@ function DatedSummary({ label, part }: { label: string; part: DatedPart }) {
   return (
     <div className="mt-1">
       <p className="text-sm">
-        <span className="text-slate-500">{label}:</span>{' '}
+        <span className="text-fs-muted">{label}:</span>{' '}
         <span className="font-medium">{part.date}</span>{' '}
-        <span className="text-slate-500">{strings[`provenance.${part.provenance}`]}</span>
+        <span className="text-fs-muted">{strings[`provenance.${part.provenance}`]}</span>
       </p>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fs-muted">
         {formatString(strings['value.source'], { source: part.source })}
       </p>
     </div>
@@ -141,7 +145,7 @@ function ResidueSummary({ residue }: { residue: ResiduePart }) {
   }
   return (
     <p className="mt-1 text-sm">
-      <span className="text-slate-500">{strings['ribbon.mgmt_residue']}:</span>{' '}
+      <span className="text-fs-muted">{strings['ribbon.mgmt_residue']}:</span>{' '}
       <span className="font-medium">{residue}</span>
     </p>
   )
@@ -153,7 +157,7 @@ function GrazingSummary({ grazing }: { grazing: GrazingPart }) {
   }
   return (
     <p className="mt-1 text-sm">
-      <span className="text-slate-500">{strings['ribbon.mgmt_grazing']}:</span>{' '}
+      <span className="text-fs-muted">{strings['ribbon.mgmt_grazing']}:</span>{' '}
       <span className="font-medium">{grazing.intensity}</span>
     </p>
   )
@@ -165,7 +169,7 @@ function TerminationSummary({ termination }: { termination: TerminationPart }) {
   }
   return (
     <p className="mt-1 text-sm">
-      <span className="text-slate-500">{strings['ribbon.mgmt_termination']}:</span>{' '}
+      <span className="text-fs-muted">{strings['ribbon.mgmt_termination']}:</span>{' '}
       <span className="font-medium">{termination.date}</span>{' '}
       <span className="font-medium">{termination.method}</span>
     </p>
@@ -182,17 +186,17 @@ function ComponentSummary({ component }: { component: RotationComponent }) {
         {formatString(strings['ribbon.component'], { position: component.position })}
       </h5>
       <p className="mt-1 text-sm">
-        <span className="text-slate-500">{strings['ribbon.crop']}:</span>{' '}
+        <span className="text-fs-muted">{strings['ribbon.crop']}:</span>{' '}
         <span className="font-medium">{component.crop_id}</span>
       </p>
       <p className="mt-1 text-sm">
-        <span className="text-slate-500">{strings['ribbon.purpose']}:</span>{' '}
+        <span className="text-fs-muted">{strings['ribbon.purpose']}:</span>{' '}
         <span className="font-medium">{component.purpose}</span>
       </p>
       <DatedSummary label={strings['ribbon.sowing']} part={component.sowing} />
       <DatedSummary label={strings['ribbon.harvest']} part={component.harvest} />
-      <div className={['mt-2', 'border-t', 'border-slate-100', 'pt-2'].join(' ')}>
-        <p className="text-xs font-semibold uppercase text-slate-500">
+      <div className={['mt-2', 'border-t', 'border-fs-faint', 'pt-2'].join(' ')}>
+        <p className="text-xs font-semibold uppercase text-fs-muted">
           {strings['ribbon.management']}
         </p>
         <ResidueSummary residue={component.management.residue} />
@@ -221,10 +225,10 @@ function RotationSummaryCard({ rotation }: { rotation: RotationDefinition }) {
       <h4 className="text-base font-semibold">
         {formatString(strings['ribbon.rotation_of'], { label: rotation.label })}
       </h4>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-fs-muted">
         {strings['print.rotation_id_label']}: <span className="font-mono">{rotation.rotation_id}</span>
       </p>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-fs-muted">
         {formatString(strings['ribbon.ag_year_start'], { month: rotation.ag_year_start.month })}
         {rotation.ag_year_start.provisional ? (
           <>
@@ -233,7 +237,7 @@ function RotationSummaryCard({ rotation }: { rotation: RotationDefinition }) {
           </>
         ) : null}
       </p>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-fs-muted">
         {rotation.repeats ? strings['ribbon.repeats'] : strings['ribbon.not_repeating']}
       </p>
       <ol className={['mt-3', 'grid', 'list-none', 'gap-3', 'sm:grid-cols-2'].join(' ')}>
@@ -260,6 +264,7 @@ export function PrintSheetView({
   climate = siteClimate,
   soilSlope = siteSoilSlope,
   rotations = ALL_DECLARED_ROTATIONS,
+  plan = null,
 }: PrintSheetViewProps) {
   const selectedField =
     caseData.fields.find((field) => field.field_id === selectedFieldId) ?? null
@@ -297,7 +302,7 @@ export function PrintSheetView({
             'font-medium',
             'text-fs-text',
             'transition',
-            'hover:bg-slate-50',
+            'hover:bg-fs-bg',
             'print:hidden',
           ].join(' ')}
         >
@@ -356,11 +361,11 @@ export function PrintSheetView({
                 role="note"
                 data-testid="print-example-banner"
                 aria-label={strings['identity.banner_title']}
-                className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3"
+                className="rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3"
               >
-                <p className="text-sm font-semibold text-amber-900">{strings['example.banner']}</p>
+                <p className="text-sm font-semibold text-fs-warning">{strings['example.banner']}</p>
                 {caseData.example_data && (
-                  <p className="mt-1 text-sm text-amber-800">{strings['identity.banner_text']}</p>
+                  <p className="mt-1 text-sm text-fs-warning">{strings['identity.banner_text']}</p>
                 )}
               </div>
             )}
@@ -397,6 +402,7 @@ export function PrintSheetView({
               </dl>
             </section>
 
+            {plan}
             <section
               aria-labelledby="print-geometry-heading"
               className="print-avoid-break border-t border-fs-border pt-4"
@@ -407,7 +413,7 @@ export function PrintSheetView({
               {geometry === null ? (
                 <p
                   data-testid="print-geometry-missing"
-                  className="mt-2 text-sm italic text-slate-500"
+                  className="mt-2 text-sm italic text-fs-muted"
                 >
                   {missingPatternText(strings['print.geometry'], { reason: 'NOT_DECLARED' })}
                 </p>
@@ -488,7 +494,7 @@ export function PrintSheetView({
               {fieldRotations.length === 0 ? (
                 <p
                   data-testid="print-rotations-missing"
-                  className="mt-2 text-sm italic text-slate-500"
+                  className="mt-2 text-sm italic text-fs-muted"
                 >
                   {missingPatternText(strings['print.rotations'], { reason: 'NOT_DECLARED' })}
                 </p>
@@ -514,5 +520,5 @@ export function PrintSheetView({
 /** Route wrapper at #/print reading the shared selected field store. */
 export default function PrintSheetScreen() {
   const selectedFieldId = useSelectedFieldId()
-  return <PrintSheetView selectedFieldId={selectedFieldId} />
+  return <PrintSheetView selectedFieldId={selectedFieldId} plan={<PlanSummary selectedFieldId={selectedFieldId} />} />
 }

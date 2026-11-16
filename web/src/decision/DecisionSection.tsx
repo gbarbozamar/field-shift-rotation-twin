@@ -427,7 +427,7 @@ function NamedYearsSection({
         'mt-4',
         'rounded-lg',
         'border',
-        'border-slate-200',
+        'border-fs-border',
         'bg-white',
         'px-4',
         'py-3',
@@ -437,7 +437,7 @@ function NamedYearsSection({
         <label
           htmlFor="decision-named-years-select"
           data-testid="decision-named-years-label"
-          className={['block', 'text-xs', 'font-semibold', 'text-slate-600'].join(' ')}
+          className={['block', 'text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
         >
           {strings['decision.named_years']}
         </label>
@@ -454,7 +454,7 @@ function NamedYearsSection({
             'mt-1',
             'rounded',
             'border',
-            'border-slate-300',
+            'border-fs-border',
             'bg-white',
             'px-2',
             'py-1',
@@ -471,7 +471,7 @@ function NamedYearsSection({
         {years.length === 0 ? (
           <p
             data-testid="decision-named-years-none"
-            className={['mt-1', 'text-xs', 'italic', 'text-slate-500'].join(' ')}
+            className={['mt-1', 'text-xs', 'italic', 'text-fs-muted'].join(' ')}
           >
             {strings['decision.named_years_none']}
           </p>
@@ -481,14 +481,14 @@ function NamedYearsSection({
       <div data-testid="decision-counts-by-year" className={['mt-3'].join(' ')}>
         <h5
           data-testid="decision-counts-by-year-heading"
-          className={['text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+          className={['text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
         >
           {strings['decision.counts_by_year']}
         </h5>
         {filteredCounts.length === 0 ? (
           <p
             data-testid="decision-counts-by-year-empty"
-            className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+            className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
           >
             {strings['decision.counts_by_year_empty']}
           </p>
@@ -502,7 +502,7 @@ function NamedYearsSection({
               >
                 <p
                   data-testid="decision-count-by-year-label"
-                  className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+                  className={['font-mono', 'text-xs', 'text-fs-muted'].join(' ')}
                 >
                   {`${entry.rotation_id} ${entry.scenario_id} ${entry.indicator}`}
                 </p>
@@ -522,7 +522,7 @@ function NamedYearsSection({
                     </p>
                     <p
                       data-testid="decision-count-by-year-within-missing"
-                      className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+                      className={['text-sm', 'italic', 'text-fs-muted'].join(' ')}
                     >
                       {missingPatternText(strings['decision.counts_by_year_within'], {
                         reason: 'NOT_DECLARED',
@@ -539,7 +539,7 @@ function NamedYearsSection({
                       <li
                         key={`${row.ag_year}:${row.carbon_model ?? ''}:${row.computation ?? ''}`}
                         data-testid="decision-not-evaluated-row"
-                        className={['text-sm', 'italic', 'text-slate-500'].join(' ')}
+                        className={['text-sm', 'italic', 'text-fs-muted'].join(' ')}
                       >
                         {missingPatternText(
                           `${strings['decision.counts_by_year_not_evaluated']} ${row.ag_year}`,
@@ -558,14 +558,14 @@ function NamedYearsSection({
       <div data-testid="decision-scenario-years" className={['mt-3'].join(' ')}>
         <h5
           data-testid="decision-scenario-years-heading"
-          className={['text-xs', 'font-semibold', 'text-slate-500'].join(' ')}
+          className={['text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}
         >
           {strings['decision.scenario_years']}
         </h5>
         {filteredDiffs.length === 0 ? (
           <p
             data-testid="decision-scenario-years-empty"
-            className={['mt-1', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+            className={['mt-1', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
           >
             {strings['decision.scenario_years_empty']}
           </p>
@@ -579,7 +579,7 @@ function NamedYearsSection({
               >
                 <p
                   data-testid="decision-scenario-year-label"
-                  className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+                  className={['font-mono', 'text-xs', 'text-fs-muted'].join(' ')}
                 >
                   {`${formatString(strings['decision.pair_of'], {
                     first: diff.pair[0],
@@ -614,7 +614,7 @@ function MeasureFirstBlock({
         'mt-4',
         'rounded-lg',
         'border',
-        'border-slate-200',
+        'border-fs-border',
         'bg-white',
         'px-4',
         'py-3',
@@ -628,7 +628,7 @@ function MeasureFirstBlock({
       </h4>
       <p
         data-testid="decision-measure-first-field"
-        className={['mt-1', 'font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+        className={['mt-1', 'font-mono', 'text-xs', 'text-fs-muted'].join(' ')}
       >
         {formatString(strings['decision.measure_first_field'], { field: fieldId })}
       </p>
@@ -643,7 +643,7 @@ function MeasureFirstBlock({
               <p className={['font-medium'].join(' ')}>
                 <span
                   data-testid="decision-measure-first-rank"
-                  className={['font-mono', 'text-xs', 'text-slate-500'].join(' ')}
+                  className={['font-mono', 'text-xs', 'text-fs-muted'].join(' ')}
                 >
                   {formatString(strings['decision.measure_first_rank'], { rank: item.rank })}
                 </span>{' '}
@@ -651,7 +651,7 @@ function MeasureFirstBlock({
               </p>
               <p
                 data-testid="decision-measure-first-why"
-                className={['text-sm', 'text-slate-600'].join(' ')}
+                className={['text-sm', 'text-fs-muted'].join(' ')}
               >
                 {item.why}
               </p>
@@ -661,7 +661,7 @@ function MeasureFirstBlock({
       ) : (
         <p
           data-testid="decision-measure-first-empty"
-          className={['mt-2', 'text-sm', 'italic', 'text-slate-500'].join(' ')}
+          className={['mt-2', 'text-sm', 'italic', 'text-fs-muted'].join(' ')}
         >
           {missingPatternText(strings['decision.measure_first'], {
             reason: 'NOT_DECLARED',

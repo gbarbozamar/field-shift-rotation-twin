@@ -899,7 +899,7 @@ export function SavedCaseView({
         <p
           role="note"
           data-testid="saved-example-banner"
-          className="mt-4 rounded-lg border border-amber-300 bg-[var(--fs-warning-bg)] px-4 py-3 text-sm text-fs-warning"
+          className="mt-4 rounded-lg border border-fs-warning bg-[var(--fs-warning-bg)] px-4 py-3 text-sm text-fs-warning"
         >
           {strings['example.banner']}
         </p>
@@ -938,7 +938,7 @@ export function SavedCaseView({
           <p
             role="alert"
             data-testid="saved-file-error"
-            className="mt-3 rounded-lg border border-red-300 bg-[var(--fs-error-bg)] px-3 py-2 text-sm text-fs-error"
+            className="mt-3 rounded-lg border border-fs-error bg-[var(--fs-error-bg)] px-3 py-2 text-sm text-fs-error"
           >
             {strings[errorKey]}
           </p>

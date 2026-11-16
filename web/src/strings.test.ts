@@ -549,6 +549,15 @@ const WORDING_SHEET: Record<string, string> = {
   'saved.carbon_horizon': 'Horizon: {start} to {end}',
   'saved.carbon_depth': 'Soil depth',
   'saved.carbon_trend_heading': 'Soil carbon trend',
+  // The plan on the print sheet (l3/original-mock, PROPOSED).
+  'plan.title': 'Your plan for this field',
+  'plan.answer': 'The answer',
+  'plan.no_answer': 'No answer yet for this field: compare on the planning board first.',
+  'plan.rotation': 'Rotation',
+  'plan.state': 'Verdict',
+  'plan.rotations': 'Rotations compared (crop and year sown)',
+  'plan.numbers': 'Your numbers',
+  'plan.declared_note': 'Every number here is your own declaration, as you typed it on the planning board.',
 }
 
 /** Source of the shell page as it was before the strings unit. */
