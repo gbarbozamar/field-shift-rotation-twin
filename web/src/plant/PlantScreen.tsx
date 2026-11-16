@@ -1538,7 +1538,7 @@ export default function PlantScreen({
     (first: PlantScreenState | null) =>
       first ?? { ...initialPlantState(), strictness: plan.state.strictness, marginOf: plan.state.marginOf, rain: plan.state.rain },
   )
-  const baseRequest = useMemo(() => planBaseRequest(plan, fieldId), [plan.sent, plan.factsSent, plan.rainValue, fieldId])
+  const baseRequest = useMemo(() => planBaseRequest(plan, fieldId), [plan.sent, plan.factsSent, fieldId])
   // Built once per (mode, strictness, margin_of, heavier rain): the price
   // looked at does not copy the request again.
   const request = useMemo(

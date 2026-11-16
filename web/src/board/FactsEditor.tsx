@@ -19,6 +19,9 @@ function labelOf(key: FactKey): string {
   if (key === 'cost') return `${strings['board.facts.soybean']}: ${strings['board.facts.cost']}`
   if (key === 'coverCost') return `${strings['board.facts.cover']}: ${strings['board.facts.cost']}`
   if (key === 'limit') return strings['board.facts.limit']
+  if (key === 'priceLow') return `${strings['board.facts.soybean']}: ${strings['board.facts.price_low']}`
+  if (key === 'priceHigh') return `${strings['board.facts.soybean']}: ${strings['board.facts.price_high']}`
+  if (key === 'rain') return strings['board.facts.rain']
   if (key.startsWith('extra.')) {
     const [, id, field, kind] = key.split('.')
     const what =
@@ -98,14 +101,16 @@ export function FactsEditor({
     <NumberField key={key} testid={`board-fact-${key}`} label={label} unit={unit} value={value} invalid={bad.has(key)} onChange={(text) => onChange(set(text))} />
   )
   return (
-    <div data-testid="board-facts" className="mt-6">
-      <h4 className="text-lg font-bold">{strings['board.facts.title']}</h4>
+    <div data-testid="board-facts">
       <p className="mb-3 text-sm text-fs-muted">{strings['board.facts.note']}</p>
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
         <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
           <legend className="px-1 font-bold">{strings['board.facts.soybean']}</legend>
           {field('price', strings['board.facts.price'], units.price, draft.price, (t) => ({ ...draft, price: t }))}
           {field('cost', strings['board.facts.cost'], units.cost, draft.cost, (t) => ({ ...draft, cost: t }))}
+          {field('priceLow', strings['board.facts.price_low'], units.price, draft.priceLow, (t) => ({ ...draft, priceLow: t }))}
+          {field('priceHigh', strings['board.facts.price_high'], units.price, draft.priceHigh, (t) => ({ ...draft, priceHigh: t }))}
+          <p className="text-xs text-fs-muted">{strings['board.facts.range_note']}</p>
           {FACT_KINDS.map((k) =>
             field(`yields.${k}`, formatString(strings['board.facts.yield'], { kind: kindName(k) }), units.yield, draft.yields[k], (t) => ({
               ...draft,
@@ -150,6 +155,13 @@ export function FactsEditor({
           <legend className="px-1 font-bold">{strings['board.facts.limit']}</legend>
           {field('limit', strings['board.facts.limit'], units.limit, draft.limit, (t) => ({ ...draft, limit: t }))}
         </fieldset>
+        {draft.rain !== null && (
+          <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
+            <legend className="px-1 font-bold">{strings['board.facts.rain']}</legend>
+            {field('rain', strings['board.facts.rain_factor'], units.rain, draft.rain, (t) => ({ ...draft, rain: t }))}
+            <p className="text-xs text-fs-muted">{strings['board.rain.declared_note']}</p>
+          </fieldset>
+        )}
       </div>
       {problems.length !== 0 && (
         <ul data-testid="board-facts-problems" role="alert" className="mt-3 list-disc rounded-xl border border-fs-error bg-fs-error-bg py-2 pl-8 pr-4 text-sm text-fs-error">

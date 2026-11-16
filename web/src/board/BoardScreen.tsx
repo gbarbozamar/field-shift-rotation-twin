@@ -351,16 +351,14 @@ export function BoardView({
   onToggleMap,
   rotations = plantRotations,
   builder = null,
+  numbers = null,
   previous = null,
   updating = false,
   limit = REQUEST_LIMIT,
   rainFactor = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null,
-  onRainFactor,
 }: {
   /** The rain factor the request sends with the stress test; the example request's by default. */
   rainFactor?: DeclaredFactor | null
-  /** Given when the user may declare their own rain factor. */
-  onRainFactor?: (value: number) => void
   /** The soil-loss limit of the comparison shown, as declared; the example request's by default. */
   limit?: { value: number; unit: string } | null
   selectedFieldId: string | null
@@ -377,6 +375,8 @@ export function BoardView({
   rotations?: PlantRotations
   /** The step of the candidates (the rotation builder), when the rotations can be edited. */
   builder?: ReactNode
+  /** The step of the user's numbers (prices, costs, yields, limit, price range, rain), when they can be edited. */
+  numbers?: ReactNode
   /** The answer shown before the one of the service now, when there was one. */
   previous?: PlantAnswer | null
   /** True while the answer shown is the one before and the new one is on its way. */
@@ -385,7 +385,9 @@ export function BoardView({
   // The steps are numbered as shown: the candidates are a step only for the
   // field whose rotations can be edited.
   const hasCandidates = builder !== null && selectedFieldId !== null
-  const scenarioStep = hasCandidates ? 3 : 2
+  const hasNumbers = numbers !== null && selectedFieldId !== null
+  const numbersStep = hasCandidates ? 3 : 2
+  const scenarioStep = numbersStep + (hasNumbers ? 1 : 0)
   return (
     <section aria-labelledby="board-title" className="mx-auto max-w-[100rem] space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
@@ -451,6 +453,22 @@ export function BoardView({
         </details>
       ) : null}
 
+      {hasNumbers && (
+        <details data-testid="board-numbers" className="group" open>
+          <summary className="cursor-pointer list-none">
+            <StepTitle n={numbersStep} title={strings['board.step.numbers']}>
+              <span className="rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:hidden">
+                {strings['board.builder.open']}
+              </span>
+              <span className="hidden rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:inline">
+                {strings['board.builder.close']}
+              </span>
+            </StepTitle>
+          </summary>
+          {numbers}
+        </details>
+      )}
+
       <div>
         <StepTitle n={scenarioStep} title={strings['board.step.scenario']} />
         <BoardControls
@@ -458,7 +476,6 @@ export function BoardView({
           strictness={state.strictness}
           rain={state.rain && rainFactor !== null}
           rainFactor={rainFactor}
-          onRainFactor={onRainFactor}
           record={service !== null && service.phase === 'answered' ? service.answer.answer.kinds_of_year : null}
           limit={limit}
           disabled={selectedFieldId === null || apiBase === null}
@@ -497,9 +514,8 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   const dispatch = (action: PlantAction) => updatePlan((p) => ({ ...p, state: plantScreenReducer(p.state, action) }))
   const setDraft = (rotations: DraftRotation[]) => updatePlan((p) => ({ ...p, draft: rotations }))
   const setFactsDraft = (facts: FactsDraft) => updatePlan((p) => ({ ...p, factsDraft: facts }))
-  const setRainValue = (value: number) => updatePlan((p) => ({ ...p, rainValue: value }))
   const fieldId = planFieldId(selectedFieldId)
-  const baseRequest = useMemo(() => planBaseRequest(plan, fieldId), [plan.sent, plan.factsSent, plan.rainValue, fieldId])
+  const baseRequest = useMemo(() => planBaseRequest(plan, fieldId), [plan.sent, plan.factsSent, fieldId])
   const baseRead = useMemo(() => readBaseRequest(baseRequest), [baseRequest])
   // The grain crops of the rotations being edited that the request declares no facts for ask for the user's numbers.
   const factsForDraft = withExtraCrops(factsDraft, extraCropIds(draft))
@@ -565,9 +581,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       rotations={rotations}
       limit={{ value: Number(factsSent.limit), unit: rawPlantRequest.soil_loss_limit.unit }}
       rainFactor={baseRead.rain.kind === 'present' ? baseRead.rain.factor : null}
-      onRainFactor={setRainValue}
       builder={
-        <>
         <RotationBuilder
           draft={draft}
           sent={sent}
@@ -580,6 +594,8 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
             updatePlan((p) => ({ ...p, draft: example, sent: example, factsSent: withExtraCrops(p.factsSent, []) }))
           }}
         />
+      }
+      numbers={
         <FactsEditor
           draft={factsForDraft}
           sent={factsSent}
@@ -589,7 +605,6 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
           onCompare={compareAll}
           onReset={() => updatePlan((p) => ({ ...p, factsDraft: EXAMPLE_FACTS, factsSent: EXAMPLE_FACTS }))}
         />
-        </>
       }
     />
   )

@@ -105,7 +105,8 @@ export function PlanSummaryView({ plan, fieldId }: { plan: Plan; fieldId: string
             </li>
           ))}
           <li>{strings['board.facts.limit']}: {facts.limit} {unitText(FACT_UNITS.limit)}</li>
-          {plan.rainValue !== null && plan.state.rain && <li>{formatString(strings['board.rain.factor'], { factor: displayNumber(plan.rainValue) })}</li>}
+          <li>{formatString(strings['board.facts.range_line'], { low: facts.priceLow, high: facts.priceHigh, unit: unitText(FACT_UNITS.price) })}</li>
+          {facts.rain !== null && plan.state.rain && <li>{formatString(strings['board.rain.factor'], { factor: facts.rain })}</li>}
         </ul>
         <p className="mt-1 text-xs text-fs-muted">{strings['plan.declared_note']}</p>
       </div>

@@ -25,9 +25,6 @@ export const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
 export const FACT_UNITS = readFactUnits(rawPlantRequest)
 const DECLARED_CROPS = declaredCropIds(rawPlantRequest)
 
-/** The rain factor the example request declares; null when it declares none to send. */
-export const REQUEST_RAIN_VALUE: number | null = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor.value : null
-
 /** The crops these rotations sow that the request declares no economic facts for. */
 export function extraCropIds(rotations: DraftRotation[]): string[] {
   return cropsUsed(rotations).filter((id) => !DECLARED_CROPS.includes(id))
@@ -39,7 +36,6 @@ export interface Plan {
   draft: DraftRotation[]
   factsSent: FactsDraft
   factsDraft: FactsDraft
-  rainValue: number | null
   /** The last answer the board showed, for the field it was asked for, and whether it was mixed with mock values. */
   lastAnswer: { fieldId: string; answer: PlantAnswer; mocked: boolean } | null
 }
@@ -56,7 +52,6 @@ export function initialPlan(): Plan {
     draft: exampleRotations(),
     factsSent: EXAMPLE_FACTS,
     factsDraft: EXAMPLE_FACTS,
-    rainValue: REQUEST_RAIN_VALUE,
     lastAnswer: null,
   }
 }
@@ -103,19 +98,11 @@ export function siteOf(fieldId: string) {
   return field === null ? null : siteReferenceOf(exampleCase.case_id, field)
 }
 
-/** A copy of a request whose declared rain factor carries this value (kept as declared otherwise). */
-function withRainFactor(request: Record<string, unknown>, value: number | null): Record<string, unknown> {
-  if (value === null) return request
-  const questions = request.questions as Record<string, unknown>
-  const factor = questions.rain_stress_factor as Record<string, unknown> | null
-  if (factor !== null && factor !== undefined) factor.value = value
-  return request
-}
-
 /**
  * The plant request of a plan for a field: the example request with the
  * field's site (the centre of its outline), the compared rotations and
- * numbers, and the rain factor, every part naming that field. Null when the
+ * numbers (prices, costs, yields, limit, price range, rain factor), every
+ * part naming that field. Null when the
  * field has no outline in the case.
  */
 export function planBaseRequest(current: Plan, fieldId: string): Record<string, unknown> | null {
@@ -124,5 +111,5 @@ export function planBaseRequest(current: Plan, fieldId: string): Record<string, 
   const rotations = current.sent.map((rotation) => ({ ...rotation, field_id: fieldId }))
   const request = applyFacts({ ...rawPlantRequest, site, rotations }, current.factsSent)
   ;(request.economic_facts as Record<string, unknown>).field_id = fieldId
-  return withRainFactor(request, current.rainValue)
+  return request
 }

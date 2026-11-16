@@ -55,7 +55,7 @@ describe('the user’s own numbers', () => {
     )
     expect(html).toContain('data-testid="board-facts-problems"')
     expect(html).toMatch(/data-testid="board-facts-compare"[^>]*disabled/)
-    expect(html).toContain(strings['board.facts.title'])
+    expect(html).toContain(strings['board.facts.note'])
   })
 
   it('a crop the request has no facts for comes in empty, is a problem until typed, and is written like the soybean', () => {
@@ -73,4 +73,20 @@ describe('the user’s own numbers', () => {
     expect(withExtraCrops(typed, []).extra).toEqual({})
     expect(changedFacts(typed, example)).toBe(5)
   })
+
+  it('the price range: read from the request, sent as typed, in order and around today\'s price', () => {
+    expect(example.priceLow).toBe(String(rawRequest.questions.soybean_price_range.low))
+    const sent = applyFacts(rawRequest, { ...example, priceLow: '150', priceHigh: '700' })
+    expect(((sent.questions as Json).soybean_price_range as Json).high).toBe(700)
+    expect(factsProblems({ ...example, priceLow: '500', priceHigh: '300' })).toContainEqual({ key: 'priceHigh', kind: 'range_order' })
+    expect(factsProblems({ ...example, price: '650' })).toContainEqual({ key: 'price', kind: 'price_outside_range' })
+  })
+
+  it('the rain factor is a number above zero, sent with the comparison', () => {
+    expect(example.rain).toBe(String(rawRequest.questions.rain_stress_factor.value))
+    expect(factsProblems({ ...example, rain: '0' })).toContainEqual({ key: 'rain', kind: 'not_positive' })
+    const sent = applyFacts(rawRequest, { ...example, rain: '1.5' })
+    expect(((sent.questions as Json).rain_stress_factor as Json).value).toBe(1.5)
+  })
 })
+

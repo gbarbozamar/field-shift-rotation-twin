@@ -26,6 +26,11 @@ export interface FactsDraft {
   coverCost: string
   pasture: Record<FactKind, string>
   limit: string
+  /** The soybean prices the tipping price is searched between (the request's soybean_price_range). */
+  priceLow: string
+  priceHigh: string
+  /** The rain factor of the stress test, or null when the request declares none to send. */
+  rain: string | null
   /** Grain crops the rotations sow that the request declares no facts for, by crop id. */
   extra: Record<string, ExtraCrop>
 }
@@ -35,6 +40,9 @@ export type FactKey =
   | 'cost'
   | 'coverCost'
   | 'limit'
+  | 'priceLow'
+  | 'priceHigh'
+  | 'rain'
   | `yields.${FactKind}`
   | `pasture.${FactKind}`
   | `extra.${string}.price`
@@ -43,7 +51,7 @@ export type FactKey =
 
 export interface FactProblem {
   key: FactKey
-  kind: 'not_a_number' | 'negative' | 'not_positive'
+  kind: 'not_a_number' | 'negative' | 'not_positive' | 'range_order' | 'price_outside_range'
 }
 
 type Json = Record<string, unknown>
@@ -75,6 +83,9 @@ export function readFacts(request: unknown): FactsDraft {
     coverCost: valueText(cover.cost),
     pasture: { el_nino: valueText(margins.el_nino), neutral: valueText(margins.neutral), la_nina: valueText(margins.la_nina) },
     limit: valueText(req.soil_loss_limit),
+    priceLow: String(((req.questions as Json).soybean_price_range as Json).low),
+    priceHigh: String(((req.questions as Json).soybean_price_range as Json).high),
+    rain: ((req.questions as Json).rain_stress_factor as Json | null) === null ? null : valueText((req.questions as Json).rain_stress_factor),
     extra: {},
   }
 }
@@ -106,6 +117,9 @@ function entries(draft: FactsDraft): [FactKey, string][] {
     ['coverCost', draft.coverCost],
     ...FACT_KINDS.map((k): [FactKey, string] => [`pasture.${k}`, draft.pasture[k]]),
     ['limit', draft.limit],
+    ['priceLow', draft.priceLow],
+    ['priceHigh', draft.priceHigh],
+    ...(draft.rain === null ? [] : [['rain', draft.rain] as [FactKey, string]]),
     ...Object.entries(draft.extra).flatMap(([id, crop]): [FactKey, string][] => [
       [`extra.${id}.price`, crop.price],
       [`extra.${id}.cost`, crop.cost],
@@ -125,11 +139,17 @@ export function factsProblems(draft: FactsDraft): FactProblem[] {
     const value = Number(text)
     if (text.trim() === '' || !Number.isFinite(value)) {
       problems.push({ key, kind: 'not_a_number' })
-    } else if (key === 'limit' && value <= 0) {
+    } else if ((key === 'limit' || key === 'rain') && value <= 0) {
       problems.push({ key, kind: 'not_positive' })
     } else if (!key.startsWith('pasture.') && key !== 'limit' && value < 0) {
       problems.push({ key, kind: 'negative' })
     }
+  }
+  // The tipping price is searched between the two prices: they must be in order, around today's price.
+  const [low, high, price] = [Number(draft.priceLow), Number(draft.priceHigh), Number(draft.price)]
+  if ([low, high, price].every(Number.isFinite) && !problems.some((p) => ['priceLow', 'priceHigh', 'price'].includes(p.key))) {
+    if (low >= high) problems.push({ key: 'priceHigh', kind: 'range_order' })
+    else if (price < low || price > high) problems.push({ key: 'price', kind: 'price_outside_range' })
   }
   return problems
 }
@@ -154,6 +174,7 @@ export interface FactUnits {
   yield: string
   margin: string
   limit: string
+  rain: string
 }
 
 function unitOf(item: unknown): string {
@@ -173,6 +194,7 @@ export function readFactUnits(request: unknown): FactUnits {
     yield: unitOf((grain.yield as Json).neutral),
     margin: unitOf((pasture.declared_margin as Json).neutral),
     limit: unitOf(req.soil_loss_limit),
+    rain: ((req.questions as Json).rain_stress_factor as Json | null) === null ? '' : unitOf((req.questions as Json).rain_stress_factor),
   }
 }
 
@@ -198,6 +220,13 @@ export function applyFacts(request: unknown, draft: FactsDraft): Json {
   }
   setValue(cover.cost, draft.coverCost)
   setValue(copy.soil_loss_limit, draft.limit)
+  const questions = copy.questions as Json
+  const range = questions.soybean_price_range as Json
+  range.low = Number(draft.priceLow)
+  range.high = Number(draft.priceHigh)
+  if (draft.rain !== null && questions.rain_stress_factor !== null && questions.rain_stress_factor !== undefined) {
+    setValue(questions.rain_stress_factor, draft.rain)
+  }
   // Each extra grain crop is written as the soybean's entry is shaped (units, provenance), with the user's numbers.
   const crops = (copy.economic_facts as Json).crops as Json[]
   for (const [id, extra] of Object.entries(draft.extra)) {

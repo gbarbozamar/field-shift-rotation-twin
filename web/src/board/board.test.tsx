@@ -867,22 +867,6 @@ describe('mixed answers: mock parts are marked (l3/original-mock)', () => {
   })
 })
 
-describe('the declared rain factor (l3/original-mock)', () => {
-  it('with the stress test on and a handler, the board offers the factor field and says it is a declaration', () => {
-    const state = { ...initialBoardState(), rain: true }
-    const html = renderToString(
-      <BoardView selectedFieldId={FIELD} state={state} apiBase={BASE} service={null} onRainFactor={() => {}} />,
-    )
-    expect(html).toContain('data-testid="board-rain-factor-input"')
-    expect(visibleText(html)).toContain(strings['board.rain.declared_note'])
-  })
-
-  it('without a handler, no factor field', () => {
-    const html = renderToString(<BoardView selectedFieldId={FIELD} state={{ ...initialBoardState(), rain: true }} apiBase={BASE} service={null} />)
-    expect(html).not.toContain('data-testid="board-rain-factor-input"')
-  })
-})
-
 describe('the site the board asks for (l3/original-mock)', () => {
   it('shows the climate point of the request field, from its outline, not the placeholder coordinates', () => {
     const html = view(FIELD, null)

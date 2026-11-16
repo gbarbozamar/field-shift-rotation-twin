@@ -111,10 +111,7 @@ export function BoardControls({
   onMarginOf,
   onStrictness,
   onRain,
-  onRainFactor,
 }: {
-  /** Given when the user may declare the factor: it receives a value above zero, as typed. */
-  onRainFactor?: (value: number) => void
   marginOf: MarginOf
   strictness: Strictness
   rain: boolean
@@ -168,47 +165,6 @@ export function BoardControls({
           onSelect={(index) => onRain(index === 1)}
         />
       ) : null}
-      {rainFactor !== null && rain && onRainFactor !== undefined && (
-        <RainFactorField key={rainFactor.value} value={rainFactor.value} disabled={disabled} onCommit={onRainFactor} />
-      )}
-    </div>
-  )
-}
-
-/**
- * The user's own rain factor: typed, sent when the field is left or Enter is
- * pressed, and only when it is a number above zero. No bounds are offered:
- * the record does not say how often a factor happens, so the screen says that.
- */
-function RainFactorField({ value, disabled, onCommit }: { value: number; disabled: boolean; onCommit: (value: number) => void }) {
-  const [text, setText] = useState(String(value))
-  const parsed = Number(text)
-  const valid = text.trim() !== '' && Number.isFinite(parsed) && parsed > 0
-  const commit = () => {
-    if (valid && parsed !== value) onCommit(parsed)
-  }
-  return (
-    <div data-testid="board-rain-factor" className="min-w-0 max-w-sm">
-      <label className="block font-mono text-[10px] uppercase tracking-widest opacity-70" htmlFor="board-rain-factor-input">
-        {strings['board.rain.your_factor']}
-      </label>
-      <input
-        id="board-rain-factor-input"
-        data-testid="board-rain-factor-input"
-        type="number"
-        inputMode="decimal"
-        step="any"
-        disabled={disabled}
-        aria-invalid={!valid}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
-        }}
-        className="mt-1 min-h-10 w-28 rounded-lg border border-fs-border bg-fs-surface px-2 tabular-nums text-fs-text aria-[invalid=true]:border-fs-error"
-      />
-      <p className="mt-1 text-xs opacity-80">{strings[valid ? 'board.rain.declared_note' : 'board.rain.invalid']}</p>
     </div>
   )
 }
