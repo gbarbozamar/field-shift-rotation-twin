@@ -397,7 +397,7 @@ function AnswerCard({
   return (
     <article
       data-testid="plant-card"
-      className="rounded-2xl border-2 border-fs-primary bg-fs-surface px-5 py-4"
+      className="rounded-fs-card border-2 border-fs-primary bg-fs-surface px-5 py-4"
     >
       <h3 className="font-mono text-[11px] font-medium uppercase tracking-widest text-fs-muted">
         {strings['plant.answer.heading']}
@@ -529,7 +529,7 @@ function PriceAnswer({ answer, price }: { answer: PlantAnswer; price: number | n
     }
   }
   return (
-    <div data-testid="plant-price-answer" className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-fs-muted">
+    <div data-testid="plant-price-answer" className="fs-card px-4 py-2 text-fs-muted">
       {content}
     </div>
   )
@@ -749,7 +749,7 @@ function AnswerBody({
       <AnswerCard answer={answer} chosenRow={chosenRow} order={order} />
       <section
         data-testid="plant-options"
-        className="rounded-2xl border border-fs-border bg-fs-surface px-5 py-4"
+        className="fs-card px-5 py-4"
       >
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h3 className="text-xl font-bold">{strings['plant.options.heading']}</h3>
@@ -958,7 +958,7 @@ export function StatusPanel({ status }: { status: ServiceStatus }) {
 /** The rain-stress part of a service answer: applied or not with its detail, or missing with its reason. */
 function RainStressBlock({ part }: { part: RainStressPart }) {
   return (
-    <div data-testid="plant-rain-stress" className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-fs-muted">
+    <div data-testid="plant-rain-stress" className="fs-card px-4 py-2 text-fs-muted">
       {part.kind === 'applied' ? (
         <p className="text-sm">
           {formatString(strings[part.applied ? 'plant.service.rain_applied' : 'plant.service.rain_not_applied'], {
@@ -1063,7 +1063,7 @@ function Questions({
   const tipping = answer?.tipping_price ?? null
   const usable = tipping !== null && tipping.today !== null && price !== null
   return (
-    <section className="space-y-6 rounded-2xl border border-fs-border bg-fs-surface px-5 py-4">
+    <section className="space-y-6 fs-card px-5 py-4">
       <h3 className="text-xl font-bold">{strings['plant.questions']}</h3>
 
       <div data-testid="plant-q-price">

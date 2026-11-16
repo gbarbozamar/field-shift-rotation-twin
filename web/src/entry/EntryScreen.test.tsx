@@ -6,6 +6,12 @@ import { getSelectedFieldId, setSelectedFieldId } from '../identity/selection'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 
+// leaflet needs a real browser window, so the small map of the overview is
+// stubbed, as in the fields screen render test.
+vi.mock('../map/FieldsMap', () => ({
+  default: () => <div data-testid="fields-map" />,
+}))
+
 /** Text of the rendered markup with every tag and React marker stripped. */
 function visibleText(html: string): string {
   return html
@@ -100,6 +106,23 @@ describe('EntryScreen', () => {
     openFieldOnFieldsScreen(selected.field_id)
     expect(getSelectedFieldId()).toBe(selected.field_id)
     expect(window.location.hash).toBe('#/fields')
+  })
+
+  it('shows the overview: the small map, the summary and the next steps', () => {
+    const html = renderToString(<EntryScreen />)
+    expect(html).toContain('data-testid="fields-map"')
+    for (const key of ['overview.summary', 'overview.kpi.fields', 'overview.kpi.hectares', 'overview.kpi.rotations', 'overview.next_steps'] as const) {
+      expect(html).toContain(strings[key])
+    }
+    for (const href of ['#/board', '#/fields', '#/plant', '#/print', '#/saved']) {
+      expect(html).toContain(`href="${href}"`)
+    }
+  })
+
+  it('says there is no answer yet while the board has shown none', () => {
+    const html = visibleText(renderToString(<EntryScreen />))
+    expect(html).toContain(strings['overview.last_answer'])
+    expect(html).toContain(strings['overview.no_answer'])
   })
 
   it('links to the fields screen for the no-selection path', () => {

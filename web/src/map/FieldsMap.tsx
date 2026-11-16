@@ -21,7 +21,7 @@ const FIELDS_BOUNDS = fieldsBounds(exampleCase.fields)
  * (assets/map-styles.json, SHA256 20ab2acd...0b261d5d, and the handoff
  * manual section 5.2 for the container).
  */
-export default function FieldsMap() {
+export default function FieldsMap({ compact = false }: { compact?: boolean }) {
   const selectedFieldId = useSelectedFieldId()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const polygonsRef = useRef(new Map<string, L.Polygon>())
@@ -58,5 +58,7 @@ export default function FieldsMap() {
 
   if (FIELDS_BOUNDS === null) return null
 
-  return <div ref={containerRef} className="h-[60dvh] min-h-[24rem] max-h-[80dvh] w-full rounded-lg border border-fs-border" />
+  // The compact map is the small overview of the case on the entry screen.
+  const size = compact ? ['h-72', 'sm:h-80', 'lg:h-[26rem]'] : ['h-[60dvh]', 'min-h-[24rem]', 'max-h-[80dvh]']
+  return <div ref={containerRef} className={[...size, 'w-full', 'rounded-lg', 'border', 'border-fs-border'].join(' ')} />
 }

@@ -91,7 +91,7 @@ export default function SiteSheet() {
   const selectedFieldId = useSelectedFieldId()
 
   return (
-    <section aria-labelledby="site-sheet-title" className="mt-8">
+    <section aria-labelledby="site-sheet-title" className="fs-card mt-6 p-4 sm:p-5">
       <h3 id="site-sheet-title" className="text-base font-semibold">
         {strings['site.title']}
       </h3>

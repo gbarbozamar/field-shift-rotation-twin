@@ -905,7 +905,7 @@ export function SavedCaseView({
         </p>
       )}
 
-      <div className="mt-4 rounded-lg border border-fs-border bg-fs-surface px-4 py-3">
+      <div className="fs-card mt-4 px-4 py-3">
         <label htmlFor="saved-case-file-input" className="block text-sm font-medium text-fs-text">
           {strings['saved.load_file']}
         </label>
@@ -945,7 +945,7 @@ export function SavedCaseView({
         )}
       </div>
 
-      <section aria-labelledby="saved-field-identity-title" className="mt-6">
+      <section aria-labelledby="saved-field-identity-title" className="fs-card mt-6 p-4 sm:p-5">
         <h3 id="saved-field-identity-title" className="text-base font-semibold text-fs-text">
           {strings['saved.field_identity_heading']}
         </h3>
@@ -1005,7 +1005,7 @@ export function SavedCaseView({
         )}
       </section>
 
-      <section aria-labelledby="saved-results-title" className="mt-6">
+      <section aria-labelledby="saved-results-title" className="fs-card mt-6 p-4 sm:p-5">
         <h3 id="saved-results-title" className="text-base font-semibold text-fs-text">
           {strings['saved.results_heading']}
         </h3>
@@ -1065,7 +1065,7 @@ export function SavedCaseView({
         )}
       </section>
 
-      <section aria-labelledby="saved-carbon-title" className="mt-6">
+      <section aria-labelledby="saved-carbon-title" className="fs-card mt-6 p-4 sm:p-5">
         <h3 id="saved-carbon-title" className="text-base font-semibold text-fs-text">
           {strings['saved.carbon_heading']}
         </h3>
@@ -1143,7 +1143,7 @@ export function SavedCaseView({
         )}
       </section>
 
-      <section aria-labelledby="saved-decision-title" className="mt-6">
+      <section aria-labelledby="saved-decision-title" className="fs-card mt-6 p-4 sm:p-5">
         <h3 id="saved-decision-title" className="text-base font-semibold text-fs-text">
           {strings['decision.title']}
         </h3>

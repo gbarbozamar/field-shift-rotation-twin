@@ -32,7 +32,7 @@ describe('App routing', () => {
     setSelectedFieldId(null)
   })
 
-  it('renders the entry screen, without the map, at the root route', () => {
+  it('renders the entry screen, with its small map, at the root route', () => {
     const html = renderAppAtHash('')
     expect(html).toContain(strings['entry.title'])
     expect(html).toContain(
@@ -40,18 +40,20 @@ describe('App routing', () => {
     )
     expect(html).toContain('href="#/saved"')
     expect(html).toContain(strings['saved.open_case'])
-    expect(html).not.toContain('data-testid="fields-map"')
+    expect(html).toContain('data-testid="fields-map"')
   })
 
-  it('the header links every section and marks the one shown', () => {
+  it('the sidebar links every section and marks the one shown', () => {
     for (const [hash, current] of [
       ['', '#/'],
       ['#/fields', '#/fields'],
       ['#/board', '#/board'],
       ['#/plant', '#/plant'],
+      ['#/print', '#/print'],
+      ['#/saved', '#/saved'],
     ] as const) {
       const links = renderAppAtHash(hash).split('data-testid="nav-link"').slice(1).map((part) => part.split('>')[0])
-      expect(links.map((link) => link.match(/href="([^"]*)"/)![1])).toEqual(['#/', '#/fields', '#/board', '#/plant'])
+      expect(links.map((link) => link.match(/href="([^"]*)"/)![1])).toEqual(['#/', '#/fields', '#/board', '#/plant', '#/print', '#/saved'])
       const marked = links.filter((link) => link.includes('aria-current="page"'))
       expect(marked.length, hash).toBe(1)
       expect(marked[0], hash).toContain(`href="${current}"`)

@@ -198,7 +198,7 @@ function RotationEditor({
 }) {
   const letter = String.fromCharCode(FIRST_LETTER + index)
   return (
-    <li data-testid="board-candidate" className="min-w-0 rounded-2xl border border-fs-border bg-fs-surface p-4">
+    <li data-testid="board-candidate" className="min-w-0 fs-card p-4">
       <div className="flex items-center gap-2">
         <span className="font-mono text-[11px] uppercase tracking-widest text-fs-muted">
           {formatString(strings['board.option'], { letter })}

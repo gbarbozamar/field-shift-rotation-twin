@@ -337,13 +337,12 @@ export function PrintSheetView({
       <article
         data-testid="print-summary-card"
         className={[
-          'rounded-lg',
-          'border',
-          'border-fs-border',
-          'bg-fs-surface',
+          'fs-card',
           'p-6',
+          'sm:p-8',
           'print:border-0',
           'print:p-0',
+          'print:shadow-none',
         ].join(' ')}
       >
         <h2 id="print-sheet-title" className="text-xl font-semibold">

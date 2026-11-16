@@ -55,21 +55,21 @@ const FONT_FACES = [
   { family: 'IBM Plex Mono', style: 'normal', weight: '500', file: 'ibm-plex-mono-medium.ttf' },
 ]
 
-/** The tokens of the interface's own identity (l3/own-identity). */
+/** The tokens of the interface (l3/own-identity, colours moved by l3/erp-shell). */
 const TOKENS: Record<string, string> = {
-  '--fs-bg': '#edf0ea',
-  '--fs-surface': '#f8faf5',
-  '--fs-text': '#16201b',
-  '--fs-muted': '#56635b',
-  '--fs-border': '#c6cfc4',
-  '--fs-faint': '#dce2d9',
-  '--fs-brand': '#17766d',
-  '--fs-primary': '#17766d',
-  '--fs-info': '#16201b',
-  '--fs-ok': '#2f6b3a',
-  '--fs-warning': '#946719',
-  '--fs-warning-bg': 'color-mix(in srgb, var(--fs-warning) 9%, var(--fs-surface))',
-  '--fs-error': '#a93f3b',
+  '--fs-bg': '#f4f7f5',
+  '--fs-surface': '#ffffff',
+  '--fs-text': '#1f2d2b',
+  '--fs-muted': '#5f6f6b',
+  '--fs-border': '#d9e0dc',
+  '--fs-faint': '#eef2f0',
+  '--fs-brand': '#1a7a3b',
+  '--fs-primary': '#3e7b2c',
+  '--fs-info': '#19648b',
+  '--fs-ok': '#3e7b2c',
+  '--fs-warning': '#86500e',
+  '--fs-warning-bg': 'color-mix(in srgb, var(--fs-warning-accent) 10%, var(--fs-surface))',
+  '--fs-error': '#c0392b',
   '--fs-error-bg': 'color-mix(in srgb, var(--fs-error) 9%, var(--fs-surface))',
   '--fs-selection-bg': 'color-mix(in srgb, var(--fs-primary) 12%, var(--fs-surface))',
   '--fs-crop-1': '#7a9a2e',
@@ -84,6 +84,12 @@ const TOKENS: Record<string, string> = {
   '--fs-radius': '8px',
   '--fs-control-min': '44px',
   '--fs-motion': '160ms',
+  '--fs-brand-soft': 'color-mix(in srgb, var(--fs-primary) 18%, var(--fs-surface))',
+  '--fs-furrow': 'color-mix(in srgb, var(--fs-primary) 5%, transparent)',
+  '--fs-warning-accent': '#f2a900',
+  '--fs-radius-card': '10px',
+  '--fs-shadow-card': '0 1px 2px rgb(31 45 43 / 0.05)',
+  '--fs-shadow-pop': '0 4px 6px -1px rgb(31 45 43 / 0.1), 0 2px 4px -2px rgb(31 45 43 / 0.1)',
 }
 
 /** The @theme entries that expose the tokens as Tailwind 4 utilities. */

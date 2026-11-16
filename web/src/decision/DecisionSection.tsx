@@ -821,7 +821,7 @@ export function DecisionPanel({
   onSelectYear?: (year: YearSelection) => void
 }) {
   return (
-    <section aria-labelledby="decision-title" className={['mt-8'].join(' ')}>
+    <section aria-labelledby="decision-title" className="fs-card mt-6 p-4 sm:p-5">
       <h3
         id="decision-title"
         data-testid="decision-title"

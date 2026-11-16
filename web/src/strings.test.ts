@@ -575,6 +575,33 @@ const WORDING_SHEET: Record<string, string> = {
   'indicator.soil_carbon_trend': 'Soil carbon trend',
   // Water and carbon on the planning board (l3/original-mock, PROPOSED).
   'board.run.pending': 'Running this rotation for water and carbon...',
+  // The application shell: sidebar, top bar and menu (l3/erp-shell, PROPOSED).
+  'nav.print': 'Print sheet',
+  'nav.saved': 'Saved case',
+  'shell.group.overview': 'Overview',
+  'shell.group.planning': 'Planning',
+  'shell.group.outputs': 'Outputs',
+  'shell.menu_open': 'Open the menu',
+  'shell.menu_close': 'Close the menu',
+  'shell.example_chip': 'Example data',
+  'shell.case_footer': 'Case on screen',
+  // The case overview on the entry screen (l3/erp-shell, PROPOSED).
+  'overview.summary': 'Summary',
+  'overview.kpi.fields': 'Fields in the case',
+  'overview.kpi.hectares': 'Hectares, measured on the field outlines',
+  'overview.kpi.rotations': 'Rotations on the planning board',
+  'overview.last_answer': 'Last answer',
+  'overview.asked_for': 'Asked for {field}',
+  'overview.no_answer': 'No answer yet. Pick a field on the planning board and compare its rotations.',
+  'overview.open_board': 'Open the planning board',
+  'overview.next_steps': 'Next steps',
+  'overview.step.board': 'Compare rotations for one field and get an answer.',
+  'overview.step.fields': 'See every field on the map with its site data.',
+  'overview.step.report': 'Read every detail line of the comparison.',
+  'overview.step.print': 'One printable sheet per field.',
+  'overview.step.saved': 'Open a saved case, with no backend needed.',
+  'overview.pick_field': 'Pick a field to carry it to the other screens.',
+  'overview.map': 'Map of the fields',
 }
 
 /** Source of the shell page as it was before the strings unit. */
