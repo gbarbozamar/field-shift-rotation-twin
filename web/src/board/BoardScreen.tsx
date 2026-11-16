@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query'
+import { QueryClient, keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
 import type { UseQueryOptions } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
 import { exampleCase } from '../identity/exampleCase'
@@ -46,6 +46,8 @@ import { CompareTable, MARGIN_MARK, SOIL_MARK, SortPicker, TableNotes, optionTit
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
 import BoardMeasureFirst from './BoardMeasureFirst'
+import { boardRunOf, boardRunQueryOptions, boardRunRequests } from './boardRuns'
+import type { BoardRun } from './boardRuns'
 import { FactsEditor } from './FactsEditor'
 import { changedFacts, factsProblems, withExtraCrops } from './factsDraft'
 import type { FactsDraft } from './factsDraft'
@@ -167,7 +169,10 @@ function Answered({
   updating,
   mock,
   measure,
+  runs,
 }: {
+  /** The run of each option's rotation (water and carbon), by rotation id; null shows no such rows. */
+  runs: ReadonlyMap<string, BoardRun> | null
   /** What to measure first, when the answer picks no rotation (null without a backend or a request). */
   measure: { baseRequest: Record<string, unknown>; apiBase: string } | null
   answer: PlantAnswer
@@ -242,6 +247,7 @@ function Answered({
         ) : null}
         <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} mockSoilKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.soilKinds}
           mockMarginKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.marginKinds}
+          runs={runs}
         />
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
           <CropLegend order={order} nameOf={cropName} />
@@ -296,7 +302,9 @@ function BoardSide({
   previous,
   updating,
   baseRequest,
+  runs,
 }: {
+  runs: ReadonlyMap<string, BoardRun> | null
   baseRequest: Record<string, unknown> | null
   selectedFieldId: string | null
   apiBase: string | null
@@ -341,6 +349,7 @@ function BoardSide({
       updating={updating}
       mock={mockReportOf(service.answer)}
       measure={baseRequest !== null ? { baseRequest, apiBase } : null}
+      runs={runs}
     />
   )
 }
@@ -366,8 +375,11 @@ export function BoardView({
   previous = null,
   updating = false,
   limit = REQUEST_LIMIT,
+  runs = null,
   rainFactor = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null,
 }: {
+  /** The run of each compared rotation through the rotation route (water and carbon), by rotation id; null shows no such rows. */
+  runs?: ReadonlyMap<string, BoardRun> | null
   /** The rain factor the request sends with the stress test; the example request's by default. */
   rainFactor?: DeclaredFactor | null
   /** The soil-loss limit of the comparison shown, as declared; the example request's by default. */
@@ -502,6 +514,7 @@ export function BoardView({
         previous={previous}
         updating={updating}
         baseRequest={baseRequest}
+        runs={runs}
       />
 
       <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
@@ -573,6 +586,14 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
     const mocked = report !== null && (report.whole || report.soilKinds.length !== 0 || report.record || report.marginKinds.length !== 0)
     updatePlan((p) => ({ ...p, lastAnswer: { fieldId: selectedFieldId, answer: answeredService.answer, mocked } }))
   }, [answeredService, selectedFieldId])
+  // Water and carbon: each compared rotation run once through the rotation
+  // route, with the site and the rotations of the same request.
+  const runRequests = useMemo(() => boardRunRequests(baseRequest), [baseRequest])
+  const runQueries = useQueries(
+    { queries: runRequests.map((run) => boardRunQueryOptions(apiBase, run, selectedFieldId !== null)) },
+    apiBase === null ? NO_SERVICE_CLIENT : undefined,
+  )
+  const runs = new Map<string, BoardRun>(runRequests.map((run, index) => [run.rotation_id, boardRunOf(runQueries[index])]))
   const [mapChoice, setMapChoice] = useState<boolean | null>(null)
   const mapOpen = mapChoice ?? selectedFieldId === null
   return (
@@ -589,6 +610,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       onToggleMap={() => setMapChoice(!mapOpen)}
       rotations={rotations}
       baseRequest={baseRequest}
+      runs={runs}
       limit={{ value: Number(factsSent.limit), unit: rawPlantRequest.soil_loss_limit.unit }}
       rainFactor={baseRead.rain.kind === 'present' ? baseRead.rain.factor : null}
       builder={

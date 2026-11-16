@@ -23,7 +23,7 @@ import type {
  * - a value that is not missing carries a provenance label and a source or
  *   the assumption mark (C4.1, C4.2); a missing one carries neither;
  * - a value holds a range or the reason it has none, never both (C2.2);
- * - a carbon value names its carbon model — amg or rothc (D1 of #77) — and
+ * - a carbon value names its carbon model (amg or rothc, D1 of #77) and
  *   one of the three computations of C1.6, and stays one item of its own:
  *   nothing here merges or averages across models (C1.5);
  * - a wholly missing part (D12) carries only its indicator, its units and a
@@ -182,7 +182,8 @@ function parseMissing(value: unknown, what: string): MissingPart {
     throw new Error(`${what}:reason-not-a-code`)
   }
   const missing: MissingPart = { reason: value.reason }
-  if (value.detail !== undefined) {
+  // The route keeps pydantic's nulls (no exclude_none): a null detail is an absent one.
+  if (value.detail !== undefined && value.detail !== null) {
     if (!isNonEmptyString(value.detail)) {
       throw new Error(`${what}:detail-empty`)
     }
@@ -218,9 +219,18 @@ function parseRange(value: unknown, what: string): UncertaintyRange {
  * enforced here is a rule the contract itself enforces; the example files
  * satisfy all of them.
  */
-function parseValueItem(value: unknown, what: string): ValueItem {
-  if (!isRecord(value)) {
+function parseValueItem(raw: unknown, what: string): ValueItem {
+  if (!isRecord(raw)) {
     throw new Error(`${what}:not-an-object`)
+  }
+  // The live route serializes the contract with pydantic's defaults as
+  // explicit nulls (model_dump without exclude_none): a null here means the
+  // field was never set, so it is read as absent before the checks below.
+  const value: Record<string, unknown> = { ...raw }
+  for (const key of ['missing', 'range', 'range_missing', 'provenance', 'source']) {
+    if (value[key] === null) {
+      delete value[key]
+    }
   }
   if (!isNonEmptyString(value.unit)) {
     throw new Error(`${what}:unit-empty`)
@@ -387,7 +397,7 @@ function parseWaterValue(value: unknown, what: string): WaterValue {
     }
     return { time_basis: value.time_basis, ag_year: value.ag_year, item: parseValueItem(value, what) }
   }
-  if (value.ag_year !== undefined) {
+  if (value.ag_year !== undefined && value.ag_year !== null) {
     throw new Error(`${what}:ag-year-with-rotation-basis`)
   }
   return { time_basis: value.time_basis, item: parseValueItem(value, what) }
@@ -456,7 +466,7 @@ function parseCarbon(value: unknown): CarbonPart {
 
 /**
  * The wholly missing form of a part: its indicator, its direction, its units
- * and a missing part whose reason is NOT_AVAILABLE — the only code D12
+ * and a missing part whose reason is NOT_AVAILABLE, the only code D12
  * allows here. No value of any kind travels with it; each would be rejected
  * by the contract, and the parser keeps to the fields the cards render.
  */

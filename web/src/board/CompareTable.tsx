@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { displayNumber, missingPatternText } from '../components/ValueDisplay'
+import { ValueDisplay, displayNumber, missingPatternText } from '../components/ValueDisplay'
+import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { barPercent, drawnSoilVerdict, stateTone, verdictTone } from '../plant/optionBars'
 import { RotationTimeline, StatePill } from '../plant/PlantVisuals'
@@ -10,6 +11,9 @@ import type { RotationStrip } from '../plant/rotationStrip'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { strings } from '../strings'
 import { MockBadge } from '../mockfill/MockPanel'
+import { indicatorName } from '../results/ResultCards'
+import type { CarbonModelId, CarbonPart, CarbonValue, IndicatorId, ResultsPerRotation, WaterPart } from '../results/resultsData'
+import type { BoardRun } from './boardRuns'
 import { SORT_KEYS, cropName, isExampleCrop, unitText, worstKind } from './boardModel'
 import type { BoardColumn, SortKey } from './boardModel'
 import { isUserRotation } from './rotationDraft'
@@ -361,10 +365,124 @@ function KindCell({
   )
 }
 
+/** A part that is wholly missing (its engine not built): its absence, with its reason. */
+function WhollyMissing({ indicator, unit, missing }: { indicator: IndicatorId; unit: string; missing: MissingPart }) {
+  return <ValueDisplay what={indicatorName(indicator)} item={{ value: null, unit, missing }} />
+}
+
+/** Water-deficit exposure of one run: each value as the result gives it, by agricultural year when it is per year. */
+function WaterValues({ part }: { part: WaterPart }) {
+  if (part.form === 'not_built') {
+    return <WhollyMissing indicator={part.indicator} unit={part.units[0]} missing={part.missing} />
+  }
+  const name = indicatorName(part.indicator)
+  return (
+    <ul data-testid="board-water" className="space-y-1">
+      {part.values.map((value, index) => (
+        <li key={value.ag_year ?? `r-${index}`} className={['flex', 'gap-2', '[&>div]:min-w-0', '[&>div]:flex-1'].join(' ')}>
+          {value.ag_year !== undefined && value.item.value !== null ? (
+            <span data-testid="board-water-year" className="font-mono text-xs text-fs-muted">
+              {value.ag_year}
+            </span>
+          ) : null}
+          <ValueDisplay what={value.ag_year === undefined ? name : name + ' ' + String(value.ag_year)} item={value.item} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The carbon values of a result, one group per carbon model in the order they travel; never merged. */
+function byModel(values: CarbonValue[]): { model: CarbonModelId; values: CarbonValue[] }[] {
+  const groups: { model: CarbonModelId; values: CarbonValue[] }[] = []
+  for (const value of values) {
+    const group = groups.find((each) => each.model === value.carbon_model)
+    if (group !== undefined) group.values.push(value)
+    else groups.push({ model: value.carbon_model, values: [value] })
+  }
+  return groups
+}
+
+/** Soil carbon trend of one run: one line per carbon model, each value with its computation, as the data gives it. */
+function CarbonValues({ part }: { part: CarbonPart }) {
+  if (part.form === 'not_built') {
+    return <WhollyMissing indicator={part.indicator} unit={part.units[0]} missing={part.missing} />
+  }
+  const name = indicatorName(part.indicator)
+  return (
+    <ul className="space-y-2">
+      {byModel(part.values).map(({ model, values }) => (
+        <li key={model} data-testid="board-carbon-model">
+          <p className="text-xs font-semibold text-fs-muted">{formatString(strings['cards.model_label'], { model })}</p>
+          <ul className="space-y-1">
+            {values.map((value) => (
+              <li key={value.computation} data-testid="board-carbon-item">
+                <p className="text-[11px] text-fs-muted">
+                  {formatString(strings['cards.computation_label'], { computation: value.computation })}
+                </p>
+                <ValueDisplay what={name} item={value.item} />
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * One cell of a row read from the run of an option: its result through
+ * `show`, or the state of the run (on its way, failed with the route's
+ * error, no result with its reason, a result this screen cannot read).
+ * An option the request holds no rotation for has no run: no value.
+ */
+function RunCell({
+  run,
+  indicator,
+  show,
+}: {
+  run: BoardRun | undefined
+  indicator: IndicatorId
+  show: (result: ResultsPerRotation) => ReactNode
+}) {
+  if (run === undefined) {
+    return <span className="text-sm italic text-fs-muted">{strings['plant.table.no_value']}</span>
+  }
+  switch (run.phase) {
+    case 'pending':
+      return (
+        <span data-testid="board-run-pending" role="status" className="text-xs text-fs-muted">
+          {strings['board.run.pending']}
+        </span>
+      )
+    case 'failed':
+      return (
+        <span data-testid="board-run-failed" className="text-xs text-fs-error">
+          {strings[`api.${run.code}`]}
+        </span>
+      )
+    case 'no_result':
+      return (
+        <span data-testid="board-run-missing" className="text-xs italic text-fs-muted">
+          {missingPatternText(indicatorName(indicator), run.missing)}
+        </span>
+      )
+    case 'unreadable':
+      return (
+        <span data-testid="board-run-unreadable" className="text-xs text-fs-error">
+          {strings['cards.live_unreadable']}
+        </span>
+      )
+    case 'result':
+      return <>{show(run.result)}</>
+  }
+}
+
 /**
  * The comparison: a column per option with its position, letter, crops and
  * state; then its crops by month, its margin and its soil loss for the kind
- * of year looked at, and each kind of year.
+ * of year looked at, its water-deficit exposure and soil carbon trend (from
+ * the run of its rotation, when runs are given), and each kind of year.
  */
 export function CompareTable({
   answer,
@@ -375,7 +493,10 @@ export function CompareTable({
   sort,
   mockSoilKinds = [],
   mockMarginKinds = [],
+  runs = null,
 }: {
+  /** The run of each option's rotation, by rotation id; null shows no water and carbon rows. */
+  runs?: ReadonlyMap<string, BoardRun> | null
   /** The kinds of year whose margin is mock example data (the board mixing). */
   mockMarginKinds?: readonly string[]
   answer: PlantAnswer
@@ -532,6 +653,32 @@ export function CompareTable({
               </div>
             )}
           />
+          {runs !== null ? (
+            <>
+              <Row
+                label={indicatorName('water_deficit_exposure')}
+                columns={columns}
+                cell={(option) => (
+                  <RunCell
+                    run={runs.get(option.rotation_id)}
+                    indicator="water_deficit_exposure"
+                    show={(result) => <WaterValues part={result.water_deficit_exposure} />}
+                  />
+                )}
+              />
+              <Row
+                label={indicatorName('soil_carbon_trend')}
+                columns={columns}
+                cell={(option) => (
+                  <RunCell
+                    run={runs.get(option.rotation_id)}
+                    indicator="soil_carbon_trend"
+                    show={(result) => <CarbonValues part={result.soil_carbon_trend} />}
+                  />
+                )}
+              />
+            </>
+          ) : null}
           {KINDS_OF_YEAR.map((each) => (
             <Row
               key={each}
