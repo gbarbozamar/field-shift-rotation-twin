@@ -38,6 +38,8 @@ describe('App routing', () => {
     expect(html).toContain(
       formatString(strings['entry.fields_count'], { n: exampleCase.fields.length }),
     )
+    expect(html).toContain('href="#/saved"')
+    expect(html).toContain(strings['saved.open_case'])
     expect(html).not.toContain('data-testid="fields-map"')
   })
 
@@ -87,5 +89,12 @@ describe('App routing', () => {
     expect(selectedHtml).toContain(exampleCase.label)
     expect(selectedHtml).toContain(strings['example.banner'])
     expect(selectedHtml).toContain('print:hidden')
+  })
+
+  it('renders the offline saved-case viewer at #/saved', () => {
+    const html = renderAppAtHash('#/saved')
+    expect(html).toContain(strings['saved.title'])
+    expect(html).toContain('2026-11-15T12:02Z')
+    expect(html).toContain(strings['saved.carbon_heading'])
   })
 })
