@@ -4,7 +4,7 @@ Runs the shipped D128 chain end to end over two synthetic PLACEHOLDER
 ``SiteSoilSlope`` demonstration fields (``field_demo_gentle`` and
 ``field_demo_steep``), synthetic PLACEHOLDER ``SiteClimate``, the two D128
 rotations (``web/src/data/demo_rotations_d128.json``), and the shipped
-``params/records/`` catalogue (132 records):
+``params/records/`` catalogue (205 records):
 
 1. ``EP2`` (``build_rotation_calendar``, ``list_phases``, ``phase_calendar``)
 2. ``daily_reference_evapotranspiration`` (FAO-56 Penman-Monteith ET0)
@@ -133,20 +133,7 @@ DEFAULT_SHARED_HYDRAULIC_PROPERTIES: Final[tuple[dict[str, Any], ...]] = (
     },
 )
 
-EXPECTED_ROTATION_B_MISSING_PARAMS: Final[frozenset[str]] = frozenset(
-    {
-        "fao56_stage_length_initial/crop=wheat",
-        "fao56_stage_length_development/crop=wheat",
-        "fao56_stage_length_mid/crop=wheat",
-        "fao56_stage_length_late/crop=wheat",
-        "fao56_stage_length_initial/crop=maize",
-        "fao56_stage_length_development/crop=maize",
-        "fao56_stage_length_mid/crop=maize",
-        "fao56_stage_length_late/crop=maize",
-        "surface_residue_cover/crop=wheat,management=no_crop",
-        "surface_residue_cover/crop=maize,management=no_crop",
-    }
-)
+EXPECTED_ROTATION_B_MISSING_PARAMS: Final[frozenset[str]] = frozenset()
 
 _VALUE_FIELDS: Final[tuple[str, ...]] = (
     "indicator",
@@ -733,7 +720,7 @@ def run_shipped_d128_fields_plan(
     rotations_path: Path = DEFAULT_ROTATIONS_PATH,
     records_dir: Path = DEFAULT_RECORDS_DIR,
 ) -> TwoFieldsPlanResult:
-    """Convenience runner loading shipped D128 rotations and 132 param records."""
+    """Convenience runner loading shipped D128 rotations and 205 param records."""
     rotations = load_d128_rotations(rotations_path)
     parameters = load_shipped_catalogue(records_dir)
     return run_two_fields_plan(rotations=rotations, parameters=parameters)

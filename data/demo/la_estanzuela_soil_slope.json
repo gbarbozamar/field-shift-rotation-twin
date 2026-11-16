@@ -30,11 +30,68 @@
       "value": 0.03,
       "unit": "t ha h ha-1 MJ-1 mm-1",
       "provenance": "DECLARED",
-      "source": "Soil class \"T Brunosol\" declared by the lead developer under D100 and D112 of issue #77 (2026-11-14); K is the class mean by D70. Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. Ciencia e Investigacion Agraria 44(1):100-112, https://doi.org/10.7764/rcia.v44i1.1622 (CC BY 4.0), Table 1, row \"T Brunosol\", column \"K_Puentes\", row mu, p. 104 (PDF p. 5): mu 0.0300, sigma 0.0110, n 26. Unit: text of p. 105, \"All K-values were expressed in compatible SI units, i.e., in (t ha h)(ha MJ mm)-1\"; the label \"mg kg-1\" printed under that column header is noted, not corrected (D70). The unit string here is the one accepted by D11 for the same unit. Soil of the demonstration point decided by the lead developer in D112 of issue #77 (2026-11-14): one soil, the Brunosol eutrico tipico of the Unidad del Lago at La Estanzuela, the soil of the accepted water profile (USER-AE; Capurro 2016, pp. 43 and 46); its class in S9 Table 1 is \"T Brunosol\" (S9: \"T is typical\"), so the class and K of D100 are unchanged and D100's vertic limit no longer applies. K is the class mean, not a measurement at the site. Read on 2026-11-14.",
+      "source": "Soil class \"T Brunosol\" declared by the lead developer under D100 and D112 of issue #77 (2026-11-14); K is the class mean by D70. Beretta-Blanco, A., Carrasco-Letelier, L. (2017). USLE/RUSLE K-factors allocated through a linear mixed model for Uruguayan soils. Ciencia e Investigacion Agraria 44(1):100-112, https://doi.org/10.7764/rcia.v44i1.1622 (CC BY 4.0), Table 1, row \"T Brunosol\", column \"K_Puentes\", row mu, p. 104 (PDF p. 5): mu 0.0300, sigma 0.0110, n 26. Unit: text of p. 105, \"All K-values were expressed in compatible SI units, i.e., in (t ha h)(ha MJ mm)-1\"; the label \"mg kg-1\" printed under that column header is noted, not corrected (D70). The unit string here is the one accepted by D11 for the same unit. Soil of the demonstration point decided by the lead developer in D112 of issue #77 (2026-11-14): one soil, the Brunosol eutrico tipico of the Unidad del Lago at La Estanzuela, the soil of the accepted water profile (USER-AE; Capurro 2016, PDF pp. 43, 49 and 50); its class in S9 Table 1 is \"T Brunosol\" (S9: \"T is typical\"), so the class and K of D100 are unchanged and D100's vertic limit no longer applies. K is the class mean, not a measurement at the site. Read on 2026-11-14.",
       "range": {
         "low": 0.019,
         "high": 0.041,
         "kind": "class mean plus or minus one class standard deviation, derived from S9 Table 1 (D70)"
+      }
+    },
+    {
+      "quantity": "clay_content",
+      "value": 31.9,
+      "unit": "%",
+      "provenance": "DECLARED",
+      "source": "D182, D195 and D210 of issue #77: TRANSFERRED VALUE, declared as not measured at the site. Ministerio de Agricultura y Pesca, Direccion de Suelos, Carta de Reconocimiento de Suelos del Uruguay, Tomo III, Apendice Parte I, Descripcion N 45, unit Ecilda Paullier Las Brujas (EP-LB), soil 'Brunosol Eutrico Tipico Fr', profile N26-1, analytical table, horizon A1 (0-24 cm), column 'ARCILLA' = 31.9 (printed p. 102, PDF p. 108; percent inferred from sum 100.0%). Signed by the lead developer (D34, 2026-11-15).",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "The source gives a single value for horizon A1 of profile N26-1, with no uncertainty range."
+      }
+    },
+    {
+      "quantity": "carbonate_content",
+      "value": 0,
+      "unit": "%",
+      "provenance": "DECLARED",
+      "source": "D183 and D195 of issue #77: INFERRED VALUE (not measured at the site). Inferred as 0 % because the site topsoil has pH (H2O) = 5.8 (Capurro Bazzano 2016, MSc thesis Udelar, handle 20.500.12008/27641, Cuadro 4, row 'La Estanzuela', PDF p. 50 / printed p. 42), and free alkaline-earth carbonates are chemically absent at pH < 7.5 (US Salinity Laboratory Staff 1954, USDA Agriculture Handbook 60, ch. 2, p. 18). Signed by the lead developer (D34, 2026-11-15).",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "An inferred value, not a measurement; the source gives no uncertainty range."
+      }
+    },
+    {
+      "quantity": "ph",
+      "value": 5.8,
+      "unit": "dimensionless",
+      "provenance": "OBSERVED",
+      "source": "D179 of issue #77: Capurro Bazzano, M.C. (2016), MSc thesis, Facultad de Agronomia, Udelar (Colibri handle 20.500.12008/27641), Cuadro 4, row 'La Estanzuela', column 'pH (H2O)' = 5.8, PDF p. 50 (printed p. 42). Soil:water ratio and sampling depth not printed in thesis; AMG was calibrated at 1:5 H2O over pH 5.6-8.3 (Clivot et al. 2019). Signed by the lead developer (D34, 2026-11-15).",
+      "range_missing": {
+        "reason": "NOT_AVAILABLE",
+        "detail": "The source gives a single value per site, with no uncertainty range."
+      }
+    },
+    {
+      "quantity": "soil_cn_ratio",
+      "value": 13.2,
+      "unit": "dimensionless",
+      "provenance": "DERIVED",
+      "source": "D193 of issue #77: DERIVED and TRANSFERRED VALUE (not measured at the site). Derived from Ministerio de Agricultura y Pesca, Carta de Reconocimiento de Suelos del Uruguay, Tomo III, Apendice Parte I, Descripcion N 45, profile N26-1, horizon A1 (0-24 cm), printed p. 102 (PDF p. 108): organic matter 5.45 % and total N 0.24 %; C:N = (5.45 / 1.724) / 0.24 = 13.17 -> 13.2 (factor 1.724 from USDA-NRCS SSIR No. 51 v1.0, 2009, p. 80, Table 3.4.1.1.1, note 2; sensitivity with factor 2.0 gives 11.4). Signed by the lead developer (D34, 2026-11-15).",
+      "range": {
+        "low": 11.4,
+        "high": 13.2,
+        "kind": "sensitivity to the organic-matter-to-carbon factor (2.0 gives 11.4 vs 1.724 gives 13.2; D193)"
+      }
+    },
+    {
+      "quantity": "soil_organic_carbon",
+      "value": 52.8,
+      "unit": "t C ha-1",
+      "provenance": "DERIVED",
+      "source": "D180 of issue #77: DERIVED stock = (3.7 % / 1.724) * 0.20 m * 1.23 g cm-3 * 10 = 52.80 -> 52.8 t C ha-1 (Clivot et al. 2019, eq. 1, p. 101). Inputs from Capurro Bazzano, M.C. (2016), MSc thesis, Udelar (Colibri handle 20.500.12008/27641): MO = 3.7 % (Cuadro 4, row 'La Estanzuela', PDF p. 50 / printed p. 42) and bulk density = 1.23 g cm-3 for 0-20 cm (Cuadro 3, PDF p. 49 / printed p. 41). Assumptions: 1.724 OM-to-C factor (USDA-NRCS SSIR No. 51 v1.0, 2009, p. 80), 0-20 cm sampling depth for Cuadro 4, Rf = 0. Factor 2.0 (ISRIC Tech. Paper 9, 2002) gives 45.5 t C ha-1. Signed by the lead developer (D34, 2026-11-15).",
+      "range": {
+        "low": 45.5,
+        "high": 52.8,
+        "kind": "sensitivity to the organic-matter-to-carbon factor (2.0 gives 45.5 vs 1.724 gives 52.8; D180)"
       }
     }
   ]

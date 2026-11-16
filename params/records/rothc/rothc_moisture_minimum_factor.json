@@ -1,0 +1,16 @@
+{
+  "id": "rothc_moisture_minimum_factor",
+  "scope": {},
+  "value": 0.2,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The printed description states no range for this constant.",
+  "citation": {
+    "reference": "Coleman, K., Prout, J.M., Milne, A.E. (2024). RothC - A model for the turnover of carbon in soil. Model Description (February 2024). Rothamsted Research, Harpenden.",
+    "locator": "section 1.6, p. 12, equation block",
+    "url": "https://www.rothamsted.ac.uk/sites/default/files/Documents/RothC_description.pdf"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Verbatim text to compare: \"b = 0.2+(1.0 - 0.2)* (max.TSMD - acc.TSMD) / (max.TSMD - 0.444 max.TSMD)\". Value transcribed by the interface developer (martinbarreto0) on issue #176 on 2026-11-14 and compared side by side with the printed page under D134 of issue #77 (orquestacion/notas_compartidas/rothc-d63-side-by-side.md, Table A, row 6f: MISMATCH in form only (the page prints (1.0 - 0.2), the issue 0.8; D134: the same value)). Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after reading that comparison. Drafted on 2026-11-15 for D218 to D224 of issue #77. The engine writes the factor of the form as 1 - minimum, so the printed (1.0 - 0.2) is this record."
+}

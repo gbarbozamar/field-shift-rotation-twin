@@ -1,0 +1,16 @@
+{
+  "id": "amg_temperature_sensitivity",
+  "scope": {},
+  "value": 0.12,
+  "unit": "degC-1",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_MINERALIZATION.tab (datafile 163911, MD5 7205d3ff8804c5d3fa42874abed8079b), row \"cT\" (function \"Temperature\"), column \"Value\"; definition in file AMGv2_parameter_list.tab (datafile 166163, MD5 e161a0997798d9bfbd356627f1a73d46), row \"cT\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim row to compare, parameters_MINERALIZATION.tab: \"cT,0.12,Temperature,https://doi.org/10.1016/j.envsoft.2019.04.004\". Definition, AMGv2_parameter_list.tab: \"c parameter of the temperature function\", type \"Real\", unit \"K-1\". Unit of this record: printed \"K-1\"; engine/amg requires the same temperature unit text for the input, the reference temperature and this sensitivity, and the reference is printed \"°C\" (OPEN for the lead developer, see COTEJO_CARBONO.md). The dataset row cites Clivot et al. (2019) as its source. The dataset description says: \"They are applicable for average French arable crop conditions.\" Whether they apply to the demonstration site is for the science lead. The dataset gives the parameter name, its function and its unit, not the equation. The equation form of engine/amg (PROPOSED) could not be compared with Clivot et al. (2019), https://doi.org/10.1016/j.envsoft.2019.04.004: its open copies are behind an anti-bot check that this session did not pass, and the publisher copy is paywalled. Which dataset parameter fills which argument of the engine is a PROPOSED mapping, by name and unit. UNIT TEXT CHANGED on 2026-11-15 under D195 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765): the source prints \"K-1\" (AMGv2_parameter_list, row \"cT\"; Clivot et al. 2019, Appendix A, p. 111: \"cT = 0.120 K-1\"); a difference of 1 K is a difference of 1 °C, so the record carries \"degC-1\" and the value does not change."
+}

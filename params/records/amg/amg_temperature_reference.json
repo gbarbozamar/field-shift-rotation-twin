@@ -1,0 +1,16 @@
+{
+  "id": "amg_temperature_reference",
+  "scope": {},
+  "value": 15.0,
+  "unit": "degC",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_MINERALIZATION.tab (datafile 163911, MD5 7205d3ff8804c5d3fa42874abed8079b), row \"Tref\" (function \"Temperature\"), column \"Value\"; definition in file AMGv2_parameter_list.tab (datafile 166163, MD5 e161a0997798d9bfbd356627f1a73d46), row \"Tref\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim row to compare, parameters_MINERALIZATION.tab: \"Tref,15,Temperature,https://doi.org/10.1016/j.envsoft.2019.04.004\". Definition, AMGv2_parameter_list.tab: \"Reference temperature\", type \"Real\", unit \"°C\". Unit of this record: printed \"°C\". The dataset row cites Clivot et al. (2019) as its source. The dataset description says: \"They are applicable for average French arable crop conditions.\" Whether they apply to the demonstration site is for the science lead. The dataset gives the parameter name, its function and its unit, not the equation. The equation form of engine/amg (PROPOSED) could not be compared with Clivot et al. (2019), https://doi.org/10.1016/j.envsoft.2019.04.004: its open copies are behind an anti-bot check that this session did not pass, and the publisher copy is paywalled. Which dataset parameter fills which argument of the engine is a PROPOSED mapping, by name and unit. UNIT TEXT CHANGED on 2026-11-15 under D195 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890256765): the source prints \"°C\" (AMGv2_parameter_list, row \"Tref\"; Clivot et al. 2019, Appendix A, p. 111: \"TRef = 15 °C\"); the record carries \"degC\", the unit text of the climate series (D118). The value does not change."
+}

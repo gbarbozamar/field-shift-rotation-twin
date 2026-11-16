@@ -1,0 +1,16 @@
+{
+  "id": "amg_stable_fraction",
+  "scope": {},
+  "value": 0.65,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_MINERALIZATION.tab (datafile 163911, MD5 7205d3ff8804c5d3fa42874abed8079b), row \"Ps\" (function \"(empty)\"), column \"Value\"; definition in file AMGv2_parameter_list.tab (datafile 166163, MD5 e161a0997798d9bfbd356627f1a73d46), row \"Ps\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim row to compare, parameters_MINERALIZATION.tab: \"Ps,0.65,,https://doi.org/10.1016/j.envsoft.2019.04.004\". Definition, AMGv2_parameter_list.tab: \"Initial proportion of the stable SOC pool (Cs/C0)\", type \"Real [0-1]\", unit \"\". Unit of this record: the list prints no unit (\"Real [0-1]\"). The dataset row cites Clivot et al. (2019) as its source. The dataset description says: \"They are applicable for average French arable crop conditions.\" Whether they apply to the demonstration site is for the science lead. The dataset gives the parameter name, its function and its unit, not the equation. The equation form of engine/amg (PROPOSED) could not be compared with Clivot et al. (2019), https://doi.org/10.1016/j.envsoft.2019.04.004: its open copies are behind an anti-bot check that this session did not pass, and the publisher copy is paywalled. Which dataset parameter fills which argument of the engine is a PROPOSED mapping, by name and unit. Second source to cross-check (secondary, CC BY 4.0): Kanari, E. et al. (2022). A robust initialization method for accurate soil organic carbon simulations. Biogeosciences 19:375-387, https://doi.org/10.5194/bg-19-375-2022, section 2.6.1, p. 379: \"The initial proportion of CS / C0 equals 0.65 for sites with a long-term arable land-use history\"; the same paragraph gives 0.40 for former long-term grassland sites. Whether the stable fraction is a constant or a value of the site is OPEN 8 of engine/amg."
+}

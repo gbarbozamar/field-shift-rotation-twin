@@ -108,25 +108,31 @@ def test_the_catalogues_hold_only_the_records_of_the_level() -> None:
     from params.catalogue import check_catalogue, load_folder
 
     service = load_folder(real.PARAMETERS_FOLDER)[0]
-    # The water lane ships the lower level of the soybean fallow itself
-    # (D208: both levels of D115 as one range, soybean, no crop); every
-    # other cover record lives in the demo's in-memory catalogues alone.
+    # The water lane ships the lower level (0.0) of the soybean, wheat, and
+    # maize fallows (D115, D208); the upper level (0.40) replaces soybean
+    # with the continuous-soybean cap and excludes the un-capped crops.
     shipped = {
         key: record
         for key, record in service.items()
         if record.get("id") == "surface_residue_cover"
     }
-    assert list(shipped) == ["water/surface_residue_cover.soybean.no_crop.json"]
-    assert shipped["water/surface_residue_cover.soybean.no_crop.json"][
-        "value"
-    ] == 0.0
+    expected_shipped = [
+        "water/surface_residue_cover.maize.no_crop.json",
+        "water/surface_residue_cover.soybean.no_crop.json",
+        "water/surface_residue_cover.wheat.no_crop.json",
+    ]
+    assert sorted(shipped) == expected_shipped
+    for key in expected_shipped:
+        assert shipped[key]["value"] == 0.0
     lower, upper = real.catalogue_at(0.0), real.catalogue_at(0.40)
     assert check_catalogue(lower) == [] and check_catalogue(upper) == []
-    # The shipped record wins at the lower level (its value is the level's);
-    # the level's declaration replaces it at the upper level.
-    assert "water/surface_residue_cover.soybean.no_crop.json" in lower
-    assert "demo/surface_residue_cover.0.0.soybean.json" not in lower
-    assert "water/surface_residue_cover.soybean.no_crop.json" not in upper
+    # The shipped records win at the lower level (their value is the level's);
+    # the upper level holds only the continuous-soybean cap declaration.
+    for key in expected_shipped:
+        assert key in lower
+        assert key not in upper
+    for crop in ("maize", "soybean", "wheat"):
+        assert f"demo/surface_residue_cover.0.0.{crop}.json" not in lower
     assert "demo/surface_residue_cover.0.4.soybean.json" in upper
     records_of = lambda catalogue: {  # noqa: E731
         (record["id"], tuple(sorted(record["scope"].items())))
@@ -264,31 +270,47 @@ def test_nothing_the_route_computes_moves_between_the_levels() -> None:
 
 def test_every_row_of_the_route_is_missing_with_its_reason() -> None:
     # On the repository's own inputs (the chain examples) the route answers
-    # no number: the ls factor is not computable (the example soil's
-    # slope-length unit is the example's, not the metre of the LS records),
-    # and the daily inputs of the water balance and the carbon records are
-    # not drafted (the cover record itself is, since D208). Missing with
-    # its reason, never zero — the honest state of the route today.
+    # no number for soil loss (the example soil's slope-length unit is not
+    # the metre of the LS records), no number for carbon (the example soil
+    # carries no organic carbon or clay properties), and no number for
+    # soybean water (trailing fallow without a following crop inside the
+    # one-year placeholder climate). With the signed 205-record catalogue,
+    # wheat-soybean-maize phase_1 computes 0.0 for water_deficit_exposure,
+    # while phase_2 and soybean-winter-fallow stay MISSING_INPUT — so no
+    # paired difference holds a value anywhere.
     table, _ = real.level_table(0.0)
-    for row in table.rows:
+    soil = [row for row in table.rows if row.indicator == "soil_loss"]
+    carbon = [row for row in table.rows if row.indicator == "soil_carbon_trend"]
+    water_rows = [
+        row for row in table.rows if row.indicator == "water_deficit_exposure"
+    ]
+    assert soil and carbon and len(water_rows) == 4
+    for row in (*soil, *carbon):
         assert row.value is None
         assert row.missing is not None
         assert row.missing.reason == "MISSING_INPUT"
         assert row.provenance is None  # C4.1: no label when missing
-    soil = [row for row in table.rows if row.indicator == "soil_loss"]
     assert all("ls" in row.missing.detail for row in soil)
-    water_rows = [
-        row for row in table.rows if row.indicator == "water_deficit_exposure"
-    ]
-    # The shipped cover record (D208) no longer blocks the balance; the
-    # undrafted daily inputs do, and no detail blames the cover.
-    assert all(
-        "the daily water balance has no value" in row.missing.detail
+
+    computed_water = [
+        row
         for row in water_rows
-    )
-    assert all(
-        "surface_residue_cover" not in row.missing.detail for row in water_rows
-    )
+        if (row.rotation_id, row.scenario_id)
+        == ("wheat-soybean-maize", "cover-0/phase_1+phase_1")
+    ]
+    missing_water = [row for row in water_rows if row not in computed_water]
+    assert len(computed_water) == 1
+    assert computed_water[0].value == 0.0
+    assert computed_water[0].missing is None
+    assert computed_water[0].provenance == "SIMULATED"
+    assert len(missing_water) == 3
+    for row in missing_water:
+        assert row.value is None
+        assert row.missing is not None
+        assert row.missing.reason == "MISSING_INPUT"
+        assert row.provenance is None
+        assert "the daily water balance has no value" in row.missing.detail
+        assert "surface_residue_cover" not in row.missing.detail
 
 
 def test_the_sweep_reads_both_levels_with_the_phases_nested() -> None:
@@ -325,9 +347,10 @@ def test_the_honest_outcome_is_no_tipping_point_for_the_decided_reason() -> None
     assert "declared C (D148, D158)" in point.reason
     assert "erosion cannot move between the levels" in point.reason
     assert "water balance (D110, D116)" in point.reason
-    assert "no number yet (D157)" in point.reason
+    assert "soybean rotation still has no value" in point.reason
+    assert "D157" in point.reason
     assert "no tipping point" in point.reason
-    # The observed reason: everything the route answers is missing.
+    # The observed reason: paired differences stay missing.
     assert "missing with its reason" in point.reason
 
 
@@ -642,7 +665,7 @@ def test_main_prints_the_honest_report(capsys) -> None:
     printed = capsys.readouterr().out
     assert "the bracket of D3: None" in printed
     assert "declared C (D148, D158)" in printed
-    assert "no number yet (D157)" in printed
+    assert "soybean rotation still has no value" in printed
     assert "'Not evaluated'" in printed
     # The guard of condition 2 inside D4: the level D115 leaves missing is
     # not admitted for the pair (D171), and the report says so.

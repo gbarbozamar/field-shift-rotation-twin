@@ -2,7 +2,7 @@
 
 PROPOSED (unit `l2/kinds-of-year`, brief S-012; brought to `main` by brief #386 under [D240](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893552817)). Classifies each agricultural year of a period as one of the kinds of year of `contracts.economic_facts.KINDS_OF_YEAR` (`el_nino`, `neutral`, `la_nina`) from the Oceanic Nino Index (ONI), or leaves it missing with its reason (`NO_COVERAGE`, C3.2: "The data source has no data for this place or this period"; `MISSING_INPUT` for a season with no printed value, D258). Pure functions; no network. Not wired into the service or the margin engine yet.
 
-**The ONI record is not in the repository.** It waits until a person checks it against the v6 table and signs it (D240 (5), D34, D66). The code reads a record only from the path a caller gives to `load_record(path)`; there is no default record, and nothing is read or loaded at import. The tests use hand-made records labelled example data, with no ONI value.
+**Signed record `kinds_of_year/records/oni_v6.json` (`#510`, `checked_by: martinbarreto0`, `status: PROPOSED`) is present in the repository and remains opt-in via `KINDS_OF_YEAR_RECORD_FILE` while `ATTRIBUTIONS.md` Row 13 terms remain `OPEN`.** The code reads a record only from the path a caller gives to `load_record(path)`; there is no default record loaded at import. The tests use hand-made records labelled example data, with no ONI value.
 
 | File | What it holds |
 |---|---|
@@ -66,4 +66,4 @@ The record transcribed on branch `l2/main-nico` carries `checked_by` `UNSIGNED_A
 
 - Which index to use (D240 (4), OPEN): the moved page says that per NWS Public Information Statement 26-05 the Relative Oceanic Niño Index (RONI) is used for official monitoring and prediction. This unit uses the ONI, as D240 (1) decides; switching to RONI is for a person.
 - Which season, or which rule over the year, should decide an agricultural year (D240 (3): the centred season, a modelling choice, CITATION NEEDED).
-- The record itself: not in the repository until a person checks and signs it (D240 (5), D34, D66). D240 also names the NWS disclaimer that the page links as its terms of use; `ATTRIBUTIONS.md` is not edited by this unit.
+- The record and terms: `kinds_of_year/records/oni_v6.json` (`#510`, `checked_by: martinbarreto0`, `status: PROPOSED`) is present in the repository and remains opt-in via `KINDS_OF_YEAR_RECORD_FILE` while `ATTRIBUTIONS.md` Row 13 NOAA/NWS terms remain `OPEN` (D240, D258).

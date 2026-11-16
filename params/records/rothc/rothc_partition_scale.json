@@ -1,0 +1,16 @@
+{
+  "id": "rothc_partition_scale",
+  "scope": {},
+  "value": 1.67,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The printed description states no range for this constant.",
+  "citation": {
+    "reference": "Coleman, K., Prout, J.M., Milne, A.E. (2024). RothC - A model for the turnover of carbon in soil. Model Description (February 2024). Rothamsted Research, Harpenden.",
+    "locator": "section 1.7, p. 13, equation line",
+    "url": "https://www.rothamsted.ac.uk/sites/default/files/Documents/RothC_description.pdf"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Verbatim text to compare: \"x = 1.67 (1.85 + 1.60 exp(-0.0786 %clay))\". Value transcribed by the interface developer (martinbarreto0) on issue #176 on 2026-11-14 and compared side by side with the printed page under D134 of issue #77 (orquestacion/notas_compartidas/rothc-d63-side-by-side.md, Table A, row 8: MATCH). Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after reading that comparison. Drafted on 2026-11-15 for D218 to D224 of issue #77."
+}

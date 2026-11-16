@@ -1,0 +1,18 @@
+{
+  "id": "amg_humification_coefficient",
+  "scope": {
+    "crop": "wheat_aboveground"
+  },
+  "value": 0.217,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_PLANT.tab (datafile 174668, MD5 65672ba890ce1d17cc19e5083631e20c), row Crop_type \"MC\", Crop_name \"Spring wheat\", column \"h_AG\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77, for rotation B. D194 of issue #77: h_AG for the retained aboveground residue; the scope is the origin \"wheat_aboveground\" that EP4 writes on main for the crop_id wheat (<crop_id>_aboveground, <crop_id>_belowground), which engine/amg/entry.py reads under the scope key crop (ORIGIN_SCOPE_KEY). Row: the spring wheat row, as D142 and D197 of issue #77 take it; the row \"MC, Winter wheat\" prints the same h_AG, h_BG, C_conc_AG and C_conc_BG. Verbatim row to compare, parameters_PLANT.tab: \"MC,Spring wheat,Blé de printemps,C3,0.425,0.409,0.101,0.066,0.96,0.51,7.517,0.5,0.217,0.4,0.44,0.4,Solebiom project\" (header \"Crop_type,Crop_name,Crop_name_FR,Plant_group,RP,RS,RR,RE,Beta,HI,SR,PSS,h_AG,h_BG,C_conc_AG,C_conc_BG,Source\"); h_AG = 0.217. Definition, AMGv2_parameter_list.tab: \"Humification coefficient of aboveground crop residues\", type \"Real [0-1]\" (no unit printed; written dimensionless, C1.1). D194 uses the dataset's 0.4 for h_BG, not the 0.39 of the 2019 text (p. 102). Replaces the draft scoped \"main_crop_winter_wheat_aboveground\", retired to params_borrador/carbono/retirados/. The dataset description says: \"They are applicable for average French arable crop conditions.\" D192 and D197 of issue #77 take them as French defaults, not calibrated for Uruguay, and say so in the label. Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after comparing the text with the source."
+}

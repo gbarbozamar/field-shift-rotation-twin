@@ -1,0 +1,16 @@
+{
+  "id": "amg_cn_ratio_sensitivity",
+  "scope": {},
+  "value": 0.06,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_MINERALIZATION.tab (datafile 163911, MD5 7205d3ff8804c5d3fa42874abed8079b), row \"aCN\" (function \"C:N\"), column \"Value\"; definition in file AMGv2_parameter_list.tab (datafile 166163, MD5 e161a0997798d9bfbd356627f1a73d46), row \"aCN\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77, for D192 of issue #77 (AMGv2 complete: lane L1 adds f(C/N) with aCN and bCN as records from the AMGv2 dataset v2.0). Row 12 of orquestacion/decisiones_para_gustavo/HOJA_COTEJO_CARBONO_22.md. The id is the one engine/amg/entry.py reads on main (PARAMETERS, \"cn_ratio_sensitivity\"), scope {}, unit dimensionless. Verbatim row to compare, parameters_MINERALIZATION.tab: \"aCN,0.06,C:N,https://doi.org/10.1016/j.envsoft.2019.04.004\". Definition, AMGv2_parameter_list.tab: \"a parameter of C:N ratio function\", type \"Real\", no unit printed (written dimensionless, C1.1). Second check, the equation: Clivot et al. (2019), Appendix A, eq. S13, printed p. 111: \"with aCN = 0.060\". Equation as engine/amg uses it (D199): f(C/N) = (1 - amg_cn_ratio_minimum) * exp(-aCN * (C/N - bCN)^2) + amg_cn_ratio_minimum. The dataset description says: \"They are applicable for average French arable crop conditions.\" D192 and D197 of issue #77 take them as French defaults, not calibrated for Uruguay, and say so in the label. Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after comparing the text with the source."
+}

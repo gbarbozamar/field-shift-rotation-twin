@@ -1,0 +1,16 @@
+{
+  "id": "amg_cn_ratio_minimum",
+  "scope": {},
+  "value": 0.2,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Mouny, J.-C., Duparque, A., Dinh, J.-L., Denoroy, P., Houot, S., Vertès, F., Trochard, R., Bouthier, A., Sagot, S., Mary, B. (2019). Modeling soil organic carbon evolution in long-term arable experiments with AMG model. Environmental Modelling & Software 118:99-113.",
+    "locator": "Appendix A, eq. S13, printed p. 111 (author manuscript p. 53); the dataset parameters_MINERALIZATION has no row for it",
+    "url": "https://doi.org/10.1016/j.envsoft.2019.04.004"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77, for D199 of issue #77 (the lower bound of f(C/N) is a record of its own, so that engine/amg holds no number but 0 and 1). Row 23 of HOJA_COTEJO_CARBONO_22.md. The id is the one engine/amg/entry.py reads on main (PARAMETERS, \"cn_ratio_minimum\"), scope {}, unit dimensionless. Verbatim text to compare, eq. S13 as printed: \"f(C/N) = 0.8 exp(-aCN (C/N - bCN)^2) + 0.2\" (the page writes the minus sign as U+2212 and the square as a superscript). The record is the added 0.2; the printed 0.8 is 1 - 0.2, so the form (1 - minimum) * exp(...) + minimum gives the printed equation. D199 also cites the official code, inrae/AMG_base, scripts/AMG_Script.R, line 220: \"fCN = round(0.8 * exp(-aCN * ((CN_ratio - bCN)^2)) + 0.2, 6)\". If S13 as printed does not give 0.2, D199 says the record is not signed and the decision is revisited. Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after comparing the text with the source."
+}

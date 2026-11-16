@@ -57,7 +57,6 @@ SOIL_SLOPE_PATH = ROOT / "data" / "demo" / "la_estanzuela_soil_slope.json"
 RECORDS_DIR = ROOT / "params" / "records"
 
 MARK = "PLACEHOLDER"
-UNMARKED = "UNMARKED_TEST_ONLY"
 
 CLIMATE_START = dt.date(2001, 1, 1)
 CLIMATE_END = dt.date(2024, 12, 31)
@@ -87,90 +86,23 @@ EXPECTED_ROTATION_B_MISSING_PARAMS: frozenset[
     }
 )
 
-# Synthetically chosen PLACEHOLDER values for the 10 unsigned Rotation B water
-# parameters (distinct repeated-digit placeholders, plainly not real FAO-56 or
-# MGAP values). Tagged with PLACEHOLDER here and unmarked in memory only when
-# merged with the shipped catalogue.
-_PLACEHOLDER_STAGE_LENGTHS: dict[str, dict[str, int]] = {
-    "wheat": {
-        "fao56_stage_length_initial": 11,
-        "fao56_stage_length_development": 22,
-        "fao56_stage_length_mid": 33,
-        "fao56_stage_length_late": 44,
-    },
-    "maize": {
-        "fao56_stage_length_initial": 15,
-        "fao56_stage_length_development": 25,
-        "fao56_stage_length_mid": 35,
-        "fao56_stage_length_late": 15,
-    },
-}
-_PLACEHOLDER_RESIDUE_COVER: dict[str, float] = {
-    "wheat": 0.111,
-    "maize": 0.222,
-}
 
-
-def _unmark_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Replace PLACEHOLDER markers in an in-memory parameter record only."""
-    raw = json.dumps(record).replace(MARK, UNMARKED)
-    return json.loads(raw)
-
-
-def _placeholder_record(
-    *,
-    param_id: str,
-    scope: dict[str, str],
-    value: float | int,
-    unit: str,
-) -> dict[str, Any]:
+def _catalogue_without_keys(
+    records: dict[str, dict[str, Any]],
+    excluded: frozenset[tuple[str, tuple[tuple[str, str], ...]]],
+) -> dict[str, dict[str, Any]]:
+    """Return an in-memory copy of ``records`` without the excluded ``(id, scope)`` keys."""
     return {
-        "id": param_id,
-        "scope": scope,
-        "value": value,
-        "unit": unit,
-        "range": None,
-        "range_missing_reason": f"{MARK} synthetic test record without uncertainty range.",
-        "citation": {
-            "reference": f"{MARK} test-only parameter record for {param_id}",
-            "locator": f"{MARK} synthetic invariant test",
-        },
-        "transcribed_by": f"{MARK} automated test author",
-        "checked_by": f"{MARK} automated test reviewer",
-        "note": f"{MARK} in-memory parameter record for L0+L1 chain readiness check.",
+        key: copy.deepcopy(record)
+        for key, record in records.items()
+        if (record["id"], tuple(sorted(record["scope"].items()))) not in excluded
     }
-
-
-def _build_rotation_b_placeholder_records() -> dict[str, dict[str, Any]]:
-    records: dict[str, dict[str, Any]] = {}
-    for crop, stages in _PLACEHOLDER_STAGE_LENGTHS.items():
-        for param_id, value in stages.items():
-            key = f"{MARK.lower()}.{param_id}.{crop}"
-            records[key] = _unmark_record(
-                _placeholder_record(
-                    param_id=param_id,
-                    scope={"crop": crop},
-                    value=value,
-                    unit="day",
-                )
-            )
-    for crop, cover in _PLACEHOLDER_RESIDUE_COVER.items():
-        key = f"{MARK.lower()}.surface_residue_cover.{crop}.no_crop"
-        records[key] = _unmark_record(
-            _placeholder_record(
-                param_id="surface_residue_cover",
-                scope={"crop": crop, "management": "no_crop"},
-                value=cover,
-                unit="fraction of the soil surface (the table prints percent)",
-            )
-        )
-    return records
 
 
 def _load_shipped_catalogue() -> dict[str, dict[str, Any]]:
     records, load_errors = load_folder(RECORDS_DIR)
     assert load_errors == [], f"Unexpected parameter load errors: {load_errors}"
-    assert len(records) == 132
+    assert len(records) == 205
     catalogue_errors = check_catalogue(records)
     assert catalogue_errors == [], f"Catalogue check failed: {catalogue_errors}"
     return records
@@ -341,17 +273,54 @@ def test_rotation_a_ep3_water_deficit_exposure_invariants(
     _assert_valid_exposure_series(results)
 
 
-def test_rotation_b_shipped_catalogue_missing_only_the_10_unsigned_params(
+def test_rotation_b_shipped_catalogue_computes_all_phases(
     d128_bundle: dict[str, Any],
 ) -> None:
-    """Invariant (b1): on shipped 132 records, Rotation B reports ONLY the 10 unsigned params."""
+    """Invariant (b1): on shipped 205 records, Rotation B evaluates 23/23 ag years across all phases."""
     rot_b = d128_bundle["rotations"]["wheat-soybean-maize"]
     cal_b = build_rotation_calendar(rot_b)
-    results = compute_water_deficit_exposure(
+    phases = list_phases(cal_b)
+    assert len(phases) >= 2
+    assert {c.crop_id for c in cal_b.components} == {"wheat", "soybean", "maize"}
+
+    direct_results = compute_water_deficit_exposure(
         cal_b,
         d128_bundle["climate"],
         d128_bundle["soil_slope"],
         parameters=d128_bundle["catalogue"],
+    )
+    assert isinstance(direct_results, list)
+    _assert_valid_exposure_series(direct_results)
+
+    for phase in phases:
+        phased_cal = phase_calendar(cal_b, phase)
+        results = compute_water_deficit_exposure(
+            phased_cal,
+            d128_bundle["climate"],
+            d128_bundle["soil_slope"],
+            parameters=d128_bundle["catalogue"],
+        )
+        assert isinstance(results, list)
+        _assert_valid_exposure_series(results)
+
+
+def test_rotation_b_missing_10_water_params_isolated_in_memory(
+    d128_bundle: dict[str, Any],
+) -> None:
+    """Invariant (b2): filtering the 10 wheat/maize water keys isolates MISSING_INPUT to those 10."""
+    rot_b = d128_bundle["rotations"]["wheat-soybean-maize"]
+    cal_b = build_rotation_calendar(rot_b)
+    stripped = _catalogue_without_keys(
+        d128_bundle["catalogue"], EXPECTED_ROTATION_B_MISSING_PARAMS
+    )
+    assert len(stripped) == len(d128_bundle["catalogue"]) - 10
+    assert check_catalogue(stripped) == []
+
+    results = compute_water_deficit_exposure(
+        cal_b,
+        d128_bundle["climate"],
+        d128_bundle["soil_slope"],
+        parameters=stripped,
     )
     assert isinstance(results, list)
     by_year = {item.ag_year: item for item in results}
@@ -371,35 +340,6 @@ def test_rotation_b_shipped_catalogue_missing_only_the_10_unsigned_params(
         detail = item.missing.detail or ""
         parsed = _extract_missing_parameters(detail)
         assert parsed == EXPECTED_ROTATION_B_MISSING_PARAMS
-
-
-def test_rotation_b_with_10_placeholder_records_computes_all_phases(
-    d128_bundle: dict[str, Any],
-) -> None:
-    """Invariant (b2): supplying the 10 placeholder records completes Rotation B across all phases."""
-    rot_b = d128_bundle["rotations"]["wheat-soybean-maize"]
-    cal_b = build_rotation_calendar(rot_b)
-    phases = list_phases(cal_b)
-    assert len(phases) >= 2
-    assert {c.crop_id for c in cal_b.components} == {"wheat", "soybean", "maize"}
-
-    augmented = copy.deepcopy(d128_bundle["catalogue"])
-    placeholder_10 = _build_rotation_b_placeholder_records()
-    assert len(placeholder_10) == 10
-    augmented.update(placeholder_10)
-    assert len(augmented) == 142
-    assert check_catalogue(augmented) == []
-
-    for phase in phases:
-        phased_cal = phase_calendar(cal_b, phase)
-        results = compute_water_deficit_exposure(
-            phased_cal,
-            d128_bundle["climate"],
-            d128_bundle["soil_slope"],
-            parameters=augmented,
-        )
-        assert isinstance(results, list)
-        _assert_valid_exposure_series(results)
 
 
 @pytest.mark.parametrize(

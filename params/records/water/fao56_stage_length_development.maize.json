@@ -1,0 +1,18 @@
+{
+  "id": "fao56_stage_length_development",
+  "scope": {
+    "crop": "maize"
+  },
+  "value": 40,
+  "unit": "day",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
+    "locator": "Chapter 6, Table 11 \"Lengths of crop development stages for various planting periods and climatic regions (days)\", row \"Maize (grain)\", plant date \"April\", region \"Spain (spr, sum.); Calif.\", column \"Dev. (Ldev)\"",
+    "url": "https://www.fao.org/4/X0490E/x0490e0b.htm"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim row to compare (group \"i. Cereals\"; columns Crop | Init. (Lini) | Dev. (Ldev) | Mid (Lmid) | Late (Llate) | Total | Plant Date | Region): \"Maize (grain) | 30 | 40 | 50 | 30 | 150 | April | Spain (spr, sum.); Calif.\". This record is the column \"Dev. (Ldev)\". Table 11, note *: \"Lengths of crop development stages provided in this table are indicative of general conditions, but may vary substantially from region to region, with climate and cropping conditions, and with crop variety. The user is strongly encouraged to obtain appropriate local information.\" One candidate row among several: the row is chosen by the lead developer (D72 dates, D78), not by this session. FAO-56 Table 11 has no row for Uruguay or the southern hemisphere; its plant dates are months of the regions listed. Identifier PROPOSED by issue #206 (branch l1/water-crop-stages, not merged). UPDATED on 2026-11-15 by an AI session to follow D209 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. D209: the three rows of D139 are signed as printed in FAO-56 Table 11 (soybean 20/25/75/30, wheat 20/60/70/30, maize 30/40/50/30). D209 names no contradiction for maize. Local check, not a source of the value: Giménez and García Petillo (2011), Agrociencia Uruguay 15(2), Cuadro 1, p. 102, give for Colonia a maize sown on 17 October and harvested on 18 March (152 days), against the 150 of the row; the text layer shifts a place label in that table, so check it on the page. Substitution by a traceable local phenology stays as D137 provides. Load only this folder for this crop: the other rows share the id and scope. SIGNED on 2026-11-15: checked_by gbarbozamar per executive sign-off (orquestacion/PAQUETE_FIRMA_CIENTIFICA_1CLICK/RESUMEN_EJECUTIVO_PARA_FIRMAR.md)."
+}

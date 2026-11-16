@@ -1,8 +1,9 @@
 """Structural, provenance, and completeness invariants of the shipped catalogue.
 
-Verifies the 132 signed records under ``params/records/`` directly against
-``params/catalogue.py`` and the parameter lookup tables of EP1, EP3, and EP4
-for the two demonstration rotations of D128 (``web/src/data/demo_rotations_d128.json``).
+Verifies the 205 signed records under ``params/records/`` directly against
+``params/catalogue.py`` and the parameter lookup tables of EP1, EP3, EP4,
+EP5 (AMG), and EP6 (RothC) for the two demonstration rotations of D128
+(``web/src/data/demo_rotations_d128.json``).
 
 Run from the repository root::
 
@@ -18,8 +19,10 @@ from typing import Any
 
 import pytest
 
+from engine.amg import entry as ep5
 from engine.erosion import soil_loss as ep1
 from engine.residues import _parameters as ep4_params
+from engine.rothc import entry as ep6
 from engine.water import exposure as ep3
 from params.catalogue import (
     CITATION_NEEDED,
@@ -46,35 +49,32 @@ WITHDRAWN_DIR = PARAMS_DIR / WITHDRAWN_FOLDER / "computed_c"
 ROOT = PARAMS_DIR.parent
 DEMO_ROTATIONS_PATH = ROOT / "web" / "src" / "data" / "demo_rotations_d128.json"
 
-EXPECTED_TOTAL_RECORDS = 132
-EXPECTED_TOP_EROSION_RECORDS = 26
-EXPECTED_RESIDUE_RECORDS = 6
+EXPECTED_TOTAL_RECORDS = 205
+EXPECTED_TOP_EROSION_RECORDS = 27
+EXPECTED_RESIDUE_RECORDS = 18
 EXPECTED_EROSION_AND_RESIDUE_RECORDS = (
     EXPECTED_TOP_EROSION_RECORDS + EXPECTED_RESIDUE_RECORDS
 )
-EXPECTED_WATER_RECORDS = 100
+EXPECTED_WATER_RECORDS = 110
+EXPECTED_AMG_RECORDS = 20
+EXPECTED_ROTHC_RECORDS = 30
 EXPECTED_WITHDRAWN_RECORDS = 61
 
-EXPECTED_ABOVEGROUND_EP4_IDS = frozenset(
-    {"rusle2_residue_yield_ratio", "rusle2_crop_yield"}
+EXPECTED_SIGNED_EP4_IDS = frozenset(
+    {
+        "residue_carbon_fraction",
+        "rhizodeposit_carbon",
+        "root_carbon_fraction",
+        "root_mass_at_harvest",
+        "rusle2_crop_yield",
+        "rusle2_residue_yield_ratio",
+    }
 )
+EXPECTED_UNSIGNED_EP4_IDS = frozenset({"residue_removed_fraction"})
 
 EXPECTED_ROTATION_B_MISSING_WATER_KEYS: frozenset[
     tuple[str, tuple[tuple[str, str], ...]]
-] = frozenset(
-    {
-        ("fao56_stage_length_initial", (("crop", "wheat"),)),
-        ("fao56_stage_length_development", (("crop", "wheat"),)),
-        ("fao56_stage_length_mid", (("crop", "wheat"),)),
-        ("fao56_stage_length_late", (("crop", "wheat"),)),
-        ("fao56_stage_length_initial", (("crop", "maize"),)),
-        ("fao56_stage_length_development", (("crop", "maize"),)),
-        ("fao56_stage_length_mid", (("crop", "maize"),)),
-        ("fao56_stage_length_late", (("crop", "maize"),)),
-        ("surface_residue_cover", (("crop", "wheat"), ("management", "no_crop"))),
-        ("surface_residue_cover", (("crop", "maize"), ("management", "no_crop"))),
-    }
-)
+] = frozenset()
 
 
 def _normalise(text: str) -> str:
@@ -126,17 +126,24 @@ def test_catalogue_layout_and_domain_counts(
     assert len(shipped_records) == EXPECTED_TOTAL_RECORDS
 
     subdirs = {path.name for path in RECORDS_DIR.iterdir() if path.is_dir()}
-    assert subdirs == {"residues", "water"}
+    assert subdirs == {"amg", "residues", "rothc", "water"}
 
     top_level = [name for name in shipped_records if "/" not in name]
     residues = [name for name in shipped_records if name.startswith("residues/")]
     water = [name for name in shipped_records if name.startswith("water/")]
+    amg = [name for name in shipped_records if name.startswith("amg/")]
+    rothc = [name for name in shipped_records if name.startswith("rothc/")]
 
     assert len(top_level) == EXPECTED_TOP_EROSION_RECORDS
     assert len(residues) == EXPECTED_RESIDUE_RECORDS
     assert len(top_level) + len(residues) == EXPECTED_EROSION_AND_RESIDUE_RECORDS
     assert len(water) == EXPECTED_WATER_RECORDS
-    assert len(top_level) + len(residues) + len(water) == len(shipped_records)
+    assert len(amg) == EXPECTED_AMG_RECORDS
+    assert len(rothc) == EXPECTED_ROTHC_RECORDS
+    assert (
+        len(top_level) + len(residues) + len(water) + len(amg) + len(rothc)
+        == len(shipped_records)
+    )
 
     assert (RECORDS_DIR / "README.md").is_file()
     for rel_path, record in shipped_records.items():
@@ -228,10 +235,10 @@ def test_d128_rotations_ep1_ep3_ep4_key_completeness(
 ) -> None:
     identities = {identity(record) for record in shipped_records.values()}
 
-    # EP1: main soil-loss route keys (empty scope) must all be present.
+    # EP1: main soil-loss route keys (empty scope) and soil-loss tolerance must be present.
     ep1_required = [
         _catalogue_key(pid, {})
-        for pid in (*ep1.PARAMETER_IDS, *ep1.MONTHLY_EROSIVITY_IDS)
+        for pid in (*ep1.PARAMETER_IDS, *ep1.MONTHLY_EROSIVITY_IDS, "soil_loss_tolerance")
     ]
     assert [key for key in ep1_required if key not in identities] == []
 
@@ -253,16 +260,16 @@ def test_d128_rotations_ep1_ep3_ep4_key_completeness(
     }
     assert rot_a_missing == set()
 
-    # EP3 Rotation B (wheat-soybean-maize): misses only the 10 unsigned wheat/maize keys.
+    # EP3 Rotation B (wheat-soybean-maize): complete in shipped records.
     rot_b_ep3 = _ep3_required_keys(crops_by_rotation["wheat-soybean-maize"])
     rot_b_missing = {
         key for key in rot_b_ep3 if _catalogue_key(key[0], key[1]) not in identities
     }
     assert rot_b_missing == EXPECTED_ROTATION_B_MISSING_WATER_KEYS
 
-    # EP4: aboveground residue-at-harvest keys are complete for all D128 crops;
-    # downstream carbon/root/removal keys remain unsigned.
-    expected_unsigned_ep4 = set(ep4_params.RECORDS) - EXPECTED_ABOVEGROUND_EP4_IDS
+    # EP4: 6 signed keys per D128 crop; only residue_removed_fraction remains unsigned.
+    expected_unsigned_ep4 = set(ep4_params.RECORDS) - EXPECTED_SIGNED_EP4_IDS
+    assert expected_unsigned_ep4 == EXPECTED_UNSIGNED_EP4_IDS
     for rotation_crops in crops_by_rotation.values():
         for crop in sorted(rotation_crops):
             present = {
@@ -271,5 +278,70 @@ def test_d128_rotations_ep1_ep3_ep4_key_completeness(
                 if _catalogue_key(pid, {"crop": crop}) in identities
             }
             missing = set(ep4_params.RECORDS) - present
-            assert present == EXPECTED_ABOVEGROUND_EP4_IDS, crop
+            assert present == EXPECTED_SIGNED_EP4_IDS, crop
             assert missing == expected_unsigned_ep4, crop
+
+
+def test_amg_and_rothc_key_completeness(
+    shipped_records: dict[str, dict[str, Any]],
+) -> None:
+    identities = {identity(record) for record in shipped_records.values()}
+    raw_rotations = json.loads(DEMO_ROTATIONS_PATH.read_text(encoding="utf-8"))
+    d128_crops = sorted(
+        {
+            comp["crop_id"]
+            for entry in raw_rotations
+            for comp in entry["components"]
+        }
+    )
+    origins = [
+        f"{crop}_{part}"
+        for crop in d128_crops
+        for part in ("aboveground", "belowground")
+    ]
+
+    # EP5 (AMG): 14 site/method constants (empty scope) + 6 origin humification coefficients.
+    amg_humification_id = ep5.PARAMETERS["humification_coefficient"][0]
+    amg_required = [
+        _catalogue_key(pid, {})
+        for name, (pid, _how) in ep5.PARAMETERS.items()
+        if name != "humification_coefficient"
+    ] + [
+        _catalogue_key(amg_humification_id, {ep5.ORIGIN_SCOPE_KEY: origin})
+        for origin in origins
+    ]
+    assert len(amg_required) == EXPECTED_AMG_RECORDS
+    assert [key for key in amg_required if key not in identities] == []
+
+    amg_records = {
+        rel: rec for rel, rec in shipped_records.items() if rel.startswith("amg/")
+    }
+    assert len(amg_records) == EXPECTED_AMG_RECORDS
+    assert {identity(rec) for rec in amg_records.values()} == set(amg_required)
+    for rel, rec in amg_records.items():
+        assert not is_placeholder(rec), rel
+        assert rec["checked_by"].strip() != "", rel
+        val = read_value(rec)
+        assert isinstance(val, float) and math.isfinite(val), rel
+
+    # EP6 (RothC): 24 site/method constants (empty scope) + 6 origin DPM:RPM ratios.
+    rothc_ratio_id = ep6.INPUT_PARAMETERS["input_dpm_rpm_ratio"]
+    rothc_required = [
+        _catalogue_key(pid, {}) for pid, _how in ep6.PARAMETERS.values()
+    ] + [
+        _catalogue_key(rothc_ratio_id, {ep6.ORIGIN_SCOPE_KEY: origin})
+        for origin in origins
+    ]
+    assert len(rothc_required) == EXPECTED_ROTHC_RECORDS
+    assert [key for key in rothc_required if key not in identities] == []
+
+    rothc_records = {
+        rel: rec for rel, rec in shipped_records.items() if rel.startswith("rothc/")
+    }
+    assert len(rothc_records) == EXPECTED_ROTHC_RECORDS
+    assert {identity(rec) for rec in rothc_records.values()} == set(rothc_required)
+    for rel, rec in rothc_records.items():
+        assert not is_placeholder(rec), rel
+        assert rec["checked_by"].strip() != "", rel
+        val = read_value(rec)
+        assert isinstance(val, float) and math.isfinite(val), rel

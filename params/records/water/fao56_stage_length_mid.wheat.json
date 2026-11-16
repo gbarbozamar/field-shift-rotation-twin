@@ -1,0 +1,18 @@
+{
+  "id": "fao56_stage_length_mid",
+  "scope": {
+    "crop": "wheat"
+  },
+  "value": 31,
+  "unit": "day",
+  "range": null,
+  "range_missing_reason": "DERIVED value with no uncertainty interval: 31 = 44 x 70/100 rounded, where 44 is the local heading-to-maturity length and 70/100 is the mid share of the FAO-56 row (70 of 70 + 30). The local heading-to-maturity length spreads over 39.1-53.4 days across the 16 campaign means; that spread is context, not an interval of this value, because the split has no source interval.",
+  "citation": {
+    "reference": "INIA-INASE. Cardozo, V.; Castro, B.; Morales, M. X.; Restaino, E.; Maltese, N. E.; Condón, F.; Berger, A. G. (2025 a 2026); Cardozo, V.; Castro, B.; Morales, M. X.; Restaino, E.; Castro, M. (2010 a 2024). Resultados Experimentales de la Evaluación Nacional de Cultivares de Trigo: Base de datos compilada 2010-2025. Convenio INASE-INIA, La Estanzuela, Colonia (Uruguay): INIA. File BD_TRIGO2026_2.xlsx, SHA-256 cf3fad8564c3cc24fdc8f35d78051e2263678e27fd0b16ef43bb617bde206aad",
+    "locator": "Sheet «BD_TRIGO EXCEL», headers in row 5. Filter (D233): column A «Ensayo» contains «LE1», column C «Localidad» = «La Estanzuela», column D «Época» = 1, column E «Ciclo» = «Intermedio» (1007 rows, 16 trials 2010-2025). Column AL «Días de Espigazón a MF» (954 rows with a value; 2010 lacks 52, 2012 lacks 1); mean per trial; mean of the 16 campaign means = 43.78 days. Cross-check from dates: (column T «Madurez Fisiologica» - column F «Fecha Siembra») - (column R «Fecha Espigazón» - column F) = 160.58 - 116.54 = 44.05 days. Definitions in sheet «INICIO», rows 30, 32 and 33.",
+    "url": "https://www.inia.uy/sites/default/files/2026-05/BD_TRIGO2026_2.xlsx"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Decision scope (D231, D233, and D231 rounding correction; replaces D209 row in main catalogue, moving D209 to sensitivity D140). Written on 2026-11-15 by an AI session to follow D231 and D233 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893254289), taken by the orchestrating AI session under the delegation of D161. Following executive sign-off, that row moves to the sensitivity catalogue of D140. Load one stage set for wheat only. WHAT IS LOCAL: the length to split, heading to physiological maturity at La Estanzuela, sowing period 1, intermediate cycle, 16 campaigns 2010-2025: 43.8 days (column AL; unrounded 43.78; campaign means 39.1-53.4), rounded to 44 at the nearest whole day, as the correction to D231 rounds every stage length (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893360747). WHAT IS TRANSFERRED: the split 70:30 between the mid and late stages, the proportion of FAO-56 Table 11, row «Winter Wheat | December | Calif., USA», mid 70 and late 30 days (chapter 6, https://www.fao.org/4/X0490E/x0490e0b.htm). WHAT IS CHOSEN: placing the start of the mid stage at heading (D231) and splitting the post-heading days by that row. The start of senescence (the FAO-56 end of the mid stage) is not measured locally; this is the least supported part of the stage set. ARITHMETIC: 44 x 70/100 = 30.8, rounded to 31; the late stage takes 44 x 30/100 = 13.2, rounded to 13; 31 + 13 = 44. Other splits, for context only: 50:50 gives 22/22, 80:20 gives 35/9. D233: rows by trial code containing «LE1»; the 109 rows of the 2014 trials at Young labelled La Estanzuela (Excel rows 2112-2220) are excluded. EP3 requires whole days (engine/water/stages.py). Values are cited; the file is not redistributed. SIGNED on 2026-11-15: checked_by gbarbozamar per executive sign-off (orquestacion/PAQUETE_FIRMA_CIENTIFICA_1CLICK/RESUMEN_EJECUTIVO_PARA_FIRMAR.md)."
+}
