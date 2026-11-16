@@ -51,7 +51,6 @@ from contracts.results.models import (
     UNIT_SOIL_LOSS_MONTHLY,
     AnnualSoilLoss,
     Missing,
-    MonthlySoilLoss,
     ReasonCode,
     SoilLossResults,
 )
