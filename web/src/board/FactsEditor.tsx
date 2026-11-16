@@ -58,7 +58,7 @@ function NumberField({
           onChange={(event) => onChange(event.target.value)}
           className="min-h-11 w-full min-w-0 rounded-lg border border-fs-border bg-fs-bg px-2 tabular-nums aria-[invalid=true]:border-fs-error"
         />
-        <span className="shrink-0 text-xs text-fs-muted">{unitText(unit)}</span>
+        <span className="w-20 shrink-0 text-xs text-fs-muted">{unitText(unit)}</span>
       </span>
     </label>
   )
