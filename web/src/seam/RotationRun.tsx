@@ -11,7 +11,7 @@ import { ApiError, runRotation } from './runRotationApi'
 import type { SiteReference } from './runRotationApi'
 import { parseRunRotation } from './runRotationResponse'
 import type { IndicatorRow, RunRotationView } from './runRotationResponse'
-import { setRunAnswered } from './runAnswer'
+import { setRunAnswered, setRunResult } from './runAnswer'
 
 /**
  * The CP1 seam (issue #119): the interface stops reading the site-data
@@ -348,7 +348,12 @@ export default function RotationRun() {
       if (site === null) {
         throw new Error('run-site-unavailable')
       }
-      return parseRunRotation(await runRotation(site, rotationDefinition.document))
+      const envelope = await runRotation(site, rotationDefinition.document)
+      const view = parseRunRotation(envelope)
+      // The result cards below show this run's result in place of the example.
+      const result = (envelope as Record<string, unknown>).result ?? null
+      setRunResult({ fieldId: site.field_id, result })
+      return view
     },
     // The stage rail reads whether a run has answered; the flag is written
     // only here, when the mutation succeeded with an answer.

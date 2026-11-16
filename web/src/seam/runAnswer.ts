@@ -35,3 +35,28 @@ export function setRunAnswered(answered: boolean): void {
 export function useRunAnswered(): boolean {
   return useSyncExternalStore(subscribeToRunAnswer, getRunAnswered, getRunAnswered)
 }
+
+/** The result document of the seam's last answered run, with the field it was run for. */
+export interface RunResult {
+  fieldId: string
+  /** The envelope's result exactly as the route answered it (a results-per-rotation document), or null with none. */
+  result: unknown
+}
+
+let runResult: RunResult | null = null
+
+/** The last run's result; null before any run has answered. */
+export function getRunResult(): RunResult | null {
+  return runResult
+}
+
+/** Record the result of the run that just answered (the seam writes it, the result cards read it). */
+export function setRunResult(value: RunResult | null): void {
+  runResult = value
+  for (const listener of listeners) listener()
+}
+
+/** React binding: the last run's result, re-rendered on every change. */
+export function useRunResult(): RunResult | null {
+  return useSyncExternalStore(subscribeToRunAnswer, getRunResult, getRunResult)
+}

@@ -260,3 +260,25 @@ describe('resultsData: the parts the display relies on', () => {
     expect(() => parseResultsPerRotation(variant)).toThrow('carbon-model-not-in-list')
   })
 })
+
+describe('the result cards show the run above once it answers (l3/original-mock)', async () => {
+  const { setRunResult } = await import('../seam/runAnswer')
+  const { setSelectedFieldId } = await import('../identity/selection')
+  const rawPerRotation = (await import('../data/PLACEHOLDER_results_per_rotation.json')).default
+
+  it('shows the live result for the selected field in place of the example; another field keeps the example', () => {
+    setSelectedFieldId('example-field-1')
+    setRunResult({ fieldId: 'example-field-1', result: rawPerRotation })
+    const html = renderToString(<ResultCards />)
+    expect(html).toContain('data-testid="results-live"')
+    expect(html).not.toContain('data-testid="results-example-banner"')
+    setRunResult({ fieldId: 'example-field-2', result: rawPerRotation })
+    expect(renderToString(<ResultCards />)).not.toContain('data-testid="results-live"')
+    setRunResult({ fieldId: 'example-field-1', result: { not: 'a result' } })
+    expect(renderToString(<ResultCards />)).toContain('data-testid="results-live-unreadable"')
+    setRunResult({ fieldId: 'example-field-1', result: null })
+    expect(renderToString(<ResultCards />)).toContain('data-testid="results-live-none"')
+    setRunResult(null)
+    setSelectedFieldId(null)
+  })
+})

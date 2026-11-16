@@ -507,6 +507,9 @@ export const strings = {
   'mock.refused.no_example': 'Mock not applied: there is no example answer for these questions, so the missing values stay missing.',
   'mock.panel.switch': 'Mock fill is on (VITE_MOCK_FILL=on). Switch it off to see only what the backend computes.',
   // The user's own numbers on the board (l3/original-mock, PROPOSED).
+  'cards.live': 'From the backend: the result of the run above, for this field.',
+  'cards.live_none': 'The run above answered no result for this field (its reason is shown above), so no card is shown and the example stays hidden.',
+  'cards.live_unreadable': 'The backend answered a result this screen cannot read; nothing is shown in its place.',
   'board.builder.season.winter': 'Winter crop (sown Mar to Jun)',
   'board.builder.season.summer': 'Summer crop (sown Jul to Feb)',
   'board.builder.year': 'Year {n} ({year})',

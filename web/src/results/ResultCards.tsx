@@ -11,7 +11,9 @@ import type {
   SoilLossPart,
   WaterPart,
 } from './resultsData'
-import { resultsExampleRotations } from './resultsData'
+import { parseResultsPerRotation, resultsExampleRotations } from './resultsData'
+import { useRunResult } from '../seam/runAnswer'
+import { useSelectedFieldId } from '../identity/selection'
 
 /**
  * The result cards (issue #141): one card per rotation of the results
@@ -263,8 +265,50 @@ function RotationCard({ doc }: { doc: ResultsPerRotation }) {
   )
 }
 
-/** The results section: its title, the example banner when the data is not of this case, one card per rotation. */
+/** What the run above answered for the selected field: its result read by the parser, or why it cannot be shown. */
+type LiveResult = { kind: 'doc'; doc: ResultsPerRotation } | { kind: 'none' } | { kind: 'unreadable' } | null
+
+function readLive(result: unknown): LiveResult {
+  if (result === null || result === undefined) return { kind: 'none' }
+  try {
+    return { kind: 'doc', doc: parseResultsPerRotation(result) }
+  } catch {
+    return { kind: 'unreadable' }
+  }
+}
+
+/**
+ * The results section: once the run above has answered a result for the
+ * selected field, that result (from the backend); until then, the example
+ * under its banner, one card per rotation.
+ */
 export default function ResultCards() {
+  const run = useRunResult()
+  const selectedFieldId = useSelectedFieldId()
+  const live = run !== null && run.fieldId === selectedFieldId ? readLive(run.result) : null
+  if (live !== null) {
+    return (
+      <section aria-labelledby="results-title" className="mt-8">
+        <h3 id="results-title" className="text-base font-semibold">
+          {strings['cards.title']}
+        </h3>
+        <p data-testid="results-live" className="mt-2 text-sm font-semibold text-fs-ok">
+          {strings['cards.live']}
+        </p>
+        {live.kind === 'doc' ? (
+          <RotationCard doc={live.doc} />
+        ) : live.kind === 'none' ? (
+          <p data-testid="results-live-none" className="mt-2 text-sm text-fs-muted">
+            {strings['cards.live_none']}
+          </p>
+        ) : (
+          <p data-testid="results-live-unreadable" role="alert" className="mt-2 text-sm text-fs-error">
+            {strings['cards.live_unreadable']}
+          </p>
+        )}
+      </section>
+    )
+  }
   const showsExampleBanner = resultsExampleRotations.some(describesAnotherCase)
 
   return (
