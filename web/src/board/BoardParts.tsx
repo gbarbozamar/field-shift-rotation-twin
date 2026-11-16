@@ -6,8 +6,8 @@ import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import { RangeLine } from './CompareTable'
-import { CardHeader } from '../components/Card'
-import { IconCalendar, IconCoins } from '../shell/icons'
+import { CardHeader, KpiTile } from '../components/Card'
+import { IconCalendar, IconCoins, IconLayers, IconRuler } from '../shell/icons'
 import { MARGINS_OF, STRICTNESSES } from '../plant/plantData'
 import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
 import type {
@@ -174,27 +174,18 @@ export function BoardControls({
 
 // --- the answer -------------------------------------------------------------------
 
-function Tile({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div data-testid="board-tile" className="rounded-xl bg-white/10 px-4 py-3">
-      <p className="font-mono text-[10px] uppercase tracking-widest opacity-70">{label}</p>
-      <div className="mt-1">{children}</div>
-    </div>
-  )
-}
-
 function TileNumber({ item, mark = null }: { item: Measured; mark?: string | null }) {
   if (item.value === null) {
-    return <p className="font-fs-heading text-xl font-bold italic opacity-70">{strings['plant.table.no_value']}</p>
+    return <p className="font-fs-heading text-xl font-bold italic text-fs-muted">{strings['plant.table.no_value']}</p>
   }
   return (
     <p className="tabular-nums" title={String(item.value)}>
       <span className="font-fs-heading text-3xl font-extrabold leading-none">{displayNumber(item.value)}</span>
       {mark !== null ? (
-        <sup className="ml-0.5 font-mono text-[10px] opacity-80">{mark}</sup>
+        <sup className="ml-0.5 font-mono text-[10px] text-fs-muted">{mark}</sup>
       ) : null}{' '}
-      <span className="text-xs opacity-70">{unitText(item.unit)}</span>
-      <RangeLine item={item} className="block text-[11px] opacity-80" />
+      <span className="text-xs font-semibold text-fs-muted">{unitText(item.unit)}</span>
+      <RangeLine item={item} className="block text-[11px] text-fs-muted" />
     </p>
   )
 }
@@ -231,7 +222,7 @@ export function AnswerBanner({
       data-testid="board-answer"
       data-answer={answer.answer}
       data-tone={answer.answer === 'chosen' ? 'chosen' : answer.answer === 'none_meets' ? 'over' : 'open'}
-      className="rounded-fs-card bg-fs-primary px-6 py-5 text-white data-[tone=open]:bg-fs-text data-[tone=over]:bg-fs-error"
+      className="rounded-fs-card bg-fs-primary px-6 py-5 text-white shadow-fs-card data-[tone=open]:bg-fs-text data-[tone=over]:bg-fs-error"
     >
       {tag}
       {chosen !== null ? (
@@ -244,34 +235,34 @@ export function AnswerBanner({
             {answer.scope}
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Tile label={formatString(strings['plant.margin_of'], { kind: strings[`plant.kind.${answer.margin_of}`] })}>
+            <KpiTile testId="board-tile" icon={IconCoins} label={formatString(strings['plant.margin_of'], { kind: strings[`plant.kind.${answer.margin_of}`] })}>
               <TileNumber item={chosen.margin[answer.margin_of]} mark={marks.margin} />
-            </Tile>
-            <Tile label={formatString(strings['plant.soil_loss_of'], { kind: strings[`plant.kind.${answer.margin_of}`] })}>
+            </KpiTile>
+            <KpiTile testId="board-tile" icon={IconLayers} label={formatString(strings['plant.soil_loss_of'], { kind: strings[`plant.kind.${answer.margin_of}`] })}>
               <TileNumber item={chosen.soil_loss[answer.margin_of]} mark={marks.soil} />
               {chosen.limit !== null ? (
-                <p data-testid="board-limit" className="text-xs opacity-80">
+                <p data-testid="board-limit" className="text-xs font-semibold text-fs-text">
                   {formatString(strings['board.limit_is'], {
                     limit: displayNumber(chosen.limit),
                     unit: unitText(chosen.limit_unit),
                   })}
                 </p>
               ) : null}
-            </Tile>
-            <Tile label={strings['plant.cost.what']}>
+            </KpiTile>
+            <KpiTile testId="board-tile" icon={IconRuler} label={strings['plant.cost.what']}>
               {cost.kind === 'value' ? (
                 <div>
                   <TileNumber item={{ value: cost.value, unit: cost.unit, missing: null, labels: cost.labels }} />
-                  <p data-testid="board-cost-against" className="text-xs opacity-80">
+                  <p data-testid="board-cost-against" className="text-xs text-fs-text">
                     {formatString(strings['board.cost.against'], { rotation: against ?? cost.against })}
                   </p>
                 </div>
               ) : cost.kind === 'nothing' ? (
                 <p className="font-fs-heading text-3xl font-extrabold leading-none">{strings['board.cost.none']}</p>
               ) : (
-                <p className="font-fs-heading text-xl font-bold italic opacity-70">{strings['plant.table.no_value']}</p>
+                <p className="font-fs-heading text-xl font-bold italic text-fs-muted">{strings['plant.table.no_value']}</p>
               )}
-            </Tile>
+            </KpiTile>
           </div>
         </div>
       ) : (

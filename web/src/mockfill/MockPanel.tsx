@@ -24,7 +24,7 @@ export function MockPanel({ report }: { report: MockReport }) {
     if (report.verdicts) parts.push(strings['mock.part.verdicts'])
   }
   return (
-    <div data-testid="mock-panel" role="note" className="rounded-xl border-2 border-fs-warning bg-fs-warning-bg px-4 py-3 text-sm">
+    <div id="mock-panel" data-testid="mock-panel" role="note" className="scroll-mt-4 rounded-xl border-2 border-fs-warning bg-fs-warning-bg px-4 py-3 text-sm">
       <p className="font-bold text-fs-warning">
         {strings['mock.panel.title']}
         <MockBadge />

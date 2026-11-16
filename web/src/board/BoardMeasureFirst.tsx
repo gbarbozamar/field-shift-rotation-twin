@@ -23,7 +23,7 @@ export type MeasurePhase =
 
 export function BoardMeasureFirstView({ phase, pair, fieldId }: { phase: MeasurePhase; pair: [string, string]; fieldId: string }) {
   return (
-    <section data-testid="board-measure-first" className="fs-card px-5 py-4">
+    <section id="board-measure-first" data-testid="board-measure-first" className="fs-card scroll-mt-4 px-5 py-4">
       <p className="text-sm text-fs-muted">{formatString(strings['board.measure.pair'], { a: pair[0], b: pair[1] })}</p>
       {phase.kind === 'pending' && <p role="status" className="mt-2 text-sm text-fs-muted">{strings['board.measure.pending']}</p>}
       {phase.kind === 'failed' && <p className="mt-2 text-sm text-fs-error">{phase.message}</p>}

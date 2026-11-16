@@ -238,13 +238,13 @@ function Bar({
       data-testid={testid}
       data-empty={String(!drawn)}
       aria-hidden="true"
-      className="relative mt-1 h-3 rounded-full bg-fs-faint data-[empty=true]:fs-fog"
+      className="fs-grid-track relative mt-1.5 h-3 rounded-[4px] data-[empty=true]:fs-fog"
     >
       {drawn ? (
         <span
           data-tone={tone}
           data-negative={String(item.value! < 0)}
-          className="absolute inset-y-0 left-0 rounded-full bg-fs-primary data-[negative=true]:border-2 data-[negative=true]:border-dashed data-[negative=true]:border-fs-error data-[negative=true]:bg-fs-error-bg data-[tone=meets]:bg-fs-ok data-[tone=none]:bg-fs-muted data-[tone=open]:bg-fs-warning data-[tone=over]:bg-fs-error"
+          className="absolute inset-y-0 left-0 rounded-[4px] bg-fs-primary data-[negative=true]:border-2 data-[negative=true]:border-dashed data-[negative=true]:border-fs-error data-[negative=true]:bg-fs-error-bg data-[tone=meets]:bg-fs-ok data-[tone=none]:bg-fs-muted data-[tone=open]:bg-fs-warning data-[tone=over]:bg-fs-error"
           style={{ width: `${barPercent(item.value!, scale!)}%` }}
         />
       ) : null}

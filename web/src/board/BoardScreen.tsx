@@ -49,6 +49,11 @@ import BoardMeasureFirst from './BoardMeasureFirst'
 import { boardRunOf, boardRunQueryOptions, boardRunRequests } from './boardRuns'
 import type { BoardRun } from './boardRuns'
 import { FactsEditor } from './FactsEditor'
+import { BoardCharts } from './BoardCharts'
+import { answerAttention } from './attention'
+import type { AttentionTarget } from './attention'
+import { AttentionPanel } from '../components/Attention'
+import type { AttentionLink } from '../components/Attention'
 import { changedFacts, factsProblems, withExtraCrops } from './factsDraft'
 import type { FactsDraft } from './factsDraft'
 import { draftProblems, exampleRotations, normalizeDraft } from './rotationDraft'
@@ -84,6 +89,28 @@ const REQUEST_LIMIT: { value: number; unit: string } | null =
     : null
 
 function ignore() {}
+
+/** The element of the board an item of "Needs attention" leads to; a closed step is opened. */
+const JUMP_IDS: { [target in AttentionTarget]?: string } = {
+  board: 'board-title',
+  candidates: 'board-candidates',
+  numbers: 'board-numbers',
+  measure: 'board-measure-first',
+  mock: 'mock-panel',
+}
+
+function jumpTo(id: string) {
+  const element = document.getElementById(id)
+  if (element === null) return
+  if (element instanceof HTMLDetailsElement) element.open = true
+  element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+/** Where an item of "Needs attention" leads on the board: a jump to its step, or the full report. */
+function boardLinkOf(target: AttentionTarget, present: (id: string) => boolean): AttentionLink {
+  const id = JUMP_IDS[target]
+  return id !== undefined && present(id) ? { onClick: () => jumpTo(id) } : { href: '#/plant' }
+}
 
 /** The heading of a step of the plan: its number and what it is. */
 function StepTitle({ n, title, children = null }: { n: number; title: string; children?: ReactNode }) {
@@ -171,7 +198,13 @@ function Answered({
   mock,
   measure,
   runs,
+  exampleNumbers,
+  editable,
 }: {
+  /** True when the numbers the answer was asked with are still the example's. */
+  exampleNumbers: boolean
+  /** True when the board shows the steps of the candidates and of the numbers. */
+  editable: boolean
   /** The run of each option's rotation (water and carbon), by rotation id; null shows no such rows. */
   runs: ReadonlyMap<string, BoardRun> | null
   /** What to measure first, when the answer picks no rotation (null without a backend or a request). */
@@ -207,6 +240,13 @@ function Answered({
   const againstText = answer.limit_cost.kind === 'value' ? nameOf(answer.limit_cost.against) : null
   // The sources an answer lacks are its root reason: said once, in the notice.
   const lacksSources = answer.sources.some((source) => source.state === 'unavailable' && source.missing_reason !== null)
+  const mocked = mock !== null && (mock.whole || mock.soilKinds.length !== 0 || mock.record || mock.marginKinds.length !== 0 || mock.refused !== null)
+  const mockSoilKinds = mock === null ? [] : mock.whole ? MARGINS_OF : mock.soilKinds
+  const mockMarginKinds = mock === null ? [] : mock.whole ? MARGINS_OF : mock.marginKinds
+  const attention = answerAttention(answer, { mocked, exampleNumbers, nameOf })
+  // A jump only to a step the board shows: the candidates and the numbers only when they can be edited.
+  const present = (id: string) =>
+    id === 'board-candidates' || id === 'board-numbers' ? editable : id === 'board-measure-first' ? measure !== null : id === 'mock-panel' ? mocked : true
   return (
     <div data-testid="board-answered" data-updating={String(updating)} className="space-y-6 data-[updating=true]:opacity-60">
       {updating ? (
@@ -215,7 +255,7 @@ function Answered({
         </p>
       ) : null}
       <div className="space-y-3">
-        {mock !== null && (mock.whole || mock.soilKinds.length !== 0 || mock.record || mock.marginKinds.length !== 0 || mock.refused !== null) && <MockPanel report={mock} />}
+        {mocked && mock !== null && <MockPanel report={mock} />}
         <AnswerBanner
           answer={answer}
           label={chosen !== null ? nameOf(chosen.rotation_id) : null}
@@ -236,6 +276,7 @@ function Answered({
         {measure !== null && (
           <BoardMeasureFirst answer={answer} baseRequest={measure.baseRequest} apiBase={measure.apiBase} nameOf={nameOf} />
         )}
+        <AttentionPanel items={attention} columns={2} linkOf={(target) => boardLinkOf(target, present)} />
       </div>
       <div>
         <StepTitle n={firstStep} title={strings['board.compare.title']}>
@@ -246,8 +287,17 @@ function Answered({
             {note}
           </p>
         ) : null}
-        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} mockSoilKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.soilKinds}
-          mockMarginKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.marginKinds}
+        <div className="mb-4">
+          <BoardCharts
+            answer={answer}
+            options={columns.map((column) => column.option)}
+            nameOf={nameOf}
+            mockMarginKinds={mockMarginKinds}
+            mockSoilKinds={mockSoilKinds}
+          />
+        </div>
+        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} mockSoilKinds={mockSoilKinds}
+          mockMarginKinds={mockMarginKinds}
           runs={runs}
         />
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -304,7 +354,11 @@ function BoardSide({
   updating,
   baseRequest,
   runs,
+  exampleNumbers,
+  editable,
 }: {
+  exampleNumbers: boolean
+  editable: boolean
   runs: ReadonlyMap<string, BoardRun> | null
   baseRequest: Record<string, unknown> | null
   selectedFieldId: string | null
@@ -351,6 +405,8 @@ function BoardSide({
       mock={mockReportOf(service.answer)}
       measure={baseRequest !== null ? { baseRequest, apiBase } : null}
       runs={runs}
+      exampleNumbers={exampleNumbers}
+      editable={editable}
     />
   )
 }
@@ -377,8 +433,11 @@ export function BoardView({
   updating = false,
   limit = REQUEST_LIMIT,
   runs = null,
+  exampleNumbers = false,
   rainFactor = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null,
 }: {
+  /** True when the numbers the answer was asked with are still the example's: "Needs attention" says so. */
+  exampleNumbers?: boolean
   /** The run of each compared rotation through the rotation route (water and carbon), by rotation id; null shows no such rows. */
   runs?: ReadonlyMap<string, BoardRun> | null
   /** The rain factor the request sends with the stress test; the example request's by default. */
@@ -452,7 +511,7 @@ export function BoardView({
       </div>
 
       {hasCandidates ? (
-        <details data-testid="board-candidates" className="group">
+        <details id="board-candidates" data-testid="board-candidates" className="group scroll-mt-4">
           <summary className="cursor-pointer list-none">
             <StepTitle n={2} title={strings['board.step.candidates']}>
               <span className="rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:hidden">
@@ -475,7 +534,7 @@ export function BoardView({
       ) : null}
 
       {hasNumbers && (
-        <details data-testid="board-numbers" className="group" open>
+        <details id="board-numbers" data-testid="board-numbers" className="group scroll-mt-4" open>
           <summary className="cursor-pointer list-none">
             <StepTitle n={numbersStep} title={strings['board.step.numbers']}>
               <span className="rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-semibold group-open:hidden">
@@ -516,6 +575,8 @@ export function BoardView({
         updating={updating}
         baseRequest={baseRequest}
         runs={runs}
+        exampleNumbers={exampleNumbers}
+        editable={hasCandidates && hasNumbers}
       />
 
       <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
@@ -612,6 +673,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       rotations={rotations}
       baseRequest={baseRequest}
       runs={runs}
+      exampleNumbers={changedFacts(factsSent, EXAMPLE_FACTS) === 0}
       limit={{ value: Number(factsSent.limit), unit: rawPlantRequest.soil_loss_limit.unit }}
       rainFactor={baseRead.rain.kind === 'present' ? baseRead.rain.factor : null}
       builder={
