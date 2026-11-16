@@ -44,6 +44,9 @@ import {
 import { CompareTable, MARGIN_MARK, SOIL_MARK, SortPicker, TableNotes, optionTitle, orderNote } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
+import { FactsEditor } from './FactsEditor'
+import { applyFacts, readFactUnits, readFacts } from './factsDraft'
+import type { FactsDraft } from './factsDraft'
 import { exampleRotations, normalizeDraft } from './rotationDraft'
 import type { DraftRotation } from './rotationDraft'
 
@@ -80,6 +83,10 @@ const REQUEST_LIMIT: { value: number; unit: string } | null =
   typeof rawPlantRequest.soil_loss_limit.value === 'number'
     ? { value: rawPlantRequest.soil_loss_limit.value, unit: rawPlantRequest.soil_loss_limit.unit }
     : null
+
+/** The numbers the example request declares: where the user's own numbers start. */
+const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
+const FACT_UNITS = readFactUnits(rawPlantRequest)
 
 /** The board asks as soon as its field is picked: the state starts in service mode. */
 export function initialBoardState(): PlantScreenState {
@@ -363,7 +370,10 @@ export function BoardView({
   builder = null,
   previous = null,
   updating = false,
+  limit = REQUEST_LIMIT,
 }: {
+  /** The soil-loss limit of the comparison shown, as declared; the example request's by default. */
+  limit?: { value: number; unit: string } | null
   selectedFieldId: string | null
   state: PlantScreenState
   apiBase: string | null
@@ -418,12 +428,12 @@ export function BoardView({
         </StepTitle>
         <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
           <FieldList fields={exampleCase.fields} selectedFieldId={selectedFieldId} />
-          {REQUEST_LIMIT !== null ? (
+          {limit !== null ? (
             <div data-testid="board-your-limit" className="rounded-xl border-2 border-fs-text bg-fs-surface px-4 py-2">
               <p className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.limit.yours']}</p>
               <p className="tabular-nums">
-                <span className="font-fs-heading text-2xl font-extrabold leading-none">{displayNumber(REQUEST_LIMIT.value)}</span>{' '}
-                <span className="text-xs text-fs-muted">{unitText(REQUEST_LIMIT.unit)}</span>
+                <span className="font-fs-heading text-2xl font-extrabold leading-none">{displayNumber(limit.value)}</span>{' '}
+                <span className="text-xs text-fs-muted">{unitText(limit.unit)}</span>
               </p>
               <p className="text-[11px] text-fs-muted">{strings['plant.declared']}</p>
             </div>
@@ -460,7 +470,7 @@ export function BoardView({
           rain={state.rain && REQUEST_READ.rain.kind === 'present'}
           rainFactor={REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null}
           record={service !== null && service.phase === 'answered' ? service.answer.answer.kinds_of_year : null}
-          limit={REQUEST_LIMIT}
+          limit={limit}
           disabled={selectedFieldId !== REQUEST_FIELD_ID || apiBase === null}
           onMarginOf={(value) => dispatch({ type: 'margin_of', value })}
           onStrictness={(value) => dispatch({ type: 'strictness', value })}
@@ -497,7 +507,10 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   // the user compares.
   const [sent, setSent] = useState<DraftRotation[]>(exampleRotations)
   const [draft, setDraft] = useState<DraftRotation[]>(exampleRotations)
-  const baseRequest = useMemo(() => ({ ...rawPlantRequest, rotations: sent }), [sent])
+  // The user's own numbers, sent and being edited, as the rotations are.
+  const [factsSent, setFactsSent] = useState<FactsDraft>(EXAMPLE_FACTS)
+  const [factsDraft, setFactsDraft] = useState<FactsDraft>(EXAMPLE_FACTS)
+  const baseRequest = useMemo(() => applyFacts({ ...rawPlantRequest, rotations: sent }, factsSent), [sent, factsSent])
   const rotations = useMemo(() => readPlantRotations(baseRequest), [baseRequest])
   const asks = apiBase !== null && selectedFieldId === REQUEST_FIELD_ID
   const request = useMemo(
@@ -544,7 +557,9 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       mapOpen={mapOpen}
       onToggleMap={() => setMapChoice(!mapOpen)}
       rotations={rotations}
+      limit={{ value: Number(factsSent.limit), unit: rawPlantRequest.soil_loss_limit.unit }}
       builder={
+        <>
         <RotationBuilder
           draft={draft}
           sent={sent}
@@ -560,6 +575,18 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
             setSent(example)
           }}
         />
+        <FactsEditor
+          draft={factsDraft}
+          sent={factsSent}
+          units={FACT_UNITS}
+          onChange={setFactsDraft}
+          onCompare={() => setFactsSent(factsDraft)}
+          onReset={() => {
+            setFactsDraft(EXAMPLE_FACTS)
+            setFactsSent(EXAMPLE_FACTS)
+          }}
+        />
+        </>
       }
     />
   )

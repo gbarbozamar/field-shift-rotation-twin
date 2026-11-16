@@ -465,9 +465,27 @@ const WORDING_SHEET: Record<string, string> = {
   'mock.part.record': 'Kinds of year of the record: mock example data.',
   'mock.part.margin': 'The margin averaged over the record: mock, because it weights the backend\'s margins by the mock kinds of year.',
   'mock.part.verdicts': 'The limit verdicts, the answer, its cost and the tipping price: mock, because they follow from the mock soil loss.',
-  'mock.refused.incoherent': 'Mock not applied: the backend\'s rotations or margins differ from the example answer, so mixing them would put numbers that do not belong together on one screen.',
+  'mock.refused.incoherent': 'Mock not applied: your rotations or numbers, or the values the backend computed, differ from the example answer, so mixing them would put numbers that do not belong together on one screen.',
   'mock.refused.no_example': 'Mock not applied: there is no example answer for these questions, so the missing values stay missing.',
   'mock.panel.switch': 'Mock fill is on (VITE_MOCK_FILL=on). Switch it off to see only what the backend computes.',
+  // The user's own numbers on the board (l3/original-mock, PROPOSED).
+  'board.facts.title': 'Your prices, costs and limit',
+  'board.facts.note': 'Your own numbers, sent exactly as you type them (declared by you). Nothing changes until you compare.',
+  'board.facts.soybean': 'Soybean',
+  'board.facts.price': 'Price',
+  'board.facts.cost': 'Cost',
+  'board.facts.yield': 'Yield, {kind}',
+  'board.facts.cover': 'Cover crop',
+  'board.facts.pasture': 'Pasture',
+  'board.facts.margin': 'Margin, {kind}',
+  'board.facts.limit': 'Soil-loss limit',
+  'board.facts.compare': 'Compare with these numbers',
+  'board.facts.reset': 'Back to the example numbers',
+  'board.facts.changed': 'Changed, not compared yet: {n}',
+  'board.facts.no_changes': 'The comparison shown uses these numbers',
+  'board.facts.problem.not_a_number': '{field}: type a number',
+  'board.facts.problem.negative': '{field}: cannot be below zero',
+  'board.facts.problem.not_positive': '{field}: must be above zero',
 }
 
 /** Source of the shell page as it was before the strings unit. */
