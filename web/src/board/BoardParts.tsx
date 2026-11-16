@@ -207,7 +207,10 @@ export function AnswerBanner({
   showWhy,
   against = null,
   marks,
+  tag = null,
 }: {
+  /** Shown at the top of the banner: the mock mark when the answer is mock example data. */
+  tag?: ReactNode
   answer: PlantAnswer
   label: string | null
   /** False when a notice beside the banner already says what the answer lacks. */
@@ -226,6 +229,7 @@ export function AnswerBanner({
       data-tone={answer.answer === 'chosen' ? 'chosen' : answer.answer === 'none_meets' ? 'over' : 'open'}
       className="rounded-2xl bg-fs-primary px-6 py-5 text-white data-[tone=open]:bg-fs-text data-[tone=over]:bg-fs-error"
     >
+      {tag}
       {chosen !== null ? (
         <div>
           <p className="font-mono text-[11px] uppercase tracking-widest opacity-80">{strings['plant.answer.heading']}</p>

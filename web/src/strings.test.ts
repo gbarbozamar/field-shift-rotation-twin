@@ -456,6 +456,18 @@ const WORDING_SHEET: Record<string, string> = {
   'print.rotations_section': 'Declared rotations',
   'print.rotations': 'Declared rotations',
   'print.rotation_id_label': 'Rotation identifier',
+  // Mixed answers (l3/original-mock, PROPOSED). Wording is a person's decision.
+  'mock.badge': 'Mock',
+  'mock.panel.title': 'Mixed answer: backend values and mock example values',
+  'mock.panel.real': 'From the backend: the margin of each kind of year, the prices and your declared limit.',
+  'mock.part.whole': 'The whole answer is mock example data: the backend has no plant answer yet.',
+  'mock.part.soil': 'Soil loss of every option: mock example data, because the backend has no climate record to compute it.',
+  'mock.part.record': 'Kinds of year of the record: mock example data.',
+  'mock.part.margin': 'The margin averaged over the record: mock, because it weights the backend\'s margins by the mock kinds of year.',
+  'mock.part.verdicts': 'The limit verdicts, the answer, its cost and the tipping price: mock, because they follow from the mock soil loss.',
+  'mock.refused.incoherent': 'Mock not applied: the backend\'s rotations or margins differ from the example answer, so mixing them would put numbers that do not belong together on one screen.',
+  'mock.refused.no_example': 'Mock not applied: there is no example answer for these questions, so the missing values stay missing.',
+  'mock.panel.switch': 'Mock fill is on (VITE_MOCK_FILL=on). Switch it off to see only what the backend computes.',
 }
 
 /** Source of the shell page as it was before the strings unit. */

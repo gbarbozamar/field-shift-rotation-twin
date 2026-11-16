@@ -9,6 +9,7 @@ import { cropOrder } from '../plant/rotationStrip'
 import type { RotationStrip } from '../plant/rotationStrip'
 import type { RotationDefinition } from '../rotation/exampleRotation'
 import { strings } from '../strings'
+import { MockBadge } from '../mockfill/MockPanel'
 import { SORT_KEYS, cropName, isExampleCrop, unitText, worstKind } from './boardModel'
 import type { BoardColumn, SortKey } from './boardModel'
 import { isUserRotation } from './rotationDraft'
@@ -278,7 +279,13 @@ function KindCell({
   option,
   kind,
   worst,
+  mockSoil,
+  mockMargin,
 }: {
+  /** True when the margin shown is mock example data. */
+  mockMargin: boolean
+  /** True when the soil loss shown is mock example data. */
+  mockSoil: boolean
   option: PlantOption
   kind: (typeof KINDS_OF_YEAR)[number]
   /** True when this is the kind of year in which the option has its smallest margin. */
@@ -292,6 +299,7 @@ function KindCell({
       {margin.value !== null ? (
         <p title={String(margin.value)}>
           <span className="font-fs-heading text-base font-bold">{displayNumber(margin.value)}</span>
+          {mockMargin && <MockBadge />}
           {worst ? (
             <span data-testid="board-worst" className="ml-1.5 rounded border border-fs-border px-1 text-[10px] font-semibold uppercase text-fs-muted">
               {strings['board.worst_mark']}
@@ -309,6 +317,7 @@ function KindCell({
         >
           {formatString(strings['board.kind.soil'], { value: displayNumber(loss.value) })}
           <Mark mark={SOIL_MARK} />
+          {mockSoil && <MockBadge />}
           {tone === 'over' ? (
             <span className="ml-1 uppercase">{strings['plant.table.over_limit']}</span>
           ) : null}
@@ -334,9 +343,15 @@ export function CompareTable({
   order,
   scales,
   sort,
+  mockSoil = false,
+  mockMarginKinds = [],
 }: {
+  /** The kinds of year whose margin is mock example data (the board mixing). */
+  mockMarginKinds?: readonly string[]
   answer: PlantAnswer
   columns: BoardColumn[]
+  /** True when the soil loss of the options is mock example data (the board mixing). */
+  mockSoil?: boolean
   /** What the columns are ordered by: only the rule of the answer gives a first place. */
   sort: SortKey
   info: (option: PlantOption) => OptionInfo
@@ -436,7 +451,12 @@ export function CompareTable({
           />
           <Row
             label={formatString(strings['plant.margin_of'], { kind: strings[`plant.kind.${kind}`] })}
-            note={marginUnit}
+            note={
+              <>
+                {marginUnit}
+                {mockMarginKinds.includes(kind) && <MockBadge />}
+              </>
+            }
             columns={columns}
             merged={
               sameMargin !== null ? (
@@ -455,6 +475,7 @@ export function CompareTable({
             note={
               <>
                 {soilUnit}
+                {mockSoil && <MockBadge />}
                 {limit !== null ? (
                   <span data-testid="board-row-limit" className="block font-semibold text-fs-text">
                     {formatString(strings['board.limit_is'], { limit: displayNumber(limit.value), unit: unitText(limit.unit) })}
@@ -489,7 +510,7 @@ export function CompareTable({
               selected={each === kind}
               columns={columns}
               cell={(option) => (
-                <KindCell option={option} kind={each} worst={worstKind(answer, option) === each} />
+                <KindCell option={option} kind={each} worst={worstKind(answer, option) === each} mockSoil={mockSoil} mockMargin={mockMarginKinds.includes(each)} />
               )}
             />
           ))}

@@ -1,6 +1,7 @@
 import { useMemo, useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
 import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query'
+import type { UseQueryOptions } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
 import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
@@ -20,6 +21,11 @@ import type { PlantAction, PlantScreenState, ServicePhase, ServiceStatus } from 
 import { CropLegend } from '../plant/PlantVisuals'
 import type { PlantAnswer, PlantOption, RainStressPart } from '../plant/plantData'
 import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../plant/plantRoute'
+import { MARGINS_OF } from '../plant/plantData'
+import type { PlantServiceAnswer } from '../plant/plantRoute'
+import { MockBadge, MockPanel } from '../mockfill/MockPanel'
+import { mixedQueryOptions, mockFillOn, mockReportOf } from '../mockfill/mockFill'
+import type { MockReport } from '../mockfill/mockFill'
 import { buildRotationStrip, cropOrder, plantRotations, readPlantRotations } from '../plant/rotationStrip'
 import type { PlantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
@@ -161,9 +167,12 @@ function Answered({
   firstStep,
   previous,
   updating,
+  mock,
 }: {
   answer: PlantAnswer
   rainStress: RainStressPart | null
+  /** What of this answer is mock example data, when the board mixes; null when it does not. */
+  mock: MockReport | null
   rotations: PlantRotations
   /** The number of the first step of the answer: the steps before it are numbered by the view. */
   firstStep: number
@@ -199,12 +208,14 @@ function Answered({
         </p>
       ) : null}
       <div className="space-y-3">
+        {mock !== null && (mock.whole || mock.soil || mock.record || mock.marginKinds.length !== 0 || mock.refused !== null) && <MockPanel report={mock} />}
         <AnswerBanner
           answer={answer}
           label={chosen !== null ? nameOf(chosen.rotation_id) : null}
           showWhy={!lacksSources}
           against={againstText}
           marks={{ margin: MARGIN_MARK, soil: SOIL_MARK }}
+          tag={mock !== null && mock.verdicts && <MockBadge />}
         />
         {previous !== null ? (
           <ChangesNote changes={answerChanges(previous, answer)} nameOf={nameOf} />
@@ -225,7 +236,9 @@ function Answered({
             {note}
           </p>
         ) : null}
-        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} />
+        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} mockSoil={mock !== null && mock.soil}
+          mockMarginKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.marginKinds}
+        />
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
           <CropLegend order={order} nameOf={cropName} />
           {order.some(isExampleCrop) ? (
@@ -237,7 +250,9 @@ function Answered({
         <TableNotes answer={answer} />
       </div>
       <div>
-        <StepTitle n={firstStep + 1} title={strings['board.step.holds']} />
+        <StepTitle n={firstStep + 1} title={strings['board.step.holds']}>
+          {mock !== null && (mock.verdicts || mock.record) && <MockBadge />}
+        </StepTitle>
         <div className="grid gap-4 xl:grid-cols-2">
           <PriceTrackPanel tipping={answer.tipping_price} nameOf={nameOf} />
           <RecordRibbon record={answer.kinds_of_year} marginOf={answer.margin_of} />
@@ -325,6 +340,7 @@ function BoardSide({
       firstStep={firstStep}
       previous={previous}
       updating={updating}
+      mock={mockReportOf(service.answer)}
     />
   )
 }
@@ -490,8 +506,13 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   )
   // While a new answer is on its way the one before stays on screen, marked
   // as updating, so a control does not blank the board.
+  // With VITE_MOCK_FILL=on the board mixes: the backend's answer, its missing
+  // parts filled from the example answer and marked mock (l3/original-mock).
+  const options: UseQueryOptions<PlantServiceAnswer, Error, PlantServiceAnswer, readonly unknown[]> = mockFillOn()
+    ? mixedQueryOptions(apiBase, request)
+    : plantScreenQueryOptions(apiBase, request)
   const query = useQuery(
-    { ...plantScreenQueryOptions(apiBase, request), placeholderData: keepPreviousData },
+    { ...options, placeholderData: keepPreviousData },
     apiBase === null ? NO_SERVICE_CLIENT : undefined,
   )
   // The map opens the screen and steps aside once a field is picked, unless
