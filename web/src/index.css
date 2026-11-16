@@ -45,22 +45,24 @@
 }
 
 :root {
-  /* Design tokens of the interface's own identity (l3/own-identity),
-     chosen by the owner of the interface lane. Do not reformat the values:
-     the tests compare them character by character. */
-  --fs-bg: #edf0ea;
-  --fs-surface: #f8faf5;
-  --fs-text: #16201b;
-  --fs-muted: #56635b;
-  --fs-border: #c6cfc4;
-  --fs-faint: #dce2d9;
-  --fs-brand: #17766d;
-  --fs-primary: #17766d;
-  --fs-info: #16201b;
-  --fs-ok: #2f6b3a;
-  --fs-warning: #946719;
-  --fs-warning-bg: color-mix(in srgb, var(--fs-warning) 9%, var(--fs-surface));
-  --fs-error: #a93f3b;
+  /* Design tokens of the interface (l3/own-identity), moved by
+     l3/erp-shell toward a modern agricultural ERP look: a soft green-grey
+     background, white cards with a green-tinted border, a field green for
+     actions and a data blue for focus. Do not reformat the values: the
+     tests compare them character by character. */
+  --fs-bg: #f4f7f5;
+  --fs-surface: #ffffff;
+  --fs-text: #1f2d2b;
+  --fs-muted: #5f6f6b;
+  --fs-border: #d9e0dc;
+  --fs-faint: #eef2f0;
+  --fs-brand: #1a7a3b;
+  --fs-primary: #3e7b2c;
+  --fs-info: #19648b;
+  --fs-ok: #3e7b2c;
+  --fs-warning: #86500e;
+  --fs-warning-bg: color-mix(in srgb, var(--fs-warning-accent) 10%, var(--fs-surface));
+  --fs-error: #c0392b;
   --fs-error-bg: color-mix(in srgb, var(--fs-error) 9%, var(--fs-surface));
   --fs-selection-bg: color-mix(in srgb, var(--fs-primary) 12%, var(--fs-surface));
   --fs-nino: #b5562f;
@@ -82,6 +84,14 @@
      of a card icon, and the faint furrows of the content background. */
   --fs-brand-soft: color-mix(in srgb, var(--fs-primary) 18%, var(--fs-surface));
   --fs-furrow: color-mix(in srgb, var(--fs-primary) 5%, transparent);
+  /* The harvest amber behind the warning fill (the warning text stays the
+     darker --fs-warning, readable on it). */
+  --fs-warning-accent: #f2a900;
+  /* The card pattern (l3/erp-shell): flat white cards, a 1px tinted border,
+     a hairline shadow; overlays get the deeper shadow. */
+  --fs-radius-card: 10px;
+  --fs-shadow-card: 0 1px 2px rgb(31 45 43 / 0.05);
+  --fs-shadow-pop: 0 4px 6px -1px rgb(31 45 43 / 0.1), 0 2px 4px -2px rgb(31 45 43 / 0.1);
 }
 
 /* Tailwind 4 theme bridge: registers the tokens as utilities for later
@@ -116,6 +126,10 @@
   --color-fs-crop-5: var(--fs-crop-5);
   --color-fs-crop-6: var(--fs-crop-6);
   --color-fs-brand-soft: var(--fs-brand-soft);
+  --color-fs-warning-accent: var(--fs-warning-accent);
+  --shadow-fs-card: var(--fs-shadow-card);
+  --shadow-fs-pop: var(--fs-shadow-pop);
+  --radius-fs-card: var(--fs-radius-card);
 }
 
 /* The hatch of what is not known (l3/board): a value that is missing, a
@@ -126,6 +140,24 @@
     var(--fs-border) 0 4px,
     transparent 4px 10px
   );
+}
+
+/* A card of the interface (l3/erp-shell): white surface, tinted border,
+   card radius, hairline shadow. Padding is set where the card is used. */
+@utility fs-card {
+  background-color: var(--fs-surface);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-card);
+  box-shadow: var(--fs-shadow-card);
+}
+
+/* The small uppercase heading of a card or a group (l3/erp-shell). */
+@utility fs-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fs-muted);
 }
 
 /* The calm field background of the content area (l3/erp-shell): faint
