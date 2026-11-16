@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url'
  *
  * D177: "`demo/` writes it and checks it; the interface reads a
  * byte-identical copy under `web/src/data/`." This file is that guard for
- * the copy `saved_case.json`: it reads both files — the copy and the demo's
- * `demo/saved_cases/example-case.json` — and compares them byte for byte,
+ * the copy `saved_case.json`: it reads both files, the copy and the demo's
+ * `demo/saved_cases/example-case.json`, and compares them byte for byte,
  * so the two can never drift silently. When the demo saves the case again
  * (there is one file per case; saving again replaces it, and the commit is
  * its version), the copy must be refreshed in the same change or this test

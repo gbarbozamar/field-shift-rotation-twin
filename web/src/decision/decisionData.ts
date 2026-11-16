@@ -20,14 +20,14 @@ import type {
  *   never exclude_none). On a key whose null carries no meaning of its own,
  *   an explicit null is read as the key being absent (withoutOptionalNulls).
  *
- * The parser reads exactly the parts the section renders — the field
+ * The parser reads exactly the parts the section renders, the field
  * identifier, the state of the decision with its reasons (D7), the state of
  * each rotation pair with its reason, its preferred rotation and its coverage
  * (D85, D86, D91), the two counts of a pair's cells shown apart and never
  * added, each naming its carbon model and computation when it carries them
  * (D87, D99, D169), the range across scenarios of the years within the limit
  * (D96), the counts by year (D1, D94, D95), the paired differences (D2), and
- * the measurement priority (D4) — and enforces, on those parts, the rules of
+ * the measurement priority (D4), and enforces, on those parts, the rules of
  * the contract that the render relies on:
  *
  * - a pair holds two different non-empty rotation ids (D2);
@@ -38,7 +38,7 @@ import type {
  * - the coverage holds non-negative counts and "k of N" never has k above N
  *   (D91);
  * - the count by the sign of the point value holds counts or a missing part
- *   with its reason — the tolerance of "equal" — never both (C3.1, D87);
+ *   with its reason, the tolerance of "equal", never both (C3.1, D87);
  * - a range across scenarios gives its minimum, its maximum and the scenario
  *   of the minimum together, or a missing part with its reason, never both
  *   (C3.1, D96), and the minimum never exceeds the maximum;
@@ -52,8 +52,8 @@ import type {
  *
  * Pure: value in, typed decision out, or an Error naming what is wrong. The
  * errors are technical codes without wording; nothing user-visible lives
- * here. The parts of the document the section does not render — the limits
- * and the tolerances — are not parsed; nothing is invented for them.
+ * here. The parts of the document the section does not render, the limits
+ * and the tolerances, are not parsed; nothing is invented for them.
  */
 
 /** The three indicator identifiers of the conventions (C1.1). */
@@ -92,7 +92,7 @@ export interface PairStateNotEvaluated {
 
 /**
  * The state of one pair of rotations across the scenarios (D85, D86, D88,
- * D97): its value verbatim — the science wording travels as data — or its
+ * D97): its value verbatim, the science wording travels as data, or its
  * missing part when the pair is not evaluated (D85), its reason or the
  * reason-missing part of a state no decision gives a reason (D86), the
  * preferred rotation of a robust preference (D74), and its coverage "k of N"

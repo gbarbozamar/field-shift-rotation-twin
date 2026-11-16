@@ -5,8 +5,8 @@ import type { ClockRow } from './clockData'
 
 /**
  * The two clocks of the results example (issue #140): for each rotation of
- * the table, the soil clock — soil loss per agricultural year, one column
- * per year — and the water clock — water-deficit exposure, one column per
+ * the table, the soil clock, soil loss per agricultural year, one column
+ * per year, and the water clock, water-deficit exposure, one column per
  * year on the years the indicator travels per year, or the value the
  * indicator carries for the whole rotation when it travels per rotation,
  * which is what the example carries. Every value, present or missing, goes

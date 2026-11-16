@@ -11,7 +11,7 @@ import { API_URL } from '../lib/api'
  * - a 4xx/5xx answer carries the one error shape of api/errors.py,
  *   { "error": { "code", "message", "details" } }, and the code travels on;
  * - a connection that fails, or a body that is not the promised shape, is
- *   UNEXPECTED — the interface's own code for "something failed on the
+ *   UNEXPECTED, the interface's own code for "something failed on the
  *   connection".
  *
  * No number, no wording and no code is ever invented here: an error body

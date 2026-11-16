@@ -16,7 +16,7 @@ import { strings } from '../strings'
  * timeline, left to right in position order. Each card carries the crop and
  * its purpose, the sowing and harvest dates, and the management block. The
  * unit is display-only: it renders what the rotation_definition contract
- * travels and decides nothing — editing is a later unit, and feasibility
+ * travels and decides nothing, editing is a later unit, and feasibility
  * belongs to the calendar engine.
  *
  * Dates are not value items (they carry no number and no unit), so they

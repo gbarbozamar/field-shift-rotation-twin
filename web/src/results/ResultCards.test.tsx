@@ -170,7 +170,7 @@ describe('ResultCards: carbon values per model and per computation', () => {
 
   it('labels every item with its model and its computation, one item per pair', () => {
     const pairs = carbonChunks.map((chunk) => {
-      const model = /Model: (amg|rothc)/.exec(chunk)?.[1]
+      const model = { AMG: 'amg', RothC: 'rothc' }[/Model: (AMG|RothC)/.exec(chunk)?.[1] ?? '']
       const computation = /Computation: (end_minus_start|fitted_slope|mean_over_cycles)/.exec(
         chunk,
       )?.[1]

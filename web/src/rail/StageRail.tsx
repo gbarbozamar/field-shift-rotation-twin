@@ -6,7 +6,7 @@ import { strings } from '../strings'
 
 /**
  * The stage rail of the fields screen (issue #435): the case in six ordered
- * stages, each with the state it is really in — done, the one stage the
+ * stages, each with the state it is really in, done, the one stage the
  * reader is on, or waiting with the reason it waits for. Every state reads
  * a signal the screen already holds: the case stage when the example case
  * carries its label, the field stage when the selection store holds a

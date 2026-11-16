@@ -42,7 +42,7 @@ describe('EntryScreen', () => {
 
   it('shows the example-data banner', () => {
     const html = renderToString(<EntryScreen />)
-    expect(html).toContain(strings['example.banner'])
+    expect(html).toContain(strings['board.example_banner'])
   })
 
   it('shows the fields count of the example case', () => {
@@ -57,7 +57,7 @@ describe('EntryScreen', () => {
       n: exampleCase.fields.length,
     })
     const plain = visibleText(renderToString(<EntryScreen />))
-    for (const text of [strings['entry.title'], fieldsCount, strings['example.banner']]) {
+    for (const text of [strings['entry.title'], fieldsCount, strings['board.example_banner']]) {
       expect(plain).toContain(text)
     }
 
@@ -66,7 +66,7 @@ describe('EntryScreen', () => {
     for (const text of [
       strings['entry.title'],
       fieldsCount,
-      strings['example.banner'],
+      strings['board.example_banner'],
       strings['entry.open_field'],
       strings['identity.selected'],
       strings['identity.field_id_label'],

@@ -413,7 +413,7 @@ function CarbonValues({ part }: { part: CarbonPart }) {
     <ul className="space-y-2">
       {byModel(part.values).map(({ model, values }) => (
         <li key={model} data-testid="board-carbon-model">
-          <p className="text-xs font-semibold text-fs-muted">{formatString(strings['cards.model_label'], { model })}</p>
+          <p className="text-xs font-semibold text-fs-muted">{formatString(strings['cards.model_label'], { model: strings[`carbon.model.${model}`] })}</p>
           <ul className="space-y-1">
             {values.map((value) => (
               <li key={value.computation} data-testid="board-carbon-item">
@@ -522,7 +522,7 @@ export function CompareTable({
   const sameMargin = uniformItem(columns.map((column) => column.option.margin[kind]))
   const sameSoil = uniformItem(columns.map((column) => column.option.soil_loss[kind]))
   return (
-    <div className="overflow-x-auto rounded-2xl border border-fs-border bg-fs-surface">
+    <div className="overflow-x-auto fs-card">
       <table
         data-testid="board-compare"
         className="w-full table-fixed border-collapse"

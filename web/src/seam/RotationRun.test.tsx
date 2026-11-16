@@ -15,7 +15,7 @@ import type { RotationRunState } from './RotationRun'
 /**
  * Acceptance test of the CP1 seam (issue #119). No real network: the fetch
  * boundary is stubbed with the route's real shapes, read from api/rotations.py
- * and its own test — the success envelope (always 200, values missing with
+ * and its own test, the success envelope (always 200, values missing with
  * their reason, never zero) and the one error shape of api/errors.py
  * ({ "error": { "code", "message", "details" } }). Every number and text of
  * the fixtures is a placeholder of the contract examples; no test asserts a
@@ -25,7 +25,7 @@ import type { RotationRunState } from './RotationRun'
  * static markup, rendered with the pure server renderer of react-dom. The
  * states that a live browser reaches through the mutation are produced here
  * by running the real fetcher and the real parser against the stubbed fetch,
- * then handing the outcome to the panel — the same path the container takes.
+ * then handing the outcome to the panel, the same path the container takes.
  */
 
 // --- the route's real shapes (placeholders of the contract examples) -----------

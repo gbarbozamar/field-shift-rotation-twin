@@ -16,9 +16,9 @@ import type {
  * in it as example data by construction and always show it under the example
  * banner, which carries that honesty.
  *
- * The parser below reads exactly the parts the clocks render — the rows of
+ * The parser below reads exactly the parts the clocks render, the rows of
  * the soil-loss and water-deficit-exposure indicators, placed on a rotation
- * and, for an agricultural-year row, on its year — and enforces, on those
+ * and, for an agricultural-year row, on its year, and enforces, on those
  * parts, the rules of the contract that the shared value display relies on:
  *
  * - a row holds a value or a missing part with its reason, never both,

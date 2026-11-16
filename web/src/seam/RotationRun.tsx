@@ -18,7 +18,7 @@ import { setRunAnswered, setRunResult } from './runAnswer'
  * example for one rotation and calls the platform route instead. For the
  * selected field that matches the example rotation's field, one action runs
  * that rotation end to end through POST /api/rotations/run on real NASA POWER
- * data; the response renders below through the shared value display — every
+ * data; the response renders below through the shared value display, every
  * value with its unit, provenance, source and range, every absence as a
  * missing value with its reason, never zero.
  *
@@ -34,7 +34,7 @@ import { setRunAnswered, setRunResult } from './runAnswer'
  *
  * One display rule completes it (D148 of issue #77, issue #249): the
  * computed C is withdrawn from the demonstration. The source text of every
- * soil-loss value of the run names the path C took, and the rule reads it —
+ * soil-loss value of the run names the path C took, and the rule reads it , 
  * a value whose C was computed shows the decided not-shown reason instead
  * of its number, and a run whose C is the declared record shows that figure
  * as the headline, beside the label D148 words verbatim. Nothing else
@@ -45,7 +45,7 @@ import { setRunAnswered, setRunResult } from './runAnswer'
 /**
  * The point that stands for a field: the centre of the bounding box of its
  * exterior ring, in decimal degrees. How the point is chosen for a field is
- * OPEN (adapters/ports.py); this is the seam's PROPOSED choice — derived from
+ * OPEN (adapters/ports.py); this is the seam's PROPOSED choice, derived from
  * the declared geometry alone, never hand-picked. Null when the geometry
  * yields no usable point: nothing is invented to fill it.
  */
@@ -111,8 +111,8 @@ function RotationRunError({ error }: { error: unknown }) {
 /**
  * The C-route markers of EP1's source text (engine/erosion/soil_loss.py, the
  * main route the platform route calls). The source of every soil-loss value
- * of a run — annual and monthly alike, a monthly source carrying its annual
- * one — embeds exactly one clause naming the path C took: C computed through
+ * of a run, annual and monthly alike, a monthly source carrying its annual
+ * one, embeds exactly one clause naming the path C took: C computed through
  * engine/erosion/c_factor/ (the COMPUTED_C clause) or the single declared
  * record by the fallback of brief #218 (the DECLARED_C clause). The declared
  * clause itself contains the words "C computed through
@@ -156,7 +156,7 @@ function isDeclaredC(item: ValueItem): boolean {
 /**
  * The La Estanzuela check D148 names (docs/VALIDATION.md, the EP1
  * plausibility entry): the link target of the not-shown reason. A URL, not
- * user-visible wording — the visible text of the link is the reason's own
+ * user-visible wording, the visible text of the link is the reason's own
  * mention of the file.
  */
 const VALIDATION_ENTRY_HREF =
@@ -206,7 +206,7 @@ function WithdrawnC() {
  * The headline of D148: when the run's soil loss went through the declared C
  * (the fallback of brief #218), its figure is the headline, with the decided
  * science label beside it, verbatim. The figure is the first present value
- * whose source says C is the declared record — the parser lists the annual
+ * whose source says C is the declared record, the parser lists the annual
  * values first, so it is the annual declared-C figure D148 headlines. The
  * rows below stay as they were: every value keeps the shared value display,
  * its unit, provenance, source and range. No declared-C figure, no headline.

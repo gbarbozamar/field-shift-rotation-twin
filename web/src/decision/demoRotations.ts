@@ -8,7 +8,7 @@ import type { RotationDefinitionExample } from '../seam/rotationDefinition'
  * web/src/data/demo_rotations_d128.json was added at the request of the
  * orchestrating session (D161), citing D128 and D72: soybean with winter
  * fallow, and wheat, second-crop soybean, then maize, on PLACEHOLDER years
- * with the month and day of row USER-AP (D72) — scenario dates, not observed
+ * with the month and day of row USER-AP (D72), scenario dates, not observed
  * harvests. They are the pair DEMO_ROTATIONS of api/test_runner_residues.py;
  * web/test_demo_rotations_d128.py checks them against the rotation
  * definition contract, that pair, row USER-AP and the crops of the

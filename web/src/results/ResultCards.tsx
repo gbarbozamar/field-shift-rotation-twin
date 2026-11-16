@@ -191,7 +191,7 @@ function CarbonItemRow({
       className={['space-y-1', 'pt-2', 'first:pt-0'].join(' ')}
     >
       <p data-testid="carbon-model-label" className={['text-xs', 'text-fs-muted'].join(' ')}>
-        {formatString(strings['cards.model_label'], { model: value.carbon_model })}
+        {formatString(strings['cards.model_label'], { model: strings[`carbon.model.${value.carbon_model}`] })}
       </p>
       <p
         data-testid="carbon-computation-label"

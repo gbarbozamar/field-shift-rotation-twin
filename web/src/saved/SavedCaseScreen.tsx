@@ -23,7 +23,7 @@ import type { StringKey } from '../strings'
  * picker without calling any backend service. Every part is validated at
  * runtime against the SavedCase contract (contracts/saved_case/): absent
  * parts and missing values always render their typed reason via
- * missingPatternText or ValueDisplay — never zero or blank — and carbon
+ * missingPatternText or ValueDisplay, never zero or blank, and carbon
  * balances always keep each model and variant separate (C1.5, #297).
  */
 

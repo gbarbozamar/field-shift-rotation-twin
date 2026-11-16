@@ -15,9 +15,9 @@ import type {
  * "site_data_soil_slope"; their values are placeholders that describe no real
  * field, and both carry example_data: true, which drives the example banner.
  *
- * The parser below reads exactly the parts the sheet renders — the climate
+ * The parser below reads exactly the parts the sheet renders, the climate
  * monthly series (the daily series and the point are not rendered by this
- * unit) and the soil-and-slope values — and enforces, on those parts, the
+ * unit) and the soil-and-slope values, and enforces, on those parts, the
  * rules of the contracts that the value display relies on:
  *
  * - an item holds a value or a missing part with its reason, never both,
@@ -40,8 +40,8 @@ export interface MonthlyValue {
 
 /**
  * A monthly climate series. What the series states once for all its present
- * values — unit, provenance, source or assumption mark, and the reason its
- * values carry no range — travels here, on the header (C2.2, C4.1).
+ * values, unit, provenance, source or assumption mark, and the reason its
+ * values carry no range, travels here, on the header (C2.2, C4.1).
  */
 export interface MonthlySeries {
   quantity: string
@@ -314,7 +314,7 @@ function parseMonthlySeries(value: unknown): MonthlySeries {
 /**
  * Parse the climate example. The point and the daily series of the contract
  * are not rendered by this unit, so they are not parsed; the field_id is
- * kept, and the example_data flag must be true — the sheet never shows data
+ * kept, and the example_data flag must be true, the sheet never shows data
  * that is not labelled as example data.
  */
 export function parseSiteClimate(value: unknown): SiteClimate {
@@ -388,7 +388,7 @@ export function parseSiteSoilSlope(value: unknown): SiteSoilSlope {
  * there is. Their field_id ("PLACEHOLDER-field") is the field of the example
  * contract, not a field of the example case, so it differs from every
  * selection; the sheet therefore shows them under the example banner, which
- * their example_data flag drives — the honest label for example data, for
+ * their example_data flag drives, the honest label for example data, for
  * whichever field is selected. When the examples come to carry a field of
  * the example case, the same flag keeps the banner on, as it should.
  */

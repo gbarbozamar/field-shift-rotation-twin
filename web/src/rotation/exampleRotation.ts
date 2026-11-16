@@ -7,7 +7,7 @@ import type { MissingPart, ProvenanceLabel, ReasonCode } from '../components/Val
  * into web/src/data/rotation_definition.json).
  *
  * The unit is display-only: this module parses and types the file, the ribbon
- * renders it, and nothing here decides whether a rotation is feasible — that
+ * renders it, and nothing here decides whether a rotation is feasible, that
  * belongs to the calendar engine. Values such as crop ids, purposes, residues
  * or methods are identifiers of the contract: they render exactly as they
  * travel and are never translated.

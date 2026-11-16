@@ -61,7 +61,7 @@ import {
  * network. The fetch boundary is stubbed with the shapes of api/decisions.py
  * and api/errors.py, and the states a browser reaches through the query are
  * produced by running the real fetcher and the real parser against the
- * stub, then handing the outcome to the panel — the same path the container
+ * stub, then handing the outcome to the panel, the same path the container
  * takes:
  * - a document is shown, from the route, with its absences and reasons;
  * - a null decision shows the route's reason, then the bundled example,

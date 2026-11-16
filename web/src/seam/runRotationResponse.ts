@@ -11,13 +11,13 @@ import type {
  * RunRotationResponse). A 2xx answer always carries the envelope, also when
  * nothing could be computed: the result then travels as null with
  * result_missing, and every value inside the result travels as a value item
- * of the results contract — a number with its provenance, source and range,
+ * of the results contract, a number with its provenance, source and range,
  * or null with a missing part and its reason code (C3.1, C3.2), never zero.
  *
  * The parser copies what the interface renders into a view: the outcome, the
  * live-data flag (the climate source of the run answered fresh or cached),
- * one row per indicator item — including a wholly missing part, which keeps
- * its units and its reason (decision D12) — and the reason a result is absent
+ * one row per indicator item, including a wholly missing part, which keeps
+ * its units and its reason (decision D12), and the reason a result is absent
  * altogether. Everything else (calendar, modules, sources beyond the flag) is
  * left unread: the route guarantees its shape, and the seam renders no more
  * than the goal asks.
@@ -139,7 +139,7 @@ function parseIndicatorItem(raw: unknown, what: string): ValueItem {
   }
   // The route serializes the contract with pydantic's defaults as explicit
   // nulls (model_dump without exclude_none): a null here means the field was
-  // never set — the contract has no null shape for these fields — so a null
+  // never set, the contract has no null shape for these fields, so a null
   // is normalized away before the key-presence checks below.
   const value: Record<string, unknown> = { ...raw }
   for (const key of ['missing', 'range', 'range_missing', 'provenance', 'source']) {
@@ -371,8 +371,8 @@ function parseListPartOrNotBuilt(
 // --- the envelope ----------------------------------------------------------------
 
 /**
- * The live-data flag: the run used real data when its climate source — the
- * NASA POWER source behind the platform route — answered fresh or cached
+ * The live-data flag: the run used real data when its climate source, the
+ * NASA POWER source behind the platform route, answered fresh or cached
  * data (adapters/ports.py). An unavailable or example climate source leaves
  * the flag off: the live-data label then does not show, whatever the values.
  * Exported for the decision route, whose envelope carries the same sources

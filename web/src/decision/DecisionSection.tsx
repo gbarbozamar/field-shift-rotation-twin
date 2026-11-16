@@ -37,8 +37,8 @@ import type { DecisionAnswer, RunDecisionRequest } from './decisionRoute'
  * document as it travels:
  *
  * - the document POST /api/decisions/run returns for the two rotations the
- *   interface holds for the selected field (decisionRoute.ts) — the two
- *   rotations of D128 for example-field-1 (demoRotations.ts) — with the
+ *   interface holds for the selected field (decisionRoute.ts), the two
+ *   rotations of D128 for example-field-1 (demoRotations.ts), with the
  *   live-data label of the seam when the route's climate source answered
  *   real data;
  * - otherwise the bundled contract example, always under the example banner,
@@ -54,7 +54,7 @@ import type { DecisionAnswer, RunDecisionRequest } from './decisionRoute'
  *   reason, and its reasons, each a sentence of the decision layer rendered
  *   as data (D7);
  * - one block per rotation pair, named by its two rotations, with the state
- *   of the pair verbatim — the science wording of D88 and D97 travels as
+ *   of the pair verbatim, the science wording of D88 and D97 travels as
  *   data, and so do its reason (D86) and the rotation a robust preference
  *   prefers (D74); a pair that is not evaluated shows the shared missing
  *   pattern with its reason (D85, C3.1);

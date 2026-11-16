@@ -8,10 +8,10 @@ import { strings } from './strings'
 /**
  * Acceptance test of the strings unit.
  *
- * Case 1 — the strings file exports exactly the keys of the wording sheet,
+ * Case 1, the strings file exports exactly the keys of the wording sheet,
  * with exactly the supplied values.
  *
- * Case 2 — no file under web/src other than the strings file contains a
+ * Case 2, no file under web/src other than the strings file contains a
  * user-visible text literal: the former shell page text and the two
  * diagnostics render from the strings file instead.
  *
@@ -39,7 +39,7 @@ const stringsFilePath = resolve(srcDir, 'strings.ts')
 const WORDING_SHEET: Record<string, string> = {
   'app.title': 'Field Shift Rotation Twin',
   'app.subtitle': 'Compares crop rotations for a field against the observed climate record',
-  'example.banner': 'Example data — synthetic, not a real field',
+  'example.banner': 'Example data: synthetic, not a real field',
   'disclaimer.full':
     'This is a research prototype made for a hackathon. It is not agronomic advice and it does not replace a professional soil-use plan. It is not affiliated with, nor endorsed by, NASA or any data provider.',
   'assumption.mark': 'assumption',
@@ -111,8 +111,8 @@ const WORDING_SHEET: Record<string, string> = {
   'clocks.soil': 'The soil clock',
   'clocks.water': 'The water clock',
   'clocks.years_hint': 'Each column is one agricultural year',
-  'clocks.example_note': 'Example data — real years arrive with the seam',
-  'seam.with_real_data': 'Live data — NASA POWER through the platform route',
+  'clocks.example_note': 'Example data: real years arrive with the seam',
+  'seam.with_real_data': 'Live data: NASA POWER through the platform route',
   // Science wording decided verbatim by D148 (issue #77) and the reason
   // approved by the interface developer (15/11/2026); decided wording.
   'soil_loss.headline_label':
@@ -128,6 +128,8 @@ const WORDING_SHEET: Record<string, string> = {
   'cards.per_rotation': 'Rotation {id}',
   'cards.availability': 'Availability',
   'cards.model_label': 'Model: {model}',
+  'carbon.model.amg': 'AMG',
+  'carbon.model.rothc': 'RothC',
   'cards.computation_label': 'Computation: {computation}',
   'decision.title': 'Decision',
   'decision.pairs': 'Rotation pairs',
@@ -314,7 +316,7 @@ const WORDING_SHEET: Record<string, string> = {
   'plant.service.rain_next_answer': 'Applies to the next answer from the service.',
   'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
   // Wording addendum Block 6, 15 Nov 2026 (l3/stage-rail, issue #435): the
-  // stage rail of the fields screen — the label of the whole rail, the six
+  // stage rail of the fields screen, the label of the whole rail, the six
   // stages in their order, the state a stage is in, and the reason each
   // stage would show while it waits.
   'rail.label': 'The case in six stages',
@@ -616,7 +618,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 px-6 py-4">
         <h1 className="text-xl font-semibold">Field Shift Rotation Twin</h1>
-        <p className="text-sm text-slate-500">Web interface — skeleton shell</p>
+        <p className="text-sm text-slate-500">Web interface, skeleton shell</p>
       </header>
       <main className="px-6 py-8">
         <p>Placeholder shell page. Screens will be added by later units.</p>
@@ -752,7 +754,7 @@ describe('no user-visible text literal outside the strings file', () => {
     }
     for (const gone of [
       'Field Shift Rotation Twin</',
-      'Web interface — skeleton shell',
+      'Web interface, skeleton shell',
       'Placeholder shell page',
       'Current hash route: {',
       'Backend: {',
@@ -765,7 +767,7 @@ describe('no user-visible text literal outside the strings file', () => {
     const violations = visibleTextViolations(HARDCODED_APP_TSX, true)
     const texts = violations.map((v) => v.text)
     expect(texts).toContain('Field Shift Rotation Twin')
-    expect(texts).toContain('Web interface — skeleton shell')
+    expect(texts).toContain('Web interface, skeleton shell')
     expect(texts).toContain('Placeholder shell page. Screens will be added by later units.')
     expect(texts.some((t) => t.startsWith('Current hash route')), 'the route diagnostic must be flagged').toBe(true)
     expect(texts.some((t) => t.startsWith('Backend')), 'the backend diagnostic must be flagged').toBe(true)

@@ -45,7 +45,7 @@
 export const strings = {
   'app.title': 'Field Shift Rotation Twin',
   'app.subtitle': 'Compares crop rotations for a field against the observed climate record',
-  'example.banner': 'Example data — synthetic, not a real field',
+  'example.banner': 'Example data: synthetic, not a real field',
   'disclaimer.full':
     'This is a research prototype made for a hackathon. It is not agronomic advice and it does not replace a professional soil-use plan. It is not affiliated with, nor endorsed by, NASA or any data provider.',
   'assumption.mark': 'assumption',
@@ -88,6 +88,8 @@ export const strings = {
   'cards.per_rotation': 'Rotation {id}',
   'cards.availability': 'Availability',
   'cards.model_label': 'Model: {model}',
+  'carbon.model.amg': 'AMG',
+  'carbon.model.rothc': 'RothC',
   'cards.computation_label': 'Computation: {computation}',
   'decision.title': 'Decision',
   'decision.pairs': 'Rotation pairs',
@@ -158,8 +160,8 @@ export const strings = {
   'clocks.soil': 'The soil clock',
   'clocks.water': 'The water clock',
   'clocks.years_hint': 'Each column is one agricultural year',
-  'clocks.example_note': 'Example data — real years arrive with the seam',
-  'seam.with_real_data': 'Live data — NASA POWER through the platform route',
+  'clocks.example_note': 'Example data: real years arrive with the seam',
+  'seam.with_real_data': 'Live data: NASA POWER through the platform route',
   // Science wording decided verbatim by D148 (issue #77); the interface
   // renders it, it does not edit it.
   'soil_loss.headline_label':
@@ -335,7 +337,7 @@ export const strings = {
   'plant.service.rain_next_answer': 'Applies to the next answer from the service.',
   'plant.service.rain_request_invalid_detail': 'the rain-stress factor of the example request could not be read',
   // Wording addendum Block 6, 15 Nov 2026 (l3/stage-rail, issue #435): the
-  // stage rail of the fields screen — the label of the whole rail, the six
+  // stage rail of the fields screen, the label of the whole rail, the six
   // stages in their order, the state a stage is in, and the reason each
   // stage would show while it waits.
   'rail.label': 'The case in six stages',

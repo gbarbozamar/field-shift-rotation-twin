@@ -109,7 +109,7 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
           <li key={field.field_id} className="relative">
             <div
               data-selected={String(field.field_id === selectedFieldId)}
-              className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
+              className="fs-card px-3 py-2 data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
             >
               <p id={`board-field-${field.field_id}-name`} className="font-bold leading-tight">{field.name}</p>
               <p id={`board-field-${field.field_id}-area`} data-testid="board-field-area" className="text-xs tabular-nums">
@@ -323,7 +323,7 @@ function BoardSide({
   }
   if (apiBase === null) {
     return (
-      <p data-testid="board-no-service" className="rounded-2xl border border-fs-border bg-fs-surface px-6 py-10 text-center text-lg">
+      <p data-testid="board-no-service" className="fs-card px-6 py-10 text-center text-lg">
         {strings['plant.service.not_available']}
       </p>
     )

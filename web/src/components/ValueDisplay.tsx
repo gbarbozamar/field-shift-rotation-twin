@@ -151,7 +151,7 @@ export function missingPattern(what: string, missing: MissingPart): string {
 /**
  * The displayed form of a measured value: rounded to three decimals, with
  * no forced trailing zeros (2.1 renders "2.1", not "2.100"). Display-only
- * (D80): the value that travels is never rounded — the exact number stays
+ * (D80): the value that travels is never rounded, the exact number stays
  * in the item and in the element, for inspection.
  */
 export function displayNumber(value: number): string {

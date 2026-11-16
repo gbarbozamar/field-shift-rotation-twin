@@ -142,7 +142,7 @@ export default function EntryScreen() {
           role="note"
           className="mt-4 rounded-lg border border-fs-warning bg-fs-warning-bg px-4 py-3 text-sm text-fs-warning"
         >
-          {strings['example.banner']}
+          {strings['board.example_banner']}
         </p>
       )}
 

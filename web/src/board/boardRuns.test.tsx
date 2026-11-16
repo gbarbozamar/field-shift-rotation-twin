@@ -184,8 +184,8 @@ describe('water and carbon rows of the comparison', () => {
     const items = result.soil_carbon_trend.form === 'present' ? result.soil_carbon_trend.values.length : 0
     expect(count(html, 'data-testid="board-carbon-model"')).toBe(ids.length * models.size)
     expect(count(html, 'data-testid="board-carbon-item"')).toBe(ids.length * items)
-    expect(text).toContain('Model: amg')
-    expect(text).toContain('Model: rothc')
+    expect(text).toContain('Model: AMG')
+    expect(text).toContain('Model: RothC')
     expect(text).toContain('Computation: fitted_slope')
     expect(text).toContain('0.5 t C ha-1 yr-1 Simulated')
     expect(text).toContain('0.25 t C ha-1 yr-1 Simulated')

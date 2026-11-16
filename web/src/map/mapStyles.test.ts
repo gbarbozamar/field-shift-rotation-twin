@@ -6,7 +6,7 @@ import * as mapStyles from './mapStyles'
  * objects carry the polygon styles of the design handoff package of
  * 15 Nov 2026, file assets/map-styles.json (SHA-256
  * 20ab2acd091824d75b70cb1f1bb93f3ac0d996ff6853efd8f071e4c30b261d5d)
- * key for key — every key present, no key extra — and the module
+ * key for key, every key present, no key extra, and the module
  * exports exactly the two names.
  */
 

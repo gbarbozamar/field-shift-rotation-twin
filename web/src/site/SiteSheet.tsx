@@ -9,8 +9,8 @@ import { siteClimate, siteSoilSlope } from './siteData'
 /**
  * The site sheet of the selected field (issue #108): the climate monthly
  * series and the soil-and-slope values of the site-data contract examples,
- * every value through the shared value display — its unit, provenance label
- * and source, its range or the assumption mark — and every absence as a
+ * every value through the shared value display, its unit, provenance label
+ * and source, its range or the assumption mark, and every absence as a
  * missing value with its reason, never zero or blank.
  *
  * The sheet hangs under the fields screen, after the field list, and follows
@@ -32,8 +32,8 @@ function monthLabel(year: number, month: number): string {
 /**
  * The value item of one month: the month's number, or its missing part, on
  * the unit of its series. What the series states once for all its present
- * values — provenance label, source or assumption mark, and the reason the
- * values carry no range — travels with the item (C2.2, C4.1, C4.2); the
+ * values, provenance label, source or assumption mark, and the reason the
+ * values carry no range, travels with the item (C2.2, C4.1, C4.2); the
  * parser of siteData.ts guarantees it is there when a value is.
  */
 function monthItem(series: MonthlySeries, month: MonthlyValue): ValueItem {

@@ -15,7 +15,7 @@ const FIELDS_BOUNDS = fieldsBounds(exampleCase.fields)
  * Plain leaflet, no React wrapper (person decision on the dependency set):
  * one L.polygon per field, clicking a polygon selects that field in the
  * shared selection store, and the selected polygon is highlighted. The view
- * is the bounding box of the fields, derived from the data alone — no
+ * is the bounding box of the fields, derived from the data alone, no
  * hand-picked center or zoom. Polygon styles and the viewport-based
  * container follow the design handoff package of 15 Nov 2026
  * (assets/map-styles.json, SHA256 20ab2acd...0b261d5d, and the handoff

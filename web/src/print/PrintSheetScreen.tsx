@@ -421,7 +421,7 @@ export function PrintSheetView({
                   <div>
                     <dt className="text-fs-muted">{strings['print.geometry_type']}</dt>
                     <dd className="font-medium">
-                      {`${geometry.type} — ${formatString(strings['print.geometry_vertices'], {
+                      {`${geometry.type}, ${formatString(strings['print.geometry_vertices'], {
                         count: geometry.vertexCount,
                       })}`}
                     </dd>
