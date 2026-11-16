@@ -2,7 +2,7 @@
 
 What to type, in order, and what you should see: clone, install, run the tests, start the backend without Docker, send the example rotation, read the answer, build and open the interface.
 
-**Checked against commit `8ccc65e0f114fbce842cbcec405537ffc227441c` (`8ccc65e`) of `main`, on 15 November 2026.** At `8ccc65e` (synced through Wave 4 `W4-01`..`W4-13` and Frontier Rev13 `F-01`..`F-25`), `contracts/` (`1766 passed, 1 xfailed`) and `validation/test_layout.py` passed directly, and Validation Run #6 (`validation/runs/run-20261115T232512Z-8ccc65e.json`, landing in parallel PR `l0/validation-run-6`) executed the full non-`ci/` pytest suite (`9131 passed, 15 skipped, 3 xfailed` across `9149` items) plus `web/` (`npm test`: `26` test files / `450` tests passed; `npm run build`: `113` modules transformed); the interactive clone-to-browser walk and the in-process module states of steps 7 and 8 were previously run at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9`, `2e5caf99086080a36a13d5972b493708258393a9`, and `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
+**Checked against commit `ba162ec6383991443ac6ce804b9993208158bc4d` (`ba162ec`) of `main`, on 15 November 2026.** At `ba162ec` (synced through `#563`, Wave 4 `W4-01`..`W4-13`, `205` signed parameter records with `6/6` operational engines `EP1`–`EP6`, and `46/46` Frontier Rev13 implementation), `contracts/` (`1766 passed, 1 xfailed`) and Validation Run #7 (`validation/runs/run-20261116T013049Z-ba162ec.json`, `l0/validation-run-7`) verified the full non-`ci/` pytest suite (`9248 passed, 14 skipped, 3 xfailed` across `9265` collected items) plus `web/` (`npm test -- --run`: `26` test files / `450` tests passed; `npm run build`: `113` modules transformed); the interactive clone-to-browser walk and the in-process module states of steps 7 and 8 were previously run at `3ced36f1bf7a57dbef47c3a60e144c48d2e576e9`, `2e5caf99086080a36a13d5972b493708258393a9`, and `b8a3ea46db44e310bf2c8d4edcd4cf6f04242730` (15 November 2026). `main` keeps moving: on a later commit the counts and some texts will differ. A step marked **not run when this page was written** is given as the repository documents it and was not run.
 
 The commands are written for a POSIX shell (bash); the `NAME=value command` form sets a variable for one command. They come from `CLAUDE.md`, `api/README.md`, `web/README.md` and `.github/workflows/ci.yml`.
 
@@ -37,13 +37,13 @@ uv creates `.venv` from `uv.lock`, the development tools included, and lists eac
 uv run pytest
 ```
 
-At `8ccc65e`, the latest recorded full non-`ci/` run is Validation Run #6 (`validation/runs/run-20261115T232512Z-8ccc65e.json`, landing in parallel PR `l0/validation-run-6`), which took `462.61s` and reported:
+At `ba162ec`, the latest recorded full non-`ci/` run is Validation Run #7 (`validation/runs/run-20261116T013049Z-ba162ec.json`, `l0/validation-run-7`), which reported across the 6 non-`ci/` shards:
 
 ```text
-9131 passed, 15 skipped, 3 xfailed (9149 items, --ignore=ci)
+9248 passed, 14 skipped, 3 xfailed (9265 items, --ignore=ci)
 ```
 
-The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (the skipped count dropped from `16` to `15` after `#515` unskipped `test_fao56_chapter_7_worked_example`, leaving `14` non-code skips and `[H8]`, and the `xfailed` items are open tests marked expected failure). When running the full suite including `ci/`, what you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine").
+The numbers change with each unit that adds or changes tests, so on a later commit yours will differ (compared with Run #6 at `8ccc65e`, `#563`'s 205-record catalogue reduced real whole-suite skips from `15` to `14` — leaving `13` non-code skips and `[H8]` — while `L16`, `L06`, and `#563` added tests; the `xfailed` items are open tests marked expected failure). When running the full suite including `ci/`, what you should see is **no failure other than** `ci/test_planted_cases.py::test_secret_scan_passes_on_a_clean_folder`, and that one only when Docker is installed but not running: it runs the secret scanner in a Docker container, which cannot start then. On a machine without the Docker command, that case and its pair are skipped instead (the test says so: "docker is not available on this machine").
 
 The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml`):
 
@@ -51,7 +51,7 @@ The contract check that CI runs on its own (check 3 of `.github/workflows/ci.yml
 uv run pytest contracts/
 ```
 
-Observed at `8ccc65e` (grows with new contracts such as `contracts/green_cover/` in `W4-12`; what matters is no failure, and the `xfailed` item is an open contract test):
+Observed at `ba162ec` (what matters is no failure, and the `xfailed` item is an open contract test):
 
 ```text
 1766 passed, 1 xfailed
@@ -99,11 +99,11 @@ npm test
 npm run build
 ```
 
-Observed at `8ccc65e` (Validation Run #6):
+Observed at `ba162ec` (Validation Run #7):
 
 - `npm ci` ends with `found 0 vulnerabilities`;
-- `npm test`: `Test Files  26 passed (26)`, `Tests  450 passed (450)`;
-- `npm run build` (`tsc -b && vite build`) transforms `113` modules, writes `dist/`, and ends with `✓ built in` and a time.
+- `npm test` (`vitest v5.1.0`): `Test Files  26 passed (26)`, `Tests  450 passed (450)`;
+- `npm run build` (`tsc -b && vite build`, `vite v8.3.8`) transforms `113` modules, writes `dist/`, and ends with `✓ built in` and a time.
 
 ## 6. Open the interface and send the example rotation
 
@@ -131,7 +131,7 @@ no_result
 Illustrative rotation: missing input: input not available: climate (site data: climate); soil_slope (site data: soil and slope)
 ```
 
-Everything else on the Fields screen (Site data, Rotation timeline, Two clocks, Results) is **example data written by hand**, labelled "Example data — synthetic, not a real field" on screen. On `North field` (`example-field-1`), **Decision** (`web/src/decision/DecisionSection.tsx`) automatically posts `web/src/data/demo_rotations_d128.json` to `POST /api/decisions/run`: in Configurations A and B (no climate source), the backend answers without a decision, so Decision shows the backend's missing-input reason above the example banner and renders the hand-written example beneath `"Example data — synthetic, not a real field"`, including `measure_first` with `field_id` and the `named_years` selector (`W4-10`, `#557`). Additional `PROPOSED` hash routes are available in `web/src/App.tsx`: `#/saved` (offline `SavedCase` viewer reading `web/src/data/saved_case.json` or a local file, `W4-08`, `#527`), `#/print` (printable field sheet linked from `#/fields`, `#520`), and `#/plant` ("What should I plant?"). Standalone Frontier Rev13 modules (`F-01`..`F-25`, [FRONTIER_VISION_REV13.md](FRONTIER_VISION_REV13.md)) are `PROPOSED` and do not alter the `P0` runtime paths above.
+Everything else on the Fields screen (Site data, Rotation timeline, Two clocks, Results) is **example data written by hand**, labelled "Example data — synthetic, not a real field" on screen. On `North field` (`example-field-1`), **Decision** (`web/src/decision/DecisionSection.tsx`) automatically posts `web/src/data/demo_rotations_d128.json` to `POST /api/decisions/run`: in Configurations A and B (no climate source), the backend answers without a decision, so Decision shows the backend's missing-input reason above the example banner and renders the hand-written example beneath `"Example data — synthetic, not a real field"`, including `measure_first` with `field_id` and the `named_years` selector (`W4-10`, `#557`). Additional `PROPOSED` hash routes are available in `web/src/App.tsx`: `#/saved` (offline `SavedCase` viewer reading `web/src/data/saved_case.json` or a local file, `W4-08`, `#527`), `#/print` (printable field sheet linked from `#/fields`, `#520`), and `#/plant` ("What should I plant?"). Standalone Frontier Rev13 modules (`F-01`..`F-25` plus `L06` and `L16` completing `46/46` §14 inventory lines, [FRONTIER_VISION_REV13.md](FRONTIER_VISION_REV13.md)) are `PROPOSED` and do not alter the `P0` runtime paths above.
 
 ## 7. Read the answer
 

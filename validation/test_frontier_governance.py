@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,25 @@ def test_frontier_inventory_covers_all_units_f01_through_f25() -> None:
         unit_id = f"F-{index:02d}"
         entries = get_inventory_by_unit(unit_id)
         assert entries, f"{unit_id} must be mapped in FRONTIER_INVENTORY"
+
+
+def test_all_46_inventory_lines_are_implemented_without_auto_validation() -> None:
+    impl_counts = Counter(entry.implementation_status for entry in FRONTIER_INVENTORY)
+    assert impl_counts == {
+        "FRONTIER_IMPLEMENTED": 40,
+        "CORE_IMPLEMENTED": 6,
+    }
+    assert impl_counts.get("NOT_IMPLEMENTED", 0) == 0
+
+    by_id = {entry.line_id: entry for entry in FRONTIER_INVENTORY}
+    for line_id in ("L06", "L16"):
+        assert by_id[line_id].implementation_status == "FRONTIER_IMPLEMENTED"
+        assert by_id[line_id].data_availability == "LOCAL_MEASUREMENT_REQUIRED"
+        assert by_id[line_id].local_validation_status == "UNVALIDATED"
+
+    assert all(
+        entry.local_validation_status != "VALIDATED" for entry in FRONTIER_INVENTORY
+    )
 
 
 def test_established_maturity_never_auto_grants_local_validation() -> None:
@@ -442,6 +462,8 @@ def test_frontier_vision_doc_matches_inventory_and_has_no_broken_links() -> None
     # Verify every relative markdown link points to an existing file in the repo.
     links = re.findall(r"\[[^\]]+\]\(([^)]+)\)", text)
     assert links
+    assert "../engine/erosion/dynamic_surface_routing.py" in links
+    assert "../engine/water/soil_structure_feedback.py" in links
     for target in links:
         assert not target.startswith(("http://", "https://"))
         resolved = (doc_path.parent / target).resolve()
