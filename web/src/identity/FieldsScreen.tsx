@@ -12,29 +12,15 @@ import RotationRun from '../seam/RotationRun'
 import { strings } from '../strings'
 
 /**
- * Multi-field identity screen on example data: the example-data banner on
- * every render, the map of the fields and the field list below it, the
- * site sheet of the selected field after the list, and the rotation of the
- * selected field as the display-only rotation ribbon when the example
- * rotation belongs to that field. The list, the map and the sheet share the
- * selected-field state through the selection module.
- * every render, the map of the fields and the field list below it, and the
- * site sheet of the selected field after the list. The list, the map and the
- * sheet share the selected-field state through the selection module, so a
- * click on either selects the field on all three.
- * two clocks of the results example after the list, under their own example
- * banner. The list and the map share the selected-field state through the
- * selection module, so a click on either selects the field on both.
- * every render, the map of the fields and the field list below it, and the
- * result cards of the results example after the list. The list and the map
- * share the selected-field state through the selection module, so a click on
- * either selects the field on both.
- * click on either selects the field on all three. After the list hangs the
- * CP1 seam: for the selected field that matches the example rotation's
- * field, the action that runs that rotation through the platform route
- * (issue #119); it decides itself whether it shows, and renders nothing for
- * every other field. The decision section follows the result cards for a
- * selected field (issues #241, #354): the document the decision route
+ * Multi-field identity screen on example data. In order: the stage rail; the
+ * example-data banner; the map of the fields and the field list below it,
+ * which share the selected-field state through the selection module, so a
+ * click on either selects the field on both. For a selected field, after the
+ * list: the CP1 seam that runs the example rotation through the platform
+ * route (issue #119; it renders nothing for any other field), the site sheet,
+ * the example rotation as the display-only ribbon when it belongs to that
+ * field, the two clocks and the result cards of the results example, and the
+ * decision section (issues #241, #354): the document the decision route
  * returns for the two rotations the interface holds for that field, or the
  * bundled decision output example under its banner, after the reason it is
  * shown.
