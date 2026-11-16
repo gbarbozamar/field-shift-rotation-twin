@@ -1,6 +1,6 @@
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { unitText } from './boardModel'
+import { cropName, unitText } from './boardModel'
 import { FACT_KINDS, changedFacts, factsProblems } from './factsDraft'
 import type { FactKey, FactKind, FactProblem, FactUnits, FactsDraft } from './factsDraft'
 
@@ -19,6 +19,14 @@ function labelOf(key: FactKey): string {
   if (key === 'cost') return `${strings['board.facts.soybean']}: ${strings['board.facts.cost']}`
   if (key === 'coverCost') return `${strings['board.facts.cover']}: ${strings['board.facts.cost']}`
   if (key === 'limit') return strings['board.facts.limit']
+  if (key.startsWith('extra.')) {
+    const [, id, field, kind] = key.split('.')
+    const what =
+      field === 'yields'
+        ? formatString(strings['board.facts.yield'], { kind: kindName(kind as FactKind) })
+        : strings[field === 'price' ? 'board.facts.price' : 'board.facts.cost']
+    return `${cropName(id)}: ${what}`
+  }
   const [group, kind] = key.split('.') as ['yields' | 'pasture', FactKind]
   return group === 'yields'
     ? `${strings['board.facts.soybean']}: ${formatString(strings['board.facts.yield'], { kind: kindName(kind) })}`
@@ -71,7 +79,10 @@ export function FactsEditor({
   onChange,
   onCompare,
   onReset,
+  blocked = false,
 }: {
+  /** True when the rotations being edited keep the comparison from being sent. */
+  blocked?: boolean
   draft: FactsDraft
   /** The units the request declares, shown beside each field. */
   units: FactUnits
@@ -115,6 +126,26 @@ export function FactsEditor({
             })),
           )}
         </fieldset>
+        {Object.entries(draft.extra).map(([id, crop]) => (
+          <fieldset key={id} data-testid="board-facts-extra" className="space-y-2 rounded-xl border-2 border-fs-warning bg-fs-surface p-3">
+            <legend className="px-1 font-bold">{cropName(id)}</legend>
+            <p className="text-xs text-fs-warning">{strings['board.facts.extra_note']}</p>
+            {field(`extra.${id}.price`, strings['board.facts.price'], units.price, crop.price, (t) => ({
+              ...draft,
+              extra: { ...draft.extra, [id]: { ...crop, price: t } },
+            }))}
+            {field(`extra.${id}.cost`, strings['board.facts.cost'], units.cost, crop.cost, (t) => ({
+              ...draft,
+              extra: { ...draft.extra, [id]: { ...crop, cost: t } },
+            }))}
+            {FACT_KINDS.map((k) =>
+              field(`extra.${id}.yields.${k}`, formatString(strings['board.facts.yield'], { kind: kindName(k) }), units.yield, crop.yields[k], (t) => ({
+                ...draft,
+                extra: { ...draft.extra, [id]: { ...crop, yields: { ...crop.yields, [k]: t } } },
+              })),
+            )}
+          </fieldset>
+        ))}
         <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
           <legend className="px-1 font-bold">{strings['board.facts.limit']}</legend>
           {field('limit', strings['board.facts.limit'], units.limit, draft.limit, (t) => ({ ...draft, limit: t }))}
@@ -131,7 +162,7 @@ export function FactsEditor({
         <button
           type="button"
           data-testid="board-facts-compare"
-          disabled={problems.length !== 0 || changed === 0}
+          disabled={problems.length !== 0 || changed === 0 || blocked}
           className="min-h-11 cursor-pointer rounded-lg bg-fs-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           onClick={onCompare}
         >

@@ -1,20 +1,26 @@
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import { cropName } from './boardModel'
+import { useState } from 'react'
 import {
+  BASE_YEAR,
+  asUserRotation,
   MAX_ROTATIONS,
   MIN_ROTATIONS,
-  cropLibrary,
+  SEASONS,
+  cropCatalogue,
   draftProblems,
+  dropLastRow,
   duplicateRotation,
+  gridOf,
   isUserRotation,
   removeRotation,
   renameRotation,
   sameDraft,
   setComponentDate,
-  toggleCrop,
+  setSlot,
 } from './rotationDraft'
-import type { DraftProblem, DraftRotation } from './rotationDraft'
+import type { DraftProblem, DraftRotation, Season, SlotContent } from './rotationDraft'
 
 /**
  * The candidates of the plan (PROPOSED, l3/board): the rotations that will be
@@ -42,12 +48,24 @@ function problemText(problem: DraftProblem): string {
       return formatString(strings['board.builder.problem.no_name'], {
         letter: String.fromCharCode(FIRST_LETTER + problem.index),
       })
+    case 'overlap':
+      return formatString(strings['board.builder.problem.overlap'], {
+        letter: String.fromCharCode(FIRST_LETTER + problem.index),
+        crop: cropName(problem.crop_id),
+        after: cropName(problem.after),
+      })
     case 'harvest_before_sowing':
       return formatString(strings['board.builder.problem.harvest_before_sowing'], {
         letter: String.fromCharCode(FIRST_LETTER + problem.index),
         crop: cropName(problem.crop_id),
       })
   }
+}
+
+/** A rotation named after its crops, in sowing order, each once. */
+function cropsName(rotation: DraftRotation): string {
+  const crops = [...new Set(rotation.components.map((component) => cropName(component.crop_id)))]
+  return crops.join(strings['board.crops_join'])
 }
 
 /** What a copy is named after: the name the user gave, or the crops of a rotation of the example. */
@@ -57,6 +75,114 @@ export function copyName(rotation: DraftRotation): string {
   }
   const crops = [...new Set(rotation.components.map((component) => cropName(component.crop_id)))]
   return crops.join(strings['board.crops_join'])
+}
+
+const EMPTY = ''
+
+function slotValue(content: SlotContent): string {
+  return content.kind === 'sown' ? content.crop_id : EMPTY
+}
+
+function slotLabel(content: SlotContent): string {
+  return content.kind === 'continues'
+    ? formatString(strings['board.builder.slot.continues'], { crop: cropName(content.crop_id) })
+    : strings['board.builder.slot.empty']
+}
+
+/**
+ * The rotation as a grid: one row per year, a winter and a summer slot in
+ * each, every slot a choice among the crops of the catalogue sown in that
+ * season. A crop with no harvest (a cover crop, a pasture) shows as
+ * continuing in the slots it still stands in.
+ */
+function SeasonGrid({
+  rotation,
+  index,
+  rotations,
+  onChange,
+}: {
+  rotation: DraftRotation
+  index: number
+  rotations: DraftRotation[]
+  onChange: (rotations: DraftRotation[]) => void
+}) {
+  // Rows the user added stay until removed, even before a crop is put in them.
+  const [rowsWanted, setRowsWanted] = useState(1)
+  const grid = gridOf(rotation, rowsWanted)
+  const catalogue = cropCatalogue()
+  const letter = String.fromCharCode(FIRST_LETTER + index)
+  return (
+    <div data-testid="board-season-grid" className="mt-3">
+      <div className="grid grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)] gap-1.5 text-sm">
+        <span />
+        {SEASONS.map((season) => (
+          <span key={season} className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">
+            {strings[`board.builder.season.${season}`]}
+          </span>
+        ))}
+        {grid.map((row, r) => (
+          <div key={r} className="contents">
+            <span className="self-center text-xs font-semibold text-fs-muted">
+              {formatString(strings['board.builder.year'], { n: r + 1, year: BASE_YEAR + r })}
+            </span>
+            {SEASONS.map((season: Season, s) => {
+              const content = row[s]
+              return (
+                <select
+                  key={season}
+                  data-testid="board-slot"
+                  data-content={content.kind}
+                  aria-label={formatString(strings['board.builder.slot_label'], {
+                    letter,
+                    n: r + 1,
+                    season: strings[`board.builder.season.${season}`],
+                  })}
+                  value={slotValue(content)}
+                  onChange={(event) => {
+                    const next = setSlot(rotations, index, r, season, event.target.value === EMPTY ? null : event.target.value)
+                    // An example rotation the user changes becomes theirs, named after its crops.
+                    onChange(asUserRotation(next, index, cropsName(next[index])))
+                  }}
+                  className="min-h-10 w-full min-w-0 rounded-lg border border-fs-border bg-fs-bg px-2 data-[content=continues]:italic data-[content=sown]:border-fs-primary data-[content=sown]:bg-fs-selection data-[content=sown]:font-semibold"
+                >
+                  <option value={EMPTY}>{slotLabel(content)}</option>
+                  {catalogue
+                    .filter((crop) => crop.season === season)
+                    .map((crop) => (
+                      <option key={crop.crop_id} value={crop.crop_id}>
+                        {cropName(crop.crop_id)}
+                      </option>
+                    ))}
+                </select>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-testid="board-add-year"
+          className="min-h-9 cursor-pointer rounded-lg border border-fs-border px-3 text-sm font-semibold"
+          onClick={() => setRowsWanted(grid.length + 1)}
+        >
+          {strings['board.builder.add_year']}
+        </button>
+        <button
+          type="button"
+          data-testid="board-remove-year"
+          disabled={grid.length <= 1}
+          className="min-h-9 cursor-pointer rounded-lg border border-fs-border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={() => {
+            onChange(dropLastRow(rotations, index, grid.length))
+            setRowsWanted(grid.length - 1)
+          }}
+        >
+          {strings['board.builder.remove_year']}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function RotationEditor({
@@ -70,7 +196,6 @@ function RotationEditor({
   rotations: DraftRotation[]
   onChange: (rotations: DraftRotation[]) => void
 }) {
-  const library = cropLibrary()
   const letter = String.fromCharCode(FIRST_LETTER + index)
   return (
     <li data-testid="board-candidate" className="min-w-0 rounded-2xl border border-fs-border bg-fs-surface p-4">
@@ -115,28 +240,12 @@ function RotationEditor({
           onChange={(event) => onChange(renameRotation(rotations, index, event.target.value))}
         />
       </label>
-      <fieldset className="mt-3">
-        <legend className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.builder.crops']}</legend>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {library.map((crop) => (
-            <label
-              key={crop.crop_id}
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-fs-border bg-fs-bg px-3 text-sm has-[:checked]:border-fs-primary has-[:checked]:bg-fs-selection has-[:checked]:font-semibold"
-            >
-              <input
-                type="checkbox"
-                className="accent-fs-primary"
-                checked={rotation.components.some((component) => component.crop_id === crop.crop_id)}
-                onChange={() => onChange(toggleCrop(rotations, index, crop.crop_id))}
-              />
-              {cropName(crop.crop_id)}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <SeasonGrid rotation={rotation} index={index} rotations={rotations} onChange={onChange} />
+      <details className="mt-3">
+        <summary className="cursor-pointer text-sm font-semibold text-fs-muted">{strings['board.builder.dates']}</summary>
       <ul className="mt-3 space-y-2">
         {rotation.components.map((component) => (
-          <li key={component.crop_id} data-testid="board-candidate-crop" className="grid grid-cols-2 items-end gap-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <li key={component.component_id} data-testid="board-candidate-crop" className="grid grid-cols-2 items-end gap-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto]">
             <span className="col-span-2 font-semibold sm:col-span-1">
               {cropName(component.crop_id)}
             </span>
@@ -162,6 +271,7 @@ function RotationEditor({
           </li>
         ))}
       </ul>
+      </details>
     </li>
   )
 }
@@ -177,7 +287,13 @@ export function RotationBuilder({
   onChange,
   onCompare,
   onReset,
+  factsBlocked = false,
+  factsChanged = false,
 }: {
+  /** True when a number the comparison needs (below) is missing or wrong: nothing can be sent. */
+  factsBlocked?: boolean
+  /** True when the numbers below changed: comparing sends them with the rotations. */
+  factsChanged?: boolean
   /** The rotations as the user is editing them. */
   draft: DraftRotation[]
   /** The rotations of the comparison shown. */
@@ -187,7 +303,7 @@ export function RotationBuilder({
   onReset: () => void
 }) {
   const problems = draftProblems(draft)
-  const changed = !sameDraft(draft, sent)
+  const changed = !sameDraft(draft, sent) || factsChanged
   return (
     <div data-testid="board-builder">
       <p className="mb-2 text-sm text-fs-muted">
@@ -212,11 +328,16 @@ export function RotationBuilder({
           ))}
         </ul>
       ) : null}
+      {factsBlocked && (
+        <p data-testid="board-builder-facts-blocked" role="alert" className="mt-3 rounded-xl border border-fs-warning bg-fs-warning-bg px-4 py-2 text-sm text-fs-warning">
+          {strings['board.builder.facts_blocked']}
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
           data-testid="board-builder-compare"
-          disabled={problems.length !== 0 || !changed}
+          disabled={problems.length !== 0 || !changed || factsBlocked}
           className="min-h-11 cursor-pointer rounded-lg bg-fs-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           onClick={onCompare}
         >

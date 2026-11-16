@@ -8,7 +8,7 @@ import { RotationBuilder, copyName } from './RotationBuilder'
 import {
   MAX_ROTATIONS,
   MIN_ROTATIONS,
-  cropLibrary,
+  cropCatalogue,
   draftProblems,
   duplicateRotation,
   exampleRotations,
@@ -18,8 +18,9 @@ import {
   renameRotation,
   sameDraft,
   setComponentDate,
+  gridOf,
+  setSlot,
   soybeanCropIds,
-  toggleCrop,
 } from './rotationDraft'
 import type { DraftRotation } from './rotationDraft'
 
@@ -50,9 +51,19 @@ describe('the start of a draft (1)', () => {
     expect(exampleRotations()[0].label).toBe(rawRequest.rotations[0].label)
   })
 
-  it('the crops to build from are the crops the request declares economic facts for, each once', () => {
-    const declared = rawRequest.economic_facts.crops.map((crop) => crop.crop_id).sort()
-    expect(cropLibrary().map((component) => component.crop_id).sort()).toEqual(declared)
+  it('the crops to build from are those the request declares facts for, plus wheat and maize of D128, each once', () => {
+    const ids = cropCatalogue().map((crop) => crop.crop_id)
+    for (const crop of rawRequest.economic_facts.crops) expect(ids).toContain(crop.crop_id)
+    expect(ids).toContain('wheat')
+    expect(ids).toContain('maize')
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('each crop sits in the sowing window of its dates', () => {
+    const season = Object.fromEntries(cropCatalogue().map((crop) => [crop.crop_id, crop.season]))
+    expect(season.wheat).toBe('winter')
+    expect(season.maize).toBe('summer')
+    expect(season[soybeanCropIds()[0]]).toBe('summer')
   })
 })
 
@@ -81,19 +92,40 @@ describe('editing (2)', () => {
     expect(removed.map((r) => r.rotation_id)).toEqual(rawRequest.rotations.slice(1).map((r) => r.rotation_id))
   })
 
-  it('takes a crop out, and brings it back as the request declares it, in sowing order and renumbered', () => {
-    const full = rawRequest.rotations[2]
-    const crop = full.components[1].crop_id
-    const without = toggleCrop(exampleRotations(), 2, crop)[2]
-    expect(without.components.map((c) => c.crop_id)).toEqual(
-      full.components.filter((c) => c.crop_id !== crop).map((c) => c.crop_id),
-    )
-    expect(without.components.map((c) => c.position)).toEqual(without.components.map((_, i) => i + 1))
-    const back = toggleCrop([without, without, without], 0, crop)[0]
-    expect(back.components.map((c) => c.crop_id)).toEqual(full.components.map((c) => c.crop_id))
-    expect(back.components.find((c) => c.crop_id === crop)!.sowing).toEqual(
-      cropLibrary().find((c) => c.crop_id === crop)!.sowing,
-    )
+  it('reads an example rotation as a grid of years and sowing windows', () => {
+    const grid = gridOf(exampleRotations()[2])
+    const ids = rawRequest.rotations[2].components.map((c) => c.crop_id)
+    expect(grid[0][1]).toMatchObject({ kind: 'sown', crop_id: ids[0] })
+    expect(grid[1][0]).toMatchObject({ kind: 'sown', crop_id: ids[1] })
+    expect(grid[1][1]).toMatchObject({ kind: 'sown', crop_id: ids[2] })
+  })
+
+  it('builds a several-year succession: wheat then second-crop soybean, then maize, and repeats the soybean', () => {
+    const soy = soybeanCropIds()[0]
+    let draft = exampleRotations()
+    draft = setSlot(draft, 0, 0, 'winter', 'wheat')
+    draft = setSlot(draft, 0, 1, 'summer', 'maize')
+    draft = setSlot(draft, 0, 2, 'summer', soy)
+    const rotation = draft[0]
+    expect(rotation.components.map((c) => c.crop_id)).toEqual(['wheat', soy, 'maize', soy])
+    expect(rotation.components.map((c) => c.position)).toEqual([1, 2, 3, 4])
+    // The soybean after the wheat of its year takes the second-crop dates: sown after the wheat harvest.
+    expect(rotation.components[1].sowing.date! >= rotation.components[0].harvest.date!).toBe(true)
+    expect(draftProblems(draft).some((p) => p.kind === 'overlap')).toBe(false)
+    expect(() => parsed(draft)).not.toThrow()
+  })
+
+  it('a crop with no harvest continues until the next sowing; clearing a slot takes its crop out', () => {
+    const grid = gridOf(exampleRotations()[2], 3)
+    expect(grid[2][0].kind).toBe('continues')
+    const cleared = setSlot(exampleRotations(), 2, 1, 'summer', null)[2]
+    expect(cleared.components.map((c) => c.crop_id)).not.toContain(rawRequest.rotations[2].components[2].crop_id)
+  })
+
+  it('a crop sown before the one before it is harvested is a problem', () => {
+    let draft = setSlot(exampleRotations(), 0, 0, 'winter', 'wheat')
+    draft = setSlot(draft, 0, 0, 'summer', 'maize')
+    expect(draftProblems(draft)).toContainEqual({ kind: 'overlap', index: 0, crop_id: 'maize', after: 'wheat' })
   })
 
   it('sets a date the user declares, and leaves a part that is missing with its reason as it is', () => {
@@ -118,8 +150,8 @@ describe('a draft stays a rotation the screen can read (3)', () => {
     let draft = duplicateRotation(exampleRotations(), 2, 'Mine')
     const index = draft.length - 1
     draft = renameRotation(draft, index, 'Soybean then pasture')
-    draft = toggleCrop(draft, index, draft[index].components[1].crop_id)
-    draft = toggleCrop(duplicateRotation(draft, 0, 'With pasture'), draft.length, cropLibrary()[2].crop_id)
+    draft = setSlot(draft, index, 1, 'winter', null)
+    draft = setSlot(duplicateRotation(draft, 0, 'With wheat'), draft.length, 0, 'winter', 'wheat')
     draft = setComponentDate(draft, index, draft[index].components[0].component_id, 'sowing', '2027-11-01')
     expect(() => parsed(draft)).not.toThrow()
     expect(parsed(draft).map((r) => r.label)).toContain('Soybean then pasture')
@@ -139,17 +171,16 @@ describe('what keeps a draft from being compared (4)', () => {
 
   it('no rotation sows the soybean crop of the tipping price', () => {
     let draft = exampleRotations()
-    for (const cropId of soybeanCropIds()) {
-      draft.forEach((rotation, index) => {
-        if (rotation.components.some((c) => c.crop_id === cropId)) draft = toggleCrop(draft, index, cropId)
-      })
-    }
+    draft = draft.map((rotation) => ({
+      ...rotation,
+      components: rotation.components.filter((c) => !soybeanCropIds().includes(c.crop_id)),
+    }))
     expect(draftProblems(draft)).toContainEqual({ kind: 'no_soybean' })
   })
 
   it('a rotation with no crop, and a rotation with no name', () => {
     let draft = exampleRotations()
-    for (const component of rawRequest.rotations[0].components) draft = toggleCrop(draft, 0, component.crop_id)
+    draft = setSlot(draft, 0, 0, 'summer', null)
     expect(draftProblems(draft)).toContainEqual({ kind: 'no_crop', index: 0 })
     expect(draftProblems(renameRotation(exampleRotations(), 1, '  '))).toContainEqual({ kind: 'no_name', index: 1 })
   })
@@ -227,5 +258,15 @@ describe('the builder (5)', () => {
     const buttons = render(draft).split('data-testid="board-candidate-duplicate"').slice(1)
     expect(buttons.length).toBe(MAX_ROTATIONS)
     expect(buttons.every((button) => button.split('>')[0].includes('disabled=""'))).toBe(true)
+  })
+})
+
+describe('an example rotation the user changes becomes theirs', async () => {
+  const { asUserRotation } = await import('./rotationDraft')
+  it('gets a user identifier and the name given; a user rotation is left as it is', () => {
+    const changed = asUserRotation(exampleRotations(), 0, 'wheat, soybean')
+    expect(isUserRotation(changed[0].rotation_id)).toBe(true)
+    expect(changed[0].label).toBe('wheat, soybean')
+    expect(asUserRotation(changed, 0, 'other')).toBe(changed)
   })
 })

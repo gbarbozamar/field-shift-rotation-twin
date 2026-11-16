@@ -46,9 +46,9 @@ import { CompareTable, MARGIN_MARK, SOIL_MARK, SortPicker, TableNotes, optionTit
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
 import { FactsEditor } from './FactsEditor'
-import { applyFacts, readFactUnits, readFacts } from './factsDraft'
+import { applyFacts, changedFacts, declaredCropIds, factsProblems, readFactUnits, readFacts, withExtraCrops } from './factsDraft'
 import type { FactsDraft } from './factsDraft'
-import { exampleRotations, normalizeDraft } from './rotationDraft'
+import { cropsUsed, draftProblems, exampleRotations, normalizeDraft } from './rotationDraft'
 import type { DraftRotation } from './rotationDraft'
 
 /**
@@ -88,6 +88,12 @@ const REQUEST_LIMIT: { value: number; unit: string } | null =
 /** The numbers the example request declares: where the user's own numbers start. */
 const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
 const FACT_UNITS = readFactUnits(rawPlantRequest)
+const DECLARED_CROPS = declaredCropIds(rawPlantRequest)
+
+/** The crops these rotations sow that the request declares no economic facts for. */
+function extraCropIds(rotations: DraftRotation[]): string[] {
+  return cropsUsed(rotations).filter((id) => !DECLARED_CROPS.includes(id))
+}
 
 /** The rain factor the example request declares; null when it declares none to send. */
 const REQUEST_RAIN_VALUE: number | null = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor.value : null
@@ -542,6 +548,17 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
     [sent, factsSent, rainValue],
   )
   const baseRead = useMemo(() => readBaseRequest(baseRequest), [baseRequest])
+  // The grain crops of the rotations being edited that the request declares no facts for ask for the user's numbers.
+  const factsForDraft = withExtraCrops(factsDraft, extraCropIds(draft))
+  const factsBlocked = factsProblems(factsForDraft).length !== 0
+  // One comparison sends the rotations and the numbers together, so a new crop never goes without its numbers.
+  const compareAll = () => {
+    const ordered = normalizeDraft(draft)
+    setDraft(ordered)
+    setSent(ordered)
+    setFactsDraft(factsForDraft)
+    setFactsSent(factsForDraft)
+  }
   const rotations = useMemo(() => readPlantRotations(baseRequest), [baseRequest])
   const asks = apiBase !== null && selectedFieldId === REQUEST_FIELD_ID
   const request = useMemo(
@@ -597,23 +614,23 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
           draft={draft}
           sent={sent}
           onChange={setDraft}
-          onCompare={() => {
-            const ordered = normalizeDraft(draft)
-            setDraft(ordered)
-            setSent(ordered)
-          }}
+          factsBlocked={factsBlocked}
+          factsChanged={changedFacts(factsForDraft, factsSent) !== 0}
+          onCompare={compareAll}
           onReset={() => {
             const example = exampleRotations()
             setDraft(example)
             setSent(example)
+            setFactsSent(withExtraCrops(factsSent, []))
           }}
         />
         <FactsEditor
-          draft={factsDraft}
+          draft={factsForDraft}
           sent={factsSent}
           units={FACT_UNITS}
+          blocked={draftProblems(draft).length !== 0}
           onChange={setFactsDraft}
-          onCompare={() => setFactsSent(factsDraft)}
+          onCompare={compareAll}
           onReset={() => {
             setFactsDraft(EXAMPLE_FACTS)
             setFactsSent(EXAMPLE_FACTS)

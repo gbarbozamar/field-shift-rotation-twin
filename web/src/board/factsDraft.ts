@@ -12,6 +12,13 @@
 export const FACT_KINDS = ['el_nino', 'neutral', 'la_nina'] as const
 export type FactKind = (typeof FACT_KINDS)[number]
 
+/** The numbers of a grain crop the request declares no facts for (wheat, maize): all the user's. */
+export interface ExtraCrop {
+  price: string
+  cost: string
+  yields: Record<FactKind, string>
+}
+
 export interface FactsDraft {
   price: string
   cost: string
@@ -19,6 +26,8 @@ export interface FactsDraft {
   coverCost: string
   pasture: Record<FactKind, string>
   limit: string
+  /** Grain crops the rotations sow that the request declares no facts for, by crop id. */
+  extra: Record<string, ExtraCrop>
 }
 
 export type FactKey =
@@ -28,6 +37,9 @@ export type FactKey =
   | 'limit'
   | `yields.${FactKind}`
   | `pasture.${FactKind}`
+  | `extra.${string}.price`
+  | `extra.${string}.cost`
+  | `extra.${string}.yields.${FactKind}`
 
 export interface FactProblem {
   key: FactKey
@@ -63,7 +75,27 @@ export function readFacts(request: unknown): FactsDraft {
     coverCost: valueText(cover.cost),
     pasture: { el_nino: valueText(margins.el_nino), neutral: valueText(margins.neutral), la_nina: valueText(margins.la_nina) },
     limit: valueText(req.soil_loss_limit),
+    extra: {},
   }
+}
+
+/** The crop ids a request declares economic facts for. */
+export function declaredCropIds(request: unknown): string[] {
+  const facts = (request as Json).economic_facts as Json
+  return (facts.crops as Json[]).map((crop) => crop.crop_id as string)
+}
+
+const EMPTY_EXTRA: ExtraCrop = { price: '', cost: '', yields: { el_nino: '', neutral: '', la_nina: '' } }
+
+/**
+ * The draft with an entry for each of these crops (empty fields for a crop new
+ * to it, the user's numbers kept for one already there), and no entry for any
+ * other crop. Nothing is filled in: an empty field is a problem until typed.
+ */
+export function withExtraCrops(draft: FactsDraft, cropIds: readonly string[]): FactsDraft {
+  const extra: Record<string, ExtraCrop> = {}
+  for (const id of cropIds) extra[id] = draft.extra[id] ?? structuredClone(EMPTY_EXTRA)
+  return { ...draft, extra }
 }
 
 function entries(draft: FactsDraft): [FactKey, string][] {
@@ -74,6 +106,11 @@ function entries(draft: FactsDraft): [FactKey, string][] {
     ['coverCost', draft.coverCost],
     ...FACT_KINDS.map((k): [FactKey, string] => [`pasture.${k}`, draft.pasture[k]]),
     ['limit', draft.limit],
+    ...Object.entries(draft.extra).flatMap(([id, crop]): [FactKey, string][] => [
+      [`extra.${id}.price`, crop.price],
+      [`extra.${id}.cost`, crop.cost],
+      ...FACT_KINDS.map((k): [FactKey, string] => [`extra.${id}.yields.${k}`, crop.yields[k]]),
+    ]),
   ]
 }
 
@@ -98,13 +135,16 @@ export function factsProblems(draft: FactsDraft): FactProblem[] {
 }
 
 export function sameFacts(a: FactsDraft, b: FactsDraft): boolean {
-  return entries(a).every(([key, text], i) => key === entries(b)[i][0] && Number(text) === Number(entries(b)[i][1]))
+  return changedFacts(a, b) === 0
 }
 
-/** The number of fields whose value differs between two drafts. */
+/** The number of fields whose value differs between two drafts (a field only one of them has counts). */
 export function changedFacts(a: FactsDraft, b: FactsDraft): number {
-  const other = entries(b)
-  return entries(a).filter(([, text], i) => Number(text) !== Number(other[i][1])).length
+  const other = new Map(entries(b))
+  const mine = entries(a)
+  const differing = mine.filter(([key, text]) => !other.has(key) || Number(text) !== Number(other.get(key))).length
+  const missing = [...other.keys()].filter((key) => !mine.some(([k]) => k === key)).length
+  return differing + missing
 }
 
 /** The units the request declares for each number, shown beside its field. */
@@ -158,5 +198,15 @@ export function applyFacts(request: unknown, draft: FactsDraft): Json {
   }
   setValue(cover.cost, draft.coverCost)
   setValue(copy.soil_loss_limit, draft.limit)
+  // Each extra grain crop is written as the soybean's entry is shaped (units, provenance), with the user's numbers.
+  const crops = (copy.economic_facts as Json).crops as Json[]
+  for (const [id, extra] of Object.entries(draft.extra)) {
+    const entry = structuredClone(grain)
+    entry.crop_id = id
+    setValue(entry.price, extra.price)
+    setValue(entry.cost, extra.cost)
+    for (const k of FACT_KINDS) setValue((entry.yield as Json)[k], extra.yields[k])
+    crops.push(entry)
+  }
   return copy
 }
