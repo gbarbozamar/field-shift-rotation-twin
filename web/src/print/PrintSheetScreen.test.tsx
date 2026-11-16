@@ -94,12 +94,12 @@ describe('PrintSheetScreen', () => {
     const html = renderToString(<PrintSheetScreen />)
     const text = visibleText(html)
 
-    // Geometry summary for North field: 5 vertices, center -33.0130, -57.0065
+    // Geometry summary for Field 1: 26 vertices, center -34.3481, -57.6927
     expect(html).toContain(strings['print.geometry_section'])
     expect(text).toContain('Polygon')
-    expect(text).toContain(formatString(strings['print.geometry_vertices'], { count: 5 }))
-    expect(text).toContain('-33.0130, -57.0065')
-    expect(text).toContain('-33.0160, -57.0100 – -33.0100, -57.0030')
+    expect(text).toContain(formatString(strings['print.geometry_vertices'], { count: 26 }))
+    expect(text).toContain('-34.3481, -57.6927')
+    expect(text).toContain('-34.3639, -57.7039 – -34.3322, -57.6815')
 
     // Site notes: scope note when site data field_id differs from selected field_id
     expect(text).toContain(

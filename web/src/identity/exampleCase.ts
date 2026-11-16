@@ -5,7 +5,7 @@ export interface PolygonGeometry {
   coordinates: number[][][]
 }
 
-/** A field of the example case (illustrative placeholder, no real field). */
+/** A field of the example case (example data; outlines supplied by the interface owner). */
 export interface ExampleField {
   field_id: string
   name: string
