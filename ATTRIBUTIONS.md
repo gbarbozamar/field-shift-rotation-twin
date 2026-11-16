@@ -14,6 +14,12 @@ Add a row **when the item is first used**, not at the end.
 | Mapa de Reconocimiento de Suelos del Uruguay 1:1,000,000 (ArcGIS layer `SUELOS/SulosMillon`), queried 2026-11-15 | Ministerio de Ganadería, Agricultura y Pesca (MGAP), Dirección General de Recursos Naturales (DGRN) | OPEN: exact REST endpoint URL of the DGRN ArcGIS server is not recorded in the repository | OPEN: DGRN/MGAP portal terms and licence are not recorded in the repository | Point-in-polygon lookup cited in the note of all four `params/records/water/curve_number.*.json` files (D207) to place INIA La Estanzuela in soil unit Ecilda Paullier – Las Brujas (used with Durán 1997 to select Hydrologic Soil Group C). Not NASA data | 2026-11-15 |
 | Rural cadastral parcels of the area of INIA La Estanzuela (four parcel outlines, KMZ exported by the interface owner), read 2026-11-16 | Dirección Nacional de Catastro (Uruguay), as shown by the padron viewer of ingar.com.uy (rural padron 2781, Colonia, the link the interface owner gave) | https://ingar.com.uy/padrones#p=colonia/rural/2781 | OPEN: the terms of use of the ingar.com.uy viewer are not recorded; the national rural parcel dataset of the Dirección Nacional de Catastro is published as open data under the Licencia de Datos Abiertos de Uruguay, which requires attribution to it. Which terms apply to this export is for a person to confirm | The four field outlines of the example case, `web/src/data/example_case.json` (branch `l3/original-mock`), shown as example data. The KMZ's point marker is not used. Not NASA data | 2026-11-16 |
 
+## Images
+
+| Image | Author and source | URL | Licence | Used for | Added on |
+|---|---|---|---|---|---|
+| Soybean field, `Glycine_max_15-p.bot-glyci.max-037.jpg`, the 960 x 720 px preview of the 2048 x 1536 px file, unmodified (`web/src/assets/images/soybean-field-ayotte-laval.jpg`, SHA-256 26b8b9bf70a3e15751cd8306d5d3d656cb987cde880b6f6394c0fa12ab90d4ae) | Gilles Ayotte (1948-), photographer; Bibliothèque de l'Université Laval, accession 15-p.bot-glyci.max-037; via Wikimedia Commons | https://commons.wikimedia.org/wiki/File:Glycine_max_15-p.bot-glyci.max-037.jpg | Creative Commons Attribution-Share Alike 4.0 International (CC BY-SA 4.0), https://creativecommons.org/licenses/by-sa/4.0/ ; credit and licence link shown beside the image on screen | Hero image of the case overview (#/), chosen by the interface owner. Not a photo of the example fields | 2026-11-16 |
+
 ## Libraries
 
 | Name | Version | URL | Licence | Added by lane | Added on |

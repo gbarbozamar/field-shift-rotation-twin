@@ -635,12 +635,13 @@ const WORDING_SHEET: Record<string, string> = {
   'attention.no_answer_detail': 'Pick a field on the planning board and compare its rotations.',
   'attention.open_board': 'Open the planning board',
   'attention.from_last': 'From the last answer, for {field}',
-  'overview.photo.alt': 'A crop field in the growing season',
-  'overview.photo.empty': 'A licensed photo goes here',
-  'overview.photo.empty_detail': 'A person chooses it and records its licence in ATTRIBUTIONS.md.',
-  'overview.photo.credit': 'Photo: {credit}',
+  'overview.photo.alt': 'Rows of soybean plants in leaf in a field; a photo from elsewhere, not one of the example fields',
+  'overview.photo.credit_lead': 'Photo:',
+  'overview.photo.credit_author': "Gilles Ayotte, Bibliothèque de l'Université Laval, via Wikimedia Commons",
+  'overview.photo.licence': 'CC BY-SA 4.0',
   'overview.areas.title': 'Field areas',
   'overview.areas.label': 'Hectares of each field, measured on its outline',
+  'overview.areas.value': '{ha} ha',
 }
 
 /** Source of the shell page as it was before the strings unit. */

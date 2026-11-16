@@ -6,11 +6,18 @@ import { formatString } from '../lib/format'
 import FieldsMap from '../map/FieldsMap'
 import { fieldAreaHa } from '../map/geometry'
 import { MockBadge } from '../mockfill/MockPanel'
-import { usePlan } from '../board/planStore'
+import { EXAMPLE_FACTS, usePlan } from '../board/planStore'
+import { answerAttention, NO_ANSWER_ITEM } from '../board/attention'
+import type { AttentionTarget } from '../board/attention'
+import { changedFacts } from '../board/factsDraft'
+import { AttentionPanel } from '../components/Attention'
+import { BarList } from '../charts/BarList'
+import heroPhoto from '../assets/images/soybean-field-ayotte-laval.jpg'
 import type { Plan } from '../board/planStore'
 import {
   IconArchive,
   IconArrowRight,
+  IconChart,
   IconCheckCircle,
   IconMap,
   IconPrinter,
@@ -89,15 +96,94 @@ function LastAnswer({ plan }: { plan: Plan }) {
   )
 }
 
+/** Where the credit of the hero photo points: the file page and its licence (CC BY-SA 4.0 asks for both). */
+const PHOTO_SOURCE_URL = 'https://commons.wikimedia.org/wiki/File:Glycine_max_15-p.bot-glyci.max-037.jpg'
+const PHOTO_LICENCE_URL = 'https://creativecommons.org/licenses/by-sa/4.0/'
+
+/**
+ * The hero band of the overview: the photo chosen by the interface owner
+ * (recorded in ATTRIBUTIONS.md), shown unaltered with a soft gradient over it
+ * so the title stays readable, and its credit with the licence link beside it.
+ */
+function HeroBand() {
+  return (
+    <div data-testid="overview-hero" className="relative h-52 overflow-hidden rounded-fs-card border border-fs-border shadow-fs-card">
+      <img src={heroPhoto} alt={strings['overview.photo.alt']} className="absolute inset-0 h-full w-full object-cover" />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-fs-text/85 via-fs-text/45 to-transparent" />
+      <div className="relative flex h-full flex-col justify-end p-6 text-fs-surface">
+        <h2 id="entry-screen-title" className="font-fs-heading text-3xl font-extrabold leading-tight">
+          {strings['entry.title']}
+        </h2>
+        <p className="mt-1 text-sm opacity-90">
+          {exampleCase.label} · {formatString(strings['entry.fields_count'], { n: exampleCase.fields.length })}
+        </p>
+      </div>
+      <p data-testid="overview-photo-credit" className="absolute bottom-2 right-2 max-w-[60%] rounded-md bg-fs-text/70 px-2 py-1 text-[11px] leading-snug text-fs-surface">
+        {strings['overview.photo.credit_lead']}{' '}
+        <a href={PHOTO_SOURCE_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+          {strings['overview.photo.credit_author']}
+        </a>
+        {', '}
+        <a href={PHOTO_LICENCE_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+          {strings['overview.photo.licence']}
+        </a>
+      </p>
+    </div>
+  )
+}
+
+/** Where an item of "Needs attention" leads from the overview: the full report for the sources, the board for the rest. */
+function overviewLinkOf(target: AttentionTarget) {
+  return { href: target === 'report' ? '#/plant' : '#/board' }
+}
+
+/** What needs attention in the case: the items of the last answer the board showed, or that there is none yet. */
+function OverviewAttention({ plan }: { plan: Plan }) {
+  const last = plan.lastAnswer
+  if (last === null) {
+    return <AttentionPanel items={[NO_ANSWER_ITEM]} linkOf={overviewLinkOf} />
+  }
+  const field = exampleCase.fields.find((each) => each.field_id === last.fieldId) ?? null
+  const nameOf = (rotationId: string) => plan.sent.find((r) => r.rotation_id === rotationId)?.label ?? rotationId
+  const items = answerAttention(last.answer, {
+    mocked: last.mocked,
+    exampleNumbers: changedFacts(plan.factsSent, EXAMPLE_FACTS) === 0,
+    nameOf,
+  })
+  return (
+    <AttentionPanel
+      items={items}
+      linkOf={overviewLinkOf}
+      subtitle={formatString(strings['attention.from_last'], { field: field?.name ?? last.fieldId })}
+    />
+  )
+}
+
+/** The area of each field, as a bar list: the outlines measured, nothing modelled. */
+function FieldAreas() {
+  return (
+    <section data-testid="overview-areas" aria-labelledby="overview-areas-title" className="fs-card p-4">
+      <CardHeader id="overview-areas-title" icon={IconChart} title={strings['overview.areas.title']} />
+      <BarList
+        label={strings['overview.areas.label']}
+        format={(ha) => formatString(strings['overview.areas.value'], { ha: ha.toFixed(1) })}
+        items={exampleCase.fields.map((field) => ({ id: field.field_id, label: field.name, value: fieldAreaHa(field) }))}
+      />
+      <p className="mt-2 text-[11px] text-fs-muted">{strings['overview.areas.label']}</p>
+    </section>
+  )
+}
+
 /**
  * The entry screen: an overview of the case on example data, in the manner
- * of the home of a farm-management system (PROPOSED, l3/erp-shell). The
- * case label and fields count with the example-data banner; a small map of
- * the field outlines beside the summary (fields, hectares measured on the
- * outlines, rotations on the planning board) and the last answer the board
- * showed; the list of fields, where the selected one offers the open action
- * that carries the selection to the fields screen; and the next steps.
- * Nothing scientific is computed here.
+ * of the home of a farm-management system (PROPOSED, l3/erp-shell, cards and
+ * attention by l3/original-mock). A hero band with the case label and the
+ * fields count, and the example-data banner; the map of the field outlines
+ * beside a right column with the summary tiles, what needs attention and the
+ * last answer the board showed; the list of fields, where the selected one
+ * offers the open action that carries the selection to the fields screen,
+ * beside the field areas and the next steps. Nothing scientific is computed
+ * here.
  */
 export default function EntryScreen() {
   const selectedFieldId = useSelectedFieldId()
@@ -105,12 +191,7 @@ export default function EntryScreen() {
 
   return (
     <section aria-labelledby="entry-screen-title" className="mx-auto max-w-7xl">
-      <h2 id="entry-screen-title" className="font-fs-heading text-2xl font-bold">
-        {strings['entry.title']}
-      </h2>
-      <p className="mt-1 text-sm text-fs-muted">
-        {exampleCase.label} · {formatString(strings['entry.fields_count'], { n: exampleCase.fields.length })}
-      </p>
+      <HeroBand />
 
       {exampleCase.example_data && (
         <p
@@ -121,7 +202,8 @@ export default function EntryScreen() {
         </p>
       )}
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="space-y-5">
         <section aria-labelledby="overview-map-title" className="fs-card p-4">
           <CardHeader id="overview-map-title" icon={IconMap} title={strings['overview.map']} />
           <p className="mb-2 text-[11px] text-fs-muted">
@@ -129,30 +211,6 @@ export default function EntryScreen() {
           </p>
           <FieldsMap compact />
         </section>
-
-        <div className="space-y-4">
-          <section aria-labelledby="overview-summary-title">
-            <h3 id="overview-summary-title" className="fs-eyebrow mb-2">
-              {strings['overview.summary']}
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <KpiTile icon={IconMap} label={strings['overview.kpi.fields']}>
-                <KpiNumber value={String(exampleCase.fields.length)} />
-              </KpiTile>
-              <KpiTile icon={IconRotate} label={strings['overview.kpi.rotations']}>
-                <KpiNumber value={String(plan.sent.length)} />
-              </KpiTile>
-              <KpiTile icon={IconRuler} label={strings['overview.kpi.hectares']} wide>
-                <KpiNumber value={TOTAL_HA.toFixed(1)} />
-              </KpiTile>
-            </div>
-          </section>
-
-          <LastAnswer plan={plan} />
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-labelledby="overview-fields-title" className="fs-card p-4">
           <CardHeader
             id="overview-fields-title"
@@ -174,7 +232,7 @@ export default function EntryScreen() {
                       'w-full', 'rounded-lg', 'border', 'px-3', 'py-2.5', 'text-left', 'transition',
                       ...(isSelected
                         ? ['border-fs-primary', 'bg-fs-selection', 'ring-1', 'ring-fs-primary']
-                        : ['border-fs-border', 'bg-fs-surface', 'hover:bg-fs-faint']),
+                        : ['border-fs-border', 'bg-fs-surface', 'shadow-fs-card', 'hover:-translate-y-0.5', 'hover:shadow-fs-card-hover']),
                     ].join(' ')}
                   >
                     <span className="flex items-center justify-between gap-3">
@@ -210,11 +268,32 @@ export default function EntryScreen() {
             <p className="text-sm text-fs-muted">{strings['identity.empty_list']}</p>
           )}
         </section>
+        </div>
 
+        <div className="space-y-5">
+          <section aria-labelledby="overview-summary-title">
+            <h3 id="overview-summary-title" className="fs-eyebrow mb-2">
+              {strings['overview.summary']}
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <KpiTile icon={IconMap} label={strings['overview.kpi.fields']}>
+                <KpiNumber value={String(exampleCase.fields.length)} />
+              </KpiTile>
+              <KpiTile icon={IconRotate} label={strings['overview.kpi.rotations']}>
+                <KpiNumber value={String(plan.sent.length)} />
+              </KpiTile>
+              <KpiTile icon={IconRuler} label={strings['overview.kpi.hectares']} wide>
+                <KpiNumber value={TOTAL_HA.toFixed(1)} />
+              </KpiTile>
+            </div>
+          </section>
+
+          <OverviewAttention plan={plan} />
+
+          <LastAnswer plan={plan} />
+        <FieldAreas />
         <nav aria-labelledby="overview-steps-title" className="fs-card p-4">
-          <h3 id="overview-steps-title" className="fs-eyebrow mb-2">
-            {strings['overview.next_steps']}
-          </h3>
+          <CardHeader id="overview-steps-title" icon={IconArrowRight} title={strings['overview.next_steps']} />
           <ul className="space-y-1">
             {NEXT_STEPS.map((step, index) => {
               const StepIcon = step.icon
@@ -244,6 +323,7 @@ export default function EntryScreen() {
             })}
           </ul>
         </nav>
+        </div>
       </div>
     </section>
   )
