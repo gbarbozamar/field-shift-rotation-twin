@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { c } from './copy'
-import { M } from './model'
+import { M, labelPoint } from './model'
 import { Card, Pill, PanelHead, Workbench } from './ui'
 
 const CONF_TONE = { high: 'ok', medium: 'warn', low: 'bad' } as const
@@ -36,10 +36,9 @@ export default function PreloadPanel() {
         left={
           <Card title={c('p1.map')}>
             <svg viewBox="0 0 600 400" role="img" aria-label={c('p1.map')} className="w-full rounded bg-fs-faint">
-              <path d="M 285 10 C 290 120, 300 230, 335 395" fill="none" stroke="var(--fs-nina)" strokeWidth="7" opacity="0.55" />
-              <text x="300" y="395" fontSize="14" fill="var(--fs-nina)">{c('p1.creek')}</text>
               {M.fields.map((x) => {
                 const on = x.id === sel
+                const [lx, ly] = labelPoint(x.points)
                 return (
                   <g key={x.id}>
                     <polygon
@@ -49,13 +48,14 @@ export default function PreloadPanel() {
                       stroke={on ? 'var(--fs-text)' : 'var(--fs-crop-5)'}
                       strokeWidth={on ? 3 : 1.5}
                     />
-                    <text x={x.points.split(' ')[0].split(',')[0]} y={Number(x.points.split(' ')[0].split(',')[1]) + 28} dx="14" fontSize="15" fontWeight="700" fill="var(--fs-text)">
+                    <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="15" fontWeight="700" fill="var(--fs-text)" pointerEvents="none">
                       {x.name}
                     </text>
                   </g>
                 )
               })}
             </svg>
+            <p className="mt-2 text-xs text-fs-muted">{c('p1.outlines')}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {M.fields.map((x) => (
                 <button

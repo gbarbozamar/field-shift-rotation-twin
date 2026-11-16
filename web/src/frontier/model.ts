@@ -67,3 +67,11 @@ export function voiAt(base: number, price: number): number {
   const f = Math.max(0.15, 1 - d / (P.band * 4))
   return Math.round(base * f * 10) / 10
 }
+
+/** The centre of the bounding box of an SVG points list, where a field's name is drawn. */
+export function labelPoint(points: string): [number, number] {
+  const xy = points.split(' ').map((pair) => pair.split(',').map(Number))
+  const xs = xy.map((p) => p[0])
+  const ys = xy.map((p) => p[1])
+  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+}
