@@ -600,7 +600,7 @@ function NamedYearsSection({
 }
 
 /** The measurement priority (D4) with its field: ranked items or NOT_DECLARED when empty. */
-function MeasureFirstBlock({
+export function MeasureFirstBlock({
   fieldId,
   items,
 }: {
@@ -615,7 +615,7 @@ function MeasureFirstBlock({
         'rounded-lg',
         'border',
         'border-fs-border',
-        'bg-white',
+        'bg-fs-surface',
         'px-4',
         'py-3',
       ].join(' ')}

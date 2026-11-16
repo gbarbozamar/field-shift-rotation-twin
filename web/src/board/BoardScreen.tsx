@@ -46,6 +46,7 @@ import {
 import { CompareTable, MARGIN_MARK, SOIL_MARK, SortPicker, TableNotes, optionTitle, orderNote } from './CompareTable'
 import type { OptionInfo } from './CompareTable'
 import { RotationBuilder } from './RotationBuilder'
+import BoardMeasureFirst from './BoardMeasureFirst'
 import { FactsEditor } from './FactsEditor'
 import { changedFacts, factsProblems, withExtraCrops } from './factsDraft'
 import type { FactsDraft } from './factsDraft'
@@ -166,7 +167,10 @@ function Answered({
   previous,
   updating,
   mock,
+  measure,
 }: {
+  /** What to measure first, when the answer picks no rotation (null without a backend or a request). */
+  measure: { baseRequest: Record<string, unknown>; apiBase: string } | null
   answer: PlantAnswer
   rainStress: RainStressPart | null
   /** What of this answer is mock example data, when the board mixes; null when it does not. */
@@ -224,6 +228,9 @@ function Answered({
         {answer.chosen === null ? (
           <SourcesNotice answer={answer} />
         ) : null}
+        {measure !== null && (
+          <BoardMeasureFirst answer={answer} baseRequest={measure.baseRequest} apiBase={measure.apiBase} nameOf={nameOf} />
+        )}
       </div>
       <div>
         <StepTitle n={firstStep} title={strings['board.compare.title']}>
@@ -289,7 +296,9 @@ function BoardSide({
   firstStep,
   previous,
   updating,
+  baseRequest,
 }: {
+  baseRequest: Record<string, unknown> | null
   selectedFieldId: string | null
   apiBase: string | null
   service: ServicePhase | null
@@ -332,6 +341,7 @@ function BoardSide({
       previous={previous}
       updating={updating}
       mock={mockReportOf(service.answer)}
+      measure={baseRequest !== null ? { baseRequest, apiBase } : null}
     />
   )
 }
@@ -353,6 +363,7 @@ export function BoardView({
   rotations = plantRotations,
   builder = null,
   numbers = null,
+  baseRequest = null,
   previous = null,
   updating = false,
   limit = REQUEST_LIMIT,
@@ -378,6 +389,8 @@ export function BoardView({
   builder?: ReactNode
   /** The step of the user's numbers (prices, costs, yields, limit, price range, rain), when they can be edited. */
   numbers?: ReactNode
+  /** The plant request the answer was asked with: its rotations and site go to the decision layer. */
+  baseRequest?: Record<string, unknown> | null
   /** The answer shown before the one of the service now, when there was one. */
   previous?: PlantAnswer | null
   /** True while the answer shown is the one before and the new one is on its way. */
@@ -494,6 +507,7 @@ export function BoardView({
         firstStep={scenarioStep + 1}
         previous={previous}
         updating={updating}
+        baseRequest={baseRequest}
       />
 
       <p data-testid="board-disclaimer" className="text-xs text-fs-muted">
@@ -580,6 +594,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       mapOpen={mapOpen}
       onToggleMap={() => setMapChoice(!mapOpen)}
       rotations={rotations}
+      baseRequest={baseRequest}
       limit={{ value: Number(factsSent.limit), unit: rawPlantRequest.soil_loss_limit.unit }}
       rainFactor={baseRead.rain.kind === 'present' ? baseRead.rain.factor : null}
       builder={

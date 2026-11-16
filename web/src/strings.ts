@@ -427,6 +427,8 @@ export const strings = {
   'unit.USD ha-1': 'USD/ha',
   'unit.t ha-1': 't/ha',
   'board.no_range': 'No range',
+  'board.measure.pair': 'The answer picks no rotation. What would settle it, asked of the decision layer for the first two options: {a} and {b}.',
+  'board.measure.pending': 'Asking the decision layer what to measure first...',
   'board.kind.not_in_record': 'Not in the record',
   'board.kind.mean_years': 'mean of {n} years',
   'board.row.crops': 'Crops by month',

@@ -909,3 +909,19 @@ describe('what each number carries in the table (l3/original-mock)', () => {
     expect(banner.includes('data-testid="board-range"') || banner.includes('data-testid="board-no-range-line"')).toBe(true)
   })
 })
+
+describe('what to measure first when the answer picks no rotation (l3/original-mock)', async () => {
+  const { BoardMeasureFirstView } = await import('./BoardMeasureFirst')
+  const { decisionExample } = await import('../decision/decisionData')
+  it('names the pair asked about, then the ranking the decision layer returns, or its reason', () => {
+    const decided = renderToString(
+      <BoardMeasureFirstView phase={{ kind: 'answered', answer: { kind: 'decision', document: decisionExample, liveData: false } }} pair={['A', 'B']} fieldId={FIELD} />,
+    )
+    expect(decided).toContain('data-testid="decision-measure-first"')
+    expect(visibleText(decided)).toContain(formatString(strings['board.measure.pair'], { a: 'A', b: 'B' }))
+    const missing = renderToString(
+      <BoardMeasureFirstView phase={{ kind: 'answered', answer: { kind: 'missing', missing: { reason: 'MISSING_INPUT', detail: 'no climate' } } }} pair={['A', 'B']} fieldId={FIELD} />,
+    )
+    expect(missing).toContain('data-testid="board-measure-missing"')
+  })
+})
