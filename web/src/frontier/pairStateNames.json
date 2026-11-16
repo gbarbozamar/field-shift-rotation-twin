@@ -1,0 +1,6 @@
+{
+  "robust": "Robust preference",
+  "notRobust": "Not robust across scenarios",
+  "notSeparatedPrefix": "Not separated",
+  "identical": "Identical"
+}

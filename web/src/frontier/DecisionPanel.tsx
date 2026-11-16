@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { c } from './copy'
 import { M, tippingPrice, verdictAt, viewAt, voiAt } from './model'
 import { Card, PanelHead, Pill, Workbench } from './ui'
+import LiveDecision from './LiveDecision'
 
 const TONE = { robust: 'ok', conditional: 'warn', abstain: 'bad' } as const
 
@@ -26,6 +27,7 @@ export default function DecisionPanel() {
       <Workbench
         left={
           <>
+            <LiveDecision />
             <Card title={c('p4.verdict')}>
               <Pill tone={TONE[verdict]}>{c(`p4.verdict.${verdict}` as 'p4.verdict.robust')}</Pill>
               <p className="mt-3 text-sm">{c(`p4.verdict.${verdict}.text` as 'p4.verdict.robust.text')}</p>

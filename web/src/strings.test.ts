@@ -621,6 +621,16 @@ const WORDING_SHEET: Record<string, string> = {
   'saved.carbon_horizon': 'Horizon: {start} to {end}',
   'saved.carbon_depth': 'Soil depth',
   'saved.carbon_trend_heading': 'Soil carbon trend',
+  // Live decision of the frontier panel (l3/frontier-showcase, PROPOSED).
+  'frontier.live.title': 'From the backend: the decision for Field 1',
+  'frontier.live.not_configured': 'No backend is configured, so this panel shows the synthetic scenario only.',
+  'frontier.live.pending': 'Asking the backend for the decision of the two demonstration rotations...',
+  'frontier.live.decision_what': 'decision',
+  'frontier.live.state': 'Decision state, as the backend words it',
+  'frontier.live.pair_not_evaluated': 'not evaluated',
+  'frontier.live.measure': 'What to measure first, as the backend ranks it',
+  'frontier.live.measure_none': 'The backend ranks nothing to measure first for this pair.',
+  'frontier.live.synthetic_below': 'Everything else on this panel is the synthetic scenario: the tipping price and the value of information in USD/ha are not part of the backend\'s decision.',
 }
 
 /** Source of the shell page as it was before the strings unit. */
