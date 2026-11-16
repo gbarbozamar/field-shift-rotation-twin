@@ -37,7 +37,7 @@ Under Rev13, every line in the 46-entry Frontier Research Inventory ([../validat
 
 Implemented in [../validation/frontier_governance.py](../validation/frontier_governance.py) and tested in [../validation/test_frontier_governance.py](../validation/test_frontier_governance.py):
 
-1. **`FRONTIER_INVENTORY` (46 entries, `L01`–`L46`):** Complete frozen registry covering all 10 domains (`Erosion`, `Water`, `Soil`, `Carbon`, `Yield`, `Climate`, `Observation`, `Twin`, `Decision`, `Economics`), enforcing `validate_frontier_inventory` and `assert_maturity_validation_independence`.
+1. **`FRONTIER_INVENTORY` (46 entries, `L01`–`L46`):** Complete frozen registry covering all 10 domains (`Erosion`, `Water`, `Soil`, `Carbon`, `Yield`, `Climate`, `Observation`, `Twin`, `Decision`, `Economics`), enforcing `validate_frontier_inventory` and `assert_maturity_validation_independence`. All **`46/46` (`100%`)** inventory lines are implemented (`40` `FRONTIER_IMPLEMENTED`, `6` `CORE_IMPLEMENTED`, `0` `NOT_IMPLEMENTED`), while **`0/46`** carry `local_validation_status = "VALIDATED"`.
 2. **Layer-Ablation Decision Gate (`evaluate_layer_ablation`, §7 rule):** Compares core-only vs. core+frontier decision state and uncertainty interval `(low, high)` across paired test cases with a caller-supplied `min_delta >= 0`. Sets `prune_recommended=True` when adding the frontier layer neither changes any decision state nor narrows any uncertainty interval beyond `min_delta` (`core_width - frontier_width > min_delta`).
 3. **National Cell-Grid Runner & Emulator Recalculation Gate (`run_national_grid_cells`, §§5.7, 6):**
    - Evaluates cells across strictly separated `historical` and `2030-2060` horizons (`HorizonGridSummary` per horizon).
@@ -80,11 +80,23 @@ Target module paths below are cited in plain backticks because sibling Frontier 
 | `F-24` | `L2a` | `adapters/earth_observation_frontier.py` | `SPL2SMAP_S` (`2026-07-01` cutoff), `ECOSTRESS`, `NISAR SME2` (`PROVISIONAL_PRE_2027`), `EMIT`, and gated EO proposals | `L29`, `L30`, `L31`, `L32`, `L33` |
 | `F-25` | `L0` | `validation/frontier_governance.py` | 46-line §14 inventory registry, §7 layer-ablation gate, national cell-grid & emulator finalist gate, Rev13 spec | `L01`–`L46` |
 
+Dedicated standalone line modules completing `46/46` (`100%`) §14 implementation coverage (strictly isolated from normative `EP1`/`EP3` and `local_validation_status = "UNVALIDATED"`):
+
+| Line | Lane | Module | Core Governance / Scientific Guard |
+|---|---|---|---|
+| `L06` | `L0` | [../engine/erosion/dynamic_surface_routing.py](../engine/erosion/dynamic_surface_routing.py) | Post-tillage roughness & consolidation trajectories, dynamic segmented `LS`, and channel export guard refusing to equate `IC` with mass export (`NOT_AVAILABLE` when uncalibrated) |
+| `L16` | `L1` | [../engine/water/soil_structure_feedback.py](../engine/water/soil_structure_feedback.py) | Dynamic topsoil bulk density, porosity, rainfall crusting attenuation, and exploratory `cn_delta_estimate` diagnostics (`normative_ep3_wired=False`) |
+
 ---
 
 ## 5. Complete 46-Line Rev13 Frontier Inventory (§14)
 
-All 46 entries below correspond 1-to-1 with `FRONTIER_INVENTORY` in [../validation/frontier_governance.py](../validation/frontier_governance.py).
+All 46 entries below correspond 1-to-1 with `FRONTIER_INVENTORY` in [../validation/frontier_governance.py](../validation/frontier_governance.py). Four-axis totals across `L01`–`L46`:
+
+- `method_maturity`: `23` `ESTABLISHED`, `16` `FRONTIER`, `7` `HYPOTHESIS`
+- `implementation_status`: **`46/46` (`100%`) implemented** (`40` `FRONTIER_IMPLEMENTED`, `6` `CORE_IMPLEMENTED`, **`0` `NOT_IMPLEMENTED`**)
+- `data_availability`: `15` `LOCAL_MEASUREMENT_REQUIRED`, `13` `SITE_DECLARED_REQUIRED`, `13` `AVAILABLE_PUBLIC`, `4` `PROVISIONAL_OR_PAUSED`, `1` `RESTRICTED_OR_ABSENT`
+- `local_validation_status`: **`0` `VALIDATED`**, `31` `UNVALIDATED`, `8` `EXPLORATORY_ONLY`, `6` `PARTIAL`, `1` `BLOCKED_NOT_EVALUATED`
 
 | ID | Domain | Capability / Research Line | Units | Method Maturity | Implementation | Data Availability | Local Validation |
 |---|---|---|---|---|---|---|---|
@@ -93,7 +105,7 @@ All 46 entries below correspond 1-to-1 with `FRONTIER_INVENTORY` in [../validati
 | `L03` | `Erosion` | D8 topographic routing and Index of Connectivity (`IC` relative hotspot) | `F-03` | `FRONTIER` | `FRONTIER_IMPLEMENTED` | `AVAILABLE_PUBLIC` | `EXPLORATORY_ONLY` |
 | `L04` | `Erosion` | Observed satellite dry residue cover (`EMIT` NPV / calibrated `HLS` `NDTI`) | `F-04` | `HYPOTHESIS` | `FRONTIER_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
 | `L05` | `Erosion` | Static AH703 `LS`, GloREDa monthly `R` climatology, and declared `C` baseline | `CORE` | `ESTABLISHED` | `CORE_IMPLEMENTED` | `AVAILABLE_PUBLIC` | `PARTIAL` |
-| `L06` | `Erosion` | Full RUSLE2 dynamic `LS`, roughness, consolidation, and channel sediment export | `F-01`, `F-03` | `FRONTIER` | `NOT_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
+| `L06` | `Erosion` | Full RUSLE2 dynamic `LS`, roughness, consolidation, and channel sediment export | `F-01`, `F-03` | `FRONTIER` | `FRONTIER_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
 | `L07` | `Water` | Daily FAO-56 Penman-Monteith `ET0` and dual-`Kc` root-zone water balance | `CORE` | `ESTABLISHED` | `CORE_IMPLEMENTED` | `AVAILABLE_PUBLIC` | `PARTIAL` |
 | `L08` | `Water` | Water Cloud Model (`WCM`) `0-5 cm` surface soil moisture inversion | `F-05` | `FRONTIER` | `FRONTIER_IMPLEMENTED` | `AVAILABLE_PUBLIC` | `UNVALIDATED` |
 | `L09` | `Water` | Ensemble Kalman Filter (`EnKF`) state assimilation with holdout split | `F-06` | `ESTABLISHED` | `FRONTIER_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
@@ -103,7 +115,7 @@ All 46 entries below correspond 1-to-1 with `FRONTIER_INVENTORY` in [../validati
 | `L13` | `Soil` | Parametric pedotransfer functions (`FC`, `PWP`, `AWC`) with 3-tier provenance | `F-07` | `ESTABLISHED` | `FRONTIER_IMPLEMENTED` | `AVAILABLE_PUBLIC` | `UNVALIDATED` |
 | `L14` | `Soil` | SoilGrids 2.0 / CONEAT regional prior mapping with effective-depth guard | `F-07` | `FRONTIER` | `FRONTIER_IMPLEMENTED` | `AVAILABLE_PUBLIC` | `UNVALIDATED` |
 | `L15` | `Soil` | Documented `0.90 m` station hydraulic profile vs `0.60 m` national reference | `CORE` | `ESTABLISHED` | `CORE_IMPLEMENTED` | `SITE_DECLARED_REQUIRED` | `PARTIAL` |
-| `L16` | `Soil` | Dynamic bulk density, structural crusting, and compaction feedback | `F-07` | `HYPOTHESIS` | `NOT_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
+| `L16` | `Soil` | Dynamic bulk density, structural crusting, and compaction feedback | `F-07` | `HYPOTHESIS` | `FRONTIER_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
 | `L17` | `Carbon` | `AMG-A` (`EP5`) and `RothC-26.3` (`EP6`) SOC balance on shared `CarbonForcing` | `CORE` | `ESTABLISHED` | `CORE_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |
 | `L18` | `Carbon` | Carbon model trajectory comparator and structural-dependence guard | `F-12` | `ESTABLISHED` | `FRONTIER_IMPLEMENTED` | `SITE_DECLARED_REQUIRED` | `UNVALIDATED` |
 | `L19` | `Carbon` | Measurable `POM`/`MAOM` mineral sorption capacity partition | `F-13` | `FRONTIER` | `FRONTIER_IMPLEMENTED` | `LOCAL_MEASUREMENT_REQUIRED` | `UNVALIDATED` |

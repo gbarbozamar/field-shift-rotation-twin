@@ -371,10 +371,12 @@ FRONTIER_INVENTORY: Final[tuple[FrontierLineEntry, ...]] = (
         "Full RUSLE2 dynamic LS, roughness, consolidation, and channel sediment export",
         ("F-01", "F-03"),
         "FRONTIER",
-        "NOT_IMPLEMENTED",
+        "FRONTIER_IMPLEMENTED",
         "LOCAL_MEASUREMENT_REQUIRED",
         "UNVALIDATED",
-        notes="Deferred beyond event scope; IC does not provide channel export mass",
+        notes=(
+            "Standalone dynamic_surface_routing.py; IC does not provide channel export mass"
+        ),
     ),
     # --- Water (L07-L12) -----------------------------------------------------
     _entry(
@@ -483,10 +485,12 @@ FRONTIER_INVENTORY: Final[tuple[FrontierLineEntry, ...]] = (
         "Dynamic bulk density, structural crusting, and compaction feedback",
         ("F-07",),
         "HYPOTHESIS",
-        "NOT_IMPLEMENTED",
+        "FRONTIER_IMPLEMENTED",
         "LOCAL_MEASUREMENT_REQUIRED",
         "UNVALIDATED",
-        notes="Unbuilt research horizon requiring time-series pedon measurements",
+        notes=(
+            "Standalone soil_structure_feedback.py; requires time-series pedon measurements"
+        ),
     ),
     # --- Carbon (L17-L20) ----------------------------------------------------
     _entry(
