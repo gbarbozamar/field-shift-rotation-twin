@@ -747,8 +747,8 @@ describe('siteReferenceOf: the point of the request', () => {
     expect(site).toEqual({
       case_id: exampleCase.case_id,
       field_id: rotationDefinition.field_id,
-      latitude: expect.closeTo(-33.013, 10),
-      longitude: expect.closeTo(-57.0065, 10),
+      latitude: expect.closeTo(-34.348063, 10),
+      longitude: expect.closeTo(-57.692699, 10),
     })
   })
 })

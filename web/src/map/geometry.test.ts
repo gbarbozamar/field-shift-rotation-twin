@@ -22,8 +22,8 @@ describe('map geometry helpers', () => {
     // Expected values copied from web/src/data/example_case.json (the
     // person-written example data), not invented here.
     expect(fieldsBounds(exampleCase.fields)).toEqual([
-      [-33.023, -57.01],
-      [-33.01, -56.99],
+      [-34.382317, -57.734666],
+      [-34.332234, -57.681518],
     ])
   })
 
