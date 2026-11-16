@@ -27,7 +27,9 @@ function labelOf(key: FactKey): string {
     const what =
       field === 'yields'
         ? formatString(strings['board.facts.yield'], { kind: kindName(kind as FactKind) })
-        : strings[field === 'price' ? 'board.facts.price' : 'board.facts.cost']
+        : field === 'margins'
+          ? formatString(strings['board.facts.margin'], { kind: kindName(kind as FactKind) })
+          : strings[field === 'price' ? 'board.facts.price' : 'board.facts.cost']
     return `${cropName(id)}: ${what}`
   }
   const [group, kind] = key.split('.') as ['yields' | 'pasture', FactKind]
@@ -131,26 +133,32 @@ export function FactsEditor({
             })),
           )}
         </fieldset>
-        {Object.entries(draft.extra).map(([id, crop]) => (
-          <fieldset key={id} data-testid="board-facts-extra" className="space-y-2 rounded-xl border-2 border-fs-warning bg-fs-surface p-3">
-            <legend className="px-1 font-bold">{cropName(id)}</legend>
-            <p className="text-xs text-fs-warning">{strings['board.facts.extra_note']}</p>
-            {field(`extra.${id}.price`, strings['board.facts.price'], units.price, crop.price, (t) => ({
-              ...draft,
-              extra: { ...draft.extra, [id]: { ...crop, price: t } },
-            }))}
-            {field(`extra.${id}.cost`, strings['board.facts.cost'], units.cost, crop.cost, (t) => ({
-              ...draft,
-              extra: { ...draft.extra, [id]: { ...crop, cost: t } },
-            }))}
-            {FACT_KINDS.map((k) =>
-              field(`extra.${id}.yields.${k}`, formatString(strings['board.facts.yield'], { kind: kindName(k) }), units.yield, crop.yields[k], (t) => ({
-                ...draft,
-                extra: { ...draft.extra, [id]: { ...crop, yields: { ...crop.yields, [k]: t } } },
-              })),
-            )}
-          </fieldset>
-        ))}
+        {Object.entries(draft.extra).map(([id, crop]) => {
+          const set = (next: typeof crop) => ({ ...draft, extra: { ...draft.extra, [id]: next } })
+          return (
+            <fieldset key={id} data-testid="board-facts-extra" className="space-y-2 rounded-xl border-2 border-fs-warning bg-fs-surface p-3">
+              <legend className="px-1 font-bold">{cropName(id)}</legend>
+              <p className="text-xs text-fs-warning">{strings['board.facts.extra_note']}</p>
+              {crop.kind === 'grain' ? (
+                <>
+                  {field(`extra.${id}.price`, strings['board.facts.price'], units.price, crop.price, (t) => set({ ...crop, price: t }))}
+                  {field(`extra.${id}.cost`, strings['board.facts.cost'], units.cost, crop.cost, (t) => set({ ...crop, cost: t }))}
+                  {FACT_KINDS.map((k) =>
+                    field(`extra.${id}.yields.${k}`, formatString(strings['board.facts.yield'], { kind: kindName(k) }), units.yield, crop.yields[k], (t) =>
+                      set({ ...crop, yields: { ...crop.yields, [k]: t } }),
+                    ),
+                  )}
+                </>
+              ) : (
+                FACT_KINDS.map((k) =>
+                  field(`extra.${id}.margins.${k}`, formatString(strings['board.facts.margin'], { kind: kindName(k) }), units.margin, crop.margins[k], (t) =>
+                    set({ ...crop, margins: { ...crop.margins, [k]: t } }),
+                  ),
+                )
+              )}
+            </fieldset>
+          )
+        })}
         <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
           <legend className="px-1 font-bold">{strings['board.facts.limit']}</legend>
           {field('limit', strings['board.facts.limit'], units.limit, draft.limit, (t) => ({ ...draft, limit: t }))}

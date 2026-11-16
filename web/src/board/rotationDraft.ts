@@ -242,8 +242,21 @@ export function cropCatalogue(): CatalogueCrop[] {
     if (component.crop_id === 'soybean') continue
     catalogue.push({ crop_id: component.crop_id, season: seasonOfDate(component.sowing.date), template: copy(component) })
   }
+  // Alfalfa: the backend's water engine has parameters for it, and D72 declares
+  // it sown on 25 April (after the maize harvest) and kept as a pasture, with
+  // no harvest. Its template is the request's pasture with that crop and date.
+  const pasture = catalogue.find((each) => each.template.purpose === 'pasture')
+  if (pasture !== undefined && !catalogue.some((each) => each.crop_id === ALFALFA.crop_id)) {
+    const year = (pasture.template.sowing.date as string).slice(0, 4)
+    const template = { ...copy(pasture.template), crop_id: ALFALFA.crop_id }
+    template.sowing = { ...template.sowing, date: `${year}-${ALFALFA.sown}` }
+    catalogue.push({ crop_id: ALFALFA.crop_id, season: seasonOfDate(template.sowing.date as string), template })
+  }
   return catalogue
 }
+
+/** Alfalfa as D72 declares it (demo/bounded.py): crop id of the water parameters, sown 25 April. */
+const ALFALFA = { crop_id: 'alfalfa', sown: '04-25' } as const
 
 /** The second-crop soybean of D128: the dates a soybean takes when sown after a winter grain of its row. */
 function secondCropSoybean(): DraftComponent | null {

@@ -7,7 +7,7 @@ import type { PlantAnswer } from '../plant/plantData'
 import { readBaseRequest } from '../plant/plantRoute'
 import { siteReferenceOf } from '../seam/RotationRun'
 import { applyFacts, declaredCropIds, readFactUnits, readFacts } from './factsDraft'
-import type { FactsDraft } from './factsDraft'
+import type { ExtraCropRef, FactsDraft } from './factsDraft'
 import { cropsUsed, exampleRotations } from './rotationDraft'
 import type { DraftRotation } from './rotationDraft'
 
@@ -25,9 +25,18 @@ export const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
 export const FACT_UNITS = readFactUnits(rawPlantRequest)
 const DECLARED_CROPS = declaredCropIds(rawPlantRequest)
 
-/** The crops these rotations sow that the request declares no economic facts for. */
-export function extraCropIds(rotations: DraftRotation[]): string[] {
-  return cropsUsed(rotations).filter((id) => !DECLARED_CROPS.includes(id))
+/**
+ * The crops these rotations sow that the request declares no economic facts
+ * for, each with how it is priced: a forage sown as a pasture is a declared
+ * margin, any other crop a grain.
+ */
+export function extraCropIds(rotations: DraftRotation[]): ExtraCropRef[] {
+  return cropsUsed(rotations)
+    .filter((id) => !DECLARED_CROPS.includes(id))
+    .map((id) => {
+      const component = rotations.flatMap((r) => r.components).find((c) => c.crop_id === id)
+      return { id, kind: component?.purpose === 'pasture' ? 'declared_margin' : 'grain' }
+    })
 }
 
 export interface Plan {

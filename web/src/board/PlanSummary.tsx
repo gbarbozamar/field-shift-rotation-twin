@@ -101,7 +101,16 @@ export function PlanSummaryView({ plan, fieldId }: { plan: Plan; fieldId: string
           <li>{strings['board.facts.pasture']}: {FACT_KINDS.map((k) => `${strings[`plant.kind.${k}`]} ${facts.pasture[k]}`).join(', ')} {unitText(FACT_UNITS.margin)}</li>
           {Object.entries(facts.extra).map(([id, crop]) => (
             <li key={id}>
-              {cropName(id)}: {strings['board.facts.price']} {crop.price} {unitText(FACT_UNITS.price)}, {strings['board.facts.cost']} {crop.cost} {unitText(FACT_UNITS.cost)}, {FACT_KINDS.map((k) => `${strings[`plant.kind.${k}`]} ${crop.yields[k]}`).join(', ')} {unitText(FACT_UNITS.yield)}
+              {cropName(id)}:{' '}
+              {crop.kind === 'grain' ? (
+                <>
+                  {strings['board.facts.price']} {crop.price} {unitText(FACT_UNITS.price)}, {strings['board.facts.cost']} {crop.cost} {unitText(FACT_UNITS.cost)}, {FACT_KINDS.map((k) => `${strings[`plant.kind.${k}`]} ${crop.yields[k]}`).join(', ')} {unitText(FACT_UNITS.yield)}
+                </>
+              ) : (
+                <>
+                  {FACT_KINDS.map((k) => `${strings[`plant.kind.${k}`]} ${crop.margins[k]}`).join(', ')} {unitText(FACT_UNITS.margin)}
+                </>
+              )}
             </li>
           ))}
           <li>{strings['board.facts.limit']}: {facts.limit} {unitText(FACT_UNITS.limit)}</li>

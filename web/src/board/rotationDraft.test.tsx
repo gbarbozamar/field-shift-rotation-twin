@@ -270,3 +270,24 @@ describe('an example rotation the user changes becomes theirs', async () => {
     expect(asUserRotation(changed, 0, 'other')).toBe(changed)
   })
 })
+
+describe('alfalfa, a crop the backend knows (D72)', async () => {
+  const { extraCropIds } = await import('./planStore')
+  const { applyFacts, readFacts, withExtraCrops, factsProblems } = await import('./factsDraft')
+  it('is in the catalogue as a winter crop sown on 25 April, kept with no harvest, and priced by a declared margin', () => {
+    const alfalfa = cropCatalogue().find((crop) => crop.crop_id === 'alfalfa')!
+    expect(alfalfa.season).toBe('winter')
+    expect(alfalfa.template.sowing.date!.slice(5)).toBe('04-25')
+    expect(alfalfa.template.harvest.date).toBeNull()
+    const draft = setSlot(exampleRotations(), 0, 1, 'winter', 'alfalfa')
+    expect(extraCropIds(draft)).toEqual([{ id: 'alfalfa', kind: 'declared_margin' }])
+    const facts = withExtraCrops(readFacts(rawRequest), extraCropIds(draft))
+    expect(factsProblems(facts).some((p) => p.key === 'extra.alfalfa.margins.neutral')).toBe(true)
+    const typed = { ...facts, extra: { alfalfa: { ...facts.extra.alfalfa, margins: { el_nino: '150', neutral: '170', la_nina: '-20' } } } }
+    expect(factsProblems(typed)).toEqual([])
+    const sent = applyFacts(rawRequest, typed) as Record<string, unknown>
+    const entry = ((sent.economic_facts as Record<string, unknown>).crops as Record<string, unknown>[]).find((c) => c.crop_id === 'alfalfa')!
+    expect(entry.kind).toBe('declared_margin')
+    expect(() => parsed(draft)).not.toThrow()
+  })
+})

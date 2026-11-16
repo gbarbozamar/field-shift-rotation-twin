@@ -59,17 +59,17 @@ describe('the user’s own numbers', () => {
   })
 
   it('a crop the request has no facts for comes in empty, is a problem until typed, and is written like the soybean', () => {
-    const withWheat = withExtraCrops(example, ['wheat'])
+    const withWheat = withExtraCrops(example, [{ id: 'wheat', kind: 'grain' }])
     expect(withWheat.extra.wheat.price).toBe('')
     expect(factsProblems(withWheat).some((p) => p.key === 'extra.wheat.price')).toBe(true)
-    const typed = { ...withWheat, extra: { wheat: { price: '220', cost: '450', yields: { el_nino: '3', neutral: '3.5', la_nina: '2' } } } }
+    const typed = { ...withWheat, extra: { wheat: { ...withWheat.extra.wheat, price: '220', cost: '450', yields: { el_nino: '3', neutral: '3.5', la_nina: '2' } } } }
     expect(factsProblems(typed)).toEqual([])
     const sent = applyFacts(rawRequest, typed)
     const wheat = ((sent.economic_facts as Json).crops as Json[]).find((c) => c.crop_id === 'wheat')!
     expect(wheat.kind).toBe('grain')
     expect((wheat.price as Json).value).toBe(220)
     expect(((wheat.yield as Json).la_nina as Json).value).toBe(2)
-    expect(withExtraCrops(typed, ['wheat']).extra.wheat.price).toBe('220')
+    expect(withExtraCrops(typed, [{ id: 'wheat', kind: 'grain' }]).extra.wheat.price).toBe('220')
     expect(withExtraCrops(typed, []).extra).toEqual({})
     expect(changedFacts(typed, example)).toBe(5)
   })
