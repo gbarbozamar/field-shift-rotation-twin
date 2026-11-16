@@ -18,8 +18,8 @@ import { useSelectedFieldId } from '../identity/selection'
 /**
  * The result cards (issue #141): one card per rotation of the results
  * example, after the field list of the fields screen. Every value the
- * example carries goes through the shared value display — its unit, its
- * provenance label and its source, its range or the reason it has none —
+ * example carries goes through the shared value display (its unit, its
+ * provenance label and its source, its range or the reason it has none),
  * and every absence renders as a missing value with its reason, never zero
  * or blank.
  *
@@ -32,15 +32,19 @@ import { useSelectedFieldId } from '../identity/selection'
  * not the ids of the example case of the identity screen; the example banner
  * is on for as long as they differ, the same honest rule the site sheet
  * applies to its examples. The name each value is displayed under is the
- * indicator identifier of the contract (soil_loss, water_deficit_exposure,
- * soil_carbon_trend) with its calendar position, rendered as data — the
- * person-approved display names of the indicators are not in the strings
- * file at the date of this unit. Decision-state wording is deliberately
- * absent: it belongs to the science reviewers (OPEN of #96).
+ * display name of its indicator (strings indicator.*, approved by the
+ * product owner on 2026-11-16) with its calendar position. Decision-state
+ * wording is deliberately absent: it belongs to the science reviewers
+ * (OPEN of #96).
  *
  * All user-visible wording lives in strings.ts; class lists are arrays of
  * single-word tokens joined at runtime.
  */
+
+/** The display name of an indicator of the contract (C1.1), approved by the product owner. */
+export function indicatorName(indicator: IndicatorId): string {
+  return strings[`indicator.${indicator}`]
+}
 
 /** The calendar position of one monthly value: the year and C5.1's month number. */
 function monthLabel(year: number, month: number): string {
@@ -77,12 +81,12 @@ function WhollyMissingRow({
   units: string[]
   missing: MissingPart
 }) {
-  return <ValueDisplay what={indicator} item={{ value: null, unit: units[0], missing }} />
+  return <ValueDisplay what={indicatorName(indicator)} item={{ value: null, unit: units[0], missing }} />
 }
 
 /**
- * One row of a card: the label names the item — the indicator identifier
- * of the contract with its calendar position, rendered as data — beside the
+ * One row of a card: the label names the item (the display name of its
+ * indicator with its calendar position) beside the
  * shared value display. The label shows for a present value, which the
  * display itself names only in its missing pattern; a missing value is
  * named by that pattern already, and no label is repeated beside it.
@@ -128,7 +132,7 @@ function SoilLossRows({ part }: { part: SoilLossPart }) {
         <ItemRow
           key={`a-${annual.ag_year}`}
           rowTestId="annual-row"
-          label={part.indicator + ' ' + String(annual.ag_year)}
+          label={indicatorName(part.indicator) + ' ' + String(annual.ag_year)}
           item={annual.item}
         />
       ))}
@@ -136,7 +140,7 @@ function SoilLossRows({ part }: { part: SoilLossPart }) {
         <ItemRow
           key={`m-${monthLabel(monthly.year, monthly.month)}-${monthly.ag_year}`}
           rowTestId="monthly-row"
-          label={part.indicator + ' ' + monthLabel(monthly.year, monthly.month)}
+          label={indicatorName(part.indicator) + ' ' + monthLabel(monthly.year, monthly.month)}
           item={monthly.item}
         />
       ))}
@@ -163,8 +167,8 @@ function WaterRows({ part }: { part: WaterPart }) {
           rowTestId="water-row"
           label={
             value.ag_year === undefined
-              ? part.indicator
-              : part.indicator + ' ' + String(value.ag_year)
+              ? indicatorName(part.indicator)
+              : indicatorName(part.indicator) + ' ' + String(value.ag_year)
           }
           item={value.item}
         />
@@ -201,10 +205,10 @@ function CarbonItemRow({
             data-testid="row-label"
             className={['font-mono', 'text-sm', 'text-fs-muted'].join(' ')}
           >
-            {indicator}
+            {indicatorName(indicator)}
           </span>
         )}
-        <ValueDisplay what={indicator} item={value.item} />
+        <ValueDisplay what={indicatorName(indicator)} item={value.item} />
       </div>
     </li>
   )

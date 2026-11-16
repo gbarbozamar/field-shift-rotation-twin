@@ -61,7 +61,7 @@ function presentCarbon(doc: ResultsPerRotation) {
 /**
  * Every item the cards render for one document, in the order the cards show
  * them: the annual and the monthly soil-loss values, the water values, the
- * carbon values — or, for a wholly missing part, the one missing item the
+ * carbon values; or, for a wholly missing part, the one missing item the
  * card renders in its place.
  */
 function renderedItems(doc: ResultsPerRotation): ValueItem[] {
@@ -139,19 +139,19 @@ describe('ResultCards: every value through the value display', () => {
 
   it('shows a value with its label, its unit, its provenance label, its source and its range', () => {
     const text = visibleText(html)
-    expect(text).toContain('soil_loss 2001 12 t ha-1 yr-1 Derived')
+    expect(text).toContain('Soil loss 2001 12 t ha-1 yr-1 Derived')
     expect(text).toContain('Source: PLACEHOLDER source: written by hand, not the output of an engine')
     expect(text).toContain('6 to 18 (PLACEHOLDER_range_kind)')
-    expect(text).toContain('soil_loss 2001-07 1 t ha-1 month-1 Derived')
-    expect(text).toContain('soil_carbon_trend 0.5 t C ha-1 yr-1 Simulated')
+    expect(text).toContain('Soil loss 2001-07 1 t ha-1 month-1 Derived')
+    expect(text).toContain('Soil carbon trend 0.5 t C ha-1 yr-1 Simulated')
   })
 
   it('shows a missing value with its reason, never zero or blank', () => {
     const text = visibleText(html)
-    expect(text).toContain('soil_loss 2002: no coverage for this place or period')
-    expect(text).toContain('soil_loss 2003-01: no coverage for this place or period')
-    expect(text).toContain('water_deficit_exposure: module not built or not enabled')
-    expect(text).toContain('soil_carbon_trend: not computable for this case')
+    expect(text).toContain('Soil loss 2002: no coverage for this place or period')
+    expect(text).toContain('Soil loss 2003-01: no coverage for this place or period')
+    expect(text).toContain('Water-deficit exposure: module not built or not enabled')
+    expect(text).toContain('Soil carbon trend: not computable for this case')
     expect(html).not.toContain('>0</span>')
   })
 })
@@ -188,7 +188,7 @@ describe('ResultCards: carbon values per model and per computation', () => {
     // The mean of the two amg values (0.375) is nowhere on the page.
     expect(text).not.toContain('0.375')
     // A model that is not enabled stays missing with its reason, three times.
-    expect(builtCard.split('soil_carbon_trend: module not built or not enabled').length - 1).toBe(
+    expect(builtCard.split('Soil carbon trend: module not built or not enabled').length - 1).toBe(
       3,
     )
   })
@@ -201,9 +201,9 @@ describe('ResultCards: a module not built', () => {
     expect(notBuiltCard).not.toBe('')
     expect(countTestIds(notBuiltCard, 'missing-line')).toBe(3)
     expect(countTestIds(notBuiltCard, 'value-line')).toBe(0)
-    for (const indicator of ['soil_loss', 'water_deficit_exposure', 'soil_carbon_trend']) {
+    for (const indicator of ['soil_loss', 'water_deficit_exposure', 'soil_carbon_trend'] as const) {
       expect(notBuiltCard).toContain(
-        `${indicator}: ${strings['missing.NOT_AVAILABLE']}`,
+        `${strings[`indicator.${indicator}`]}: ${strings['missing.NOT_AVAILABLE']}`,
       )
     }
   })

@@ -569,6 +569,12 @@ const WORDING_SHEET: Record<string, string> = {
   'plan.rotations': 'Rotations compared (crop and year sown)',
   'plan.numbers': 'Your numbers',
   'plan.declared_note': 'Every number here is your own declaration, as you typed it on the planning board.',
+  // Indicator display names (owner's decision, 2026-11-16).
+  'indicator.soil_loss': 'Soil loss',
+  'indicator.water_deficit_exposure': 'Water-deficit exposure',
+  'indicator.soil_carbon_trend': 'Soil carbon trend',
+  // Water and carbon on the planning board (l3/original-mock, PROPOSED).
+  'board.run.pending': 'Running this rotation for water and carbon...',
 }
 
 /** Source of the shell page as it was before the strings unit. */
