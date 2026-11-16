@@ -208,7 +208,7 @@ function Answered({
         </p>
       ) : null}
       <div className="space-y-3">
-        {mock !== null && (mock.whole || mock.soil || mock.record || mock.marginKinds.length !== 0 || mock.refused !== null) && <MockPanel report={mock} />}
+        {mock !== null && (mock.whole || mock.soilKinds.length !== 0 || mock.record || mock.marginKinds.length !== 0 || mock.refused !== null) && <MockPanel report={mock} />}
         <AnswerBanner
           answer={answer}
           label={chosen !== null ? nameOf(chosen.rotation_id) : null}
@@ -236,7 +236,7 @@ function Answered({
             {note}
           </p>
         ) : null}
-        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} mockSoil={mock !== null && mock.soil}
+        <CompareTable answer={answer} columns={columns} info={info} order={order} scales={scales} sort={sort} mockSoilKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.soilKinds}
           mockMarginKinds={mock === null ? [] : mock.whole ? MARGINS_OF : mock.marginKinds}
         />
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">

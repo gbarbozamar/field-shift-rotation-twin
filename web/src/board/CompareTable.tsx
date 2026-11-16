@@ -343,15 +343,15 @@ export function CompareTable({
   order,
   scales,
   sort,
-  mockSoil = false,
+  mockSoilKinds = [],
   mockMarginKinds = [],
 }: {
   /** The kinds of year whose margin is mock example data (the board mixing). */
   mockMarginKinds?: readonly string[]
   answer: PlantAnswer
   columns: BoardColumn[]
-  /** True when the soil loss of the options is mock example data (the board mixing). */
-  mockSoil?: boolean
+  /** The kinds of year (or average) whose soil loss is mock example data (the board mixing). */
+  mockSoilKinds?: readonly string[]
   /** What the columns are ordered by: only the rule of the answer gives a first place. */
   sort: SortKey
   info: (option: PlantOption) => OptionInfo
@@ -475,7 +475,7 @@ export function CompareTable({
             note={
               <>
                 {soilUnit}
-                {mockSoil && <MockBadge />}
+                {mockSoilKinds.includes(kind) && <MockBadge />}
                 {limit !== null ? (
                   <span data-testid="board-row-limit" className="block font-semibold text-fs-text">
                     {formatString(strings['board.limit_is'], { limit: displayNumber(limit.value), unit: unitText(limit.unit) })}
@@ -510,7 +510,7 @@ export function CompareTable({
               selected={each === kind}
               columns={columns}
               cell={(option) => (
-                <KindCell option={option} kind={each} worst={worstKind(answer, option) === each} mockSoil={mockSoil} mockMargin={mockMarginKinds.includes(each)} />
+                <KindCell option={option} kind={each} worst={worstKind(answer, option) === each} mockSoil={mockSoilKinds.includes(each)} mockMargin={mockMarginKinds.includes(each)} />
               )}
             />
           ))}

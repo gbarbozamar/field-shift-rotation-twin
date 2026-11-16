@@ -848,13 +848,13 @@ describe('the price the user looks at (13)', () => {
 })
 
 describe('mixed answers: mock parts are marked (l3/original-mock)', () => {
-  const mixed = (mock: { whole: boolean; soil: boolean; record: boolean; marginKinds: string[]; verdicts: boolean; refused: 'incoherent' | 'no_example' | null }): ServicePhase => ({
+  const mixed = (mock: { whole: boolean; soilKinds: string[]; record: boolean; marginKinds: string[]; verdicts: boolean; refused: 'incoherent' | 'no_example' | null }): ServicePhase => ({
     phase: 'answered',
     answer: Object.assign({ answer: example, rainStress: null }, { mock }),
   })
 
   it('a filled soil loss shows the mixed panel and the mock mark on the soil rows', () => {
-    const html = view(FIELD, mixed({ whole: false, soil: true, record: false, marginKinds: [], verdicts: true, refused: null }))
+    const html = view(FIELD, mixed({ whole: false, soilKinds: ['average', 'el_nino', 'neutral', 'la_nina'], record: false, marginKinds: [], verdicts: true, refused: null }))
     expect(html).toContain('data-testid="mock-panel"')
     expect(visibleText(html)).toContain(strings['mock.part.soil'])
     expect(visibleText(html)).toContain(strings['mock.part.verdicts'])
@@ -862,7 +862,7 @@ describe('mixed answers: mock parts are marked (l3/original-mock)', () => {
   })
 
   it('a refused fill says why and marks no value', () => {
-    const html = view(FIELD, mixed({ whole: false, soil: false, record: false, marginKinds: [], verdicts: false, refused: 'incoherent' }))
+    const html = view(FIELD, mixed({ whole: false, soilKinds: [], record: false, marginKinds: [], verdicts: false, refused: 'incoherent' }))
     expect(html).toContain('data-testid="mock-refused"')
     expect(visibleText(html)).toContain(strings['mock.refused.incoherent'])
   })

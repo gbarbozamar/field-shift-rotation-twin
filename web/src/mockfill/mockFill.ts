@@ -1,8 +1,11 @@
 import rawExamples from '../data/PLACEHOLDER_plant_answers.json'
+import exampleRequest from '../data/PLACEHOLDER_plant_request.json'
 import { postToRoute } from '../seam/runRotationApi'
 import {
   PlantNotAvailableError,
+  isRecord,
   plantRunUrl,
+  plantScreenQueryOptions,
   readAnswerMissing,
   readPlantServiceAnswer,
 } from '../plant/plantRoute'
@@ -16,9 +19,10 @@ import type { PlantServiceAnswer } from '../plant/plantRoute'
  * - Off unless VITE_MOCK_FILL is exactly "on"; off, nothing here runs.
  * - The fill works on the raw JSON body, before the screen's own parser reads
  *   it, so a filled body still has to pass every check of the contract.
- * - It fills only when the example belongs to the same question: the same
- *   rotations and, for every margin the backend did compute, the same number.
- *   Otherwise nothing is filled and the report says why (refused).
+ * - It fills only when the example belongs to the same question: the request
+ *   is the example request (same site, rotations, economic facts and limit),
+ *   and every margin and soil loss the backend did compute is the example's
+ *   number. Otherwise nothing is filled and the report says why (refused).
  * - What follows from a filled value (the limit verdicts, the answer, its
  *   cost, the tipping price) is taken from the example too, and reported, so
  *   no real verdict is ever shown next to a mock soil loss.
@@ -27,8 +31,8 @@ import type { PlantServiceAnswer } from '../plant/plantRoute'
 export interface MockReport {
   /** The whole answer is the example: the backend had no plant answer. */
   whole: boolean
-  /** The soil loss of the options was filled. */
-  soil: boolean
+  /** The kinds of year (or average) whose soil loss was filled (the backend computed the others). */
+  soilKinds: string[]
   /** The kinds of year of the record were filled. */
   record: boolean
   /** The kinds of year whose margin was filled (the backend computed the others). */
@@ -51,16 +55,24 @@ export function mockFillOn(env: MockEnv = import.meta.env): boolean {
 
 type Json = Record<string, unknown>
 
-function isRecord(value: unknown): value is Json {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 /** A measured value the backend could not compute: no value, a reason. */
 function isMissingValue(value: unknown): boolean {
   return isRecord(value) && value.value === null && typeof value.reason === 'string'
 }
 
-const NONE: MockReport = { whole: false, soil: false, record: false, marginKinds: [], verdicts: false, refused: null }
+/** A fresh report with nothing filled (a new object each time: reports are never shared). */
+function nothingFilled(refused: MockReport['refused'] = null): MockReport {
+  return { whole: false, soilKinds: [], record: false, marginKinds: [], verdicts: false, refused }
+}
+
+const SAME_AS_EXAMPLE = ['site', 'rotations', 'economic_facts', 'soil_loss_limit'] as const
+
+/** True when the request asks about exactly the example request's field, rotations, facts and limit. */
+export function isExampleRequest(request: unknown): boolean {
+  if (!isRecord(request)) return false
+  const example = exampleRequest as Json
+  return SAME_AS_EXAMPLE.every((key) => JSON.stringify(request[key]) === JSON.stringify(example[key]))
+}
 
 /** The example answer to the same questions as a request, or null when the examples hold none. */
 export function exampleFor(request: unknown): Json | null {
@@ -79,7 +91,16 @@ function optionsOf(body: Json): Json[] {
   return Array.isArray(body.options) ? (body.options as Json[]) : []
 }
 
-/** Same rotations in the same order, and every margin the backend computed equal to the example's. */
+/** True when every value the backend computed in this block equals the example's at the same kind. */
+function sameComputed(block: unknown, exampleBlock: unknown): boolean {
+  if (!isRecord(block) || !isRecord(exampleBlock)) return false
+  return Object.keys(block).every((kind) => {
+    const value = (block[kind] as Json | null)?.value
+    return value === null || value === undefined || value === (exampleBlock[kind] as Json | null)?.value
+  })
+}
+
+/** Same rotations in the same order, and every margin and soil loss the backend computed equal to the example's. */
 function coherent(real: Json, example: Json): boolean {
   const a = optionsOf(real)
   const b = optionsOf(example)
@@ -87,13 +108,7 @@ function coherent(real: Json, example: Json): boolean {
   return a.every((option, i) => {
     const other = b[i]
     if (option.rotation_id !== other.rotation_id) return false
-    const margins = option.margin as Json
-    const others = other.margin as Json
-    if (!isRecord(margins) || !isRecord(others)) return false
-    return Object.keys(margins).every((kind) => {
-      const value = (margins[kind] as Json | null)?.value
-      return value === null || value === undefined || value === (others[kind] as Json | null)?.value
-    })
+    return sameComputed(option.margin, other.margin) && sameComputed(option.soil_loss, other.soil_loss)
   })
 }
 
@@ -104,8 +119,12 @@ const OPTION_VERDICT_KEYS = ['state', 'limit', 'limit_check'] as const
  * The body with its missing parts filled from the example, and the report of
  * what was filled. Pure: neither argument is changed.
  */
-export function fillPlantBody(realBody: unknown, example: Json | null): { body: unknown; mock: MockReport } {
-  if (!isRecord(realBody)) return { body: realBody, mock: NONE }
+export function fillPlantBody(
+  realBody: unknown,
+  example: Json | null,
+  request: unknown,
+): { body: unknown; mock: MockReport } {
+  if (!isRecord(realBody)) return { body: realBody, mock: nothingFilled() }
   const real = structuredClone(realBody)
   const soilMissing = optionsOf(real).some((option) =>
     isRecord(option.soil_loss) && Object.values(option.soil_loss).some(isMissingValue),
@@ -113,12 +132,15 @@ export function fillPlantBody(realBody: unknown, example: Json | null): { body: 
   const recordMissing =
     isRecord(real.kinds_of_year) &&
     Array.isArray(real.kinds_of_year.years) &&
+    real.kinds_of_year.years.length !== 0 &&
     (real.kinds_of_year.years as Json[]).every((year) => year.kind === null)
-  if (!soilMissing && !recordMissing) return { body: real, mock: NONE }
-  if (example === null) return { body: real, mock: { ...NONE, refused: 'no_example' } }
-  if (!coherent(real, example)) return { body: real, mock: { ...NONE, refused: 'incoherent' } }
+  if (!soilMissing && !recordMissing) return { body: real, mock: nothingFilled() }
+  if (example === null) return { body: real, mock: nothingFilled('no_example') }
+  if (!isExampleRequest(request) || !coherent(real, example)) {
+    return { body: real, mock: nothingFilled('incoherent') }
+  }
 
-  const mock: MockReport = { ...NONE, marginKinds: [] }
+  const mock = nothingFilled()
   const exampleOptions = optionsOf(example)
   optionsOf(real).forEach((option, i) => {
     const losses = option.soil_loss as Json
@@ -126,7 +148,7 @@ export function fillPlantBody(realBody: unknown, example: Json | null): { body: 
     for (const kind of Object.keys(losses)) {
       if (isMissingValue(losses[kind]) && isRecord(exampleLosses[kind]) && exampleLosses[kind].value !== null) {
         losses[kind] = exampleLosses[kind]
-        mock.soil = true
+        if (!mock.soilKinds.includes(kind)) mock.soilKinds.push(kind)
       }
     }
   })
@@ -144,7 +166,7 @@ export function fillPlantBody(realBody: unknown, example: Json | null): { body: 
     real.kinds_of_year = example.kinds_of_year
     mock.record = true
   }
-  if (mock.soil || mock.record || mock.marginKinds.length !== 0) {
+  if (mock.soilKinds.length !== 0 || mock.record || mock.marginKinds.length !== 0) {
     for (const key of VERDICT_KEYS) real[key] = example[key]
     optionsOf(real).forEach((option, i) => {
       for (const key of OPTION_VERDICT_KEYS) option[key] = exampleOptions[i][key]
@@ -164,28 +186,26 @@ export async function runPlantMixed(base: string, request: Record<string, unknow
   const example = exampleFor(request)
   const missing = readAnswerMissing(body)
   if (missing !== null) {
-    if (example === null) throw new PlantNotAvailableError(missing)
-    const whole: MockReport = { whole: true, soil: true, record: true, marginKinds: [], verdicts: true, refused: null }
+    // The whole example stands in only for the example request itself: for
+    // other rotations or facts the example would answer another question.
+    if (example === null || !isExampleRequest(request)) throw new PlantNotAvailableError(missing)
+    const whole: MockReport = { ...nothingFilled(), whole: true, record: true, verdicts: true }
     return { ...readPlantServiceAnswer(example, request), mock: whole }
   }
-  const { body: filled, mock } = fillPlantBody(body, example)
+  const { body: filled, mock } = fillPlantBody(body, example, request)
   return { ...readPlantServiceAnswer(filled, request), mock }
 }
 
-/** The query options of the board with mixing on: the same call options, another query function. */
+/** The query options of the board with mixing on: the screen's call options, another key and query function. */
 export function mixedQueryOptions(base: string | null, request: Record<string, unknown> | null) {
   return {
-    queryKey: ['plant-run-mixed', base, request] as const,
-    queryFn: (): Promise<MixedServiceAnswer> => runPlantMixed(base ?? '', request ?? {}),
-    retry: false as const,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false as const,
-    enabled: base !== null && request !== null,
+    ...plantScreenQueryOptions(base, request),
+    queryKey: ['plant-run-mixed', base ?? '', request ?? {}] as const,
+    queryFn: (): Promise<PlantServiceAnswer> => runPlantMixed(base ?? '', request ?? {}),
   }
 }
 
 /** The report a service answer carries, or null when it was not mixed. */
 export function mockReportOf(answer: PlantServiceAnswer): MockReport | null {
-  const report = (answer as Partial<MixedServiceAnswer>).mock
-  return report === undefined ? null : report
+  return answer.mock ?? null
 }

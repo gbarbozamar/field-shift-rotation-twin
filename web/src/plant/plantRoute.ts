@@ -3,6 +3,7 @@ import type { MissingPart } from '../components/ValueDisplay'
 import { strings } from '../strings'
 import { missingPart, parsePlantAnswer, parseRainStress } from './plantData'
 import type { MarginOf, PlantAnswer, RainStressPart, Strictness } from './plantData'
+import type { MockReport } from '../mockfill/mockFill'
 
 /**
  * The service call of the screen "What should I plant?" (S-021, PROPOSED):
@@ -61,7 +62,7 @@ export interface PlantChoices {
   rain: boolean
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -186,6 +187,8 @@ export function readBaseRequest(baseRequest: unknown): BaseRequestRead {
 export interface PlantServiceAnswer {
   answer: PlantAnswer
   rainStress: RainStressPart | null
+  /** Present only when the board mixed this answer with example values (mockfill/mockFill.ts). */
+  mock?: MockReport
 }
 
 /**

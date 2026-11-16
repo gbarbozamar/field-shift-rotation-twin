@@ -480,7 +480,7 @@ export const strings = {
   // Mixed answers (l3/original-mock, PROPOSED). Wording is a person's decision.
   'mock.badge': 'Mock',
   'mock.panel.title': 'Mixed answer: backend values and mock example values',
-  'mock.panel.real': 'From the backend: the margin of each kind of year, the prices and your declared limit.',
+  'mock.panel.real': 'From the backend: every number without a MOCK mark, the prices and your declared limit.',
   'mock.part.whole': 'The whole answer is mock example data: the backend has no plant answer yet.',
   'mock.part.soil': 'Soil loss of every option: mock example data, because the backend has no climate record to compute it.',
   'mock.part.record': 'Kinds of year of the record: mock example data.',

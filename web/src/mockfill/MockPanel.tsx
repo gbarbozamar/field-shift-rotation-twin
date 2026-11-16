@@ -18,7 +18,7 @@ export function MockPanel({ report }: { report: MockReport }) {
   const parts: string[] = []
   if (report.whole) parts.push(strings['mock.part.whole'])
   else {
-    if (report.soil) parts.push(strings['mock.part.soil'])
+    if (report.soilKinds.length !== 0) parts.push(strings['mock.part.soil'])
     if (report.record) parts.push(strings['mock.part.record'])
     if (report.marginKinds.length !== 0) parts.push(strings['mock.part.margin'])
     if (report.verdicts) parts.push(strings['mock.part.verdicts'])
