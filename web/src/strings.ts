@@ -490,6 +490,9 @@ export const strings = {
   'mock.refused.no_example': 'Mock not applied: there is no example answer for these questions, so the missing values stay missing.',
   'mock.panel.switch': 'Mock fill is on (VITE_MOCK_FILL=on). Switch it off to see only what the backend computes.',
   // The user's own numbers on the board (l3/original-mock, PROPOSED).
+  'board.rain.your_factor': 'Your rain factor',
+  'board.rain.declared_note': 'Your declaration: the record does not yet say how often rain this erosive happens.',
+  'board.rain.invalid': 'Type a number above zero; the factor sent stays the last valid one.',
   'board.facts.title': 'Your prices, costs and limit',
   'board.facts.note': 'Your own numbers, sent exactly as you type them (declared by you). Nothing changes until you compare.',
   'board.facts.soybean': 'Soybean',

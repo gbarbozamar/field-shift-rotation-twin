@@ -144,3 +144,11 @@ describe('runPlantMixed, whole answer', () => {
     await expect(runPlantMixed('http://service.invalid', edited)).rejects.toBeInstanceOf(PlantNotAvailableError)
   })
 })
+
+describe('exampleFor and the rain factor', () => {
+  it('finds no example for a rain factor the examples were not stressed by', () => {
+    const request = structuredClone(rawRequest) as Json
+    ;((request.questions as Json).rain_stress_factor as Json).value = 1.5
+    expect(exampleFor(request)).toBeNull()
+  })
+})

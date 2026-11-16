@@ -78,11 +78,12 @@ export function isExampleRequest(request: unknown): boolean {
 export function exampleFor(request: unknown): Json | null {
   if (!isRecord(request) || !isRecord(request.questions)) return null
   const q = request.questions
-  const rainOn = q.rain_stress_factor !== null && q.rain_stress_factor !== undefined
+  // The rain factor counts by its value: an example stressed by another factor answers another question.
+  const rainValue = (q.rain_stress_factor as Json | null | undefined)?.value ?? null
   const found = (rawExamples as { answers: Json[] }).answers.find((answer) => {
     const aq = answer.questions as Json
-    const exampleRain = aq.rain_stress_factor !== null && aq.rain_stress_factor !== undefined
-    return aq.strictness === q.strictness && aq.margin_of === q.margin_of && exampleRain === rainOn
+    const exampleRain = (aq.rain_stress_factor as Json | null | undefined)?.value ?? null
+    return aq.strictness === q.strictness && aq.margin_of === q.margin_of && exampleRain === rainValue
   })
   return found === undefined ? null : structuredClone(found)
 }

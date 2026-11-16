@@ -22,7 +22,7 @@ import { CropLegend } from '../plant/PlantVisuals'
 import type { PlantAnswer, PlantOption, RainStressPart } from '../plant/plantData'
 import { configuredApiBase, plantScreenQueryOptions, readBaseRequest } from '../plant/plantRoute'
 import { MARGINS_OF } from '../plant/plantData'
-import type { PlantServiceAnswer } from '../plant/plantRoute'
+import type { DeclaredFactor, PlantServiceAnswer } from '../plant/plantRoute'
 import { MockBadge, MockPanel } from '../mockfill/MockPanel'
 import { mixedQueryOptions, mockFillOn, mockReportOf } from '../mockfill/mockFill'
 import type { MockReport } from '../mockfill/mockFill'
@@ -87,6 +87,20 @@ const REQUEST_LIMIT: { value: number; unit: string } | null =
 /** The numbers the example request declares: where the user's own numbers start. */
 const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
 const FACT_UNITS = readFactUnits(rawPlantRequest)
+
+/** The rain factor the example request declares; null when it declares none to send. */
+const REQUEST_RAIN_VALUE: number | null = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor.value : null
+
+/** A copy of a request whose declared rain factor carries this value (kept as declared otherwise). */
+function withRainFactor(request: Record<string, unknown>, value: number | null): Record<string, unknown> {
+  if (value === null) return request
+  const copy = structuredClone(request)
+  const questions = copy.questions as Record<string, unknown>
+  const factor = questions.rain_stress_factor as Record<string, unknown> | null
+  if (factor === null || factor === undefined) return copy
+  factor.value = value
+  return copy
+}
 
 /** The board asks as soon as its field is picked: the state starts in service mode. */
 export function initialBoardState(): PlantScreenState {
@@ -371,7 +385,13 @@ export function BoardView({
   previous = null,
   updating = false,
   limit = REQUEST_LIMIT,
+  rainFactor = REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null,
+  onRainFactor,
 }: {
+  /** The rain factor the request sends with the stress test; the example request's by default. */
+  rainFactor?: DeclaredFactor | null
+  /** Given when the user may declare their own rain factor. */
+  onRainFactor?: (value: number) => void
   /** The soil-loss limit of the comparison shown, as declared; the example request's by default. */
   limit?: { value: number; unit: string } | null
   selectedFieldId: string | null
@@ -467,8 +487,9 @@ export function BoardView({
         <BoardControls
           marginOf={state.marginOf}
           strictness={state.strictness}
-          rain={state.rain && REQUEST_READ.rain.kind === 'present'}
-          rainFactor={REQUEST_READ.rain.kind === 'present' ? REQUEST_READ.rain.factor : null}
+          rain={state.rain && rainFactor !== null}
+          rainFactor={rainFactor}
+          onRainFactor={onRainFactor}
           record={service !== null && service.phase === 'answered' ? service.answer.answer.kinds_of_year : null}
           limit={limit}
           disabled={selectedFieldId !== REQUEST_FIELD_ID || apiBase === null}
@@ -510,7 +531,13 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   // The user's own numbers, sent and being edited, as the rotations are.
   const [factsSent, setFactsSent] = useState<FactsDraft>(EXAMPLE_FACTS)
   const [factsDraft, setFactsDraft] = useState<FactsDraft>(EXAMPLE_FACTS)
-  const baseRequest = useMemo(() => applyFacts({ ...rawPlantRequest, rotations: sent }, factsSent), [sent, factsSent])
+  // The rain factor the user declares for the stress test (the example's to start).
+  const [rainValue, setRainValue] = useState<number | null>(REQUEST_RAIN_VALUE)
+  const baseRequest = useMemo(
+    () => withRainFactor(applyFacts({ ...rawPlantRequest, rotations: sent }, factsSent), rainValue),
+    [sent, factsSent, rainValue],
+  )
+  const baseRead = useMemo(() => readBaseRequest(baseRequest), [baseRequest])
   const rotations = useMemo(() => readPlantRotations(baseRequest), [baseRequest])
   const asks = apiBase !== null && selectedFieldId === REQUEST_FIELD_ID
   const request = useMemo(
@@ -558,6 +585,8 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
       onToggleMap={() => setMapChoice(!mapOpen)}
       rotations={rotations}
       limit={{ value: Number(factsSent.limit), unit: rawPlantRequest.soil_loss_limit.unit }}
+      rainFactor={baseRead.rain.kind === 'present' ? baseRead.rain.factor : null}
+      onRainFactor={setRainValue}
       builder={
         <>
         <RotationBuilder
