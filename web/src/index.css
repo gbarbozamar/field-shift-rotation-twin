@@ -78,6 +78,10 @@
   --fs-radius: 8px;
   --fs-control-min: 44px;
   --fs-motion: 160ms;
+  /* Shell tokens (l3/erp-shell): the tinted tile of an active menu item and
+     of a card icon, and the faint furrows of the content background. */
+  --fs-brand-soft: color-mix(in srgb, var(--fs-primary) 18%, var(--fs-surface));
+  --fs-furrow: color-mix(in srgb, var(--fs-primary) 5%, transparent);
 }
 
 /* Tailwind 4 theme bridge: registers the tokens as utilities for later
@@ -111,6 +115,7 @@
   --color-fs-crop-4: var(--fs-crop-4);
   --color-fs-crop-5: var(--fs-crop-5);
   --color-fs-crop-6: var(--fs-crop-6);
+  --color-fs-brand-soft: var(--fs-brand-soft);
 }
 
 /* The hatch of what is not known (l3/board): a value that is missing, a
@@ -121,6 +126,15 @@
     var(--fs-border) 0 4px,
     transparent 4px 10px
   );
+}
+
+/* The calm field background of the content area (l3/erp-shell): faint
+   diagonal furrows over the background token, a soft light at the top. */
+@utility fs-field-bg {
+  background-color: var(--fs-bg);
+  background-image:
+    radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--fs-surface) 70%, transparent), transparent 70%),
+    repeating-linear-gradient(118deg, var(--fs-furrow) 0 1px, transparent 1px 26px);
 }
 
 body {

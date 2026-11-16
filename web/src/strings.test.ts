@@ -569,6 +569,16 @@ const WORDING_SHEET: Record<string, string> = {
   'plan.rotations': 'Rotations compared (crop and year sown)',
   'plan.numbers': 'Your numbers',
   'plan.declared_note': 'Every number here is your own declaration, as you typed it on the planning board.',
+  // The application shell: sidebar, top bar and menu (l3/erp-shell, PROPOSED).
+  'nav.print': 'Print sheet',
+  'nav.saved': 'Saved case',
+  'shell.group.overview': 'Overview',
+  'shell.group.planning': 'Planning',
+  'shell.group.outputs': 'Outputs',
+  'shell.menu_open': 'Open the menu',
+  'shell.menu_close': 'Close the menu',
+  'shell.example_chip': 'Example data',
+  'shell.case_footer': 'Case on screen',
 }
 
 /** Source of the shell page as it was before the strings unit. */
