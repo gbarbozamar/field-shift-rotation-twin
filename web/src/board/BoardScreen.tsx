@@ -109,8 +109,8 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
               data-selected={String(field.field_id === selectedFieldId)}
               className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
             >
-              <p className="font-bold leading-tight">{field.name}</p>
-              <p data-testid="board-field-area" className="text-xs tabular-nums">
+              <p id={`board-field-${field.field_id}-name`} className="font-bold leading-tight">{field.name}</p>
+              <p id={`board-field-${field.field_id}-area`} data-testid="board-field-area" className="text-xs tabular-nums">
                 {formatString(strings['field.area'], { ha: fieldAreaHa(field).toFixed(1) })}
               </p>
               {site !== null && (
@@ -122,7 +122,8 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
             <button
               type="button"
               aria-pressed={field.field_id === selectedFieldId}
-              aria-label={field.name}
+              aria-labelledby={`board-field-${field.field_id}-name`}
+              aria-describedby={`board-field-${field.field_id}-area`}
               className="absolute inset-0 cursor-pointer rounded-xl"
               onClick={() => setSelectedFieldId(field.field_id)}
             />

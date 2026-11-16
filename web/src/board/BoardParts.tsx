@@ -5,6 +5,7 @@ import { displayNumber, missingPatternText } from '../components/ValueDisplay'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
+import { RangeLine } from './CompareTable'
 import { MARGINS_OF, STRICTNESSES } from '../plant/plantData'
 import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
 import type {
@@ -191,6 +192,7 @@ function TileNumber({ item, mark = null }: { item: Measured; mark?: string | nul
         <sup className="ml-0.5 font-mono text-[10px] opacity-80">{mark}</sup>
       ) : null}{' '}
       <span className="text-xs opacity-70">{unitText(item.unit)}</span>
+      <RangeLine item={item} className="block text-[11px] opacity-80" />
     </p>
   )
 }
@@ -515,7 +517,7 @@ export function RecordRibbon({ record, marginOf }: { record: KindsOfYearRecord; 
           {formatString(strings['board.record.span'], { first, last, n: record.years.length })}
         </p>
       </div>
-      <ol className="mt-3 flex gap-1">
+      <ol className="mt-3 flex flex-wrap gap-1">
         {record.years.map((year) => (
           <li
             key={year.ag_year}
@@ -523,7 +525,7 @@ export function RecordRibbon({ record, marginOf }: { record: KindsOfYearRecord; 
             data-tone={year.kind !== null ? kindTone(year.kind) : 'open'}
             data-dim={String(marginOf !== 'average' && year.kind !== marginOf)}
             title={year.kind !== null ? strings[`plant.kind.${year.kind}`] : strings['plant.table.no_value']}
-            className="min-w-0 flex-1 data-[dim=true]:opacity-30"
+            className="w-9 shrink-0 data-[dim=true]:opacity-30"
           >
             <span
               data-tone={year.kind !== null ? kindTone(year.kind) : 'open'}

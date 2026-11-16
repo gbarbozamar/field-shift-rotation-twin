@@ -3,7 +3,6 @@ import { strings } from '../strings'
 import { cropName } from './boardModel'
 import { useState } from 'react'
 import {
-  BASE_YEAR,
   asUserRotation,
   MAX_ROTATIONS,
   MIN_ROTATIONS,
@@ -123,7 +122,7 @@ function SeasonGrid({
         {grid.map((row, r) => (
           <div key={r} className="contents">
             <span className="self-center text-xs font-semibold text-fs-muted">
-              {formatString(strings['board.builder.year'], { n: r + 1, year: BASE_YEAR + r })}
+              {formatString(strings['board.builder.year'], { n: r + 1 })}
             </span>
             {SEASONS.map((season: Season, s) => {
               const content = row[s]
@@ -159,6 +158,7 @@ function SeasonGrid({
           </div>
         ))}
       </div>
+      <p className="mt-2 text-xs text-fs-muted">{strings['board.builder.cycle_note']}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
@@ -313,7 +313,9 @@ export function RotationBuilder({
       <ul className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {draft.map((rotation, index) => (
           <RotationEditor
-            key={rotation.rotation_id}
+            // By position, not identifier: an example rotation the user changes gets a new identifier,
+            // and a remount would drop the focus and the years added to its grid.
+            key={index}
             rotation={rotation}
             index={index}
             rotations={draft}

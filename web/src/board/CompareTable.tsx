@@ -128,6 +128,36 @@ function Mark({ mark }: { mark: string }) {
 }
 
 /**
+ * The uncertainty of a number, said beside it: its range, or that it has
+ * none (the reason the answer gives travels in the title). Nothing for a
+ * missing number, whose reason is already shown.
+ */
+export function RangeLine({ item, className = 'block text-[11px] text-fs-muted' }: { item: Measured; className?: string }) {
+  if (item.labels === null) return null
+  if (item.labels.range !== null) {
+    return (
+      <span data-testid="board-range" className={className}>
+        {formatString(strings['value.range'], {
+          low: displayNumber(item.labels.range.low),
+          high: displayNumber(item.labels.range.high),
+          kind: item.labels.range.kind,
+        })}
+      </span>
+    )
+  }
+  const reason = item.labels.range_missing
+  return (
+    <span
+      data-testid="board-no-range-line"
+      className={className}
+      title={reason === null ? undefined : missingPatternText(strings['board.no_range'], reason)}
+    >
+      {strings['board.no_range']}
+    </span>
+  )
+}
+
+/**
  * A number of the table: its unit is said once, in the head of its row, and
  * its mark points at its note. Its range, when the answer carries one, is
  * shown under it.
@@ -142,15 +172,7 @@ function Number({ item, mark }: { item: Measured; mark: string }) {
     <span className="tabular-nums" title={String(item.value)}>
       <span className="font-fs-heading text-xl font-extrabold">{displayNumber(item.value)}</span>
       <Mark mark={mark} />
-      {item.labels.range !== null ? (
-        <span data-testid="board-range" className="block text-[11px] text-fs-muted">
-          {formatString(strings['value.range'], {
-            low: displayNumber(item.labels.range.low),
-            high: displayNumber(item.labels.range.high),
-            kind: item.labels.range.kind,
-          })}
-        </span>
-      ) : null}
+      <RangeLine item={item} />
     </span>
   )
 }
@@ -300,6 +322,7 @@ function KindCell({
         <p title={String(margin.value)}>
           <span className="font-fs-heading text-base font-bold">{displayNumber(margin.value)}</span>
           {mockMargin && <MockBadge />}
+          <RangeLine item={margin} className="ml-1.5 text-[10px] font-normal text-fs-muted" />
           {worst ? (
             <span data-testid="board-worst" className="ml-1.5 rounded border border-fs-border px-1 text-[10px] font-semibold uppercase text-fs-muted">
               {strings['board.worst_mark']}
@@ -320,7 +343,14 @@ function KindCell({
           {mockSoil && <MockBadge />}
           {tone === 'over' ? (
             <span className="ml-1 uppercase">{strings['plant.table.over_limit']}</span>
+          ) : tone === 'open' ? (
+            <span data-testid="board-kind-not-resolved" className="ml-1 uppercase text-fs-warning">{strings['plant.pill.not_resolved']}</span>
+          ) : tone === 'none' ? (
+            <span data-testid="board-kind-not-in-record" className="ml-1 uppercase">{strings['board.kind.not_in_record']}</span>
           ) : null}
+          <span data-testid="board-kind-years" className="block text-[10px] text-fs-muted">
+            {formatString(strings['board.kind.mean_years'], { n: loss.n_years })}
+          </span>
         </p>
       ) : (
         <p className="text-xs italic text-fs-muted">

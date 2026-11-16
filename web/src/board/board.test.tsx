@@ -888,3 +888,24 @@ describe('the plan on the print sheet (l3/original-mock)', async () => {
     expect(renderToString(<PlanSummaryView plan={withAnswer} fieldId={OTHER_FIELD} />)).toContain('data-testid="plan-no-answer"')
   })
 })
+
+describe('what each number carries in the table (l3/original-mock)', () => {
+  it('each kind-of-year soil loss says how many years it is the mean of', () => {
+    const html = view(FIELD, answered(example))
+    expect(count(html, 'data-testid="board-kind-years"')).toBeGreaterThan(0)
+  })
+
+  it('a soil loss not resolved in a kind of year says so in words, not only in colour', () => {
+    const option = example.options[0]
+    const unresolved: PlantAnswer = {
+      ...example,
+      options: [{ ...option, kinds_not_resolved: ['el_nino'], kinds_not_met: option.kinds_not_met.filter((k) => k !== 'el_nino'), kinds_not_in_record: option.kinds_not_in_record.filter((k) => k !== 'el_nino') }, ...example.options.slice(1)],
+    }
+    expect(view(FIELD, answered(unresolved))).toContain('data-testid="board-kind-not-resolved"')
+  })
+
+  it('the headline numbers carry their range or say they have none', () => {
+    const banner = after(view(FIELD, answered(example)), 'board-answer')
+    expect(banner.includes('data-testid="board-range"') || banner.includes('data-testid="board-no-range-line"')).toBe(true)
+  })
+})
