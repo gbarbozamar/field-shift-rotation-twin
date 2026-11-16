@@ -552,7 +552,7 @@ def _check_calendars(
             f"got {type(calendars).__name__} (G5)"
         )
     entries: list[tuple[tuple[str, str], RotationCalendar]] = []
-    for key, calendar in calendars.items():
+    for key, rotation_calendar in calendars.items():
         if not isinstance(key, tuple) or len(key) != 2:
             raise TypeError(
                 "calendars: every key must be a (rotation_id, scenario_id) pair, "
@@ -568,12 +568,12 @@ def _check_calendars(
             raise ValueError(
                 "calendars: rotation_id and scenario_id must be non-empty text (G5)"
             )
-        if not isinstance(calendar, RotationCalendar):
+        if not isinstance(rotation_calendar, RotationCalendar):
             raise TypeError(
                 f"calendars[{key!r}]: expected RotationCalendar, "
-                f"got {type(calendar).__name__} (G5)"
+                f"got {type(rotation_calendar).__name__} (G5)"
             )
-        entries.append(((rotation_id, scenario_id), calendar))
+        entries.append(((rotation_id, scenario_id), rotation_calendar))
     return entries
 
 

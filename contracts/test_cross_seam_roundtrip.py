@@ -1,7 +1,7 @@
 """Cross-seam round-trip, identifier alignment, and C3.1/C3.2 invariants test.
 
 Covers every shipped ``contracts/*/examples/PLACEHOLDER_*.json`` file and its
-Pydantic model across all eleven contract packages:
+Pydantic model across all twelve contract packages:
 
 - ``contracts/inputs/``
 - ``contracts/results/``
@@ -14,6 +14,7 @@ Pydantic model across all eleven contract packages:
 - ``contracts/field_identity/``
 - ``contracts/economic_facts/``
 - ``contracts/plant_answer/``
+- ``contracts/green_cover/``
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from contracts.carbon_forcing import CarbonForcing
 from contracts.decision_output import DecisionOutput
 from contracts.economic_facts import EconomicFacts
 from contracts.field_identity import FieldIdentity
+from contracts.green_cover import GreenCoverStrip
 from contracts.inputs import RotationCalendar, SiteClimate, SiteSoilSlope
 from contracts.inputs.common import DateValue, Missing, ReasonCode, Value
 from contracts.inputs.site_climate import DailyValue, MonthlyValue
@@ -58,6 +60,7 @@ EXAMPLE_MODELS: dict[str, type[BaseModel]] = {
     "decision_output/examples/PLACEHOLDER_decision_output.json": DecisionOutput,
     "economic_facts/examples/PLACEHOLDER_economic_facts.json": EconomicFacts,
     "field_identity/examples/PLACEHOLDER_field_identity.json": FieldIdentity,
+    "green_cover/examples/PLACEHOLDER_green_cover.json": GreenCoverStrip,
     "inputs/examples/PLACEHOLDER_chain_site_climate.json": SiteClimate,
     "inputs/examples/PLACEHOLDER_chain_site_soil_slope.json": SiteSoilSlope,
     "inputs/examples/PLACEHOLDER_rotation_calendar.json": RotationCalendar,
@@ -335,6 +338,7 @@ def test_example_data_false_preserved_and_composite_propagation_enforced() -> No
         "carbon_forcing/examples/PLACEHOLDER_carbon_forcing.json",
         "carbon_balance/examples/PLACEHOLDER_carbon_balance.json",
         "decision_output/examples/PLACEHOLDER_decision_output.json",
+        "green_cover/examples/PLACEHOLDER_green_cover.json",
     ):
         raw = json.loads(_read_example_text(rel_path))
         raw["example_data"] = False
@@ -378,6 +382,7 @@ def test_example_case_family_id_alignment_across_seams() -> None:
     _, saved = _roundtrip("saved_case/examples/PLACEHOLDER_saved_case.json")
     _, req = _roundtrip("plant_answer/examples/PLACEHOLDER_plant_request.json")
     _, ans = _roundtrip("plant_answer/examples/PLACEHOLDER_plant_answer.json")
+    _, green_cover = _roundtrip("green_cover/examples/PLACEHOLDER_green_cover.json")
 
     assert isinstance(identity, FieldIdentity)
     assert isinstance(climate, SiteClimate)
@@ -388,13 +393,14 @@ def test_example_case_family_id_alignment_across_seams() -> None:
     assert isinstance(saved, SavedCase)
     assert isinstance(req, PlantRequest)
     assert isinstance(ans, PlantAnswer)
+    assert isinstance(green_cover, GreenCoverStrip)
 
     expected_case = "example-case"
     expected_field = "example-field-1"
     known_fields = {f.field_id for f in identity.fields}
     assert expected_field in known_fields
 
-    for doc in (climate, soil, rotation, facts, decision, saved, ans):
+    for doc in (climate, soil, rotation, facts, decision, saved, ans, green_cover):
         assert doc.case_id == expected_case
         assert doc.field_id == expected_field
 

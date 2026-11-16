@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderToString } from 'react-dom/server'
 import rawDecisionOutput from '../data/PLACEHOLDER_decision_output.json'
 import rawDemoRotations from '../data/demo_rotations_d128.json'
+import rawSavedCase from '../data/saved_case.json'
 import { missingPatternText } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import { setSelectedFieldId } from '../identity/selection'
@@ -14,11 +15,18 @@ import { strings } from '../strings'
 import DecisionSection, {
   DecisionPanel,
   HELD_ROTATIONS,
+  filterCountsByYear,
+  filterScenarioYearDifferences,
   notCalledReason,
   sectionStateOf,
 } from './DecisionSection'
-import type { DecisionSectionState } from './DecisionSection'
-import { decisionExample, parseDecisionOutput, samePair } from './decisionData'
+import type { DecisionSectionState, YearSelection } from './DecisionSection'
+import {
+  agriculturalYearsOf,
+  decisionExample,
+  parseDecisionOutput,
+  samePair,
+} from './decisionData'
 import { demoRotationsD128, parseDemoRotations } from './demoRotations'
 import {
   decisionRequestOf,
@@ -28,11 +36,13 @@ import {
 } from './decisionRoute'
 
 /**
- * Acceptance test of the decision section (issues #241 and #354). The panel
- * is a pure function of its state, so its whole behaviour is its static
- * markup, rendered with the pure server renderer of react-dom. Every
- * expected text below is the supplied wording of strings.ts filled with the
- * values of the data, written out in full.
+ * Acceptance test of the decision section (issues #241, #354, and Block 4
+ * "Measure first" with its field and named-years selector). The panel is a
+ * pure function of its state (with optional controlled year selection for
+ * tests), so its whole behaviour is its static markup, rendered with the pure
+ * server renderer of react-dom. Every expected text below is the supplied
+ * wording of strings.ts filled with the values of the data, written out in
+ * full.
  *
  * The bundled example (issue #241), the fallback of the section:
  * (a) one block per rotation pair of the example, named by its two
@@ -41,7 +51,11 @@ import {
  * (c) the two counts render under their own headings, apart, never summed;
  * (d) the coverage and the years-within summary render from the data;
  * (e) the example banner is visible;
- * (f) nothing the section does not render is invented.
+ * (f) nothing the section does not render is invented;
+ * (g) Block 4: measure_first (D4) renders ranked items with field_id or
+ *     NOT_DECLARED when empty, and the named-years selector discovers
+ *     distinct agricultural years from the data and filters counts_by_year
+ *     and scenario-year rows.
  *
  * The route's document (issue #354), with the route mocked: no real
  * network. The fetch boundary is stubbed with the shapes of api/decisions.py
@@ -76,8 +90,8 @@ function renderExample(): string {
   return renderToString(<DecisionPanel state={{ phase: 'not-called', missing: null }} />)
 }
 
-function renderState(state: DecisionSectionState): string {
-  return renderToString(<DecisionPanel state={state} />)
+function renderState(state: DecisionSectionState, selectedYear?: YearSelection): string {
+  return renderToString(<DecisionPanel state={state} selectedYear={selectedYear} />)
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -249,27 +263,215 @@ describe('DecisionSection: the bundled example', () => {
 
   // -- (f) no invented field -----------------------------------------------------------
 
-  it('renders nothing for the parts it does not render: no limits, no paired differences, no tolerances, no counts by year, no measurement priority (f)', () => {
+  it('renders nothing for the parts it does not render: no limits, no tolerances, no paired-difference method or rotation-basis differences (f)', () => {
     const html = renderExample()
-    // The limit value and its unit (limits).
-    expect(html).not.toContain('t ha-1 yr-1')
+    // The limit value and its reason (limits).
     expect(html).not.toContain('the user declared the limit without a range')
-    // The paired differences, their cells and their method.
+    expect(html).not.toContain('no limit is declared for this indicator')
+    // The rotation-basis paired differences and the paired-difference method.
     expect(html).not.toContain('end_minus_start')
-    expect(html).not.toContain('-14')
     expect(html).not.toContain('paired-difference method')
-    // The tolerance of soil_loss.
+    // The tolerance of soil_loss and other indicators.
     expect(html).not.toContain('the designer of the case set the tolerance without a range')
-    // The counts by year and their rows not evaluated.
+    expect(html).not.toContain('the designer of the case set no tolerance')
+    // No raw contract field names leaked into visible markup.
     expect(html).not.toContain('years_evaluated')
-    expect(html).not.toContain('the example series ends before this agricultural year does')
-    // The measurement priority.
-    expect(html).not.toContain('residue cover at sowing')
-    expect(html).not.toContain('illustrative: moves the soil-loss difference')
     // No reason line: no call was attempted and no reason was given.
     expect(countTestIds(html, 'decision-not-called')).toBe(0)
     expect(countTestIds(html, 'decision-route-missing')).toBe(0)
     expect(countTestIds(html, 'decision-route-error')).toBe(0)
+  })
+})
+
+// --- Block 4: Measure first with its field & named-years selector --------------------
+
+describe('Measure first (D4) with its field', () => {
+  it('renders measure_first items with rank, scope and priority reason beside field_id on the bundled example', () => {
+    const html = renderExample()
+    const text = visibleText(html)
+
+    expect(countTestIds(html, 'decision-measure-first')).toBe(1)
+    expect(text).toContain(strings['decision.measure_first'])
+    expect(text).toContain('Field: example-field-1')
+    expect(countTestIds(html, 'decision-measure-first-item')).toBe(1)
+    expect(text).toContain('Rank 1')
+    expect(text).toContain('residue cover at sowing')
+    expect(text).toContain('illustrative: moves the soil-loss difference more than the evaluated inputs')
+    expect(countTestIds(html, 'decision-measure-first-empty')).toBe(0)
+  })
+
+  it('renders tied-rank items from saved_case decision_output verbatim with its field', () => {
+    const savedDecision = parseDecisionOutput(rawSavedCase.decision_output)
+    const html = renderState({
+      phase: 'answered',
+      answer: { kind: 'decision', document: savedDecision, liveData: false },
+    })
+    const text = visibleText(html)
+
+    expect(text).toContain(`Field: ${savedDecision.field_id}`)
+    expect(countTestIds(html, 'decision-measure-first-item')).toBe(savedDecision.measure_first.length)
+    expect(countText(text, 'Rank 2')).toBe(3)
+    expect(text).toContain('&#x27;u&#x27; (the 2022 soil loss of rotations B and C, t ha-1 yr-1)')
+    expect(text).toContain('the admitted values of')
+  })
+
+  it('shows NOT_DECLARED via the shared missing pattern when measure_first is empty, never inventing parameters', () => {
+    const routeDoc = parseDecisionOutput(ROUTE_DOCUMENT)
+    const html = renderState({
+      phase: 'answered',
+      answer: { kind: 'decision', document: routeDoc, liveData: true },
+    })
+    const text = visibleText(html)
+
+    expect(countTestIds(html, 'decision-measure-first-item')).toBe(0)
+    expect(countTestIds(html, 'decision-measure-first-empty')).toBe(1)
+    expect(text).toContain(`Field: ${routeDoc.field_id}`)
+    expect(text).toContain(
+      missingPatternText(strings['decision.measure_first'], {
+        reason: 'NOT_DECLARED',
+        detail: strings['decision.measure_first_not_declared'],
+      }),
+    )
+  })
+})
+
+describe('named-years selector and year filtering', () => {
+  it('discovers distinct agricultural years strictly from counts_by_year and paired_differences, sorted ascending', () => {
+    expect(agriculturalYearsOf(decisionExample)).toEqual([2001, 2002])
+    expect(agriculturalYearsOf(parseDecisionOutput(ROUTE_DOCUMENT))).toEqual([])
+    expect(agriculturalYearsOf(parseDecisionOutput(rawSavedCase.decision_output))).toEqual([
+      2020, 2021, 2022, 2023,
+    ])
+  })
+
+  it('renders the selector with All years plus discovered agricultural years on the bundled example', () => {
+    const html = renderExample()
+    expect(countTestIds(html, 'decision-named-years')).toBe(1)
+    expect(html).toContain(strings['decision.named_years'])
+    expect(html).toContain(`<option value="all" selected="">${strings['decision.named_years_all']}</option>`)
+    expect(html).toContain('<option value="2001">2001</option>')
+    expect(html).toContain('<option value="2002">2002</option>')
+    expect(countTestIds(html, 'decision-named-years-none')).toBe(0)
+  })
+
+  it('renders a disabled selector with no invented years when the document carries no agricultural years', () => {
+    const routeDoc = parseDecisionOutput(ROUTE_DOCUMENT)
+    const html = renderState({
+      phase: 'answered',
+      answer: { kind: 'decision', document: routeDoc, liveData: true },
+    })
+    expect(html).toContain('disabled=""')
+    expect(countTestIds(html, 'decision-named-years-none')).toBe(1)
+    expect(html).toContain(strings['decision.named_years_none'])
+    expect(countTestIds(html, 'decision-counts-by-year-empty')).toBe(1)
+    expect(countTestIds(html, 'decision-scenario-years-empty')).toBe(1)
+  })
+
+  it('shows all counts_by_year and scenario-year rows when All years is selected', () => {
+    const html = renderExample()
+    const text = visibleText(html)
+
+    expect(countTestIds(html, 'decision-count-by-year-item')).toBe(2)
+    expect(countTestIds(html, 'decision-not-evaluated-row')).toBe(2)
+    expect(text).toContain('1 evaluated, 0 within the limit')
+    expect(text).toContain('Not evaluated 2002: no coverage for this place or period')
+    expect(countTestIds(html, 'decision-scenario-year-row')).toBe(2)
+    expect(text).toContain('example-rotation-1 against example-rotation-2 PLACEHOLDER_scenario_one soil_loss 2001')
+    expect(text).toContain('-4 t ha-1 yr-1 Derived')
+    expect(text).toContain('-14 to 6 (PLACEHOLDER_range_kind)')
+    expect(text).toContain('soil_loss 2002: missing input:')
+  })
+
+  it('filters counts_by_year not-evaluated rows and scenario-year rows when a specific year is selected', () => {
+    const html2001 = renderState({ phase: 'not-called', missing: null }, 2001)
+    const text2001 = visibleText(html2001)
+    expect(html2001).toContain('<option value="2001" selected="">2001</option>')
+    expect(countTestIds(html2001, 'decision-not-evaluated-row')).toBe(0)
+    expect(text2001).not.toContain('Not evaluated 2002')
+    expect(countTestIds(html2001, 'decision-scenario-year-row')).toBe(1)
+    expect(text2001).toContain('soil_loss 2001')
+    expect(text2001).toContain('-4 t ha-1 yr-1 Derived')
+    expect(text2001).not.toContain('soil_loss 2002: missing input')
+
+    const html2002 = renderState({ phase: 'not-called', missing: null }, 2002)
+    const text2002 = visibleText(html2002)
+    expect(html2002).toContain('<option value="2002" selected="">2002</option>')
+    expect(countTestIds(html2002, 'decision-not-evaluated-row')).toBe(2)
+    expect(text2002).toContain('Not evaluated 2002')
+    expect(countTestIds(html2002, 'decision-scenario-year-row')).toBe(1)
+    expect(text2002).toContain('soil_loss 2002: missing input')
+    expect(text2002).not.toContain('-14 to 6')
+  })
+
+  it('handles unjudged counts_by_year (years_within_limits null) with NOT_DECLARED and filters by year', () => {
+    const docWithUnjudged = parseDecisionOutput({
+      ...ROUTE_DOCUMENT,
+      counts_by_year: [
+        {
+          rotation_id: PAIR[0],
+          scenario_id: 'phase_1+phase_1',
+          indicator: 'soil_loss',
+          carbon_model: null,
+          computation: null,
+          years_evaluated: 0,
+          years_within_limits: null,
+          not_evaluated: [
+            {
+              time_basis: 'ag_year',
+              ag_year: 2020,
+              carbon_model: null,
+              computation: null,
+              missing: { reason: 'NOT_DECLARED', detail: 'no limit declared' },
+            },
+            {
+              time_basis: 'ag_year',
+              ag_year: 2021,
+              carbon_model: null,
+              computation: null,
+              missing: { reason: 'NO_COVERAGE', detail: 'missing climate' },
+            },
+          ],
+        },
+      ],
+    })
+
+    const htmlAll = renderState({
+      phase: 'answered',
+      answer: { kind: 'decision', document: docWithUnjudged, liveData: false },
+    })
+    const textAll = visibleText(htmlAll)
+    expect(textAll).toContain('0 evaluated')
+    expect(textAll).toContain('Years within the limit: not declared for this case')
+    expect(countTestIds(htmlAll, 'decision-not-evaluated-row')).toBe(2)
+
+    const html2021 = renderState(
+      { phase: 'answered', answer: { kind: 'decision', document: docWithUnjudged, liveData: false } },
+      2021,
+    )
+    const text2021 = visibleText(html2021)
+    expect(countTestIds(html2021, 'decision-not-evaluated-row')).toBe(1)
+    expect(text2021).toContain('Not evaluated 2021: no coverage for this place or period')
+    expect(text2021).not.toContain('Not evaluated 2020')
+  })
+
+  it('falls back to All years if a selected year is not present in the document', () => {
+    const html = renderState({ phase: 'not-called', missing: null }, 2099)
+    expect(html).toContain(`<option value="all" selected="">${strings['decision.named_years_all']}</option>`)
+    expect(countTestIds(html, 'decision-scenario-year-row')).toBe(2)
+  })
+
+  it('filterCountsByYear and filterScenarioYearDifferences filter purely without mutating inputs', () => {
+    expect(filterCountsByYear(decisionExample.counts_by_year, 'all')).toHaveLength(2)
+    expect(filterCountsByYear(decisionExample.counts_by_year, 2001).map((c) => c.notEvaluated)).toEqual([
+      [],
+      [],
+    ])
+    expect(filterCountsByYear(decisionExample.counts_by_year, 2002).map((c) => c.notEvaluated.length)).toEqual([
+      1, 1,
+    ])
+    expect(filterScenarioYearDifferences(decisionExample.paired_differences, 'all')).toHaveLength(2)
+    expect(filterScenarioYearDifferences(decisionExample.paired_differences, 2001)).toHaveLength(1)
+    expect(filterScenarioYearDifferences(decisionExample.paired_differences, 2002)).toHaveLength(1)
   })
 })
 
@@ -932,6 +1134,59 @@ describe('parseDecisionOutput', () => {
       copy.example_data = 'yes'
     })
     expect(() => parseDecisionOutput(doc)).toThrow(/example-data-not-a-boolean/)
+  })
+
+  it('rejects an empty or missing field_id', () => {
+    const doc = broken((copy) => {
+      copy.field_id = ''
+    })
+    expect(() => parseDecisionOutput(doc)).toThrow(/field-id-empty/)
+  })
+
+  it('rejects invalid measure_first entries and out-of-order ranks (D4)', () => {
+    const zeroRank = broken((copy) => {
+      copy.measure_first = [{ rank: 0, what: 'input', why: 'reason' }]
+    })
+    expect(() => parseDecisionOutput(zeroRank)).toThrow(/rank-not-positive-integer/)
+
+    const emptyWhy = broken((copy) => {
+      copy.measure_first = [{ rank: 1, what: 'input', why: '' }]
+    })
+    expect(() => parseDecisionOutput(emptyWhy)).toThrow(/why-empty/)
+
+    const outOfOrder = broken((copy) => {
+      copy.measure_first = [
+        { rank: 2, what: 'a', why: 'b' },
+        { rank: 1, what: 'c', why: 'd' },
+      ]
+    })
+    expect(() => parseDecisionOutput(outOfOrder)).toThrow(/not-in-rank-order/)
+  })
+
+  it('rejects invalid counts_by_year and paired_differences entries', () => {
+    const withinAbove = broken((copy) => {
+      const count = (copy.counts_by_year as Record<string, unknown>[])[0]
+      count.years_within_limits = 5
+    })
+    expect(() => parseDecisionOutput(withinAbove)).toThrow(/within-greater-than-evaluated/)
+
+    const carbonCount = broken((copy) => {
+      const count = (copy.counts_by_year as Record<string, unknown>[])[0]
+      count.indicator = 'soil_carbon_trend'
+    })
+    expect(() => parseDecisionOutput(carbonCount)).toThrow(/soil-carbon-trend-has-no-count-by-year/)
+
+    const missingAgYear = broken((copy) => {
+      const diff = (copy.paired_differences as Record<string, unknown>[])[0]
+      delete diff.ag_year
+    })
+    expect(() => parseDecisionOutput(missingAgYear)).toThrow(/ag-year-not-an-integer/)
+
+    const rotationWithAgYear = broken((copy) => {
+      const diff = (copy.paired_differences as Record<string, unknown>[])[2]
+      diff.ag_year = 2001
+    })
+    expect(() => parseDecisionOutput(rotationWithAgYear)).toThrow(/rotation-basis-with-ag-year/)
   })
 
   it('leaves the document passed in unchanged', () => {
