@@ -106,7 +106,7 @@ export function FactsEditor({
     <div data-testid="board-facts">
       <p className="mb-3 text-sm text-fs-muted">{strings['board.facts.note']}</p>
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-        <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
+        <fieldset className="space-y-2 fs-card p-3">
           <legend className="px-1 font-bold">{strings['board.facts.soybean']}</legend>
           {field('price', strings['board.facts.price'], units.price, draft.price, (t) => ({ ...draft, price: t }))}
           {field('cost', strings['board.facts.cost'], units.cost, draft.cost, (t) => ({ ...draft, cost: t }))}
@@ -120,11 +120,11 @@ export function FactsEditor({
             })),
           )}
         </fieldset>
-        <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
+        <fieldset className="space-y-2 fs-card p-3">
           <legend className="px-1 font-bold">{strings['board.facts.cover']}</legend>
           {field('coverCost', strings['board.facts.cost'], units.cost, draft.coverCost, (t) => ({ ...draft, coverCost: t }))}
         </fieldset>
-        <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
+        <fieldset className="space-y-2 fs-card p-3">
           <legend className="px-1 font-bold">{strings['board.facts.pasture']}</legend>
           {FACT_KINDS.map((k) =>
             field(`pasture.${k}`, formatString(strings['board.facts.margin'], { kind: kindName(k) }), units.margin, draft.pasture[k], (t) => ({
@@ -159,12 +159,12 @@ export function FactsEditor({
             </fieldset>
           )
         })}
-        <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
+        <fieldset className="space-y-2 fs-card p-3">
           <legend className="px-1 font-bold">{strings['board.facts.limit']}</legend>
           {field('limit', strings['board.facts.limit'], units.limit, draft.limit, (t) => ({ ...draft, limit: t }))}
         </fieldset>
         {draft.rain !== null && (
-          <fieldset className="space-y-2 rounded-xl border border-fs-border bg-fs-surface p-3">
+          <fieldset className="space-y-2 fs-card p-3">
             <legend className="px-1 font-bold">{strings['board.facts.rain']}</legend>
             {field('rain', strings['board.facts.rain_factor'], units.rain, draft.rain, (t) => ({ ...draft, rain: t }))}
             <p className="text-xs text-fs-muted">{strings['board.rain.declared_note']}</p>

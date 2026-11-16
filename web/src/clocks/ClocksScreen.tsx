@@ -85,7 +85,7 @@ export default function ClocksScreen() {
   const rotations = rotationsOfTable(resultsTable)
 
   return (
-    <section aria-labelledby="clocks-title" className="mt-8">
+    <section aria-labelledby="clocks-title" className="fs-card mt-6 p-4 sm:p-5">
       <h3 id="clocks-title" data-testid="clocks-title" className="text-base font-semibold">
         {strings['clocks.title']}
       </h3>

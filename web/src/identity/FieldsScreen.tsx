@@ -44,7 +44,7 @@ export default function FieldsScreen() {
         <a
           href="#/print"
           data-testid="fields-print-link"
-          className="inline-flex items-center rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-medium text-fs-primary transition hover:bg-fs-bg"
+          className="inline-flex min-h-10 items-center rounded-lg border border-fs-border bg-fs-surface px-3 py-1.5 text-sm font-medium text-fs-primary shadow-fs-card transition hover:bg-fs-faint"
         >
           {strings['print.open_link']}
         </a>
@@ -75,7 +75,7 @@ export default function FieldsScreen() {
             </div>
           )}
 
-          <div className="mt-6">
+          <div className="fs-card mt-6 p-4">
             <h3 className="text-base font-semibold">{strings['map.title']}</h3>
             <p className="mt-1 text-sm text-fs-muted">{strings['map.select_hint']}</p>
             <div className="mt-2 h-[60dvh] min-h-[24rem] max-h-[80dvh]">
@@ -93,7 +93,7 @@ export default function FieldsScreen() {
                   aria-pressed={isSelected}
                   onClick={() => setSelectedFieldId(field.field_id)}
                   className={[
-                    'w-full', 'rounded-lg', 'border', 'px-4', 'py-3', 'text-left', 'transition',
+                    'w-full', 'rounded-fs-card', 'border', 'px-4', 'py-3', 'text-left', 'shadow-fs-card', 'transition',
                     isSelected ? 'border-fs-primary' : 'border-fs-border',
                     ...(isSelected
                       ? ['bg-fs-selection', 'ring-2', 'ring-fs-primary']
@@ -135,13 +135,13 @@ export default function FieldsScreen() {
             most the viewport minus the main padding), instead of
             leaving the left column as empty space on the way down.
             Under 1100px this wrapper is plain block flow, unchanged. */}
-        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-8 min-[1100px]:max-h-[calc(100dvh-4rem)] min-[1100px]:w-[520px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
+        <div className="min-w-0 [&>*]:min-w-0 [&_*]:break-words min-[1100px]:sticky min-[1100px]:top-20 min-[1100px]:max-h-[calc(100dvh-6.5rem)] min-[1100px]:w-[520px] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain">
           <RotationRun />
 
           <SiteSheet />
 
           {selectedFieldId === exampleRotation.field_id && (
-            <div className="mt-8">
+            <div className="fs-card mt-6 p-4 sm:p-5">
               <RotationRibbon rotation={exampleRotation} />
             </div>
           )}

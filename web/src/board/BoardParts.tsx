@@ -131,7 +131,7 @@ export function BoardControls({
   return (
     <div
       data-testid="board-controls"
-      className="flex flex-wrap items-end gap-x-8 gap-y-3 rounded-2xl bg-fs-text px-5 py-3 text-fs-surface"
+      className="flex flex-wrap items-end gap-x-8 gap-y-3 rounded-fs-card bg-fs-text px-5 py-3 text-fs-surface"
     >
       <Segmented
         name="board-kind"
@@ -229,7 +229,7 @@ export function AnswerBanner({
       data-testid="board-answer"
       data-answer={answer.answer}
       data-tone={answer.answer === 'chosen' ? 'chosen' : answer.answer === 'none_meets' ? 'over' : 'open'}
-      className="rounded-2xl bg-fs-primary px-6 py-5 text-white data-[tone=open]:bg-fs-text data-[tone=over]:bg-fs-error"
+      className="rounded-fs-card bg-fs-primary px-6 py-5 text-white data-[tone=open]:bg-fs-text data-[tone=over]:bg-fs-error"
     >
       {tag}
       {chosen !== null ? (
@@ -422,14 +422,14 @@ export function PriceTrackPanel({
   if (track === null) {
     const missing: MissingPart = tipping.missing ?? { reason: 'NOT_AVAILABLE' }
     return (
-      <section data-testid="board-price" className="rounded-2xl border border-fs-border bg-fs-surface px-5 py-4">
+      <section data-testid="board-price" className="fs-card px-5 py-4">
         <h3 className="text-lg font-bold">{strings['board.price.title']}</h3>
         <p className="text-sm italic text-fs-muted">{missingPatternText(strings['board.price.title'], missing)}</p>
       </section>
     )
   }
   return (
-    <section data-testid="board-price" className="rounded-2xl border border-fs-border bg-fs-surface px-5 py-4">
+    <section data-testid="board-price" className="fs-card px-5 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
         <h3 className="text-lg font-bold">{strings['board.price.title']}</h3>
         <p className="text-sm text-fs-muted">
@@ -510,7 +510,7 @@ export function RecordRibbon({ record, marginOf }: { record: KindsOfYearRecord; 
   const first = record.years[0].ag_year
   const last = record.years[record.years.length - 1].ag_year
   return (
-    <section data-testid="board-record" className="rounded-2xl border border-fs-border bg-fs-surface px-5 py-4">
+    <section data-testid="board-record" className="fs-card px-5 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
         <h3 className="text-lg font-bold">{strings['board.record.title']}</h3>
         <p className="text-sm text-fs-muted">
@@ -574,7 +574,7 @@ export function RainEcho({ part }: { part: RainStressPart }) {
       data-testid="board-rain-echo"
       data-applied={String(applied)}
       role="note"
-      className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-sm data-[applied=false]:border-fs-warning data-[applied=false]:bg-fs-warning-bg data-[applied=false]:text-fs-warning"
+      className="fs-card px-4 py-2 text-sm data-[applied=false]:border-fs-warning data-[applied=false]:bg-fs-warning-bg data-[applied=false]:text-fs-warning"
     >
       {part.kind === 'applied'
         ? formatString(strings[part.applied ? 'plant.service.rain_applied' : 'plant.service.rain_not_applied'], {
@@ -595,7 +595,7 @@ export function AnswerLimits({ answer }: { answer: PlantAnswer }) {
     return null
   }
   return (
-    <section data-testid="board-limits" className="rounded-2xl border border-fs-border px-5 py-3 text-sm text-fs-muted">
+    <section data-testid="board-limits" className="rounded-fs-card border border-fs-border px-5 py-3 text-sm text-fs-muted">
       <h3 className="font-mono text-[10px] uppercase tracking-widest">{strings['board.limits.heading']}</h3>
       <ul className="mt-1 list-disc space-y-0.5 pl-5">
         {answer.declared_limits.map((limit) => (
@@ -625,7 +625,7 @@ export function ChangesNote({
       ? nameOf(side.chosen)
       : strings[`plant.answer.${side.answer === 'none_meets' ? 'none_meets' : 'not_resolved'}`]
   return (
-    <section data-testid="board-changes" role="status" className="rounded-xl border border-fs-border bg-fs-surface px-4 py-2 text-sm">
+    <section data-testid="board-changes" role="status" className="fs-card px-4 py-2 text-sm">
       <h3 className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.changed.title']}</h3>
       {changes.length === 0 ? (
         <p data-testid="board-changes-none">{strings['board.changed.none']}</p>
