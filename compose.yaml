@@ -31,6 +31,8 @@ services:
       # Soil and slope: the PLACEHOLDER example, to exercise the whole route.
       # Its numbers mean nothing and it is shown as example data.
       SOIL_SLOPE_EXAMPLE_FILE: ${SOIL_SLOPE_EXAMPLE_FILE-contracts/inputs/examples/PLACEHOLDER_site_soil_slope.json}
+      # ONI ERSST v6 record cleared per D260 for POST /api/plant/run.
+      KINDS_OF_YEAR_RECORD_FILE: ${KINDS_OF_YEAR_RECORD_FILE-kinds_of_year/records/oni_v6.json}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:

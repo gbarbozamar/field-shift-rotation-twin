@@ -9,7 +9,7 @@
   },
   "aggregation": "published annual average over six plots; do not mix with LEELP1 or demo soil",
   "year_basis": "calendar_year_PER_D230_TO_BE_CHECKED",
-  "year_basis_checked_by": "",
+  "year_basis_checked_by": "gbarbozamar",
   "rows": [
     {
       "year": 2017,
@@ -39,5 +39,5 @@
     "source": "D230 of issue #77; not a new threshold"
   },
   "signature_record": "SIGNATURE_AND_ACCEPTANCE.json",
-  "checked_scope": "Published numeric H10 values. Calendar-year interpretation is separately pending in year_basis_checked_by."
+  "checked_scope": "Published numeric H10 values and calendar-year interpretation (2017-01-01..2019-12-31, D262) are signed under explicit evidence_limit (no raw tank-event timestamps), while [H10] remains not evaluated in this release (D262) pending unavailable plot rain-gauge series, 2017-early-2018 management dates, and plot HSG/CN/soil hydraulic records."
 }

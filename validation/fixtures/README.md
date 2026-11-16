@@ -4,11 +4,11 @@ Signed files that hold the expected values of a check of `docs/VALIDATION.md` to
 
 > **Status: PROPOSED.** The paths, the field lists and the skip rule below were written by a builder session (blueprint, section 3.7). They take effect only when a person approves the pull request. The expected values and the tolerances are those of decision D124 of [issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886937443), amended for two H2 steps by [D138 of issue #77](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6887623727). This README holds no value of a source: the values are in the signed files, checked against the source by the person who signs.
 >
-> **Five signed fixtures are indexed here** (four already on `main`, plus `h10_grahmann2022_runoff.json` from this PR):
+> **Five signed fixtures are indexed here** (`checked_by` filled under D34, D66):
 >
 > - `e3_ah703_tables.json` (`#238`, `[E3]`), `h2_example18.json` (`#239`, `[H2]`), and `h1_fao56_example37.json` (`#455`, `[H1]`, [D228](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893079768)), each with `checked_by` filled (and parameter records signed where applicable, D34, D66). All three checks run and pass.
 > - `fao56_example35_surface_layer.json` (`#515`): signed FAO-56 Chapter 7, Example 35 (corrected February 2006 edition) surface-layer fixture (`checked_by: gbarbozamar`), with `early_wetting_option`, `full_precision_interpolation`, `half_digit_criterion` (half-last-digit comparison), and `surface_only_scope` accepted by `gbarbozamar` after seeing the comparison results (`results_seen_before_acceptance: true`, `retroactive_preregistration: false`, `full_ep3_reproduction: false`). `engine/water/evaporation/surface_layer.py` `step` itself remains unchanged pending L1 integration review.
-> - `h10_grahmann2022_runoff.json` (this PR, `[H10]`): signed numeric transcription of Grahmann et al. (2022), Table 5 (`2017`–`2019`, `checked_by: gbarbozamar`, `transcribed_by: AI session, 2026-11-15`), while `year_basis_checked_by` remains empty (`""`) so `[H10]` stays **`not evaluated`** (`BLOCKED_NOT_EVALUATED`) until all five open human gates are closed.
+> - `h10_grahmann2022_runoff.json` (`[H10]`): signed numeric transcription of Grahmann et al. (2022), Table 5 (`2017`–`2019`, `checked_by: gbarbozamar`, `transcribed_by: AI session, 2026-11-15`) and `year_basis_checked_by: "gbarbozamar"` signed per [D262](https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6905528847) under explicit `evidence_limit` (no raw event timestamps), while `[H10]` is formally **`not evaluated in this release (D262)`** (`BLOCKED_NOT_EVALUATED`) because plot-specific rain-gauge series, 2017–early-2018 dates, and plot HSG/CN/hydraulic records are unavailable.
 
 | File | Check | Test that reads it |
 |---|---|---|
@@ -16,7 +16,7 @@ Signed files that hold the expected values of a check of `docs/VALIDATION.md` to
 | `h2_example18.json` | [H2]: the daily reference evapotranspiration against FAO-56 Chapter 4, EXAMPLE 18 | `engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56` |
 | `e3_ah703_tables.json` | [E3]: `LS` against AH703 Table 4-2 and `m` against the Moderate column of Table 4-5 | `engine/erosion/test_ls.py::test_e3_slope_length_and_steepness_against_published_values` |
 | `fao56_example35_surface_layer.json` | FAO-56 Chapter 7, Example 35 (corrected Feb 2006): surface-layer evaporation (`#515`; `results_seen_before_acceptance: true`, `surface_only_scope`, `full_ep3_reproduction: false`) | `engine/water/evaporation/test_surface_layer.py::test_fao56_chapter_7_worked_example` |
-| `h10_grahmann2022_runoff.json` | [H10]: Grahmann et al. (2022) Table 5 yearly runoff & rainfall (`2017`–`2019`) and D230 criteria (`year_basis_checked_by` empty, keeping `[H10]` `not evaluated`) | `validation/test_h10_fixture_gate.py` (fixture & gate checks; `validation/test_h10_runoff.py` tests `validation/h10_runoff.py` on hand-made values) |
+| `h10_grahmann2022_runoff.json` | [H10]: Grahmann et al. (2022) Table 5 yearly runoff & rainfall (`2017`–`2019`) and D230 criteria (`checked_by` & `year_basis_checked_by: gbarbozamar` per D262; `[H10]` `not evaluated in this release`) | `validation/test_h10_fixture_gate.py` (fixture & gate checks; `validation/test_h10_runoff.py` tests `validation/h10_runoff.py` on hand-made values) |
 
 ## Skip rule (`h1_fao56_example37.json`, `h2_example18.json`, `e3_ah703_tables.json`)
 
@@ -125,13 +125,13 @@ Verified by `validation/test_h10_fixture_gate.py`. Carries the published Table 5
 | `source` | object | `reference`, `url`, and `locator` (Table 5 and six Wischmeier plots) |
 | `aggregation` | text | States six-plot annual average; do not mix with LEELP1 or demo soil |
 | `year_basis` | text | `"calendar_year_PER_D230_TO_BE_CHECKED"` |
-| `year_basis_checked_by` | text | **Separate gate.** Empty (`""`) keeps `[H10]` `not evaluated` (`BLOCKED_NOT_EVALUATED`) even though numeric values are signed |
+| `year_basis_checked_by` | text | **Separate gate.** Signed `"gbarbozamar"` under D262 for the `2017–2019` calendar-year basis (`evidence_limit`: no raw event timestamps); empty blocks evaluation |
 | `rows` | list | Three annual entries (`2017`, `2018`, `2019`) with `year`, `runoff_mm`, `printed`, `rainfall_mm`, and `locator` |
 | `criteria` | object | D230 criteria (`pbias_bound_percent`, `event_cap_mm`, `source`) |
 | `signature_record` | text | Reference to the external acceptance record |
-| `checked_scope` | text | States numeric scope vs. pending `year_basis_checked_by` |
+| `checked_scope` | text | States signed numeric and `2017-01-01`..`2019-12-31` calendar-year scope (`D262`, `evidence_limit`) while `[H10]` remains `not evaluated in this release (D262)` |
 
-**Gate rule:** signing `checked_by` alone does not make `[H10]` evaluable. `validation/test_h10_fixture_gate.py` enforces that `[H10]` remains `not evaluated` (`BLOCKED_NOT_EVALUATED`) while `year_basis_checked_by` is empty, and while the remaining human gates in `docs/VALIDATION.md` (crop dates, 35-vs-6-day interval conflict, rainfall forcing route, plot HSG/CN and soil profile, and an actual EP3 plot run) remain open.
+**Gate rule:** signing `checked_by` and `year_basis_checked_by` (D262) still does not make `[H10]` evaluable in this release. `validation/test_h10_fixture_gate.py` enforces that `[H10]` remains `not evaluated` (`BLOCKED_NOT_EVALUATED`) while plot-specific inputs (unavailable plot rain-gauge series, 2017–early-2018 management dates, and plot HSG/CN/hydraulic records per D262) and an actual EP3 plot run are absent, and also verifies in `tmp_path` that an empty `year_basis_checked_by` still blocks evaluation.
 
 ## OPEN
 
