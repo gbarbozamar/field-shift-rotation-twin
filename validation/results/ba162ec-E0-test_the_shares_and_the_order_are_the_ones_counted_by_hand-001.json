@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "ba162ec-E0-test_the_shares_and_the_order_are_the_ones_counted_by_hand-001",
+  "run_id": "run-20261116T013049Z-ba162ec",
+  "test_code": "E0",
+  "expected": {
+    "missing_reason": "the entry E0 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for validation/test_trivial_comparator_erosion.py::test_the_shares_and_the_order_are_the_ones_counted_by_hand"
+  },
+  "notes": "Test validation/test_trivial_comparator_erosion.py::test_the_shares_and_the_order_are_the_ones_counted_by_hand. Placed under E0: a test of validation/test_trivial_comparator_erosion.py, the test file of entry E0, under the heading '(a) the order counted by hand' (rule of the second run, PROPOSED: every test of the file except the one under the heading 'the functions are pure and hold no value of the method')."
+}

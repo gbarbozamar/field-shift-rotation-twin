@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "ba162ec-H2-test_h2_worked_example_18_of_fao_56-001",
+  "run_id": "run-20261116T013049Z-ba162ec",
+  "test_code": "H2",
+  "expected": {
+    "missing_reason": "the expected values of this check are in the signed fixture validation/fixtures/h2_example18.json, which the test reads; this store holds no expected-value record for it (validation/README.md, OPEN 21)"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56"
+  },
+  "notes": "Test engine/water/et0/test_h2.py::test_h2_worked_example_18_of_fao_56. Placed under H2: named as the test of the entry in docs/VALIDATION.md, entry H2."
+}
