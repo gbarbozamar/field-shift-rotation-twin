@@ -28,3 +28,15 @@ describe('frontier showcase', () => {
     expect(['low', 'medium', 'high']).toContain(rotationRisk(0))
   })
 })
+
+describe('every synthetic card says so on itself', async () => {
+  const { strings } = await import('../strings')
+  const PreloadPanel = (await import('./PreloadPanel')).default
+  it('the preload cards each carry the synthetic mark; the plan carries no signature line', () => {
+    const html = renderToStaticMarkup(<PreloadPanel />)
+    expect((html.match(/data-testid="frontier-synthetic-tag"/g) ?? []).length).toBeGreaterThanOrEqual(4)
+    const plan = renderToStaticMarkup(<PlanPanel />)
+    expect(plan).toContain(strings['frontier.p5.plan.not_official'])
+    expect(plan).not.toContain('Signed by')
+  })
+})

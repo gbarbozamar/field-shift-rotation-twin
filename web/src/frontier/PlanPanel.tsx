@@ -22,10 +22,7 @@ function FarmerPlan() {
       <p className="font-mono text-sm">{p.loss.toFixed(1)} / {p.limit.toFixed(1)} {c('p1.limit.unit')} ({share}%)</p>
       <div className="mt-1 h-3 rounded bg-fs-faint"><div className="h-3 rounded bg-fs-primary" style={{ width: `${share}%` }} /></div>
       <p className="mt-4 text-sm"><span className="text-fs-muted">{c('p5.plan.status')}: </span><Pill tone="ok">{c('p5.grid.within')}</Pill></p>
-      <div className="mt-8 grid gap-6 text-sm sm:grid-cols-2">
-        <div className="border-t border-fs-text pt-1">{c('p5.plan.sign')}</div>
-        <div className="border-t border-fs-text pt-1">{c('p5.plan.date')}</div>
-      </div>
+      <p className="mt-6 rounded border border-fs-warning bg-fs-warning-bg px-3 py-2 text-sm text-fs-warning">{c('p5.plan.not_official')}</p>
       <button type="button" onClick={() => window.print()} className="mt-6 min-h-10 rounded-lg bg-fs-text px-4 text-sm font-bold text-fs-surface print:hidden">
         {c('p5.plan.print')}
       </button>

@@ -60,7 +60,7 @@ function RunBlock({ run }: { run: LiveRun }) {
 /** The backend's indicators for the rotations of Field 1 (a pure view). */
 export function LiveIndicatorsView({ configured, runs }: { configured: boolean; runs: LiveRun[] }) {
   return (
-    <Card title={c('live.kpi_title')}>
+    <Card title={c('live.kpi_title')} live>
       <div data-testid="frontier-kpi-live">
         {!configured ? (
           <p className="text-sm text-fs-muted">{c('live.not_configured')}</p>

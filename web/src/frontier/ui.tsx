@@ -1,10 +1,24 @@
 import type { ReactNode } from 'react'
 import { cx } from './cx'
+import { c } from './copy'
 
-export function Card({ title, children, className = '' }: { title?: string; children: ReactNode; className?: string }) {
+/**
+ * A card of the showcase. Every card carries the synthetic mark beside its
+ * title, so a single frame or a printed card is never read as real data; a
+ * card that shows what the backend answered says so instead (live).
+ */
+export function Card({ title, children, className = '', live = false }: { title?: string; children: ReactNode; className?: string; live?: boolean }) {
   return (
     <section className={cx('rounded-lg', 'border', 'border-fs-border', 'bg-fs-surface', 'p-4', className)}>
-      {title && <h3 className="mb-3 text-base font-bold">{title}</h3>}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {title && <h3 className="text-base font-bold">{title}</h3>}
+        <span
+          data-testid={live ? 'frontier-live-tag' : 'frontier-synthetic-tag'}
+          className={cx('rounded', 'border', 'px-1.5', 'py-0.5', 'font-mono', 'text-[10px]', 'font-bold', 'uppercase', 'tracking-wide', live ? 'border-fs-ok' : 'border-fs-warning', live ? 'text-fs-ok' : 'text-fs-warning')}
+        >
+          {c(live ? 'live_tag' : 'synthetic_tag')}
+        </span>
+      </div>
       {children}
     </section>
   )

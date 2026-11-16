@@ -18,7 +18,7 @@ export type LivePhase =
 /** The backend's decision for the first field, shown verbatim (a pure view of the phase). */
 export function LiveDecisionView({ phase }: { phase: LivePhase }) {
   return (
-    <Card title={c('live.title')}>
+    <Card title={c('live.title')} live>
       <div data-testid="frontier-live" data-phase={phase.kind}>
         {phase.kind === 'not_configured' && <p className="text-sm text-fs-muted">{c('live.not_configured')}</p>}
         {phase.kind === 'pending' && <p role="status" className="text-sm text-fs-muted">{c('live.pending')}</p>}
