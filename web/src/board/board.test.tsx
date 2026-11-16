@@ -621,12 +621,11 @@ describe('the other orders, ties and the worst kind of year (7)', () => {
 })
 
 describe('the steps of the plan (8)', () => {
-  it('the limit the request declares is shown as the user\'s own, with its unit and its declared mark', () => {
-    const tile = after(view(null, null), 'board-your-limit').split('</div>')[0]
+  it('the limit is said once, where it is used: in the limit rule of the scenario, with its unit', () => {
+    const html = view(null, null)
     const limit = rawRequest.soil_loss_limit
-    expect(visibleText(`<${tile}`)).toContain(strings['board.limit.yours'])
-    expect(visibleText(`<${tile}`)).toContain(`${displayNumber(limit.value)} ${unitText(limit.unit)}`)
-    expect(visibleText(`<${tile}`)).toContain(strings['plant.declared'])
+    expect(html).not.toContain('data-testid="board-your-limit"')
+    expect(visibleText(after(html, 'board-controls'))).toContain(`${displayNumber(limit.value)} ${unitText(limit.unit)}`)
   })
 
   it('before an answer: the steps of the field and of the scenario; with an answer, all five in order', () => {

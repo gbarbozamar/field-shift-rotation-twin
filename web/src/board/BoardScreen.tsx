@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { UseQueryOptions } from '@tanstack/react-query'
 import rawPlantRequest from '../data/PLACEHOLDER_plant_request.json'
-import { displayNumber } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import type { ExampleField } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
@@ -32,7 +31,7 @@ import { buildRotationStrip, cropOrder, plantRotations, readPlantRotations } fro
 import type { PlantRotations } from '../plant/rotationStrip'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
-import { answerChanges, boardColumns, cropName, isExampleCrop, optionLetter, unitText } from './boardModel'
+import { answerChanges, boardColumns, cropName, isExampleCrop, optionLetter } from './boardModel'
 import type { SortKey } from './boardModel'
 import {
   AnswerBanner,
@@ -412,7 +411,7 @@ export function BoardView({
         </div>
         {exampleCase.example_data ? (
           <p data-testid="board-example" role="note" className="rounded-full border border-fs-warning bg-fs-warning-bg px-3 py-1 text-sm text-fs-warning">
-            {strings['example.banner']}
+            {strings['board.example_banner']}
           </p>
         ) : null}
       </div>
@@ -431,19 +430,7 @@ export function BoardView({
             </button>
           ) : null}
         </StepTitle>
-        <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <FieldList fields={exampleCase.fields} selectedFieldId={selectedFieldId} />
-          {limit !== null ? (
-            <div data-testid="board-your-limit" className="rounded-xl border-2 border-fs-text bg-fs-surface px-4 py-2">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-fs-muted">{strings['board.limit.yours']}</p>
-              <p className="tabular-nums">
-                <span className="font-fs-heading text-2xl font-extrabold leading-none">{displayNumber(limit.value)}</span>{' '}
-                <span className="text-xs text-fs-muted">{unitText(limit.unit)}</span>
-              </p>
-              <p className="text-[11px] text-fs-muted">{strings['plant.declared']}</p>
-            </div>
-          ) : null}
-        </div>
+        <FieldList fields={exampleCase.fields} selectedFieldId={selectedFieldId} />
         {mapOpen && map !== null ? (
           <div data-testid="board-map" className="mt-3">
             {map}
@@ -462,6 +449,13 @@ export function BoardView({
                 {strings['board.builder.close']}
               </span>
             </StepTitle>
+            <ul data-testid="board-candidates-summary" className="mb-2 flex flex-wrap gap-2 group-open:hidden">
+              {(rotations.rotations ?? []).map((rotation) => (
+                <li key={rotation.rotation_id} className="rounded-lg border border-fs-border bg-fs-surface px-3 py-1 text-sm font-semibold">
+                  {rotation.label}
+                </li>
+              ))}
+            </ul>
           </summary>
           {builder}
         </details>
