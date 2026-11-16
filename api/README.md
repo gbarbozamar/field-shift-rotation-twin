@@ -433,7 +433,7 @@ For a person to set on the host. The app reads them at start-up; a wrong value m
 | `SOIL_SLOPE_EXAMPLE_FILE` | The accepted soil-and-slope example, once a person supplies its values | D38; the PLACEHOLDER file is for testing the pipeline only (#77) |
 | `SOIL_TABLE_FILES`, `SOIL_GROUPS_FILE` | Unset. Set instead of `SOIL_SLOPE_EXAMPLE_FILE` once a person supplies the soil tables (`K` of S9, D48; available water, D49, if its licence allows) and the soil groups of the demonstration fields | D48, D49; OPEN in adapters/README.md |
 | `CORS_ORIGINS` | `https://gbarbozamar.github.io` | D42 |
-| `KINDS_OF_YEAR_RECORD_FILE` | Unset until a person signs the ONI record (D34, D66) | PROPOSED |
+| `KINDS_OF_YEAR_RECORD_FILE` | `kinds_of_year/records/oni_v6.json` (`D260` cleared; set by default in `compose.yaml`, env-driven in `api/config.py`) | PROPOSED |
 | `RAIN_STRESS_TEST` | Unset (off) unless a person decides to switch the heavier-rain stress test on; then `on` | S-032 (PROPOSED) |
 
 With the first four set, the climate source is the NASA POWER adapter: the first request of a case fetches from the service and stores the response; later requests reuse it.

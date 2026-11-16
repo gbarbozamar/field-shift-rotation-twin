@@ -1,10 +1,10 @@
 """Fixture schema and human-gate tests for [H10] (Grahmann et al. 2022 Table 5).
 
 Verifies that ``validation/fixtures/h10_grahmann2022_runoff.json`` parses
-cleanly, carries the signed numeric transcription (``checked_by``), and
-enforces the separate ``year_basis_checked_by`` and plot-input gates so [H10]
-remains ``not evaluated`` (``BLOCKED_NOT_EVALUATED``) until all open human
-decisions are resolved.
+cleanly, carries the signed numeric transcription (``checked_by``) and the
+D262 ``year_basis_checked_by`` signature under ``evidence_limit``, and enforces
+the plot-input and EP3-run gates so [H10] remains ``not evaluated in this
+release`` (``BLOCKED_NOT_EVALUATED``).
 
 Run from the repository root:
 ``python -m pytest validation/test_h10_fixture_gate.py``.
@@ -211,7 +211,7 @@ def test_h10_signed_fixture_parses_and_matches_table_5_structure():
     assert fixture["checked_by"] == EXPECTED_CHECKED_BY
     assert fixture["transcribed_by"] == EXPECTED_TRANSCRIBED_BY
     assert fixture["year_basis"] == EXPECTED_YEAR_BASIS
-    assert fixture["year_basis_checked_by"] == ""
+    assert fixture["year_basis_checked_by"] == EXPECTED_CHECKED_BY
 
     source = fixture["source"]
     assert "Grahmann et al. (2022)" in source["reference"]
@@ -238,12 +238,11 @@ def test_h10_fixture_gate_keeps_h10_not_evaluated_while_year_basis_unchecked():
     gate = evaluate_h10_fixture_gate(H10_FIXTURE)
     assert gate.status == "BLOCKED_NOT_EVALUATED"
     assert gate.outcome == "not_evaluated"
-    assert "Calendar-year interpretation has not been checked" in gate.issues
-    assert (
-        "Plot-specific HSG/CN, soil profile, calendar, and climate are not confirmed"
-        in gate.issues
+    assert "Calendar-year interpretation has not been checked" not in gate.issues
+    assert gate.issues == (
+        "Plot-specific HSG/CN, soil profile, calendar, and climate are not confirmed",
+        "No actual EP3 plot run supplied",
     )
-    assert "No actual EP3 plot run supplied" in gate.issues
     assert gate.comparison is not None
     assert gate.comparison.years == (2017, 2018, 2019)
     assert gate.comparison.pbias_condition.verdict is None
@@ -251,21 +250,21 @@ def test_h10_fixture_gate_keeps_h10_not_evaluated_while_year_basis_unchecked():
     assert gate.comparison.h10.verdict is None
     assert gate.comparison.large_events.flagged is None
 
-    # Even if synthetic plot inputs and modelled values were supplied, empty
-    # year_basis_checked_by alone still keeps [H10] not evaluated.
+    # With year_basis_checked_by signed under D262, [H10] evaluates only when
+    # synthetic overrides are passed for both plot_inputs_confirmed and
+    # modelled_yearly; without real plot records and an EP3 run, it stays
+    # not evaluated in this release.
     synthetic_modelled = {2017: 200.0, 2018: 550.0, 2019: 310.0}  # PLACEHOLDER
-    still_blocked = evaluate_h10_fixture_gate(
+    synthetic_probe = evaluate_h10_fixture_gate(
         H10_FIXTURE,
         plot_inputs_confirmed=True,
         modelled_yearly=synthetic_modelled,
     )
-    assert still_blocked.status == "BLOCKED_NOT_EVALUATED"
-    assert still_blocked.outcome == "not_evaluated"
-    assert still_blocked.issues == (
-        "Calendar-year interpretation has not been checked",
-    )
-    assert still_blocked.comparison is not None
-    assert still_blocked.comparison.h10.verdict is None
+    assert synthetic_probe.status == "EVALUATED"
+    assert synthetic_probe.outcome in ("passed", "failed")
+    assert synthetic_probe.issues == ()
+    assert synthetic_probe.comparison is not None
+    assert synthetic_probe.comparison.h10.verdict in ("pass", "fail")
 
 
 def test_tmp_path_missing_fixture_file_blocks_h10(tmp_path: Path):
