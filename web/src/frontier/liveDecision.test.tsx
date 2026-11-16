@@ -48,3 +48,22 @@ describe('the live decision of the frontier panel', () => {
     expect(decided).toContain(decisionExample.measure_first[0].what)
   })
 })
+
+describe('the live indicators of the stress-test panel', async () => {
+  const { LiveIndicatorsView, liveRunRequests } = await import('./LiveIndicators')
+
+  it('asks once per rotation held for Field 1', () => {
+    expect(liveRunRequests()).toHaveLength(2)
+  })
+
+  it('a run with no result shows its reason; no backend, it says so', () => {
+    const html = renderToString(
+      <LiveIndicatorsView
+        configured
+        runs={[{ label: 'A', phase: { kind: 'answered', view: { outcome: 'no_result', liveData: false, parts: [], resultMissing: { reason: 'MISSING_INPUT', detail: 'no climate' } } } }]}
+      />,
+    )
+    expect(html).toContain('data-testid="frontier-kpi-missing"')
+    expect(renderToString(<LiveIndicatorsView configured={false} runs={[]} />)).toContain(strings['frontier.live.not_configured'])
+  })
+})

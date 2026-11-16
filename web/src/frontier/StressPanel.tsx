@@ -3,6 +3,7 @@ import { c } from './copy'
 import { exceeds } from './cx'
 import { M, tippingPrice } from './model'
 import { Bar, Card, PanelHead, Segmented, Workbench } from './ui'
+import LiveIndicators from './LiveIndicators'
 
 const LIMIT = M.fields[0].limit
 
@@ -29,6 +30,9 @@ export default function StressPanel() {
   return (
     <>
       <PanelHead title={c('p3.title')} lead={c('p3.lead')} />
+      <div className="mb-4">
+        <LiveIndicators />
+      </div>
       <Workbench
         left={
           <>

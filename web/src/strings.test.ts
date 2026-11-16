@@ -622,6 +622,10 @@ const WORDING_SHEET: Record<string, string> = {
   'saved.carbon_depth': 'Soil depth',
   'saved.carbon_trend_heading': 'Soil carbon trend',
   // Live decision of the frontier panel (l3/frontier-showcase, PROPOSED).
+  'frontier.live.kpi_title': 'From the backend: the observed record for the rotations of Field 1',
+  'frontier.live.kpi_pending': 'Asking the backend for this rotation...',
+  'frontier.live.kpi_result_what': 'result',
+  'frontier.live.kpi_synthetic_note': 'The backend runs the observed record only: the three horizons, their stress cases and the cards beside them are the synthetic scenario.',
   'frontier.live.title': 'From the backend: the decision for Field 1',
   'frontier.live.not_configured': 'No backend is configured, so this panel shows the synthetic scenario only.',
   'frontier.live.pending': 'Asking the backend for the decision of the two demonstration rotations...',
