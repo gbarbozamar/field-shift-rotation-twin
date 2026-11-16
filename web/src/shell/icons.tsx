@@ -156,3 +156,63 @@ export function IconMark(props: IconProps) {
     </Svg>
   )
 }
+
+export function IconChart(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 20.5h16" />
+      <rect x="5.5" y="11" width="3" height="7" rx="1" />
+      <rect x="10.5" y="6" width="3" height="12" rx="1" />
+      <rect x="15.5" y="13.5" width="3" height="4.5" rx="1" />
+    </Svg>
+  )
+}
+
+export function IconAlert(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M10.3 4.2 2.9 17.5A2 2 0 0 0 4.6 20.5h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9.5v4.5M12 17.2v.1" />
+    </Svg>
+  )
+}
+
+export function IconCoins(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <ellipse cx="9" cy="7" rx="5.5" ry="2.5" />
+      <path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V7" />
+      <path d="M9.5 16.4c.9.4 2.2.6 3.5.6 3 0 5.5-1.1 5.5-2.5v-4c0-1.2-1.8-2.2-4.2-2.4" />
+      <path d="M18.5 14.5v3c0 1.4-2.5 2.5-5.5 2.5-1.9 0-3.6-.4-4.6-1.1" />
+    </Svg>
+  )
+}
+
+export function IconLayers(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m12 3.5 8.5 4.5-8.5 4.5L3.5 8 12 3.5Z" />
+      <path d="m3.5 12 8.5 4.5 8.5-4.5" />
+      <path d="m3.5 16 8.5 4.5 8.5-4.5" />
+    </Svg>
+  )
+}
+
+export function IconCalendar(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </Svg>
+  )
+}
+
+export function IconImage(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="4.5" width="18" height="15" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.8" />
+      <path d="m21 16-5-5-9 8.5" />
+    </Svg>
+  )
+}

@@ -87,10 +87,24 @@
   /* The harvest amber behind the warning fill (the warning text stays the
      darker --fs-warning, readable on it). */
   --fs-warning-accent: #f2a900;
-  /* The card pattern (l3/erp-shell): flat white cards, a 1px tinted border,
-     a hairline shadow; overlays get the deeper shadow. */
+  /* The card pattern (l3/erp-shell, given depth by l3/original-mock): white
+     cards, a 1px tinted border and a soft layered shadow (a contact shadow
+     and a wide, faint one); a clickable card lifts to the hover shadow;
+     overlays get the deeper shadow. */
   --fs-radius-card: 10px;
-  --fs-shadow-card: 0 1px 2px rgb(31 45 43 / 0.05);
+  --fs-shadow-card: 0 1px 2px rgb(31 45 43 / 0.04), 0 4px 12px -2px rgb(31 45 43 / 0.06), 0 12px 32px -16px rgb(31 45 43 / 0.1);
+  --fs-shadow-card-hover: 0 2px 4px rgb(31 45 43 / 0.05), 0 10px 24px -6px rgb(31 45 43 / 0.12), 0 20px 44px -20px rgb(31 45 43 / 0.16);
+  /* The soft halo behind a card that needs attention (l3/original-mock). */
+  --fs-shadow-attention: 0 1px 2px rgb(31 45 43 / 0.04), 0 14px 36px -12px rgb(31 45 43 / 0.18);
+  /* The chart kit (l3/original-mock): one colour per series, in order, and
+     the grid of the plot in the border colour. */
+  --fs-chart-1: #3e7b2c;
+  --fs-chart-2: #19648b;
+  --fs-chart-3: #c99a2e;
+  --fs-chart-4: #7b5e8a;
+  --fs-chart-5: #b5562f;
+  --fs-chart-6: #17766d;
+  --fs-chart-grid: var(--fs-border);
   --fs-shadow-pop: 0 4px 6px -1px rgb(31 45 43 / 0.1), 0 2px 4px -2px rgb(31 45 43 / 0.1);
 }
 
@@ -128,6 +142,15 @@
   --color-fs-brand-soft: var(--fs-brand-soft);
   --color-fs-warning-accent: var(--fs-warning-accent);
   --shadow-fs-card: var(--fs-shadow-card);
+  --shadow-fs-card-hover: var(--fs-shadow-card-hover);
+  --shadow-fs-attention: var(--fs-shadow-attention);
+  --color-fs-chart-1: var(--fs-chart-1);
+  --color-fs-chart-2: var(--fs-chart-2);
+  --color-fs-chart-3: var(--fs-chart-3);
+  --color-fs-chart-4: var(--fs-chart-4);
+  --color-fs-chart-5: var(--fs-chart-5);
+  --color-fs-chart-6: var(--fs-chart-6);
+  --color-fs-chart-grid: var(--fs-chart-grid);
   --shadow-fs-pop: var(--fs-shadow-pop);
   --radius-fs-card: var(--fs-radius-card);
 }
@@ -149,6 +172,31 @@
   border: 1px solid var(--fs-border);
   border-radius: var(--fs-radius-card);
   box-shadow: var(--fs-shadow-card);
+}
+
+/* A card that can be clicked (l3/original-mock): it lifts a little and
+   takes the hover shadow under the pointer, and when the stretched button
+   over it has the keyboard focus, so that the lift is never hover-only. */
+@utility fs-card-lift {
+  transition:
+    box-shadow var(--fs-motion) ease-out,
+    transform var(--fs-motion) ease-out;
+  &:hover,
+  &:has(:focus-visible) {
+    box-shadow: var(--fs-shadow-card-hover);
+    transform: translateY(-2px);
+  }
+}
+
+/* The track of a bar in a table cell (l3/original-mock): the faint surface
+   with a dashed quarter grid, so a bar reads against a scale. */
+@utility fs-grid-track {
+  background-color: var(--fs-faint);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(25% - 1px),
+    var(--fs-chart-grid) calc(25% - 1px) 25%
+  );
 }
 
 /* The small uppercase heading of a card or a group (l3/erp-shell). */

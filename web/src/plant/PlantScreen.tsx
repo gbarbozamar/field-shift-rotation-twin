@@ -23,6 +23,8 @@ import type { PlantRotations, RotationStrip } from './rotationStrip'
 import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
+import { CardHeader } from '../components/Card'
+import { IconCheckCircle, IconRotate, IconSprout } from '../shell/icons'
 import { planBaseRequest, planFieldId, usePlan } from '../board/planStore'
 import { useSelectedFieldId } from '../identity/selection'
 import {
@@ -397,11 +399,9 @@ function AnswerCard({
   return (
     <article
       data-testid="plant-card"
-      className="rounded-fs-card border-2 border-fs-primary bg-fs-surface px-5 py-4"
+      className="fs-card border-2 border-fs-primary px-5 py-4"
     >
-      <h3 className="font-mono text-[11px] font-medium uppercase tracking-widest text-fs-muted">
-        {strings['plant.answer.heading']}
-      </h3>
+      <CardHeader icon={IconCheckCircle} title={strings['plant.answer.heading']} className="mb-1" />
       {chosen !== null ? (
         <div>
           {chosenRow !== null && chosenRow.rotation !== null ? (
@@ -751,10 +751,7 @@ function AnswerBody({
         data-testid="plant-options"
         className="fs-card px-5 py-4"
       >
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h3 className="text-xl font-bold">{strings['plant.options.heading']}</h3>
-          <CropLegend order={order} />
-        </div>
+        <CardHeader icon={IconRotate} title={strings['plant.options.heading']} aside={<CropLegend order={order} />} />
         {rows.map(({ option, rotation, strip, stripMissing }) => (
           <OptionBlock
             key={option.rotation_id}
@@ -1064,7 +1061,7 @@ function Questions({
   const usable = tipping !== null && tipping.today !== null && price !== null
   return (
     <section className="space-y-6 fs-card px-5 py-4">
-      <h3 className="text-xl font-bold">{strings['plant.questions']}</h3>
+      <CardHeader icon={IconSprout} title={strings['plant.questions']} className="mb-0" />
 
       <div data-testid="plant-q-price">
         <label htmlFor="plant-price" className="font-fs-heading text-lg font-bold leading-tight">

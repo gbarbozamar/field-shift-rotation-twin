@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
 import { missingPatternText } from '../components/ValueDisplay'
+import { CardCount, CardHeader, KpiTile } from '../components/Card'
 import { exampleCase } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
 import { formatString } from '../lib/format'
@@ -45,33 +45,8 @@ const NEXT_STEPS: { href: string; label: StringKey; hint: StringKey; icon: Icon;
   { href: '#/saved', label: 'saved.open_case', hint: 'overview.step.saved', icon: IconArchive },
 ]
 
-/** The header of an overview card: the icon, the small uppercase title, and an optional count on the right. */
-function CardHeader({ id, icon: HeaderIcon, title, aside }: { id: string; icon: Icon; title: string; aside?: ReactNode }) {
-  return (
-    <div className="mb-2 flex items-center gap-2">
-      <span className="text-fs-primary">
-        <HeaderIcon />
-      </span>
-      <h3 id={id} className="fs-eyebrow flex-1">
-        {title}
-      </h3>
-      {aside}
-    </div>
-  )
-}
-
-function KpiTile({ icon: TileIcon, value, label, wide }: { icon: Icon; value: string; label: string; wide?: boolean }) {
-  return (
-    <div className={['fs-card', 'flex', 'items-start', 'gap-3', 'p-3.5', ...(wide ? ['col-span-2'] : [])].join(' ')}>
-      <span className="rounded-md bg-fs-brand-soft p-1.5 text-fs-primary">
-        <TileIcon />
-      </span>
-      <div className="min-w-0">
-        <p className="font-fs-heading text-xl font-semibold leading-tight tabular-nums">{value}</p>
-        <p className="mt-0.5 text-[11px] leading-snug text-fs-muted">{label}</p>
-      </div>
-    </div>
-  )
+function KpiNumber({ value }: { value: string }) {
+  return <p className="font-fs-heading text-2xl font-bold leading-none">{value}</p>
 }
 
 /** The last answer the board showed, read from the plan store as it stands; nothing is computed here. */
@@ -161,9 +136,15 @@ export default function EntryScreen() {
               {strings['overview.summary']}
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <KpiTile icon={IconMap} value={String(exampleCase.fields.length)} label={strings['overview.kpi.fields']} />
-              <KpiTile icon={IconRotate} value={String(plan.sent.length)} label={strings['overview.kpi.rotations']} />
-              <KpiTile icon={IconRuler} value={TOTAL_HA.toFixed(1)} label={strings['overview.kpi.hectares']} wide />
+              <KpiTile icon={IconMap} label={strings['overview.kpi.fields']}>
+                <KpiNumber value={String(exampleCase.fields.length)} />
+              </KpiTile>
+              <KpiTile icon={IconRotate} label={strings['overview.kpi.rotations']}>
+                <KpiNumber value={String(plan.sent.length)} />
+              </KpiTile>
+              <KpiTile icon={IconRuler} label={strings['overview.kpi.hectares']} wide>
+                <KpiNumber value={TOTAL_HA.toFixed(1)} />
+              </KpiTile>
             </div>
           </section>
 
@@ -177,11 +158,7 @@ export default function EntryScreen() {
             id="overview-fields-title"
             icon={IconMap}
             title={strings['identity.title']}
-            aside={
-              <span className="rounded-full bg-fs-faint px-2 py-0.5 text-[11px] font-semibold tabular-nums text-fs-muted">
-                {exampleCase.fields.length}
-              </span>
-            }
+            aside={<CardCount n={exampleCase.fields.length} />}
           />
           <p className="mb-3 text-xs text-fs-muted">{strings['overview.pick_field']}</p>
           <ul className="grid gap-2 sm:grid-cols-2">

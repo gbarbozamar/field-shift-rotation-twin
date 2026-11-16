@@ -6,6 +6,8 @@ import type { MissingPart } from '../components/ValueDisplay'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
 import { RangeLine } from './CompareTable'
+import { CardHeader } from '../components/Card'
+import { IconCalendar, IconCoins } from '../shell/icons'
 import { MARGINS_OF, STRICTNESSES } from '../plant/plantData'
 import { KINDS_OF_YEAR, answerAtPrice } from '../plant/plantData'
 import type {
@@ -423,19 +425,23 @@ export function PriceTrackPanel({
     const missing: MissingPart = tipping.missing ?? { reason: 'NOT_AVAILABLE' }
     return (
       <section data-testid="board-price" className="fs-card px-5 py-4">
-        <h3 className="text-lg font-bold">{strings['board.price.title']}</h3>
+        <CardHeader icon={IconCoins} title={strings['board.price.title']} />
         <p className="text-sm italic text-fs-muted">{missingPatternText(strings['board.price.title'], missing)}</p>
       </section>
     )
   }
   return (
     <section data-testid="board-price" className="fs-card px-5 py-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-        <h3 className="text-lg font-bold">{strings['board.price.title']}</h3>
-        <p className="text-sm text-fs-muted">
-          {formatString(strings['plant.q.price_today'], { price: displayNumber(tipping.today!), unit: unitText(tipping.unit) })}
-        </p>
-      </div>
+      <CardHeader
+        icon={IconCoins}
+        title={strings['board.price.title']}
+        className="mb-0"
+        aside={
+          <p className="text-sm text-fs-muted">
+            {formatString(strings['plant.q.price_today'], { price: displayNumber(tipping.today!), unit: unitText(tipping.unit) })}
+          </p>
+        }
+      />
       <div aria-hidden="true" className="relative mt-6 h-3 overflow-hidden rounded-full bg-fs-faint">
         <span
           data-side={track.down.kind}
@@ -511,12 +517,16 @@ export function RecordRibbon({ record, marginOf }: { record: KindsOfYearRecord; 
   const last = record.years[record.years.length - 1].ag_year
   return (
     <section data-testid="board-record" className="fs-card px-5 py-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-        <h3 className="text-lg font-bold">{strings['board.record.title']}</h3>
-        <p className="text-sm text-fs-muted">
-          {formatString(strings['board.record.span'], { first, last, n: record.years.length })}
-        </p>
-      </div>
+      <CardHeader
+        icon={IconCalendar}
+        title={strings['board.record.title']}
+        className="mb-0"
+        aside={
+          <p className="text-sm text-fs-muted">
+            {formatString(strings['board.record.span'], { first, last, n: record.years.length })}
+          </p>
+        }
+      />
       <ol className="mt-3 flex flex-wrap gap-1">
         {record.years.map((year) => (
           <li

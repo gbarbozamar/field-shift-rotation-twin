@@ -106,11 +106,12 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
       {fields.map((field) => {
         const site = siteOf(field.field_id)
         return (
-          <li key={field.field_id} className="relative">
-            <div
-              data-selected={String(field.field_id === selectedFieldId)}
-              className="fs-card px-3 py-2 data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
-            >
+          <li
+            key={field.field_id}
+            data-selected={String(field.field_id === selectedFieldId)}
+            className="fs-card fs-card-lift relative data-[selected=true]:border-fs-primary data-[selected=true]:bg-fs-selection data-[selected=true]:ring-1 data-[selected=true]:ring-fs-primary"
+          >
+            <div data-selected={String(field.field_id === selectedFieldId)} className="px-3.5 py-2.5">
               <p id={`board-field-${field.field_id}-name`} className="font-bold leading-tight">{field.name}</p>
               <p id={`board-field-${field.field_id}-area`} data-testid="board-field-area" className="text-xs tabular-nums">
                 {formatString(strings['field.area'], { ha: fieldAreaHa(field).toFixed(1) })}
@@ -126,7 +127,7 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
               aria-pressed={field.field_id === selectedFieldId}
               aria-labelledby={`board-field-${field.field_id}-name`}
               aria-describedby={`board-field-${field.field_id}-area`}
-              className="absolute inset-0 cursor-pointer rounded-xl"
+              className="absolute inset-0 cursor-pointer rounded-fs-card"
               onClick={() => setSelectedFieldId(field.field_id)}
             />
           </li>

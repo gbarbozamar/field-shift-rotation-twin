@@ -3,6 +3,8 @@ import type { MissingPart, ValueItem } from '../components/ValueDisplay'
 import { exampleCase } from '../identity/exampleCase'
 import { formatString } from '../lib/format'
 import { strings } from '../strings'
+import { CardHeader } from '../components/Card'
+import { IconRotate } from '../shell/icons'
 import type {
   CarbonPart,
   CarbonValue,
@@ -243,19 +245,15 @@ function RotationCard({ doc }: { doc: ResultsPerRotation }) {
   return (
     <article
       data-testid="rotation-card"
-      className={[
-        'mt-4',
-        'rounded-lg',
-        'border',
-        'border-fs-border',
-        'bg-fs-surface',
-        'px-4',
-        'py-3',
-      ].join(' ')}
+      className="fs-card mt-4 px-5 py-4"
     >
-      <h4 data-testid="rotation-heading" className={['text-sm', 'font-semibold'].join(' ')}>
-        {formatString(strings['cards.per_rotation'], { id: doc.rotation_id })}
-      </h4>
+      <CardHeader
+        icon={IconRotate}
+        level="h4"
+        className="mb-0"
+        headingTestId="rotation-heading"
+        title={formatString(strings['cards.per_rotation'], { id: doc.rotation_id })}
+      />
       <h5
         data-testid="availability-heading"
         className={['mt-3', 'text-xs', 'font-semibold', 'text-fs-muted'].join(' ')}

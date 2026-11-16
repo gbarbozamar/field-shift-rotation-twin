@@ -88,7 +88,7 @@ const TOKENS: Record<string, string> = {
   '--fs-furrow': 'color-mix(in srgb, var(--fs-primary) 5%, transparent)',
   '--fs-warning-accent': '#f2a900',
   '--fs-radius-card': '10px',
-  '--fs-shadow-card': '0 1px 2px rgb(31 45 43 / 0.05)',
+  '--fs-shadow-card': '0 1px 2px rgb(31 45 43 / 0.04), 0 4px 12px -2px rgb(31 45 43 / 0.06), 0 12px 32px -16px rgb(31 45 43 / 0.1)',
   '--fs-shadow-pop': '0 4px 6px -1px rgb(31 45 43 / 0.1), 0 2px 4px -2px rgb(31 45 43 / 0.1)',
 }
 
