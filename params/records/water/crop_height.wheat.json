@@ -3,16 +3,19 @@
   "scope": {
     "crop": "wheat"
   },
-  "value": 1.0,
+  "value": 0.93,
   "unit": "m",
-  "range": null,
-  "range_missing_reason": "Table 12 prints one value for this row, with no range.",
+  "range": {
+    "low": 0.84,
+    "high": 1.06,
+    "basis": "Lowest and highest of the 16 campaign means of plant height (83.9 and 106.2 cm), same selection as the value; the spread between campaigns, not a confidence interval"
+  },
   "citation": {
-    "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
-    "locator": "Chapter 6, Table 12, column «Maximum Crop Height (h) (m)», row «Spring Wheat»",
-    "url": "https://www.fao.org/4/X0490E/x0490e0b.htm"
+    "reference": "INIA-INASE. Cardozo, V.; Castro, B.; Morales, M. X.; Restaino, E.; Maltese, N. E.; Condón, F.; Berger, A. G. (2025 a 2026); Cardozo, V.; Castro, B.; Morales, M. X.; Restaino, E.; Castro, M. (2010 a 2024). Resultados Experimentales de la Evaluación Nacional de Cultivares de Trigo: Base de datos compilada 2010-2025. Convenio INASE-INIA, La Estanzuela, Colonia (Uruguay): INIA. File BD_TRIGO2026_2.xlsx, SHA-256 cf3fad8564c3cc24fdc8f35d78051e2263678e27fd0b16ef43bb617bde206aad",
+    "locator": "Sheet «BD_TRIGO EXCEL», headers in row 5. Filter (D233): column A «Ensayo» contains «LE1», column C «Localidad» = «La Estanzuela», column D «Época» = 1, column E «Ciclo» = «Intermedio» (1007 rows, 16 trials 2010-2025). Column U «Altura», in cm (1006 rows with a value; 2017 lacks 1); mean per trial; mean of the 16 campaign means = 92.95 cm = 0.93 m. Definition in sheet «INICIO», row 34: «En centímetros desde el suelo hasta la espiga, incluyendo aristas».",
+    "url": "https://www.inia.uy/sites/default/files/2026-05/BD_TRIGO2026_2.xlsx"
   },
   "transcribed_by": "AI session (D34 of issue #77)",
   "checked_by": "gbarbozamar",
-  "note": "Read on 2026-11-15 by an AI session in FAO-56 Table 12 (official HTML edition) under D34 of issue #77, and re-opened by the orchestrating session for D204. Value to compare: row «Spring Wheat», column «Maximum Crop Height (h) (m)»: «1». The row «Winter Wheat – with frozen soils» also prints 1; the row for non-frozen soils leaves h blank. The signed basal coefficients of wheat come from the row «Spring Wheat». Local control, not used: 0.93 m (national cultivar evaluation, La Estanzuela, computed by an AI session in params_borrador/candidatos/agua/crop_height.wheat.enc_bd_le.json, not checked). UPDATED on 2026-11-15 by an AI session to follow D204 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D204: wheat 1 m. LIMIT D204 DECLARES: one height per crop for the whole cycle (FAO-56 asks for the height of each period: «h mean maximum plant height during the period of calculation (initial, development, mid-season, or late-season) [m],», chapter 7, symbols of Eq. 72). A height per stage is a lane L1 unit for after the event. New draft written on 2026-11-15 for the second rotation of D128. SIGNED on 2026-11-15: checked_by gbarbozamar, row T4 of section 3.1 of the water signing sheet. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+  "note": "Decision scope (D232, D233; supersedes signed D204 T4/T5 currently on origin/main superseding previous 1.0 m / 1.5 to sensitivity). Written on 2026-11-15 by an AI session to follow D232 and D233 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893254289), taken by the orchestrating AI session under the delegation of D161. Following executive sign-off, 1.0 m becomes the sensitivity, as D204 did for soybean. Load one wheat height only: both records share id and scope. WHAT IS LOCAL: the value, the mean of 16 campaign means of plant height at La Estanzuela, sowing period 1, intermediate cycle, 2010-2025 (83.9-106.2 cm). WHAT IS CHOSEN: one final height for the whole cycle (the limit declared in D204; FAO-56 asks for the mean maximum height of each period, chapter 7, symbols of Eq. 72), and the intermediate cycle and sowing period 1 as the match for the D72 sowing date. LIMIT: the height includes the awns (sheet «INICIO», row 34), so it is somewhat above the canopy height. CONTEXT: the value lies inside the updated standard range for common wheat, 0.70-1.10 m (Pereira et al. 2021, Agric. Water Manag. 243:106466, Table 15). ARITHMETIC: 92.95 cm / 100 = 0.9295 m, rounded to 0.93 m. D233: rows by trial code containing «LE1»; the 109 rows of the 2014 trials at Young labelled La Estanzuela (Excel rows 2112-2220) are excluded. Values are cited; the file is not redistributed. SIGNED on 2026-11-15: checked_by gbarbozamar per executive sign-off (orquestacion/PAQUETE_FIRMA_CIENTIFICA_1CLICK/RESUMEN_EJECUTIVO_PARA_FIRMAR.md)."
 }

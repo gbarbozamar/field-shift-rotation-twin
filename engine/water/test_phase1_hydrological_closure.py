@@ -6,13 +6,14 @@ Verifies deterministically in-memory against the repository's active signed
 ``PLACEHOLDER`` daily ``SiteClimate`` series spanning 8,766 days
 (2001-01-01..2024-12-31):
 
-1. ``soybean-winter-fallow`` phase 1 produces non-missing exposure outputs
-   across all 23 full agricultural years (2001..2023) and closes the daily
-   soil-water mass balance across all 8,766 days within tight floating-point
-   tolerance.
-2. ``wheat-soybean-maize`` phase 1 remains not evaluated (``value is None``,
-   ``MISSING_INPUT``) against the active ``params/records/`` catalogue, naming
-   only the exact 10 unsigned wheat/maize water parameter keys (#433).
+1. ``soybean-winter-fallow`` phase 1 and ``wheat-soybean-maize`` phase 1 produce
+   non-missing exposure outputs across all 23 full agricultural years
+   (2001..2023) and close the daily soil-water mass balance across all 8,766
+   days within tight floating-point tolerance against the active 205-record
+   ``params/records/`` catalogue.
+2. Filtering the 10 wheat/maize water parameter keys (#433) out of an
+   in-memory copy of the catalogue isolates ``MISSING_INPUT`` on
+   ``wheat-soybean-maize`` phase 1 to those exact 10 keys.
 
 Every climate input in this module is synthetic ``PLACEHOLDER`` data; it does
 not represent NASA POWER observations or claim physical field validation.
@@ -20,6 +21,7 @@ not represent NASA POWER observations or claim physical field validation.
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import json
 import math
@@ -65,7 +67,7 @@ FULL_AG_YEARS = list(range(2001, 2024))
 BOUNDARY_AG_YEARS = (2000, 2024)
 EPS = sys.float_info.epsilon
 
-EXPECTED_UNSIGNED_WHEAT_MAIZE_PARAMS: frozenset[
+EXPECTED_WHEAT_MAIZE_WATER_PARAMS: frozenset[
     tuple[str, tuple[tuple[str, str], ...]]
 ] = frozenset(
     {
@@ -240,39 +242,24 @@ def phase1_bundle() -> dict[str, Any]:
     }
 
 
-def test_active_params_layout_and_signed_water_soybean_records(
-    phase1_bundle: dict[str, Any],
+def _catalogue_without_keys(
+    records: dict[str, dict[str, Any]],
+    excluded: frozenset[tuple[str, tuple[tuple[str, str], ...]]],
+) -> dict[str, dict[str, Any]]:
+    """Return an in-memory copy of ``records`` without the excluded ``(id, scope)`` keys."""
+    return {
+        key: copy.deepcopy(record)
+        for key, record in records.items()
+        if (record["id"], tuple(sorted(record["scope"].items()))) not in excluded
+    }
+
+
+def _assert_phase1_exposure_and_mass_closure(
+    phase1_calendar: RotationCalendar,
+    climate: SiteClimate,
+    records: dict[str, dict[str, Any]],
+    soil_slope: SiteSoilSlope,
 ) -> None:
-    """Active params/records layout passes and carries signed water and soybean records."""
-    records: dict[str, dict[str, Any]] = phase1_bundle["records"]
-    required_paths = (
-        "water/column_capacity.json",
-        "water/column_depth.json",
-        "water/initial_storage.json",
-        "water/fao56_stage_length_initial.soybean.json",
-        "water/fao56_stage_length_development.soybean.json",
-        "water/fao56_stage_length_mid.soybean.json",
-        "water/fao56_stage_length_late.soybean.json",
-        "water/surface_residue_cover.soybean.no_crop.json",
-    )
-    for rel_path in required_paths:
-        assert rel_path in records, f"Missing active record: {rel_path}"
-        assert str(records[rel_path]["checked_by"]).strip() != ""
-
-
-def test_soybean_winter_fallow_phase1_8766_day_exposure_and_mass_closure(
-    phase1_bundle: dict[str, Any],
-) -> None:
-    """Soybean-winter-fallow phase 1 computes EP3 and closes daily mass across 8,766 days."""
-    records = phase1_bundle["records"]
-    soil_slope = phase1_bundle["soil_slope"]
-    climate = phase1_bundle["climate"]
-    rotation = phase1_bundle["rotations"]["soybean-winter-fallow"]
-
-    calendar = build_rotation_calendar(rotation)
-    assert list_phases(calendar) == [0]
-    phase1_calendar = phase_calendar(calendar, 0)
-
     results: list[WaterDeficitExposure] = compute_water_deficit_exposure(
         phase1_calendar,
         climate,
@@ -382,11 +369,81 @@ def test_soybean_winter_fallow_phase1_8766_day_exposure_and_mass_closure(
     )
 
 
-def test_wheat_soybean_maize_phase1_not_evaluated_with_exact_10_missing_params(
+def test_active_params_layout_and_signed_water_soybean_records(
     phase1_bundle: dict[str, Any],
 ) -> None:
-    """Wheat-soybean-maize phase 1 stays not evaluated with the exact 10 missing #433 keys."""
+    """Active params/records layout passes and carries signed water, soybean, wheat, and maize records."""
+    records: dict[str, dict[str, Any]] = phase1_bundle["records"]
+    assert len(records) == 205
+    required_paths = (
+        "water/column_capacity.json",
+        "water/column_depth.json",
+        "water/initial_storage.json",
+        "water/fao56_stage_length_initial.soybean.json",
+        "water/fao56_stage_length_development.soybean.json",
+        "water/fao56_stage_length_mid.soybean.json",
+        "water/fao56_stage_length_late.soybean.json",
+        "water/surface_residue_cover.soybean.no_crop.json",
+        "water/fao56_stage_length_initial.wheat.json",
+        "water/fao56_stage_length_development.wheat.json",
+        "water/fao56_stage_length_mid.wheat.json",
+        "water/fao56_stage_length_late.wheat.json",
+        "water/surface_residue_cover.wheat.no_crop.json",
+        "water/fao56_stage_length_initial.maize.json",
+        "water/fao56_stage_length_development.maize.json",
+        "water/fao56_stage_length_mid.maize.json",
+        "water/fao56_stage_length_late.maize.json",
+        "water/surface_residue_cover.maize.no_crop.json",
+    )
+    for rel_path in required_paths:
+        assert rel_path in records, f"Missing active record: {rel_path}"
+        assert str(records[rel_path]["checked_by"]).strip() != ""
+
+
+def test_soybean_winter_fallow_phase1_8766_day_exposure_and_mass_closure(
+    phase1_bundle: dict[str, Any],
+) -> None:
+    """Soybean-winter-fallow phase 1 computes EP3 and closes daily mass across 8,766 days."""
     records = phase1_bundle["records"]
+    soil_slope = phase1_bundle["soil_slope"]
+    climate = phase1_bundle["climate"]
+    rotation = phase1_bundle["rotations"]["soybean-winter-fallow"]
+
+    calendar = build_rotation_calendar(rotation)
+    assert list_phases(calendar) == [0]
+    phase1_calendar = phase_calendar(calendar, 0)
+    _assert_phase1_exposure_and_mass_closure(
+        phase1_calendar, climate, records, soil_slope
+    )
+
+
+def test_wheat_soybean_maize_phase1_8766_day_exposure_and_mass_closure(
+    phase1_bundle: dict[str, Any],
+) -> None:
+    """Wheat-soybean-maize phase 1 computes EP3 and closes daily mass across 8,766 days."""
+    records = phase1_bundle["records"]
+    soil_slope = phase1_bundle["soil_slope"]
+    climate = phase1_bundle["climate"]
+    rotation = phase1_bundle["rotations"]["wheat-soybean-maize"]
+
+    calendar = build_rotation_calendar(rotation)
+    assert 0 in list_phases(calendar)
+    phase1_calendar = phase_calendar(calendar, 0)
+    _assert_phase1_exposure_and_mass_closure(
+        phase1_calendar, climate, records, soil_slope
+    )
+
+
+def test_wheat_soybean_maize_phase1_missing_10_params_isolated_in_memory(
+    phase1_bundle: dict[str, Any],
+) -> None:
+    """Filtering the 10 wheat/maize water keys isolates MISSING_INPUT to those exact 10 keys."""
+    records = _catalogue_without_keys(
+        phase1_bundle["records"], EXPECTED_WHEAT_MAIZE_WATER_PARAMS
+    )
+    assert len(records) == len(phase1_bundle["records"]) - 10
+    assert check_catalogue(records) == []
+
     soil_slope = phase1_bundle["soil_slope"]
     climate = phase1_bundle["climate"]
     rotation = phase1_bundle["rotations"]["wheat-soybean-maize"]
@@ -417,4 +474,4 @@ def test_wheat_soybean_maize_phase1_not_evaluated_with_exact_10_missing_params(
         assert item.missing.reason == "MISSING_INPUT"
         missing_params = _extract_missing_parameters(item.missing.detail or "")
         assert len(missing_params) == 10
-        assert missing_params == EXPECTED_UNSIGNED_WHEAT_MAIZE_PARAMS
+        assert missing_params == EXPECTED_WHEAT_MAIZE_WATER_PARAMS

@@ -48,27 +48,6 @@ RECORDS_DIR = ROOT / "params" / "records"
 MARK = "PLACEHOLDER"
 UNMARKED = "UNMARKED_TEST_ONLY"
 
-# PLACEHOLDER stage lengths and residue cover for Rotation B only (same pattern
-# as engine/water/test_d128_chain_invariants.py; plainly not real values).
-_PLACEHOLDER_STAGE_LENGTHS: dict[str, dict[str, int]] = {
-    "wheat": {
-        "fao56_stage_length_initial": 11,
-        "fao56_stage_length_development": 22,
-        "fao56_stage_length_mid": 33,
-        "fao56_stage_length_late": 44,
-    },
-    "maize": {
-        "fao56_stage_length_initial": 15,
-        "fao56_stage_length_development": 25,
-        "fao56_stage_length_mid": 35,
-        "fao56_stage_length_late": 15,
-    },
-}
-_PLACEHOLDER_RESIDUE_COVER: dict[str, float] = {
-    "wheat": 0.111,
-    "maize": 0.222,
-}
-
 
 def _unmark(obj: Any) -> Any:
     return json.loads(json.dumps(obj).replace(MARK, UNMARKED))
@@ -103,31 +82,9 @@ def _placeholder_record(
 def _shipped_catalogue() -> dict[str, dict[str, Any]]:
     records, errors = load_folder(RECORDS_DIR)
     assert errors == []
+    assert len(records) == 205
     assert check_catalogue(records) == []
     return records
-
-
-def _augmented_catalogue() -> dict[str, dict[str, Any]]:
-    catalogue = copy.deepcopy(_shipped_catalogue())
-    for crop, stages in _PLACEHOLDER_STAGE_LENGTHS.items():
-        for param_id, value in stages.items():
-            catalogue[f"{MARK.lower()}.{param_id}.{crop}"] = _placeholder_record(
-                param_id=param_id,
-                scope={"crop": crop},
-                value=value,
-                unit="day",
-            )
-    for crop, cover in _PLACEHOLDER_RESIDUE_COVER.items():
-        catalogue[f"{MARK.lower()}.surface_residue_cover.{crop}.no_crop"] = (
-            _placeholder_record(
-                param_id="surface_residue_cover",
-                scope={"crop": crop, "management": "no_crop"},
-                value=cover,
-                unit="fraction of the soil surface (the table prints percent)",
-            )
-        )
-    assert check_catalogue(catalogue) == []
-    return catalogue
 
 
 def _soil_slope() -> SiteSoilSlope:
@@ -244,7 +201,7 @@ def _build_placeholder_climate(
 def bundle() -> dict[str, Any]:
     soil = _soil_slope()
     calendars = _d128_calendars(soil.case_id, soil.field_id)
-    catalogue = _augmented_catalogue()
+    catalogue = _shipped_catalogue()
     climate = _build_placeholder_climate(
         soil.case_id,
         soil.field_id,

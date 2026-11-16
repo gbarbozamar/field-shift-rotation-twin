@@ -8,9 +8,7 @@ evaluation of [D0] and [W0] across the two PLACEHOLDER demonstration fields.
 from __future__ import annotations
 
 import datetime as dt
-import json
 import math
-import re
 
 import pytest
 
@@ -34,22 +32,6 @@ ROTATION_A_ID = "soybean-winter-fallow"
 ROTATION_B_ID = "wheat-soybean-maize"
 EXPECTED_SCENARIOS = frozenset({"phase_1+phase_1", "phase_1+phase_2"})
 
-_PARAM_DETAIL_RE = re.compile(
-    r"parameters with no record in parameters \(D56\), scope (\{[^}]+\}): ([^;]+)"
-)
-
-
-def _extract_missing_parameters(detail: str) -> set[str]:
-    found: set[str] = set()
-    for match in _PARAM_DETAIL_RE.finditer(detail):
-        scope_dict = json.loads(match.group(1))
-        scope_tag = ",".join(
-            f"{key}={scope_dict[key]}" for key in sorted(scope_dict)
-        )
-        for param_id in re.findall(r"'([^']+)'", match.group(2)):
-            found.add(f"{param_id}/{scope_tag}" if scope_tag else param_id)
-    return found
-
 
 @pytest.fixture(scope="module")
 def plan() -> TwoFieldsPlanResult:
@@ -57,7 +39,7 @@ def plan() -> TwoFieldsPlanResult:
 
 
 def test_shipped_inputs_and_placeholder_fields(plan: TwoFieldsPlanResult) -> None:
-    assert len(plan.parameters) == 132
+    assert len(plan.parameters) == 205
     assert check_catalogue(plan.parameters) == []
 
     gentle = plan.gentle.soil_slope
@@ -248,9 +230,11 @@ def test_rotation_a_numeric_ep1_ep3_ep4_all_full_years(
             assert water_by_yr[boundary_yr].missing.reason == "NO_COVERAGE"
 
 
-def test_rotation_b_numeric_ep1_ep4_and_exact_ep3_missing_input(
+def test_rotation_b_numeric_ep1_ep3_ep4_all_full_years(
     plan: TwoFieldsPlanResult,
 ) -> None:
+    """Rotation B computes numeric EP1, EP3 (23/23 years), and EP4 on the 205-record catalogue."""
+    assert EXPECTED_ROTATION_B_MISSING_PARAMS == frozenset()
     for field_plan in (plan.gentle, plan.steep):
         phases = field_plan.phases_by_rotation[ROTATION_B_ID]
         assert len(phases) == 2
@@ -284,19 +268,14 @@ def test_rotation_b_numeric_ep1_ep4_and_exact_ep3_missing_input(
                     ret.value, prod.value - exp.value, rel_tol=1e-9, abs_tol=1e-9
                 )
 
-            discovered_missing: set[str] = set()
             for ag_year in FULL_AG_YEARS:
                 sl_item = annual_sl[ag_year]
                 assert sl_item.missing is None and sl_item.value is not None
                 assert math.isfinite(sl_item.value) and sl_item.value > 0.0
 
                 w_item = water_by_yr[ag_year]
-                assert w_item.value is None
-                assert w_item.missing is not None
-                assert w_item.missing.reason == "MISSING_INPUT"
-                discovered_missing |= _extract_missing_parameters(w_item.missing.detail)
-
-            assert discovered_missing == EXPECTED_ROTATION_B_MISSING_PARAMS
+                assert w_item.missing is None and w_item.value is not None
+                assert math.isfinite(w_item.value) and 0.0 <= w_item.value <= 1.0
 
             for boundary_yr in BOUNDARY_AG_YEARS:
                 assert water_by_yr[boundary_yr].value is None

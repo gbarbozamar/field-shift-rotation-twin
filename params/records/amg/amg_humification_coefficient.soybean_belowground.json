@@ -1,0 +1,18 @@
+{
+  "id": "amg_humification_coefficient",
+  "scope": {
+    "crop": "soybean_belowground"
+  },
+  "value": 0.4,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_PLANT.tab (datafile 174668, MD5 65672ba890ce1d17cc19e5083631e20c), row Crop_type \"MC\", Crop_name \"Soybean\", column \"h_BG\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Read on 2026-11-14. Transcribed by an AI session under D34 of issue #77. Verbatim cells to compare, parameters_PLANT.tab: Crop_type \"MC\", Crop_name \"Soybean\", Crop_name_FR \"Soja\", h_BG \"0.4\". Definition, AMGv2_parameter_list.tab: \"Humification coefficient of belowground crop residues\", type \"Real [0-1]\" (no unit printed; written dimensionless, C1.1). The crop types of the file: \"MC for main crop, CC for cover crop, CCH for harvested cover crop\". RE-SCOPED on 2026-11-15 from \"main_crop_soybean_belowground\" to \"soybean_belowground\", the origin EP4 writes on main for the crop_id soybean (D194 of issue #77: <crop_id>_aboveground for the retained aboveground carbon, <crop_id>_belowground for root and rhizodeposit carbon), which engine/amg/entry.py reads under the scope key crop (ORIGIN_SCOPE_KEY). The value does not change. D194 chose the row \"MC, Soybean\" and h_BG. The weighted single record of D194 (row 14 of the sheet, scope crop soybean) is obsolete: EP4 splits the origin on main. The dataset description says: \"They are applicable for average French arable crop conditions.\" Whether they apply to the demonstration site is for the science lead."
+}

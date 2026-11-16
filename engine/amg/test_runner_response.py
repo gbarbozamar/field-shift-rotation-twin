@@ -212,7 +212,10 @@ def test_the_response_is_the_one_of_the_forms_of_main_but_for_the_amg_reasons(
     detail, and holds no number."""
     engines_or_skip()
     parameters = catalogue(records)
-    assert not any(r["id"].startswith("amg_") for r in parameters.values())
+    if records == "empty":
+        assert not any(r["id"].startswith("amg_") for r in parameters.values())
+    else:
+        assert any(r["id"].startswith("amg_") for r in parameters.values())
     assert entry.SCHEME == "exponential" and "cn_ratio" in entry.MODIFIERS
     assert producer.SOIL_CN_RATIO in producer.SOIL_PROPERTIES
     now = post(rotation(kind), parameters)

@@ -1,0 +1,18 @@
+{
+  "id": "root_mass_at_harvest",
+  "scope": {
+    "crop": "wheat"
+  },
+  "value": 543.2,
+  "unit": "kg ha-1",
+  "range": null,
+  "range_missing_reason": "The sources give no range for this derived value; D197 states the coefficient of variation near 50 % of the shoot:root ratios as a limit, not as a range.",
+  "citation": {
+    "reference": "Clivot, H., Mouny, J.-C., Duparque, A., Dinh, J.-L., Denoroy, P., Houot, S., Vertès, F., Trochard, R., Bouthier, A., Sagot, S., Mary, B. (2019). Modeling soil organic carbon evolution in long-term arable experiments with AMG model. Environmental Modelling & Software 118:99-113. With: Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "AMGv2 dataset v2.0, file parameters_PLANT.tab (datafile 174668, MD5 65672ba890ce1d17cc19e5083631e20c), row Crop_type \"MC\", Crop_name \"Spring wheat\", columns \"SR\", \"HI\", \"Beta\"; Clivot et al. (2019), eq. 8 and 10, printed p. 102; IPCC (2019) Refinement, vol. 4, ch. 11, Table 11.1A (New), row \"Spring Wheat\", column DRY, p. 11.18 (PDF p. 18); yield of the signed record rusle2_crop_yield (scope crop wheat)",
+    "url": "https://doi.org/10.1016/j.envsoft.2019.04.004"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "DERIVED. Drafted on 2026-11-15 by an AI session under D34 of issue #77, for rotation B. D197 of issue #77 (inputs computed as AMG computes them, so the model is used as it was calibrated). The id, scope key crop and unit are those engine/residues/_parameters.py reads on main (RECORDS, CROP_SCOPE_KEY); the scope value is the crop_id of demonstration rotation B (D128). Arithmetic (D197): root dry matter 0-20 cm = yield x DRY / (SR x HI) x (1 - Beta^20). Yield 4193.25 kg ha-1 (signed record rusle2_crop_yield.wheat, params/records/residues/); DRY 0.89; SR 7.517; HI 0.51; Beta 0.96. Step 1: 4193.25 x 0.89 = 3731.9925. Step 2: 7.517 x 0.51 = 3.83367. Step 3: 3731.9925 / 3.83367 = 973.48 (whole root dry matter). Step 4: 1 - 0.96^20 = 0.55800 (share above 20 cm). Step 5: 973.48 x 0.55800 = 543.20, rounded to 543.2 kg ha-1 (DERIVED). The depth 20 cm is the soil depth of D180. Verbatim cells to compare: parameters_PLANT.tab \"MC,Spring wheat,Blé de printemps,C3,0.425,0.409,0.101,0.066,0.96,0.51,7.517,0.5,0.217,0.4,0.44,0.4,Solebiom project\" (SR 7.517, HI 0.51, Beta 0.96). IPCC Table 11.1A (New), row \"Spring Wheat 0.006 (± 75%)d 0.009 (± 75%)d 1.3 0.28 (±26%) 0.89\", last column \"Dry matter fraction of harvested product (DRY)\" = 0.89 (read on the local copy research_notes/validador_ia/IPCC2019-ch11.pdf, MD5 06c11d4f5a2b729564f8b3bd1ba11824, PDF p. 18). Clivot et al. (2019), printed p. 102: eq. 8 C_R = Y_P / (SR x HI) x 0.40 and eq. 10, the cumulative belowground fraction BGF = 1 - Beta^Depth (Gale and Grigal 1987). Limits (D197): the dataset's shoot:root ratios carry a coefficient of variation near 50 % (Clivot et al. 2019, section 2.5.2); no root biomass was measured at La Estanzuela; the yield is a national mean read as dry matter (D196). The dataset description says: \"They are applicable for average French arable crop conditions.\" D192 and D197 of issue #77 take them as French defaults, not calibrated for Uruguay, and say so in the label. Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after comparing the text with the source."
+}

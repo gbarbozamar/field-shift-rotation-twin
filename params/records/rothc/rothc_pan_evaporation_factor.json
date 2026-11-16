@@ -1,0 +1,16 @@
+{
+  "id": "rothc_pan_evaporation_factor",
+  "scope": {},
+  "value": 0.75,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The printed description states no range for this constant.",
+  "citation": {
+    "reference": "Coleman, K., Prout, J.M., Milne, A.E. (2024). RothC - A model for the turnover of carbon in soil. Model Description (February 2024). Rothamsted Research, Harpenden.",
+    "locator": "section 1.6, p. 10 (and section 1.2, item 2, p. 5)",
+    "url": "https://www.rothamsted.ac.uk/sites/default/files/Documents/RothC_description.pdf"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Verbatim text to compare: \"which is multiplied internally by 0.75 to give evapotranspiration\". Value transcribed by the interface developer (martinbarreto0) on issue #176 on 2026-11-14 and compared side by side with the printed page under D134 of issue #77 (orquestacion/notas_compartidas/rothc-d63-side-by-side.md, Table A, row 6h: value found on p. 10 and p. 5, not at the issue's locator). Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after reading that comparison. Drafted on 2026-11-15 for D218 to D224 of issue #77. D80 and D220: with no open-pan series EP6 divides the FAO-56 ET0 by this factor, so the demand equals ET0 (an adaptation)."
+}

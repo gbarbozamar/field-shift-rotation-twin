@@ -1,0 +1,18 @@
+{
+  "id": "residue_carbon_fraction",
+  "scope": {
+    "crop": "soybean"
+  },
+  "value": 0.44,
+  "unit": "dimensionless",
+  "range": null,
+  "range_missing_reason": "The source gives no range (uncertainty interval) for this value.",
+  "citation": {
+    "reference": "Clivot, H., Duparque, A., Ferchaud, F., Lagrange, H., Levavasseur, F., Levert, M., Marsac, S., Mary, B., Mouny, J.-C., Piquemal, B., Sagot, S., Servain, F., Trochard, R., Cadoux, S., Perrin, A.-S. (2023). AMGv2 parameters. Recherche Data Gouv, dataset version 2.0 (released 2023-09-11). https://doi.org/10.57745/MEQQIX. Licence: Etalab Open Licence 2.0 (etalab-2.0).",
+    "locator": "file parameters_PLANT.tab (datafile 174668, MD5 65672ba890ce1d17cc19e5083631e20c), row Crop_type \"MC\", Crop_name \"Soybean\", column \"C_conc_AG\"; definition in file AMGv2_parameter_list.tab, row \"C_conc_AG\"",
+    "url": "https://doi.org/10.57745/MEQQIX"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77. Row 15 of HOJA_COTEJO_CARBONO_22.md. D197 of issue #77 (inputs computed as AMG computes them, so the model is used as it was calibrated). The id, scope key crop and unit are those engine/residues/_parameters.py reads on main (RECORDS, CROP_SCOPE_KEY); the scope value is the crop_id of the demonstration rotations (D128). Verbatim row to compare, parameters_PLANT.tab: \"MC,Soybean,Soja,C3,0.267,0.567,0.101,0.066,0.939,0.32,7.517,0.4,0.276,0.4,0.44,0.4,Solebiom project\" (header \"Crop_type,Crop_name,Crop_name_FR,Plant_group,RP,RS,RR,RE,Beta,HI,SR,PSS,h_AG,h_BG,C_conc_AG,C_conc_BG,Source\"); C_conc_AG = 0.44. Definition, AMGv2_parameter_list.tab: \"C content of the aboveground crop residues\", unit \"gC.g-1 DW\": a ratio of masses, written dimensionless as EP4 requires (C1.1; nothing is converted). Second check: Clivot et al. (2019), printed p. 102: \"a C content of 0.44 g g-1 in the aboveground plant material (Redin et al., 2014)\". D197 reports the local soybean residue value 0.50 (Mazzilli, Piñeiro and Kemanian 2012, Table 1) as the sensitivity, not as this record. The dataset description says: \"They are applicable for average French arable crop conditions.\" D192 and D197 of issue #77 take them as French defaults, not calibrated for Uruguay, and say so in the label. Per D161 no AI session writes a person's name in checked_by: the lead developer, or their delegate (D66), fills it after comparing the text with the source."
+}

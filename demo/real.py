@@ -58,19 +58,19 @@ The levels, read off D115 verbatim:
 The honest outcome this unit asserts (D176 condition 3): with the declared
 ``C`` (D148, D158) EP1 does not read the cover and gives one figure for
 both rotations, so erosion cannot move between the levels; the only engine
-that reads the declared cover is the water balance (D110, D116), which has
-no number yet (D157). Until it has one, the expected result is **no tipping
-point**, for that reason. The route's own outputs on the repository's
-inputs make the outcome stronger still, and the demo reports it as
-observed: every soil-loss row the route answers is missing with its reason
-(the ``ls`` factor of the example soil is not computable — its slope-length
-unit is the example's, not the metre of the LS records), every water row is
-missing ``MISSING_INPUT`` naming the records not drafted, and so is every
-carbon row; no paired difference holds a value at either level, the pair is
-not evaluated at both levels, and the sweep reports no bracket. The soybean
-rotation's outputs at the two levels are equal, row for row: nothing the
-route computes today moves between the levels. When the water axis has a
-number, this unit changes with it.
+that reads the declared cover is the water balance (D110, D116), where on
+the repository's one-year placeholder climate every soybean water row is
+still missing ``MISSING_INPUT`` (a trailing fallow with no following crop
+laid out inside the record). Every soil-loss row the route answers is
+missing with its reason (the ``ls`` factor of the example soil is not
+computable — its slope-length unit is the example's, not the metre of the
+LS records), every carbon row is missing ``MISSING_INPUT`` on the example
+soil, and even where the wheat rotation's ``phase_1`` computes ``0.0``
+water deficit exposure with the signed 205-record catalogue, no paired
+difference holds a value at either level, the pair is not evaluated at
+both levels, and the sweep reports no bracket. The soybean rotation's
+outputs at the two levels are equal, row for row: nothing the route
+computes today moves between the levels.
 
 D10 and D12 (condition 4): the measured input of D10 and the check of D12
 **wait** — the cover is an input of the engines, not a cell of the results
@@ -208,8 +208,10 @@ DECLARED_C_REASON = (
 )
 WATER_NO_NUMBER_REASON = (
     "the only engine that reads the declared cover is the water balance "
-    "(D110, D116), which has no number yet (D157): its records are not "
-    "drafted, so every water row the route answers is missing with its reason"
+    "(D110, D116), where the soybean rotation still has no value on the "
+    "one-year placeholder climate (D157): a trailing fallow without a "
+    "following crop inside the record leaves every soybean water row "
+    "missing with its reason"
 )
 
 
@@ -320,14 +322,14 @@ def catalogue_at(level: float) -> dict[str, dict]:
     The lower level declares 0 % (bare soil) for every fallow of both
     rotations; the upper level declares the cap for the fallows of the
     rotations that have one — here the soybean rotation alone (0.40,
-    continuous soybean). The water lane ships the lower level of the
-    soybean fallow itself (D208 keeps both levels of D115 as one range in
-    a single record): where the shipped record already holds this level's
-    value the shipped record wins, with its citation, and no duplicate is
-    added; where it holds the range's other end, the level's own
-    declaration governs this run and replaces it. The records are checked
-    as the service checks its own catalogue; a problem is a defect of
-    this module.
+    continuous soybean). The water lane ships the lower level (0.0) for
+    the soybean, wheat, and maize fallows (D115, D208): where a shipped
+    record already holds this level's value the shipped record wins, with
+    its citation, and no duplicate is added; at the upper level (0.40),
+    shipped cover records whose value differs or whose rotation has no cap
+    are excluded so the catalogue holds only the continuous-soybean cap.
+    The records are checked as the service checks its own catalogue; a
+    problem is a defect of this module.
     """
     from params.catalogue import check_catalogue
 
@@ -341,18 +343,27 @@ def catalogue_at(level: float) -> dict[str, dict]:
             if cap is not None
             for crop in _crops_of(rotation)
         }
+    for key, record in list(catalogue.items()):
+        if record.get("id") != water.SURFACE_RESIDUE_COVER:
+            continue
+        scope = record.get("scope")
+        crop = scope.get(water.CROP_KEY) if isinstance(scope, dict) else None
+        if (
+            crop not in covers
+            or scope != _scope_of(crop)
+            or record.get("value") != covers[crop]
+        ):
+            del catalogue[key]
     for crop, value in covers.items():
         scope = _scope_of(crop)
-        shipped = [
-            key
-            for key, record in catalogue.items()
-            if record.get("id") == water.SURFACE_RESIDUE_COVER
+        already_shipped = any(
+            record.get("id") == water.SURFACE_RESIDUE_COVER
             and record.get("scope") == scope
-        ]
-        if shipped and catalogue[shipped[0]].get("value") == value:
+            and record.get("value") == value
+            for record in catalogue.values()
+        )
+        if already_shipped:
             continue
-        for key in shipped:
-            del catalogue[key]
         catalogue[f"demo/{water.SURFACE_RESIDUE_COVER}.{level}.{crop}.json"] = (
             cover_record(scope, value)
         )
@@ -699,14 +710,14 @@ def the_uncertain_input(
 def honest_reason(point: TippingPoint) -> str:
     """Why no tipping point is expected, as D176 condition 3 states it."""
     decided = (
-        f"{DECLARED_C_REASON}; {WATER_NO_NUMBER_REASON}. Until the water "
-        "axis has a number, the expected result is 'no tipping point', for "
-        "that reason"
+        f"{DECLARED_C_REASON}; {WATER_NO_NUMBER_REASON}. Until both sides of "
+        "the pair hold comparable water values, the expected result is "
+        "'no tipping point', for that reason"
     )
     observed = (
         "observed on the repository's own inputs (the chain examples of "
-        "contracts/inputs/examples/): every soil-loss, water and carbon row "
-        "the route answers is missing with its reason, so no paired "
+        "contracts/inputs/examples/): every soil-loss and carbon row, and "
+        "every soybean water row, is missing with its reason, so no paired "
         "difference holds a value at either level and the pair is not "
         "evaluated at both levels"
     )

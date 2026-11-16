@@ -1,6 +1,6 @@
 """Physical mass & carbon conservation, boundary, and G1-G7 tests for EP4 ``build_residue_ledger``.
 
-Uses synthetic ``PLACEHOLDER`` inputs alongside the six signed residue records
+Uses synthetic ``PLACEHOLDER`` inputs alongside the 18 signed residue records
 shipped under ``params/records/residues/`` (loaded dynamically, with zero
 parameter literals written in this file).
 """
@@ -61,21 +61,24 @@ from params.catalogue import check_catalogue, load_folder, read_value
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SIGNED_RESIDUES_DIR = REPO_ROOT / "params" / "records" / "residues"
 SIGNED_CROPS = ("maize", "soybean", "wheat")
-SIGNED_IDS = ("rusle2_crop_yield", "rusle2_residue_yield_ratio")
+SIGNED_IDS = (
+    "rusle2_crop_yield",
+    "rusle2_residue_yield_ratio",
+    "residue_carbon_fraction",
+    "root_mass_at_harvest",
+    "root_carbon_fraction",
+    "rhizodeposit_carbon",
+)
 
-# Synthetic PLACEHOLDER values for the five proposed residue parameters not in
+# Synthetic PLACEHOLDER values for the one proposed residue parameter not in
 # params/records/residues/ (repeated digits, clearly unreal).
 SYNTHETIC_PROPOSED: dict[str, dict[str, float]] = {
-    "residue_carbon_fraction": {"maize": 0.444, "soybean": 0.333, "wheat": 0.555},
     "residue_removed_fraction": {"maize": 0.666, "soybean": 0.222, "wheat": 0.777},
-    "root_mass_at_harvest": {"maize": 33.3, "soybean": 22.2, "wheat": 44.4},
-    "root_carbon_fraction": {"maize": 0.333, "soybean": 0.444, "wheat": 0.222},
-    "rhizodeposit_carbon": {"maize": 5.55, "soybean": 4.44, "wheat": 6.66},
 }
 
 
 def load_signed_residue_records() -> tuple[dict[str, dict], dict[tuple[str, str], float]]:
-    """Load the 6 shipped signed residue records from ``params/records/residues/``."""
+    """Load the 18 shipped signed residue records from ``params/records/residues/``."""
     records, problems = load_folder(SIGNED_RESIDUES_DIR)
     assert problems == []
     assert check_catalogue(records) == []
@@ -87,12 +90,12 @@ def load_signed_residue_records() -> tuple[dict[str, dict], dict[tuple[str, str]
         values[(rec["id"], rec["scope"]["crop"])] = val
     expected_keys = {(pid, crop) for pid in SIGNED_IDS for crop in SIGNED_CROPS}
     assert set(values) == expected_keys
-    assert len(records) == 6
+    assert len(records) == 18
     return records, values
 
 
 def hybrid_catalogue(**overrides: dict | None) -> dict[str, dict]:
-    """Combine the 6 shipped signed residue records with unmarked PLACEHOLDER proposed records."""
+    """Combine the 18 shipped signed residue records with unmarked PLACEHOLDER proposed records."""
     signed, _ = load_signed_residue_records()
     combined: dict[str, dict] = {f"residues/{k}": copy.deepcopy(v) for k, v in signed.items()}
     for name, by_crop in SYNTHETIC_PROPOSED.items():
@@ -238,11 +241,11 @@ def assert_ledger_conserves_mass_and_carbon(ledger: ResidueLedger, start_month: 
 
 def test_signed_residue_records_catalogue_is_complete_and_valid():
     records, values = load_signed_residue_records()
-    assert len(records) == 6
+    assert len(records) == 18
     for (pid, crop), val in values.items():
         assert val > 0.0, (pid, crop)
     params = hybrid_catalogue()
-    assert len(params) == 6 + len(SYNTHETIC_PROPOSED) * len(SIGNED_CROPS)
+    assert len(params) == 18 + len(SYNTHETIC_PROPOSED) * len(SIGNED_CROPS)
 
 
 def test_mass_and_carbon_conservation_across_all_three_management_modes():
@@ -267,7 +270,7 @@ def test_mass_and_carbon_conservation_across_all_three_management_modes():
             signed_vals[("rusle2_residue_yield_ratio", crop)]
             * signed_vals[("rusle2_crop_yield", crop)]
         )
-        c_frac = SYNTHETIC_PROPOSED["residue_carbon_fraction"][crop]
+        c_frac = signed_vals[("residue_carbon_fraction", crop)]
         rem_frac = (
             SYNTHETIC_PROPOSED["residue_removed_fraction"][crop]
             if crop == "wheat"

@@ -3,10 +3,10 @@
   "scope": {
     "crop": "wheat"
   },
-  "value": 1.5,
+  "value": 1.465,
   "unit": "dimensionless",
   "range": null,
-  "range_missing_reason": "DERIVED from one printed height, with no range: 1 + 0.5h with h of Table 12.",
+  "range_missing_reason": "DERIVED from one local height with no interval: 1 + 0.5h with h = 0.93 m. FAO-56 gives no interval for the exponent. For context only, the spread of the campaign means of h (0.84-1.06 m) would give 1.42-1.53; that is not an uncertainty interval of this value.",
   "citation": {
     "reference": "Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998). Crop evapotranspiration - Guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome. ISBN 92-5-104219-5. Official HTML edition",
     "locator": "Chapter 7, Eq. 76 (an image, https://www.fao.org/4/X0490E/x0490e2s.gif) with its list of symbols and the text below it",
@@ -14,5 +14,5 @@
   },
   "transcribed_by": "AI session (D34 of issue #77)",
   "checked_by": "gbarbozamar",
-  "note": "Read on 2026-11-15 by an AI session under D34 of issue #77. Eq. 76, read as an image: fc = ((Kcb - Kc min) / (Kc max - Kc min))^(1 + 0.5h). Verbatim text to compare: «The '1+0.5h' exponent in the equation represents the effect of plant height on shading the soil surface»; symbols: «h mean plant height [m].» UPDATED on 2026-11-15 by an AI session to follow D204 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. No session signs: checked_by stays empty until a person compares the value with its source (D34, D66). D204: the exponent is 1 + 0.5 h with the height of crop_height (wheat). DERIVED: 1 + 0.5 x 1 = 1.5. The source also says: «This equation should be used with caution and validated from field observations.» EP3 reads one exponent per crop, the same on every crop day. New draft written on 2026-11-15 for the second rotation of D128. SIGNED on 2026-11-15: checked_by gbarbozamar, row T5 of section 3.1 of the water signing sheet. The person stated in chat that they had compared the value with its source; an AI session wrote this field at their instruction."
+  "note": "Decision scope (D232, D233; supersedes signed D204 T4/T5 currently on origin/main superseding previous 1.0 m / 1.5 to sensitivity). Written on 2026-11-15 by an AI session to follow D232 and D233 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6893254289), taken by the orchestrating AI session under the delegation of D161. Following executive sign-off, 1.5 becomes the sensitivity together with h = 1.0 m. Load one exponent for wheat only: both records share id and scope. WHAT IS TRANSFERRED: the formula, FAO-56 Eq. 76, read as an image: fc = ((Kcb - Kc min) / (Kc max - Kc min))^(1 + 0.5h); verbatim text to compare: «The '1+0.5h' exponent in the equation represents the effect of plant height on shading the soil surface»; symbols: «h mean plant height [m].» The source also says: «This equation should be used with caution and validated from field observations.» WHAT IS LOCAL: h = 0.93 m, the draft crop_height.wheat.json of this folder (national cultivar evaluation, La Estanzuela, sowing period 1, intermediate cycle, 16 campaigns 2010-2025, D233 selection; the height includes the awns). WHAT IS CHOSEN: one height, hence one exponent, for the whole cycle (the limit declared in D204); EP3 reads one exponent per crop, the same on every crop day. ARITHMETIC: 1 + 0.5 x 0.93 = 1.465. This record must change if the signed height changes. SIGNED on 2026-11-15: checked_by gbarbozamar per executive sign-off (orquestacion/PAQUETE_FIRMA_CIENTIFICA_1CLICK/RESUMEN_EJECUTIVO_PARA_FIRMAR.md)."
 }

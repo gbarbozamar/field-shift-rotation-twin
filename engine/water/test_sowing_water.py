@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 from contracts.inputs.rotation_calendar import RotationCalendar
-from contracts.inputs.site_climate import DailySeries, DailyValue, SiteClimate
+from contracts.inputs.site_climate import SiteClimate
 from contracts.inputs.site_soil_slope import SiteSoilSlope
 from contracts.results.models import Missing
 from contracts.rotation_definition import RotationDefinition
@@ -693,50 +693,36 @@ def test_inputs_not_mutated_g1() -> None:
     assert params == params_snap
 
 
-# --- D128 chain tests (with PLACEHOLDER climate & 10 PLACEHOLDER records) -----
+# --- D128 chain tests (with PLACEHOLDER climate & shipped catalogue) ----------
 
 _D128_CLIMATE_START = dt.date(2001, 1, 1)
 _D128_CLIMATE_END = dt.date(2024, 12, 31)
 
-_PLACEHOLDER_STAGE_LENGTHS: dict[str, dict[str, int]] = {
-    "wheat": {
-        "fao56_stage_length_initial": 11,
-        "fao56_stage_length_development": 22,
-        "fao56_stage_length_mid": 33,
-        "fao56_stage_length_late": 44,
-    },
-    "maize": {
-        "fao56_stage_length_initial": 15,
-        "fao56_stage_length_development": 25,
-        "fao56_stage_length_mid": 35,
-        "fao56_stage_length_late": 15,
-    },
-}
-_PLACEHOLDER_RESIDUE_COVER: dict[str, float] = {
-    "wheat": 0.111,
-    "maize": 0.222,
-}
+_ROTATION_B_WATER_KEYS: frozenset[tuple[str, tuple[tuple[str, str], ...]]] = frozenset(
+    {
+        ("fao56_stage_length_initial", (("crop", "wheat"),)),
+        ("fao56_stage_length_development", (("crop", "wheat"),)),
+        ("fao56_stage_length_mid", (("crop", "wheat"),)),
+        ("fao56_stage_length_late", (("crop", "wheat"),)),
+        ("fao56_stage_length_initial", (("crop", "maize"),)),
+        ("fao56_stage_length_development", (("crop", "maize"),)),
+        ("fao56_stage_length_mid", (("crop", "maize"),)),
+        ("fao56_stage_length_late", (("crop", "maize"),)),
+        ("surface_residue_cover", (("crop", "wheat"), ("management", "no_crop"))),
+        ("surface_residue_cover", (("crop", "maize"), ("management", "no_crop"))),
+    }
+)
 
 
-def _d128_placeholder_10() -> dict[str, dict[str, Any]]:
-    records: dict[str, dict[str, Any]] = {}
-    for crop, stages in _PLACEHOLDER_STAGE_LENGTHS.items():
-        for param_id, value in stages.items():
-            key = f"{MARK.lower()}.{param_id}.{crop}"
-            records[key] = _unmark(
-                _placeholder_record(param_id, {"crop": crop}, value, unit="day")
-            )
-    for crop, cover in _PLACEHOLDER_RESIDUE_COVER.items():
-        key = f"{MARK.lower()}.surface_residue_cover.{crop}.no_crop"
-        records[key] = _unmark(
-            _placeholder_record(
-                "surface_residue_cover",
-                {"crop": crop, "management": "no_crop"},
-                cover,
-                unit="fraction of the soil surface (the table prints percent)",
-            )
-        )
-    return records
+def _catalogue_without_keys(
+    records: dict[str, dict[str, Any]],
+    excluded: frozenset[tuple[str, tuple[tuple[str, str], ...]]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        key: copy.deepcopy(record)
+        for key, record in records.items()
+        if (record["id"], tuple(sorted(record["scope"].items()))) not in excluded
+    }
 
 
 @pytest.fixture(scope="module")
@@ -798,39 +784,41 @@ def test_d128_rotation_a_sowing_water_invariants(
             assert 0.0 <= item.value <= capacity
 
 
-def test_d128_rotation_b_shipped_catalogue_reports_missing_input(
-    d128_sowing_bundle: dict[str, Any],
+def _assert_sowing_water_results_valid(
+    results: list[SowingAvailableWater], capacity: float
 ) -> None:
-    cal_b = build_rotation_calendar(
-        d128_sowing_bundle["rotations"]["wheat-soybean-maize"]
-    )
-    results = compute_sowing_available_water(
-        cal_b,
-        d128_sowing_bundle["climate"],
-        d128_sowing_bundle["soil_slope"],
-        parameters=d128_sowing_bundle["catalogue"],
-    )
     assert len(results) > 0
     for item in results:
         assert item.unit == UNIT_SOWING_AVAILABLE_WATER
         assert item.sowing_date is not None
-        assert isinstance(item.value, Missing)
-        if item.sowing_date < _D128_CLIMATE_START or item.sowing_date > _D128_CLIMATE_END:
+        if (
+            item.sowing_date < _D128_CLIMATE_START
+            or item.sowing_date > _D128_CLIMATE_END
+        ):
+            assert isinstance(item.value, Missing)
             assert item.value.reason == "NO_COVERAGE"
         else:
-            assert item.value.reason == "MISSING_INPUT"
+            assert isinstance(item.value, float)
+            assert math.isfinite(item.value)
+            assert 0.0 <= item.value <= capacity
 
 
-def test_d128_rotation_b_with_10_placeholder_records_computes_all_phases(
+def test_d128_rotation_b_shipped_catalogue_computes_all_phases(
     d128_sowing_bundle: dict[str, Any],
 ) -> None:
     cal_b = build_rotation_calendar(
         d128_sowing_bundle["rotations"]["wheat-soybean-maize"]
     )
-    augmented = copy.deepcopy(d128_sowing_bundle["catalogue"])
-    augmented.update(_d128_placeholder_10())
-    assert check_catalogue(augmented) == []
+    catalogue = d128_sowing_bundle["catalogue"]
     capacity = d128_sowing_bundle["capacity"]
+
+    direct_results = compute_sowing_available_water(
+        cal_b,
+        d128_sowing_bundle["climate"],
+        d128_sowing_bundle["soil_slope"],
+        parameters=catalogue,
+    )
+    _assert_sowing_water_results_valid(direct_results, capacity)
 
     for phase in list_phases(cal_b):
         phased = phase_calendar(cal_b, phase)
@@ -838,19 +826,38 @@ def test_d128_rotation_b_with_10_placeholder_records_computes_all_phases(
             phased,
             d128_sowing_bundle["climate"],
             d128_sowing_bundle["soil_slope"],
-            parameters=augmented,
+            parameters=catalogue,
         )
-        assert len(results) > 0
-        for item in results:
-            assert item.unit == UNIT_SOWING_AVAILABLE_WATER
-            assert item.sowing_date is not None
-            if (
-                item.sowing_date < _D128_CLIMATE_START
-                or item.sowing_date > _D128_CLIMATE_END
-            ):
-                assert isinstance(item.value, Missing)
-                assert item.value.reason == "NO_COVERAGE"
-            else:
-                assert isinstance(item.value, float)
-                assert math.isfinite(item.value)
-                assert 0.0 <= item.value <= capacity
+        _assert_sowing_water_results_valid(results, capacity)
+
+
+def test_d128_rotation_b_missing_10_water_params_reports_missing_input(
+    d128_sowing_bundle: dict[str, Any],
+) -> None:
+    cal_b = build_rotation_calendar(
+        d128_sowing_bundle["rotations"]["wheat-soybean-maize"]
+    )
+    stripped = _catalogue_without_keys(
+        d128_sowing_bundle["catalogue"], _ROTATION_B_WATER_KEYS
+    )
+    assert len(stripped) == len(d128_sowing_bundle["catalogue"]) - 10
+    assert check_catalogue(stripped) == []
+
+    results = compute_sowing_available_water(
+        cal_b,
+        d128_sowing_bundle["climate"],
+        d128_sowing_bundle["soil_slope"],
+        parameters=stripped,
+    )
+    assert len(results) > 0
+    for item in results:
+        assert item.unit == UNIT_SOWING_AVAILABLE_WATER
+        assert item.sowing_date is not None
+        assert isinstance(item.value, Missing)
+        if (
+            item.sowing_date < _D128_CLIMATE_START
+            or item.sowing_date > _D128_CLIMATE_END
+        ):
+            assert item.value.reason == "NO_COVERAGE"
+        else:
+            assert item.value.reason == "MISSING_INPUT"

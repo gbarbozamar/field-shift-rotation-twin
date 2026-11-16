@@ -1,0 +1,19 @@
+{
+  "id": "surface_residue_cover",
+  "scope": {
+    "crop": "wheat",
+    "management": "no_crop"
+  },
+  "value": 0.0,
+  "unit": "fraction of the soil surface (the table prints percent)",
+  "range": null,
+  "range_missing_reason": "D115 gives no upper level before a winter cereal: only the 0 % level runs, and the upper level is missing with its reason.",
+  "citation": {
+    "reference": "Decision D115 and D208 of issue #77, gbarbozamar/field-shift-rotation-twin, 15 November 2026, taken by the orchestrating AI session under the delegation of D161",
+    "locator": "Row D208 of the comment of 15 November 2026, which applies the lower level of the residue-cover block of D115 (row D115, comment of 00:09 UTC: «Lower level: 0 % (bare soil, FAO-56 with no mulch)»)",
+    "url": "https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411"
+  },
+  "transcribed_by": "AI session (D34 of issue #77)",
+  "checked_by": "gbarbozamar",
+  "note": "Drafted on 2026-11-15 by an AI session under D34 of issue #77, for the fallow before wheat in the second rotation of D128 (after maize, USER-AP). Value: the lower level of D115 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6886369099), «0 % (bare soil, FAO-56 with no mulch)», written as the fraction 0.0. UPDATED on 2026-11-15 by an AI session to follow D208 of issue #77 (https://github.com/gbarbozamar/field-shift-rotation-twin/issues/77#issuecomment-6890628411), taken by the orchestrating AI session under the delegation of D161. D208: the first number takes the no-residue level, with its warning in the label: it is not the practice of the site (no-till with residue) and it overstates evaporation and runoff. The scope names the crop sown after the fallow (EXPOSURE.md choice 19). SIGNED on 2026-11-15: checked_by gbarbozamar per executive sign-off (orquestacion/PAQUETE_FIRMA_CIENTIFICA_1CLICK/RESUMEN_EJECUTIVO_PARA_FIRMAR.md)."
+}

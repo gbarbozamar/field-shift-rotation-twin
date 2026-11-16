@@ -25,7 +25,6 @@ from contracts.inputs.common import Missing as InputMissing
 from contracts.inputs.rotation_calendar import (
     AgYearStart,
     Feasibility,
-    RotationCalendar,
     RuleViolation,
 )
 from contracts.results.models import Missing, ResultsTable, ResultsTableRow
@@ -523,9 +522,9 @@ _RECORDS_DIR = _ROOT / "params" / "records"
 _BRIDGE_MARK = "PLACEHOLDER"
 _BRIDGE_UNMARKED = "UNMARKED_TEST_ONLY"
 
-# PLACEHOLDER stage lengths for synthetic tests and Rotation B's unsigned
-# crops (wheat, maize). Distinct repeated digits, plainly not real FAO-56
-# values, unmarked in memory only when fed into the catalogue lookup.
+# PLACEHOLDER stage lengths for synthetic tests and Rotation B's synthetic
+# stage-length override (wheat, maize). Distinct repeated digits, plainly not real
+# FAO-56 values, unmarked in memory only when fed into the catalogue lookup.
 _PLACEHOLDER_ROTATION_B_STAGE_LENGTHS = {
     "wheat": {
         "fao56_stage_length_initial": 11,
@@ -567,14 +566,25 @@ def _stage_length_record(
 
 def _placeholder_stage_catalogue(
     lengths_by_crop: dict[str, dict[str, float | int]],
+    *,
+    replace_in: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     records: dict[str, dict] = {}
+    overrides: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
     for crop, stages in lengths_by_crop.items():
         for param_id, value in stages.items():
-            records[f"placeholder.{param_id}.{crop}"] = _stage_length_record(
-                param_id=param_id, crop=crop, value=value
-            )
-    return records
+            rec = _stage_length_record(param_id=param_id, crop=crop, value=value)
+            records[f"placeholder.{param_id}.{crop}"] = rec
+            overrides.add((rec["id"], tuple(sorted(rec["scope"].items()))))
+    if replace_in is None:
+        return records
+    merged = {
+        key: copy.deepcopy(rec)
+        for key, rec in replace_in.items()
+        if (rec.get("id"), tuple(sorted(rec.get("scope", {}).items()))) not in overrides
+    }
+    merged.update(records)
+    return merged
 
 
 def _placeholder_rotation_definition(
@@ -915,7 +925,8 @@ def test_d128_rotation_b_shipped_catalogue_preserves_missing_input_without_filli
     cal_b = calendars["wheat-soybean-maize"]
     start, end = dt.date(2020, 7, 1), dt.date(2023, 6, 30)
 
-    living_map = flags_by_rotation_from_calendars(
+    # On the 205-record shipped catalogue, Rotation B resolves every daily flag as a bool.
+    shipped_living_map = flags_by_rotation_from_calendars(
         {
             ("soybean-winter-fallow", "phase_0"): cal_a,
             ("wheat-soybean-maize", "phase_0"): cal_b,
@@ -923,6 +934,47 @@ def test_d128_rotation_b_shipped_catalogue_preserves_missing_input_without_filli
         start_date=start,
         end_date=end,
         parameters=shipped,
+    )
+    shipped_flags_b = shipped_living_map[("wheat-soybean-maize", "phase_0")]
+    assert len(shipped_flags_b) == (end - start).days + 1
+    assert all(isinstance(flag, bool) for flag in shipped_flags_b.values())
+    assert any(flag is True for flag in shipped_flags_b.values())
+    assert any(flag is False for flag in shipped_flags_b.values())
+    assert shipped_flags_b == water_living_crop.live_crop_by_day(
+        cal_b, start, end, parameters=shipped
+    )
+    (shipped_order,) = erosion_orders(
+        shipped_living_map, MONTHLY_EROSIVITY, start_month=cal_a.ag_year_start.month
+    )
+    assert shipped_order.order is not None
+    assert shipped_order.means is not None
+    assert shipped_order.reason is None
+
+    # Removing wheat/maize stage lengths still preserves Missing(MISSING_INPUT) without filling.
+    stage_ids = frozenset(
+        {
+            "fao56_stage_length_initial",
+            "fao56_stage_length_development",
+            "fao56_stage_length_mid",
+            "fao56_stage_length_late",
+        }
+    )
+    without_wheat_maize = {
+        key: rec
+        for key, rec in shipped.items()
+        if not (
+            rec.get("id") in stage_ids
+            and rec.get("scope", {}).get("crop") in {"wheat", "maize"}
+        )
+    }
+    living_map = flags_by_rotation_from_calendars(
+        {
+            ("soybean-winter-fallow", "phase_0"): cal_a,
+            ("wheat-soybean-maize", "phase_0"): cal_b,
+        },
+        start_date=start,
+        end_date=end,
+        parameters=without_wheat_maize,
     )
     flags_b = living_map[("wheat-soybean-maize", "phase_0")]
     assert any(
@@ -949,8 +1001,9 @@ def test_d128_rotation_a_shipped_and_rotation_b_placeholder_compare_across_phase
     cal_a = calendars["soybean-winter-fallow"]
     cal_b = calendars["wheat-soybean-maize"]
 
-    augmented = copy.deepcopy(shipped)
-    augmented.update(_placeholder_stage_catalogue(_PLACEHOLDER_ROTATION_B_STAGE_LENGTHS))
+    augmented = _placeholder_stage_catalogue(
+        _PLACEHOLDER_ROTATION_B_STAGE_LENGTHS, replace_in=shipped
+    )
     assert check_catalogue(augmented) == []
 
     start, end = dt.date(2020, 7, 1), dt.date(2023, 6, 30)
