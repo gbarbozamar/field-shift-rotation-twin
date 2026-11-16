@@ -32,7 +32,7 @@ describe('App routing', () => {
     setSelectedFieldId(null)
   })
 
-  it('renders the entry screen, without the map, at the root route', () => {
+  it('renders the entry screen, with its small map, at the root route', () => {
     const html = renderAppAtHash('')
     expect(html).toContain(strings['entry.title'])
     expect(html).toContain(
@@ -40,7 +40,7 @@ describe('App routing', () => {
     )
     expect(html).toContain('href="#/saved"')
     expect(html).toContain(strings['saved.open_case'])
-    expect(html).not.toContain('data-testid="fields-map"')
+    expect(html).toContain('data-testid="fields-map"')
   })
 
   it('the sidebar links every section and marks the one shown', () => {
