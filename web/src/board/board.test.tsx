@@ -889,3 +889,11 @@ describe('the declared rain factor (l3/original-mock)', () => {
     expect(html).not.toContain('data-testid="board-rain-factor-input"')
   })
 })
+
+describe('the site the board asks for (l3/original-mock)', () => {
+  it('shows the climate point of the request field, from its outline, not the placeholder coordinates', () => {
+    const html = view(FIELD, null)
+    expect(html).toContain('data-testid="board-field-point"')
+    expect(visibleText(html)).not.toContain(`${rawRequest.site.latitude.toFixed(4)}, ${rawRequest.site.longitude.toFixed(4)}`)
+  })
+})

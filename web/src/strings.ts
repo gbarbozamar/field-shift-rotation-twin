@@ -522,6 +522,7 @@ export const strings = {
   'board.builder.dates': 'Dates of each crop',
   'board.builder.problem.overlap': 'Option {letter}: {crop} is sown before {after} is harvested. Change a date or a crop.',
   'field.area': '{ha} ha, measured on the outline',
+  'board.field.point': 'Climate point {lat}, {lon} (centre of the outline)',
   'board.rain.your_factor': 'Your rain factor',
   'board.rain.declared_note': 'Your declaration: the record does not yet say how often rain this erosive happens.',
   'board.rain.invalid': 'Type a number above zero; the factor sent stays the last valid one.',

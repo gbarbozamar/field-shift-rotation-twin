@@ -65,12 +65,17 @@ function nothingFilled(refused: MockReport['refused'] = null): MockReport {
   return { whole: false, soilKinds: [], record: false, marginKinds: [], verdicts: false, refused }
 }
 
-const SAME_AS_EXAMPLE = ['site', 'rotations', 'economic_facts', 'soil_loss_limit'] as const
+const SAME_AS_EXAMPLE = ['rotations', 'economic_facts', 'soil_loss_limit'] as const
 
-/** True when the request asks about exactly the example request's field, rotations, facts and limit. */
+/**
+ * True when the request asks about the example request's field (by case and
+ * field, wherever its point is placed) with exactly its rotations, facts and limit.
+ */
 export function isExampleRequest(request: unknown): boolean {
-  if (!isRecord(request)) return false
+  if (!isRecord(request) || !isRecord(request.site)) return false
   const example = exampleRequest as Json
+  const site = example.site as Json
+  if (request.site.case_id !== site.case_id || request.site.field_id !== site.field_id) return false
   return SAME_AS_EXAMPLE.every((key) => JSON.stringify(request[key]) === JSON.stringify(example[key]))
 }
 

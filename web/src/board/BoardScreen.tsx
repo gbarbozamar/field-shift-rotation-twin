@@ -8,6 +8,7 @@ import { exampleCase } from '../identity/exampleCase'
 import type { ExampleField } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
 import FieldsMap from '../map/FieldsMap'
+import { siteReferenceOf } from '../seam/RotationRun'
 import { fieldAreaHa } from '../map/geometry'
 import { barScale } from '../plant/optionBars'
 import {
@@ -90,6 +91,15 @@ const EXAMPLE_FACTS: FactsDraft = readFacts(rawPlantRequest)
 const FACT_UNITS = readFactUnits(rawPlantRequest)
 const DECLARED_CROPS = declaredCropIds(rawPlantRequest)
 
+/**
+ * The site the board asks for: the request's field, at the centre of its
+ * outline in the example case (the point the run seam sends too), never the
+ * placeholder coordinates of the example request.
+ */
+const REQUEST_FIELD = exampleCase.fields.find((field) => field.field_id === REQUEST_FIELD_ID) ?? null
+const REQUEST_SITE = REQUEST_FIELD === null ? null : siteReferenceOf(exampleCase.case_id, REQUEST_FIELD)
+if (REQUEST_SITE === null) throw new Error('board:request-field-without-outline')
+
 /** The crops these rotations sow that the request declares no economic facts for. */
 function extraCropIds(rotations: DraftRotation[]): string[] {
   return cropsUsed(rotations).filter((id) => !DECLARED_CROPS.includes(id))
@@ -147,6 +157,11 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
               <p data-testid="board-field-area" className="text-xs tabular-nums">
                 {formatString(strings['field.area'], { ha: fieldAreaHa(field).toFixed(1) })}
               </p>
+              {described && REQUEST_SITE !== null && (
+                <p data-testid="board-field-point" className="text-[11px] tabular-nums text-fs-muted">
+                  {formatString(strings['board.field.point'], { lat: REQUEST_SITE.latitude.toFixed(4), lon: REQUEST_SITE.longitude.toFixed(4) })}
+                </p>
+              )}
               <p className="text-xs text-fs-muted">
                 {described
                   ? strings['board.field.ready']
@@ -544,7 +559,7 @@ export default function BoardScreen({ apiBase = configuredApiBase() }: { apiBase
   // The rain factor the user declares for the stress test (the example's to start).
   const [rainValue, setRainValue] = useState<number | null>(REQUEST_RAIN_VALUE)
   const baseRequest = useMemo(
-    () => withRainFactor(applyFacts({ ...rawPlantRequest, rotations: sent }, factsSent), rainValue),
+    () => withRainFactor(applyFacts({ ...rawPlantRequest, site: REQUEST_SITE, rotations: sent }, factsSent), rainValue),
     [sent, factsSent, rainValue],
   )
   const baseRead = useMemo(() => readBaseRequest(baseRequest), [baseRequest])
