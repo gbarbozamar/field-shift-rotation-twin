@@ -63,3 +63,32 @@ export function attributionMarkup(): string {
     '</a>',
   ].join(' ')
 }
+
+/**
+ * The mean Earth radius in metres (IUGG mean radius R1), the sphere the area
+ * below is measured on: the usual choice of geographic area helpers.
+ */
+const EARTH_MEAN_RADIUS_M = 6371008.8
+
+/** Area of one closed GeoJSON ring on the sphere, in square metres (always positive). */
+function ringAreaM2(ring: number[][]): number {
+  const rad = Math.PI / 180
+  let sum = 0
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [lon1, lat1] = ring[i]
+    const [lon2, lat2] = ring[i + 1]
+    sum += (lon2 - lon1) * rad * (2 + Math.sin(lat1 * rad) + Math.sin(lat2 * rad))
+  }
+  return Math.abs((sum * EARTH_MEAN_RADIUS_M * EARTH_MEAN_RADIUS_M) / 2)
+}
+
+/**
+ * The area of a field measured on its outline, in hectares: the exterior ring
+ * less any holes, on the sphere of mean Earth radius. A measurement of the
+ * outline as declared, not of the cultivated surface.
+ */
+export function fieldAreaHa(field: ExampleField): number {
+  const [outer, ...holes] = field.geometry.coordinates
+  const m2 = ringAreaM2(outer) - holes.reduce((total, hole) => total + ringAreaM2(hole), 0)
+  return m2 / 10000
+}

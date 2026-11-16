@@ -1,6 +1,8 @@
 import { exampleCase } from './exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from './selection'
 import FieldsMap from '../map/FieldsMap'
+import { fieldAreaHa } from '../map/geometry'
+import { formatString } from '../lib/format'
 import SiteSheet from '../site/SiteSheet'
 import { RotationRibbon } from '../rotation/RotationRibbon'
 import { exampleRotation } from '../rotation/exampleRotation'
@@ -108,6 +110,9 @@ export default function FieldsScreen() {
                   </span>
                   <span className="mt-1 block text-sm text-fs-muted">
                     {strings['identity.field_id_label']}: {field.field_id}
+                  </span>
+                  <span data-testid="field-area" className="block text-sm tabular-nums text-fs-muted">
+                    {formatString(strings['field.area'], { ha: fieldAreaHa(field).toFixed(1) })}
                   </span>
                 </button>
               </li>

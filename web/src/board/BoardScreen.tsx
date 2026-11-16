@@ -8,6 +8,7 @@ import { exampleCase } from '../identity/exampleCase'
 import type { ExampleField } from '../identity/exampleCase'
 import { setSelectedFieldId, useSelectedFieldId } from '../identity/selection'
 import FieldsMap from '../map/FieldsMap'
+import { fieldAreaHa } from '../map/geometry'
 import { barScale } from '../plant/optionBars'
 import {
   SourcesNotice,
@@ -126,7 +127,7 @@ function StepTitle({ n, title, children = null }: { n: number; title: string; ch
 
 function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; selectedFieldId: string | null }) {
   return (
-    <ul data-testid="board-fields" className="grid gap-2 sm:grid-cols-3">
+    <ul data-testid="board-fields" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
       {fields.map((field) => {
         const described = field.field_id === REQUEST_FIELD_ID
         return (
@@ -137,6 +138,9 @@ function FieldList({ fields, selectedFieldId }: { fields: ExampleField[]; select
               className="rounded-xl border border-fs-border bg-fs-surface px-3 py-2 data-[described=false]:border-dashed data-[described=false]:bg-transparent data-[described=false]:text-fs-muted data-[selected=true]:border-2 data-[selected=true]:border-fs-primary"
             >
               <p className="font-bold leading-tight">{field.name}</p>
+              <p data-testid="board-field-area" className="text-xs tabular-nums">
+                {formatString(strings['field.area'], { ha: fieldAreaHa(field).toFixed(1) })}
+              </p>
               <p className="text-xs text-fs-muted">
                 {described
                   ? strings['board.field.ready']

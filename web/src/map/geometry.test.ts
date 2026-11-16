@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { exampleCase } from '../identity/exampleCase'
 import { strings } from '../strings'
-import { attributionMarkup, fieldPositions, fieldsBounds } from './geometry'
+import { attributionMarkup, fieldAreaHa, fieldPositions, fieldsBounds } from './geometry'
+import type { ExampleField } from '../identity/exampleCase'
 
 describe('map geometry helpers', () => {
   it('turns GeoJSON [lng, lat] rings into Leaflet [lat, lng] positions', () => {
@@ -37,5 +38,32 @@ describe('map geometry helpers', () => {
     expect(markup).toContain('https://www.openstreetmap.org/copyright')
     expect(markup.startsWith('<a')).toBe(true)
     expect(markup.endsWith('</a>')).toBe(true)
+  })
+})
+
+describe('fieldAreaHa', () => {
+  const square = (lat0: number, lat1: number, lon0: number, lon1: number): ExampleField => ({
+    field_id: 'square',
+    name: 'square',
+    geometry: { type: 'Polygon', coordinates: [[[lon0, lat0], [lon1, lat0], [lon1, lat1], [lon0, lat1], [lon0, lat0]]] },
+  })
+
+  it('a one-degree cell at the equator matches the closed form R^2 dLon (sin lat1 - sin lat0)', () => {
+    const R = 6371008.8
+    const expected = (R * R * (Math.PI / 180) * Math.sin(Math.PI / 180)) / 10000
+    expect(fieldAreaHa(square(0, 1, 0, 1))).toBeCloseTo(expected, 3)
+  })
+
+  it('is the same whichever way the ring turns', () => {
+    const cw = square(-34.3, -34.4, -57.7, -57.6)
+    const ccw: ExampleField = { ...cw, geometry: { type: 'Polygon', coordinates: [[...cw.geometry.coordinates[0]].reverse()] } }
+    expect(fieldAreaHa(ccw)).toBeCloseTo(fieldAreaHa(cw), 6)
+  })
+
+  it('subtracts a hole', () => {
+    const outer = square(0, 1, 0, 1)
+    const hole = square(0.25, 0.75, 0.25, 0.75).geometry.coordinates[0]
+    const holed: ExampleField = { ...outer, geometry: { type: 'Polygon', coordinates: [outer.geometry.coordinates[0], hole] } }
+    expect(fieldAreaHa(holed)).toBeCloseTo(fieldAreaHa(outer) - fieldAreaHa(square(0.25, 0.75, 0.25, 0.75)), 3)
   })
 })
