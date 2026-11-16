@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "ba162ec-D0-test_a_tie_of_two_means_gives_no_order-001",
+  "run_id": "run-20261116T013049Z-ba162ec",
+  "test_code": "D0",
+  "expected": {
+    "missing_reason": "the entry D0 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for validation/test_trivial_comparator.py::test_a_tie_of_two_means_gives_no_order"
+  },
+  "notes": "Test validation/test_trivial_comparator.py::test_a_tie_of_two_means_gives_no_order. Placed under D0: a test of validation/test_trivial_comparator.py, the test file of entry D0, under the heading '(d) what entry D0 does not say: no order, with the reason' (rule of the second run, PROPOSED: every test of the file except the one under the heading 'the functions are pure and hold no value of the method')."
+}

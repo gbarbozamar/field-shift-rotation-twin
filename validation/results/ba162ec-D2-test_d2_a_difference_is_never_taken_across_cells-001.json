@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "kind": "result",
+  "id": "ba162ec-D2-test_d2_a_difference_is_never_taken_across_cells-001",
+  "run_id": "run-20261116T013049Z-ba162ec",
+  "test_code": "D2",
+  "expected": {
+    "missing_reason": "the entry D2 of docs/VALIDATION.md states its expected outcome as logic on hand-made data; the data and the outcome are written in the test, and this store holds no expected-value record for it"
+  },
+  "outcome": "passed",
+  "observed": {
+    "text": "pytest reported 'passed' for decision/test_decision.py::test_d2_a_difference_is_never_taken_across_cells"
+  },
+  "notes": "Test decision/test_decision.py::test_d2_a_difference_is_never_taken_across_cells. Placed under D2: under the heading of D2 in decision/test_decision.py, as the first and second runs placed it."
+}
